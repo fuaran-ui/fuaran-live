@@ -1,0 +1,7 @@
+{
+  "kind": "ports",
+  "app": "fuaran-live",
+  "estate": "fuaran-ui",
+  "class": "website",
+  "client": [24040, 24049]
+}

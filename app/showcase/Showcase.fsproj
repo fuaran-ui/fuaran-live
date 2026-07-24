@@ -1,0 +1,151 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The showcase (F#) – the zero-egress half of the site.
+
+    Every page is a Fuaran app rendered through the F# `Fuaran.UI.Renderer` – the
+    site is exhibit zero for "UI as typed data". The language tier is consumed by
+    direct ProjectReference into the sibling ../../../fuaran checkout (the same
+    workspace-checkout binding the playground app uses); the Fable stack versions
+    are pinned here since this project sits outside fuaran's central package
+    management. Compiled only via `dotnet fable`, never `dotnet build`.
+
+    A separate project from the playground (../FuaranLive.fsproj) on purpose:
+    the two entries ship as separate artifacts, and this one must contain no
+    provider/key machinery – its zero-egress posture is inspectable in the
+    shipped files.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImportDirectoryBuildProps>false</ImportDirectoryBuildProps>
+    <ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <DefineConstants Condition="'$(Configuration)' != 'Release'">FABLE_COMPILER;DEBUG</DefineConstants>
+    <DefineConstants Condition="'$(Configuration)' == 'Release'">FABLE_COMPILER</DefineConstants>
+    <!-- Feliz 3.x + Fable.Elmish are pre-F#-10-nullness libraries; the renderer
+         and the fuaran samples disable nullness for the same reason. -->
+    <Nullable>disable</Nullable>
+    <WarningLevel>0</WarningLevel>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- `dotnet build` is NOT a supported gate for this project, and cannot be
+       made one: DefineConstants only reach this project's own sources, so the
+       referenced Fuaran projects compile as plain .NET assemblies WITHOUT
+       FABLE_COMPILER – their Fable-only members (e.g. the renderer's
+       StateStore.useStateKeys React hook) are #if'd out of the assembly and
+       any call site here fails FS0039. `dotnet fable` recompiles the whole
+       project graph from source with FABLE_COMPILER defined everywhere, which
+       is why the real pipeline (scripts/fable-app.mjs) is green. Fail fast
+       with the explanation instead of the misleading FS0039. Design-time
+       builds (IDE/Fable project cracking) are exempt; -p:SkipFableOnlyGuard=true
+       is the escape hatch. -->
+  <Target Name="FableOnlyGuard" BeforeTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true' AND '$(SkipFableOnlyGuard)' != 'true'">
+    <Error Text="Showcase.fsproj is Fable-only: plain `dotnet build` cannot typecheck it (referenced Fuaran projects build without FABLE_COMPILER, so their Fable-only members are absent from the .NET assemblies). Compile via `pnpm run build:showcase` / `node scripts/fable-app.mjs`, or pass -p:SkipFableOnlyGuard=true to see the raw FS0039 failures." />
+  </Target>
+
+  <ItemGroup>
+    <!-- The shared brand module (palette theme + persisted light/dark
+         preference) – one definition for both entries of the site. -->
+    <Compile Include="..\shared\Brand.fs">
+      <Link>shared\Brand.fs</Link>
+    </Compile>
+    <!-- The multi-language source projector (Attesor's engine) + the PURE JSON
+         model it walks. JsonValue/JsonHost are model+serialisation only – no
+         transport, no provider, no key machinery – so the showcase's
+         no-key-egress guarantee holds; nothing else from the vendored module
+         is compiled into this entry. -->
+    <Compile Include="..\vendor\aiwire\JsonValue.fs">
+      <Link>vendor\JsonValue.fs</Link>
+    </Compile>
+    <Compile Include="..\vendor\aiwire\JsonHost.fs">
+      <Link>vendor\JsonHost.fs</Link>
+    </Compile>
+    <Compile Include="..\Projection.fs">
+      <Link>Projection.fs</Link>
+    </Compile>
+    <Compile Include="Pillars.fs" />
+    <Compile Include="Replay.fs" />
+    <Compile Include="GoSessions.fs" />
+    <Compile Include="Conformance.fs" />
+    <Compile Include="EvalCard.fs" />
+    <Compile Include="Rosetta.fs" />
+    <Compile Include="Attesor.fs" />
+    <Compile Include="Teleport.fs" />
+    <Compile Include="Skins.fs" />
+    <Compile Include="Kintsugi.fs" />
+    <Compile Include="TimeMachine.fs" />
+    <Compile Include="BlindSurveyor.fs" />
+    <Compile Include="Notarised.fs" />
+    <Compile Include="UnitTest.fs" />
+    <Compile Include="GitForInterfaces.fs" />
+    <Compile Include="Bouncer.fs" />
+    <Compile Include="Degradation.fs" />
+    <Compile Include="Pandas.fs" />
+    <Compile Include="Send.fs" />
+    <Compile Include="GrepApps.fs" />
+    <Compile Include="WhatIf.fs" />
+    <Compile Include="Bazaar.fs" />
+    <Compile Include="Relay.fs" />
+    <Compile Include="LivingSheet.fs" />
+    <Compile Include="Counterfactual.fs" />
+    <Compile Include="PatternBank.fs" />
+    <Compile Include="Charts.fs" />
+    <Compile Include="Responsive.fs" />
+    <Compile Include="Evaluation.fs" />
+    <Compile Include="Contact.fs" />
+    <Compile Include="WireVersioning.fs" />
+    <Compile Include="TypedQuestion.fs" />
+    <Compile Include="HandOnTheWheel.fs" />
+    <Compile Include="LocaleLens.fs" />
+    <Compile Include="Receiver.fs" />
+    <Compile Include="Pages.fs" />
+    <Compile Include="App.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Typed tree + the renderer (transitively pulls Fuaran.UI). The renderer
+         carries the parity-locked class vocabulary + reference-CSS contract. -->
+    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI\Fuaran.UI.fsproj" />
+    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
+    <!-- Rosetta's F# host runs the real canonical encoder (CanonicalJson.encodeNode)
+         + the Fable-safe SHA-256 – the byte-parity oracle the TS/Python hosts match. -->
+    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\Fuaran.UI.OpStream.Abstractions.fsproj" />
+    <!-- Infinite Skins' contrast auditor runs the shipped manifest-free WCAG
+         derivation (Fuaran.UI.StyleObserver.Flags) over real computed DOM colours.
+         The Abstractions project is FSharp.Core-only – Fable-safe. -->
+    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.StyleObserver.Abstractions\Fuaran.UI.StyleObserver.Abstractions.fsproj" />
+    <!-- Kintsugi's "senses" panel also runs the shipped manifest-free LayoutObserver
+         overflow derivation over real DOM geometry. FSharp.Core-only – Fable-safe. -->
+    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.LayoutObserver.Abstractions\Fuaran.UI.LayoutObserver.Abstractions.fsproj" />
+    <!-- Git for Interfaces runs the real shipped structural 3-way merge engine
+         (Fuaran.UI.OpStream.Dag.Merge – TreeMerge.merge3Way / merge3WayWithAuthor)
+         in the browser; the engine is Fable-portable (the .NET-only
+         Stopwatch/telemetry + DAG-verify paths are guarded). Pulls Fuaran.UI.Ops
+         + OpStream.{Abstractions,Replay} + Dag.Abstractions. -->
+    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.OpStream.Dag.Merge\Fuaran.UI.OpStream.Dag.Merge.fsproj" />
+    <!-- The Pattern Bank runs the real Fuaran.Core signature-search engine
+         (FunctionRegistry.findBySignature) – the same engine powering the shipped
+         Fuaran.UI.FastPath package. A Fable-source-packed feed package (branch-
+         independent); the page defines its own pattern set over it. -->
+    <PackageReference Include="Fuaran.Core.Function" Version="0.1.11" />
+    <!-- The Versioning Envelope page runs the real Fuaran.Core.Wire.Versioning
+         negotiation + tolerant-decode substrate (envelope encode/parse, negotiate,
+         decodeTolerant/reencode, classify/bump). -->
+    <PackageReference Include="Fuaran.Core.Wire" Version="0.1.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Explicit versions (matched to fuaran/Directory.Packages.props + the
+         playground app project), since this sits outside central package
+         management. -->
+    <PackageReference Include="Fable.Core" Version="5.0" />
+    <PackageReference Include="Fable.Elmish" Version="5.0.2" />
+    <PackageReference Include="Fable.Elmish.React" Version="5.6" />
+    <PackageReference Include="Feliz" Version="3.3.3" />
+  </ItemGroup>
+
+</Project>

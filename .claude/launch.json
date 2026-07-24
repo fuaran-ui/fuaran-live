@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fuaran-live-dev",
+      "runtimeExecutable": "C:\\nvm4w\\nodejs\\pnpm.cmd",
+      "runtimeArgs": ["exec", "vite"],
+      "port": 24040
+    },
+    {
+      "name": "fuaran-live-dev-alt",
+      "runtimeExecutable": "C:\\nvm4w\\nodejs\\pnpm.cmd",
+      "runtimeArgs": ["exec", "vite", "--port", "24041"],
+      "port": 24041
+    }
+  ]
+}

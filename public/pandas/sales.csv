@@ -1,0 +1,9 @@
+region,product,revenue,units
+EMEA,Widget,5200,410
+EMEA,Gadget,3100,180
+APAC,Widget,4200,330
+APAC,Gadget,2600,150
+Americas,Widget,6750,520
+Americas,Gadget,3300,240
+Africa,Widget,1480,110
+Africa,Gadget,900,70

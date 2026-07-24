@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--CSP-INJECTION-POINT-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="fuaran-live – serverless, client-only BYOK playground for the Fuaran UI language, built entirely in Fuaran itself (F#/Fable). No account, no server."
+    />
+    <title>fuaran-live – Fuaran UI playground</title>
+    <link rel="icon" type="image/svg+xml" href="brand/fuaran-favicon.svg" />
+  </head>
+  <body>
+    <!-- The entirely-F#/Fable app mounts here. The whole playground is a Fuaran
+         app rendered through the F# Fuaran.UI.Renderer – no TypeScript shell. -->
+    <div id="fuaran-live-fs-root"></div>
+    <script type="module" src="/app/output/App.js"></script>
+  </body>
+</html>

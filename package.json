@@ -1,0 +1,58 @@
+{
+  "name": "fuaran-live",
+  "version": "0.1.0",
+  "private": true,
+  "description": "fuaran-live — a serverless, client-only BYOK browser playground for the Fuaran UI language. Prompt an LLM, watch it emit canonical wire-format JSON, and see the Fuaran.UI tree render live — no account, no server, no backend.",
+  "license": "Apache-2.0",
+  "author": "Andrew J. Willshire <andrew@fuaran.com> (Diametrical Ltd)",
+  "type": "module",
+  "homepage": "https://github.com/fuaran-ui/fuaran-live",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fuaran-ui/fuaran-live.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm run fable:app && vite",
+    "build": "pnpm run fable:app && vite build",
+    "build:showcase": "pnpm run fable:app && cross-env VITE_SITE=showcase vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "conformance": "vitest run -c vitest.conformance.config.ts",
+    "fable": "dotnet fable fable-host --outDir fable-host/output",
+    "fable:watch": "dotnet fable watch fable-host --outDir fable-host/output",
+    "build:dual": "pnpm run fable && tsc --noEmit && cross-env VITE_DUAL_HOST=1 vite build",
+    "fable:app": "node scripts/fable-app.mjs",
+    "fable:app:watch": "dotnet fable watch app --outDir app/output",
+    "parity": "playwright test -c tests/parity/playwright.config.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@fuaran-ui/ops": "^0.1.0",
+    "@fuaran-ui/renderer": "^0.1.0",
+    "@fuaran-ui/schema": "^0.1.0",
+    "@fuaran-ui/ui": "^0.1.0",
+    "katex": "^0.16.11",
+    "marked": "^15.0.7",
+    "qrcode-generator": "^1.4.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "cross-env": "^7.0.3",
+    "prettier": "^3.4.2",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  }
+}

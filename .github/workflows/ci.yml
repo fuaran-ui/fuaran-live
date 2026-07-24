@@ -1,0 +1,89 @@
+name: CI
+
+# The @fuaran-ui/* packages resolve from the public npm registry; the committed
+# pnpm-lock.yaml is authoritative (installs are --frozen-lockfile). The F#/Fable
+# app project-references the sibling F# tier, and the conformance gate reads the
+# shared wire-format corpus, so both public repos are checked out as siblings.
+# Local verification: clone fuaran-dotnet as ../fuaran and fuaran-specification
+# as ../wire-format-fixtures, then `pnpm install && pnpm run build && pnpm test`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fuaran-live
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: fuaran-live
+
+      # Sibling checkouts (both repos are public — no token needed): the Fable
+      # app project-references ../fuaran; the conformance gate reads
+      # ../wire-format-fixtures.
+      - uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-dotnet
+          path: fuaran
+
+      - uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-specification
+          path: wire-format-fixtures
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The projection-conformance gate compiles the F#/Fable projector, so the
+      # .NET SDK is required (the rest of the repo is F#/Fable-built too).
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # The F# tier's nuget.config declares a local folder feed at a fixed
+      # relative depth; NuGet hard-errors (NU1301) on a missing folder source,
+      # so mint it empty — Fuaran.Core.* restores from nuget.org.
+      - name: Create empty local-nuget-feed
+        run: mkdir -p "$GITHUB_WORKSPACE/../../local-nuget-feed"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Several test suites consume Fable-compiled output (the app projector at
+      # app/output/, the query-portal bridge at fable-host/output/), so both
+      # Fable projects compile before the test steps run.
+      - name: Compile the Fable projects
+        run: |
+          dotnet tool restore
+          pnpm run fable:app
+          pnpm run fable
+
+      - name: Test
+        run: pnpm test
+
+      # The multi-language source projector (app/Projection.fs) is kept honest by
+      # the codegen-conformance harness: for every Node fixture in the shared
+      # wire-format corpus it projects the wire JSON to @fuaran-ui/ui source,
+      # executes it against the real packages, and asserts the re-encode is
+      # byte-identical. Runs its own vitest config, so it is a distinct gate from
+      # the main `Test` step above.
+      - name: Conformance (projection ↔ wire-format corpus)
+        run: pnpm run conformance
+
+      - name: Build
+        run: pnpm build

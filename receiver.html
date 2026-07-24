@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--CSP-INJECTION-POINT-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A vacant Fuaran host. This page ships a player and no application – apps arrive here as bytes, digest-verified, carried by a QR code, a link, or a pasted string."
+    />
+    <title>Vacant host – waiting for bytes</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body class="rcv">
+    <!-- HOST 2. There is no application in this document – just the player
+         (the Fuaran renderer) mounting below. The app you may be about to see
+         arrives entirely as bytes in the URL fragment, which never leaves the
+         browser. That is the point of this page. -->
+    <div id="fuaran-receiver-root"></div>
+    <script type="module" src="/app/showcase/output/Receiver.js"></script>
+  </body>
+</html>

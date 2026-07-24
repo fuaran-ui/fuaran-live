@@ -1,0 +1,38 @@
+/* Icon glyph map — the host-side half of the Fuaran UI icon contract.
+ *
+ * The renderer emits every icon as an EMPTY placement hook —
+ * <span class="fuaran-icon fuaran-{kind}-icon" data-icon="{name}" aria-hidden="true"></span> —
+ * and leaves glyph choice to the host. This site maps the names its rendered
+ * trees commonly carry (including trees arriving via the docs-site deep links)
+ * to monochrome SVG masks painted in currentColor, so glyphs follow the
+ * surrounding tone/theme colour in both light and dark. The ::before is scoped
+ * to MAPPED names only: an unmapped name renders as nothing — never the raw
+ * name, never an unmasked square.
+ *
+ * Loaded by every document that renders a tree: the playground shell, both
+ * preview hosts, the showcase, and the teleport receiver. One file, no copies.
+ */
+.fuaran-icon[data-icon='user']::before,
+.fuaran-icon[data-icon='trending-up']::before,
+.fuaran-icon[data-icon='alert']::before,
+.fuaran-icon[data-icon='refresh']::before {
+  content: '';
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  background-color: currentColor;
+  -webkit-mask: var(--fuaran-icon-glyph) center / contain no-repeat;
+  mask: var(--fuaran-icon-glyph) center / contain no-repeat;
+}
+.fuaran-icon[data-icon='user'] {
+  --fuaran-icon-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5'/%3E%3C/svg%3E");
+}
+.fuaran-icon[data-icon='trending-up'] {
+  --fuaran-icon-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17l6-6 4 4 8-8'/%3E%3Cpath d='M15 7h6v6'/%3E%3C/svg%3E");
+}
+.fuaran-icon[data-icon='alert'] {
+  --fuaran-icon-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 2.5 20h19z'/%3E%3Cpath d='M12 9v5'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+}
+.fuaran-icon[data-icon='refresh'] {
+  --fuaran-icon-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12a8 8 0 1 1-2.3-5.6'/%3E%3Cpath d='M20 3v5h-5'/%3E%3C/svg%3E");
+}

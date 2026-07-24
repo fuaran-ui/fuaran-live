@@ -1,0 +1,250 @@
+{
+  "kind": "goSessionsReplay",
+  "version": "v1",
+  "id": "go-sessions",
+  "recordedAt": "2026-07-22T00:00:00Z",
+  "server": {
+    "framing": "A Go session surface of the Fuaran UI wire format, over the Rust reference core.",
+    "port": 14050,
+    "contract": "docs/BYOS-CONTRACT.md"
+  },
+  "note": "Regenerable, never hand-authored: run the demo binary with `--record \u003cdir\u003e` to replay the scripted session against the live core and rewrite this file. Each frame's `resolved` is the core's resolved-projection wire JSON (scalar Transforms folded to literals); `states` carries the reactive $state slot values at that frame so a decode-only renderer resolves the metric faithfully. The BYOS JSON contract a live client drives is docs/BYOS-CONTRACT.md.",
+  "frames": [
+    {
+      "seq": 0,
+      "label": "First paint – the core's resolved projection (scalar Transforms folded to literals)",
+      "action": {
+        "kind": "load"
+      },
+      "states": {},
+      "resolved": {
+        "id": "dashboard",
+        "kind": {
+          "$type": "Box",
+          "children": [
+            {
+              "id": "revenue",
+              "kind": {
+                "$type": "Metric",
+                "format": {
+                  "$type": "Currency",
+                  "code": "GBP"
+                },
+                "label": "Revenue",
+                "value": {
+                  "$type": "State",
+                  "defaultValue": 0,
+                  "key": "revenue"
+                }
+              }
+            },
+            {
+              "id": "open-tickets",
+              "kind": {
+                "$type": "Badge",
+                "label": "3",
+                "variant": "Critical"
+              }
+            },
+            {
+              "id": "headline",
+              "kind": {
+                "$type": "Markdown",
+                "text": "All systems nominal"
+              }
+            }
+          ],
+          "layout": {
+            "$type": "Auto"
+          },
+          "role": "Dashboard"
+        }
+      }
+    },
+    {
+      "seq": 1,
+      "label": "Write $state.revenue = 7500 – the write-back path",
+      "action": {
+        "kind": "setState",
+        "key": "revenue",
+        "value": 7500
+      },
+      "states": {
+        "revenue": 7500
+      },
+      "resolved": {
+        "id": "dashboard",
+        "kind": {
+          "$type": "Box",
+          "children": [
+            {
+              "id": "revenue",
+              "kind": {
+                "$type": "Metric",
+                "format": {
+                  "$type": "Currency",
+                  "code": "GBP"
+                },
+                "label": "Revenue",
+                "value": {
+                  "$type": "State",
+                  "defaultValue": 0,
+                  "key": "revenue"
+                }
+              }
+            },
+            {
+              "id": "open-tickets",
+              "kind": {
+                "$type": "Badge",
+                "label": "3",
+                "variant": "Critical"
+              }
+            },
+            {
+              "id": "headline",
+              "kind": {
+                "$type": "Markdown",
+                "text": "All systems nominal"
+              }
+            }
+          ],
+          "layout": {
+            "$type": "Auto"
+          },
+          "role": "Dashboard"
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "label": "Apply a valid op – re-kind the headline",
+      "action": {
+        "kind": "applyOp",
+        "op": {
+          "$type": "EditNode",
+          "newKind": {
+            "$type": "Markdown",
+            "text": {
+              "$type": "Literal",
+              "text": "Investigating incident"
+            }
+          },
+          "target": "headline"
+        }
+      },
+      "states": {
+        "revenue": 7500
+      },
+      "resolved": {
+        "id": "dashboard",
+        "kind": {
+          "$type": "Box",
+          "children": [
+            {
+              "id": "revenue",
+              "kind": {
+                "$type": "Metric",
+                "format": {
+                  "$type": "Currency",
+                  "code": "GBP"
+                },
+                "label": "Revenue",
+                "value": {
+                  "$type": "State",
+                  "defaultValue": 0,
+                  "key": "revenue"
+                }
+              }
+            },
+            {
+              "id": "open-tickets",
+              "kind": {
+                "$type": "Badge",
+                "label": "3",
+                "variant": "Critical"
+              }
+            },
+            {
+              "id": "headline",
+              "kind": {
+                "$type": "Markdown",
+                "text": "Investigating incident"
+              }
+            }
+          ],
+          "layout": {
+            "$type": "Auto"
+          },
+          "role": "Dashboard"
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "label": "Apply an invalid op – rejected; the last good tree is kept",
+      "action": {
+        "kind": "applyOp",
+        "op": {
+          "$type": "EditNode",
+          "newKind": {
+            "$type": "NotAKind"
+          },
+          "target": "headline"
+        }
+      },
+      "states": {
+        "revenue": 7500
+      },
+      "reject": {
+        "code": "WRONG_NODE_KIND",
+        "class": "decode",
+        "path": "$.newKind.$type",
+        "message": "fuaran: WRONG_NODE_KIND at $.newKind.$type: unknown NodeKind discriminator 'NotAKind'"
+      },
+      "resolved": {
+        "id": "dashboard",
+        "kind": {
+          "$type": "Box",
+          "children": [
+            {
+              "id": "revenue",
+              "kind": {
+                "$type": "Metric",
+                "format": {
+                  "$type": "Currency",
+                  "code": "GBP"
+                },
+                "label": "Revenue",
+                "value": {
+                  "$type": "State",
+                  "defaultValue": 0,
+                  "key": "revenue"
+                }
+              }
+            },
+            {
+              "id": "open-tickets",
+              "kind": {
+                "$type": "Badge",
+                "label": "3",
+                "variant": "Critical"
+              }
+            },
+            {
+              "id": "headline",
+              "kind": {
+                "$type": "Markdown",
+                "text": "Investigating incident"
+              }
+            }
+          ],
+          "layout": {
+            "$type": "Auto"
+          },
+          "role": "Dashboard"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "wireTree",
+  "id": "time-machine",
+  "recordedAt": "2026-07-08T00:00:00Z",
+  "note": "Placeholder recorded artefact for the shared replay-loader seam. The full recorded-session capture – timed op-stream frames for scrubbable playback – arrives with the Time Machine page; this canonical wire tree is enough to demonstrate the loader end to end.",
+  "wire": {
+    "id": "tm-preview",
+    "kind": {
+      "$type": "Box",
+      "role": "Dashboard",
+      "children": [
+        {
+          "id": "tm-heading",
+          "kind": {
+            "$type": "Heading",
+            "level": 2,
+            "text": { "$type": "Literal", "text": "Frame 42 of 118 – restored from the recording" }
+          }
+        },
+        {
+          "id": "tm-body",
+          "kind": {
+            "$type": "Markdown",
+            "text": {
+              "$type": "Literal",
+              "text": "This tree was loaded by the page-agnostic replay loader with **no API key** – the site's reliability floor."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

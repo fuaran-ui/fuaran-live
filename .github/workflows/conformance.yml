@@ -1,0 +1,78 @@
+name: Projection conformance
+
+# The codegen-conformance gate for the source-projection Output box. For every
+# Node fixture in the workspace wire-format-fixtures/ corpus, the TypeScript
+# projection (app/Projection.fs, Fable-compiled) must execute against the real
+# @fuaran-ui/ui surface and re-encode byte-identically to the wire fixture.
+# Any drift FAILS THE BUILD — this is the validation engine that keeps the
+# verified TS projection honest (see docs/PROJECTION_FIDELITY.md; the Python /
+# F# legs are demo-grade pending their re-authored arms).
+#
+# This gate assembles a multi-repo layout because the Fable app build
+# project-references the sibling F# tier (the @fuaran-ui/* npm packages
+# themselves resolve from the registry). Every checked-out repo is public —
+# no token needed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      # Assemble the workspace layout:
+      #   <root>/wire-format-fixtures   (fuaran-specification)
+      #   <root>/fuaran                 (F# tier — F# arm project reference)
+      #   <root>/fuaran-live            (this repo)
+      - name: Checkout the wire-format corpus (fuaran-specification)
+        uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-specification
+          path: workspace/wire-format-fixtures
+
+      - name: Checkout fuaran (F# tier)
+        uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-dotnet
+          path: workspace/fuaran
+
+      - name: Checkout fuaran-live (this repo)
+        uses: actions/checkout@v4
+        with:
+          path: workspace/fuaran-live
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup .NET (F# arm)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # NuGet hard-errors (NU1301) on the F# tier's missing local folder feed;
+      # mint it empty — Fuaran.Core.* restores from nuget.org.
+      - name: Create empty local-nuget-feed
+        run: mkdir -p "$GITHUB_WORKSPACE/../local-nuget-feed"
+
+      - name: Install fuaran-live
+        working-directory: workspace/fuaran-live
+        run: pnpm install --frozen-lockfile
+
+      # The harness consumes the Fable-compiled projector (app/output/).
+      - name: Build the F#/Fable app
+        working-directory: workspace/fuaran-live
+        run: |
+          dotnet tool restore
+          pnpm run fable:app
+
+      # Runs the TS arm: project every Node fixture, execute the generated
+      # source against @fuaran-ui/ui, byte-compare the canonical re-encode.
+      - name: Conformance gate
+        working-directory: workspace/fuaran-live
+        run: pnpm conformance

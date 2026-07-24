@@ -1,0 +1,175 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    fuaran-live (F#) – the entirely-F#/Fable rebuild of the playground.
+
+    Stage 1 of the migration: an Elmish app that renders the playground chrome
+    as a `Fuaran.UI` tree through the F# `Fuaran.UI.Renderer` – the same renderer
+    that draws the user's emitted tree. The point of fuaran-live is that the demo
+    of Fuaran is *itself a Fuaran app*; this rebuild makes it one end-to-end, with
+    no TypeScript shell – "built entirely in the language it promotes."
+
+    Mirrors the self-contained fable-host project: the F# language tier is consumed
+    by direct ProjectReference into the sibling ../../fuaran checkout (the same
+    workspace-checkout binding the @fuaran-ui/* link bridge uses), and the Fable
+    stack versions are pinned here since this project sits outside fuaran's central
+    package management. Compiled only via `dotnet fable`, never `dotnet build`.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImportDirectoryBuildProps>false</ImportDirectoryBuildProps>
+    <ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <DefineConstants Condition="'$(Configuration)' != 'Release'">FABLE_COMPILER;DEBUG</DefineConstants>
+    <DefineConstants Condition="'$(Configuration)' == 'Release'">FABLE_COMPILER</DefineConstants>
+    <!-- Feliz 3.x + Fable.Elmish are pre-F#-10-nullness libraries; the renderer
+         and the fuaran samples disable nullness for the same reason. -->
+    <Nullable>disable</Nullable>
+    <WarningLevel>0</WarningLevel>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- `dotnet build` is NOT a supported gate for this project, and cannot be
+       made one: DefineConstants only reach this project's own sources, so the
+       referenced Fuaran projects compile as plain .NET assemblies WITHOUT
+       FABLE_COMPILER – their Fable-only members are #if'd out of the assembly
+       and any call site here fails FS0039. `dotnet fable` recompiles the whole
+       project graph from source with FABLE_COMPILER defined everywhere, which
+       is why the real pipeline (scripts/fable-app.mjs) is green. Fail fast
+       with the explanation instead of the misleading FS0039. Design-time
+       builds (IDE/Fable project cracking) are exempt; -p:SkipFableOnlyGuard=true
+       is the escape hatch. -->
+  <Target Name="FableOnlyGuard" BeforeTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true' AND '$(SkipFableOnlyGuard)' != 'true'">
+    <Error Text="FuaranLive.fsproj is Fable-only: plain `dotnet build` cannot typecheck it (referenced Fuaran projects build without FABLE_COMPILER, so their Fable-only members are absent from the .NET assemblies). Compile via `pnpm run build` / `node scripts/fable-app.mjs`, or pass -p:SkipFableOnlyGuard=true to see the raw failures." />
+  </Target>
+
+  <ItemGroup>
+    <!-- The Fable-safe slice of the Ops apply engine + the canonical-JSON codec,
+         LINKED (not ProjectReferenced – a ref to Fuaran.UI.Ops would also pull the
+         .NET-only ErrorRender.fs and break the Fable compile, exactly as the
+         parity fable-host documents). These give the closed loop its decode →
+         apply → encode core in the browser. Compile order = dependency order.
+
+         NB: the `Fuaran.UI.Ops.Types` module (TreeOp / Spec / the WireTree marker)
+         is NOT linked here – it moved to Fuaran.UI.Ops.Abstractions and now reaches
+         this compile transitively via the Fuaran.UI.Renderer ProjectReference
+         (Renderer → Telemetry.Abstractions → Ops.Abstractions). -->
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\Introspect.fs">
+      <Link>linked\Introspect.fs</Link>
+    </Compile>
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\JsonDecode.fs">
+      <Link>linked\JsonDecode.fs</Link>
+    </Compile>
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\Apply.fs">
+      <Link>linked\Apply.fs</Link>
+    </Compile>
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
+      <Link>linked\CanonicalJson.fs</Link>
+    </Compile>
+    <!-- The op-record + hash-chain slice (Phase 466): each agent panel turn is
+         its own hash-chained op-stream scope, so a panel's provenance is
+         tamper-evident and replayable in the browser. Fable-safe (the showcase
+         project Fable-compiles the whole parent project already). These three
+         lean on the Fuaran.Core spine packages added below. -->
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\OpRecord.fs">
+      <Link>linked\OpRecord.fs</Link>
+    </Compile>
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\StreamEntry.fs">
+      <Link>linked\StreamEntry.fs</Link>
+    </Compile>
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\HashChain.fs">
+      <Link>linked\HashChain.fs</Link>
+    </Compile>
+    <!-- The §18 elicitation envelope codec (Phase 465) – the typed-question
+         protocol the agent loop's askUser tool speaks. Fable-safe (the showcase
+         project already Fable-compiles it via its OpStream.Abstractions
+         ProjectReference); linked here for the same reason as the files above
+         (a full ProjectReference would double-compile the linked modules). -->
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\Elicitation.fs">
+      <Link>linked\Elicitation.fs</Link>
+    </Compile>
+    <!-- The canonical wire-format JSON Schema generator – Fable-safe by design (no
+         reflection, no System.Text.Json; a self-contained structural hand-walk).
+         LINKED so the agent self-debug loop can expose per-kind required-field
+         schemas to the model via the getKindSchema tool, instead of forcing it to
+         guess field names one decode error at a time. -->
+    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\SchemaGen.fs">
+      <Link>linked\SchemaGen.fs</Link>
+    </Compile>
+    <!-- The vendored AI-connector wire layer (Phase 576) – a self-contained
+         Apache-2.0 copy under the FuaranLive.AiWire namespace: the JsonValue /
+         JsonHost canonical-JSON model, the provider contract types, the
+         IHttpTransport egress seam, retry, and the SSE streaming state
+         machine. Byok.fs expresses the three providers over this substrate
+         and drives them through a browser fetch IHttpTransport. Compile
+         order = dependency order (mirrors the original project). -->
+    <Compile Include="vendor\aiwire\JsonValue.fs" />
+    <Compile Include="vendor\aiwire\JsonHost.fs" />
+    <Compile Include="vendor\aiwire\Contract.fs" />
+    <Compile Include="vendor\aiwire\RetryPolicy.fs" />
+    <Compile Include="vendor\aiwire\IHttpTransport.fs" />
+    <Compile Include="vendor\aiwire\ErrorClassifier.fs" />
+    <Compile Include="vendor\aiwire\RetryRunner.fs" />
+    <Compile Include="vendor\aiwire\Streaming.fs" />
+    <!-- The shared brand module (palette theme + persisted light/dark
+         preference) – one definition for both entries of the site (the showcase
+         project links the same file). -->
+    <Compile Include="shared\Brand.fs" />
+    <Compile Include="Ports.fs" />
+    <Compile Include="Byok.fs" />
+    <Compile Include="SystemPrompt.fs" />
+    <Compile Include="Session.fs" />
+    <Compile Include="Panels.fs" />
+    <Compile Include="Permalink.fs" />
+    <Compile Include="Gallery.fs" />
+    <Compile Include="Compare.fs" />
+    <Compile Include="Projection.fs" />
+    <Compile Include="Agent.fs" />
+    <Compile Include="Ask.fs" />
+    <Compile Include="Demo.fs" />
+    <Compile Include="Voice.fs" />
+    <Compile Include="Live.fs" />
+    <Compile Include="WebRtc.fs" />
+    <Compile Include="PatternBank.fs" />
+    <Compile Include="App.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Typed tree + the renderer (transitively pulls Fuaran.UI). The renderer
+         carries the parity-locked class vocabulary + reference-CSS contract. -->
+    <ProjectReference Include="..\..\fuaran\src\Fuaran.UI\Fuaran.UI.fsproj" />
+    <ProjectReference Include="..\..\fuaran\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Explicit versions (matched to fuaran/Directory.Packages.props + the
+         fable-host project), since this sits outside central package management. -->
+    <PackageReference Include="Fable.Core" Version="5.0" />
+    <PackageReference Include="Fable.Elmish" Version="5.0.2" />
+    <PackageReference Include="Fable.Elmish.React" Version="5.6" />
+    <PackageReference Include="Feliz" Version="3.3.3" />
+    <!-- Phase 379 – the linked Fuaran.UI.Ops/Apply.fs delegates its structural-five
+         apply legs to the Fuaran.Core skeleton engine (Fuaran.Core.Ops over the UI
+         NodeWitness / IdWitness from Fuaran.Core.Tree). The real Fuaran.UI.Ops.fsproj
+         carries these two package refs; because this project LINKS Apply.fs rather
+         than ProjectReferencing Fuaran.UI.Ops, it must carry them itself. Both are
+         FSharp.Core-only + Fable-clean (source-packed under fable/), so Fable
+         retranspiles the Core skeleton source in-browser. Versions matched to
+         fuaran/Directory.Packages.props. -->
+    <PackageReference Include="Fuaran.Core.Tree" Version="0.1.11" />
+    <PackageReference Include="Fuaran.Core.Ops" Version="0.1.11" />
+    <!-- The Pattern Bank fast path runs the real Fuaran.Core signature-search
+         engine (FunctionRegistry.findBySignature – the same engine powering the
+         public Fuaran.UI.FastPath package). Fable-source-packed. -->
+    <PackageReference Include="Fuaran.Core.Function" Version="0.1.11" />
+    <!-- The linked OpRecord/StreamEntry/HashChain slice (Phase 466 panel
+         provenance) delegates to the Fuaran.Core op-stream skeleton, exactly as
+         the real Fuaran.UI.OpStream.Abstractions.fsproj does; same linked-not-
+         referenced rationale as the Core.Tree/Ops pair above. -->
+    <PackageReference Include="Fuaran.Core.OpStream" Version="0.1.11" />
+  </ItemGroup>
+
+</Project>

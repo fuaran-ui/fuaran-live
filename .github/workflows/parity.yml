@@ -1,0 +1,80 @@
+name: Cross-host parity
+
+# Phase 85 — behavioural cross-implementation parity gate.
+#
+# The same canonical wire JSON, rendered through the TS @fuaran-ui/renderer
+# (ts-host.html) and the F# Fuaran.UI.Renderer (fable-host.html, Fable-compiled),
+# must produce structurally identical DOM with the same CSS class vocabulary +
+# ARIA contract for the primitive matrix. Any divergence FAILS THE BUILD — the
+# regression guard over the Phase 77 reference-CSS byte-copy + parity-locked
+# class names.
+#
+# Like conformance.yml, this gate assembles a multi-repo layout because the
+# Fable host project-references the sibling F# tier (the @fuaran-ui/* npm
+# packages resolve from the registry). Every checked-out repo is public —
+# no token needed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      # Assemble the workspace layout:
+      #   <root>/wire-format-fixtures   (fuaran-specification — the parity fixtures)
+      #   <root>/fuaran                 (F# tier — Fable host project reference)
+      #   <root>/fuaran-live            (this repo)
+      - name: Checkout the wire-format corpus (fuaran-specification)
+        uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-specification
+          path: workspace/wire-format-fixtures
+
+      - name: Checkout fuaran (F# tier)
+        uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-dotnet
+          path: workspace/fuaran
+
+      - name: Checkout fuaran-live (this repo)
+        uses: actions/checkout@v4
+        with:
+          path: workspace/fuaran-live
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup .NET (Fable host)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # NuGet hard-errors (NU1301) on the F# tier's missing local folder feed;
+      # mint it empty — Fuaran.Core.* restores from nuget.org.
+      - name: Create empty local-nuget-feed
+        run: mkdir -p "$GITHUB_WORKSPACE/../local-nuget-feed"
+
+      - name: Install fuaran-live
+        working-directory: workspace/fuaran-live
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore .NET tools (Fable)
+        working-directory: workspace/fuaran-live
+        run: dotnet tool restore
+
+      - name: Install Playwright browser
+        working-directory: workspace/fuaran-live
+        run: pnpm exec playwright install --with-deps chromium
+
+      # build:dual (Fable + Vite) then run the Playwright parity gate against the
+      # built dist. Fails the build on any cross-host DOM/CSS divergence.
+      - name: Cross-host parity gate
+        working-directory: workspace/fuaran-live
+        run: pnpm run parity

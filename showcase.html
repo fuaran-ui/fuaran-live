@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--CSP-INJECTION-POINT-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="fuaran-live – the Fuaran capability showcase. Small, self-contained pages, each staging one capability of UI-as-typed-data. Zero egress: nothing leaves your browser."
+    />
+    <title>fuaran-live – Fuaran showcase</title>
+    <link rel="icon" type="image/svg+xml" href="brand/fuaran-favicon.svg" />
+  </head>
+  <body>
+    <!-- The zero-egress showcase root. A separate entry (and Fable project)
+         from the playground: its bundle imports none of the provider/key
+         machinery, so the shipped files contain no key-egress code – see
+         app/showcase/. -->
+    <div id="fuaran-showcase-root"></div>
+    <script type="module" src="/app/showcase/output/App.js"></script>
+  </body>
+</html>

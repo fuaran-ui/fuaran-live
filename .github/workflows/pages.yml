@@ -1,0 +1,73 @@
+name: Deploy to GitHub Pages
+
+# Builds the static dist/ and publishes it to GitHub Pages. The app is fully
+# static — no server, no secrets; the visitor supplies their own provider key
+# at runtime, client-side only. The F#/Fable app project-references the
+# sibling F# tier, so the public fuaran-dotnet + fuaran-specification repos
+# are checked out as siblings (see ci.yml).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fuaran-live
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: fuaran-live
+      - uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-dotnet
+          path: fuaran
+      - uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-specification
+          path: wire-format-fixtures
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # NuGet hard-errors (NU1301) on the F# tier's missing local folder feed;
+      # mint it empty — Fuaran.Core.* restores from nuget.org.
+      - name: Create empty local-nuget-feed
+        run: mkdir -p "$GITHUB_WORKSPACE/../../local-nuget-feed"
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        # Playground artifact — its demo-gallery door targets the showcase's
+        # production origin (same reasoning as azure-static-web-apps.yml).
+        run: pnpm build
+        env:
+          VITE_SHOWCASE_ORIGIN: https://fuaran-ui.gallery
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: fuaran-live/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,13 @@
+dist
+node_modules
+pnpm-lock.yaml
+
+# Projection-conformance build + generated artefacts (Phase 84)
+tests/projection-conformance/.gen-ts
+tests/projection-conformance/fsharp-harness/bin
+tests/projection-conformance/fsharp-harness/obj
+tests/projection-conformance/fsharp-harness/Generated.fs
+
+# Vendored Go-toolchain glue — kept byte-verbatim (rosettaParity.test.ts evals it
+# as the committed toolchain output; do not reformat).
+public/rosetta/wasm_exec.js

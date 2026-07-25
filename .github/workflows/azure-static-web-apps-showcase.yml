@@ -77,6 +77,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Restore .NET tools (Fable)
+        run: dotnet tool restore
+
       - name: Build showcase
         # The showcase's "open the playground" door targets the playground's
         # production origin (falls back to same-origin showcase.html when unset,

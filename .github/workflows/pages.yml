@@ -53,6 +53,9 @@ jobs:
         run: mkdir -p "$GITHUB_WORKSPACE/../../local-nuget-feed"
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Restore .NET tools (Fable)
+        run: dotnet tool restore
       - name: Build
         # Playground artifact — its demo-gallery door targets the showcase's
         # production origin (same reasoning as azure-static-web-apps.yml).

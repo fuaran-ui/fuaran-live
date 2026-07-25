@@ -75,8 +75,12 @@ jobs:
         working-directory: workspace/fuaran-live
         run: pnpm exec playwright install --with-deps chromium
 
-      # build:dual (Fable + Vite) then run the Playwright parity gate against the
-      # built dist. Fails the build on any cross-host DOM/CSS divergence.
+      - name: Build the dual-host artifact
+        working-directory: workspace/fuaran-live
+        run: pnpm run build:dual
+
+      # Runs the Playwright parity gate against the built dist. Fails the build
+      # on any cross-host DOM/CSS divergence.
       - name: Cross-host parity gate
         working-directory: workspace/fuaran-live
         run: pnpm run parity

@@ -459,17 +459,18 @@ let toolDefinitions: ToolDefinition list =
       InputSchema = schemaObj (nodeIdProp "The id of the node whose bindings to read.") [ "nodeId" ] }
     { Name = "askUser"
       Description =
-        "Ask the USER a typed question AS a live form (an elicitation envelope). The input is the whole envelope: a question tree (canonical Node wire format) plus an answer contract declaring which state entries constitute the answer, each typed by a value space. The user sees your question rendered live in the conversation; the loop waits; you receive exactly ONE typed outcome: Answered (a validated answer object – every field already checked against its declared space), Declined, or TimedOut. Never returns prose. Use it only when you genuinely need the user's decision; ask at most one question per turn."
+        "Ask the USER a typed question AS a live form (an elicitation envelope). The input is the whole envelope: the version tag \"$elicitation\": \"1\" (required on every call; it cannot be declared in this schema because provider schemas reject $-prefixed property keys), plus a question tree (canonical Node wire format) plus an answer contract declaring which state entries constitute the answer, each typed by a value space. The user sees your question rendered live in the conversation; the loop waits; you receive exactly ONE typed outcome: Answered (a validated answer object – every field already checked against its declared space), Declined, or TimedOut. Never returns prose. Use it only when you genuinely need the user's decision; ask at most one question per turn."
       InputSchema =
+        // The envelope's "$elicitation" version tag is NOT declared here:
+        // Anthropic rejects tool input_schema property keys outside
+        // '^[a-zA-Z0-9_.-]{1,64}$'. additionalProperties therefore stays open
+        // so the tag (taught in the description + system prompt, enforced by
+        // the host codec) is not schema-forbidden.
         createObj
           [ "type" ==> "object"
             "properties"
             ==> createObj
-              [ "$elicitation"
-                ==> createObj
-                  [ "type" ==> "string"
-                    "description" ==> "The format version tag. Always \"1\"." ]
-                "id"
+              [ "id"
                 ==> createObj
                   [ "type" ==> "string"
                     "description" ==> "Your short id for this question (kebab-case)." ]
@@ -492,8 +493,8 @@ let toolDefinitions: ToolDefinition list =
                   [ "type" ==> "object"
                     "description"
                     ==> "Optional: {\"<name>\": <scalar>} suggested answer; must conform to the contract." ] ]
-            "required" ==> [| "$elicitation"; "id"; "tree"; "contract" |]
-            "additionalProperties" ==> false ] } ]
+            "required" ==> [| "id"; "tree"; "contract" |]
+            "additionalProperties" ==> true ] } ]
 
 /// The live state the tools read. Getters, so the dispatcher always sees the
 /// loop's latest working tree / error log without re-wiring.

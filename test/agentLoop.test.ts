@@ -22,6 +22,8 @@ import {
   runEmitRepairProbe,
   runResumeProbe,
   runPanelProbe,
+  runAdvisoryProbe,
+  runAdvisoryRepeatProbe,
   // @ts-expect-error untyped Fable output (no .d.ts for app/output/Agent.js)
 } from '../app/output/Agent.js';
 
@@ -219,5 +221,29 @@ describe('Phase 466 – agent expression turns: live panels with scoped op strea
 
     // Panel emissions never leak into the main-preview session.
     expect(r.MainSessionUntouched).toBe(true);
+  });
+});
+
+describe('pre-emit advisories in the loop (Phase 664)', () => {
+  it('feeds an applied-but-inert emission back and completes once corrected', async () => {
+    const r = await runAdvisoryProbe();
+    // Turn 1 applied but drew FUARAN090; the loop did NOT halt satisfied – it
+    // fed the advisory back; turn 2's $state-sourced correction completed.
+    expect(r.HaltReason).toBe('completed');
+    expect(r.Iterations).toBe(2);
+    expect(r.FeedbackTurns).toBe(1);
+    expect(r.FeedbackNamesFuaran090).toBe(true);
+    // The transcript's emission row names the advisory codes too.
+    expect(r.EmissionSummaryNamesFuaran090).toBe(true);
+    // The corrected tree carries a clean advisory slate.
+    expect(r.FinalAdvisoryCount).toBe(0);
+  });
+
+  it('never feeds an identical advisory set twice (warnings cannot burn the budget)', async () => {
+    const r = await runAdvisoryRepeatProbe();
+    // Same inert wire re-emitted: fed once, then completed normally.
+    expect(r.HaltReason).toBe('completed');
+    expect(r.Iterations).toBe(2);
+    expect(r.FeedbackTurns).toBe(1);
   });
 });

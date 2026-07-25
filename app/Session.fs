@@ -167,6 +167,39 @@ let ingest (session: SessionState) (rawAssistantText: string) : IngestOutcome =
               Snapshots = [ tree ] }
         )
 
+// ─── pre-emit advisories (Phase 664) ─────────────────────────────────────────
+//
+// An emission can APPLY cleanly and still carry dead intent — `editable: true`
+// over a non-writable source (FUARAN090), an inert control (FUARAN069), a
+// decorative filter (FUARAN074). `PreEmitValidate.validate` computes exactly
+// this class; each defect projects through the shared `describe` so the loop
+// feeds the model the same code + message every other host reports.
+
+type Advisory =
+  { Code: string
+    Severity: string
+    Message: string }
+
+/// The pre-emit advisories for the session's current tree (`[]` when no tree).
+/// Pure – never throws; the tree was already decode/apply-validated to exist.
+let preEmitAdvisories (session: SessionState) : Advisory list =
+  match session.Tree with
+  | None -> []
+  | Some tree ->
+    match Fuaran.UI.PreEmitValidate.validate tree with
+    | Ok() -> []
+    | Error defects ->
+      defects
+      |> List.map (fun d ->
+        let code, severity, message = Fuaran.UI.PreEmitValidate.describe d
+
+        { Code = code
+          Severity =
+            (match severity with
+             | Fuaran.UI.PreEmitValidate.DefectSeverity.Error -> "error"
+             | Fuaran.UI.PreEmitValidate.DefectSeverity.Warning -> "warning")
+          Message = message })
+
 // ─── closed-loop turn construction ───────────────────────────────────────────
 
 /// Append a transcript turn (pure).

@@ -435,7 +435,7 @@ let toolDefinitions: ToolDefinition list =
       InputSchema = schemaObj (nodeIdProp "Optional: restrict to one node id.") [] }
     { Name = "getRuntimeErrors"
       Description =
-        "Return the decode/apply errors from your MOST RECENT emission (malformed wire JSON, unknown ids, illegal ops). The slate is cleared on each new emission, so a non-empty result is always about the tree you just emitted – not a pile-up from earlier attempts. Call this if an emission did not take effect, to see exactly why. Tip: if the error is a missing/wrong field on a kind, call getKindSchema for that kind to get its whole shape at once."
+        "Return the decode/apply errors from your MOST RECENT emission (malformed wire JSON, unknown ids, illegal ops) PLUS the pre-emit advisories on the currently-applied tree – declared intent that does nothing as authored (e.g. FUARAN090: editable grid over a non-writable source; FUARAN069: a handler-free control with no writable binding), each with the declarative fix named. The slate is cleared on each new emission, so a non-empty result is always about the tree you just emitted – not a pile-up from earlier attempts. Call this if an emission did not take effect, or to check an applied tree for dead intent. Tip: if the error is a missing/wrong field on a kind, call getKindSchema for that kind to get its whole shape at once."
       InputSchema = schemaObj (createObj []) [] }
     { Name = "getKindSchema"
       Description =
@@ -499,9 +499,16 @@ let toolDefinitions: ToolDefinition list =
 /// The live state the tools read. Getters, so the dispatcher always sees the
 /// loop's latest working tree / error log without re-wiring.
 type ToolContext =
-  { CurrentTreeJson: unit -> string option
+  {
+    CurrentTreeJson: unit -> string option
     RuntimeErrors: unit -> Session.IngestError list
-    Dom: DomReader }
+    /// Pre-emit advisories for the CURRENT applied tree (Phase 664) – defects
+    /// that don't stop an emission applying but mark dead intent (FUARAN090
+    /// inert editable grid, FUARAN069 inert control, …). Same fresh-slate
+    /// discipline as `RuntimeErrors`.
+    Advisories: unit -> Session.Advisory list
+    Dom: DomReader
+  }
 
 type ToolDispatchResult = { Ok: bool; Content: string }
 
@@ -516,6 +523,7 @@ let dispatchTool (ctx: ToolContext) (name: string) (input: obj) : ToolDispatchRe
       Content = jsonPretty report }
   | "getRuntimeErrors" ->
     let errors = ctx.RuntimeErrors()
+    let advisories = ctx.Advisories()
 
     let payload =
       createObj
@@ -523,6 +531,15 @@ let dispatchTool (ctx: ToolContext) (name: string) (input: obj) : ToolDispatchRe
           "errors"
           ==> (errors
                |> List.map (fun e -> createObj [ "kind" ==> e.Kind; "message" ==> e.Message ])
+               |> List.toArray)
+          // Phase 664 – applied-but-advisory defects on the CURRENT tree. The
+          // emission took effect; each advisory names intent that is dead as
+          // authored (with the declarative fix in its message).
+          "advisoryCount" ==> List.length advisories
+          "advisories"
+          ==> (advisories
+               |> List.map (fun a ->
+                 createObj [ "code" ==> a.Code; "severity" ==> a.Severity; "message" ==> a.Message ])
                |> List.toArray) ]
 
     { Ok = true
@@ -575,7 +592,7 @@ You have six tools. Five are read-only (all resolve instantly in the browser; no
 
 - **getKindSchema** – the AUTHORITATIVE shape of a node kind: its required + optional fields and every binding/spec they reference. Pass the kind's $type (e.g. "Select", "Chart", "Tabs"); omit the argument to list every valid kind. Call this BEFORE emitting any kind you are not certain of – it is the exact contract the decoder enforces, so you never have to guess a field name.
 - **getRenderedDom** – the REAL geometry of what rendered: each node's bounding box plus flags (overflowing, truncated, hidden). This is ground truth, not your assumption.
-- **getRuntimeErrors** – the decode/apply failures from your MOST RECENT emission (the slate clears each emission, so a non-empty result is never a stale pile-up). If an emission "didn't take", call this to see exactly why.
+- **getRuntimeErrors** – the decode/apply failures from your MOST RECENT emission (the slate clears each emission, so a non-empty result is never a stale pile-up), plus the pre-emit ADVISORIES on the applied tree: an emission can apply cleanly and still carry dead intent (an `editable: true` grid whose source is not `$state` – FUARAN090; a handler-free control bound to nothing writable – FUARAN069). Each advisory names its declarative fix. If an emission "didn't take", call this to see exactly why; a non-empty advisory list after a successful emission means part of what you declared does nothing.
 - **getNodeState** – one node's runtime state/style/kind from the live tree.
 - **getBindingValue** – a node's data bindings and their values. Note: this playground renders Static emissions only, so non-Static bindings report as unresolved by design – do not treat that as an error.
 
@@ -761,6 +778,14 @@ let runAgentLoop
 
   let runtimeErrors = ResizeArray<Session.IngestError>()
 
+  // Phase 664 – pre-emit advisories for the current applied tree, on the same
+  // fresh-slate discipline as `runtimeErrors`. `lastAdvisoryFeedback` is the
+  // fingerprint of the advisory set last fed back on a no-tools turn, so an
+  // identical set is never fed twice (a model that deliberately keeps the
+  // shape completes normally; warnings can never burn the budget).
+  let advisories = ResizeArray<Session.Advisory>()
+  let lastAdvisoryFeedback = ref ""
+
   let working =
     ref (Session.withTurn initialSession { Role = User; Content = userPrompt })
 
@@ -800,6 +825,7 @@ let runAgentLoop
           | None -> None
           | Some t -> Some(Canon.encodeNode t)
       RuntimeErrors = fun () -> List.ofSeq runtimeErrors
+      Advisories = fun () -> List.ofSeq advisories
       Dom = deps.Dom }
 
   let halt (reason: HaltReason) (detail: string option) (provErr: ProviderError option) : AgentRunResult =
@@ -876,6 +902,7 @@ let runAgentLoop
             // thinking already-replaced trees were still failing. A turn that emits
             // nothing does not clear it – the prior failure stays visible to repair.
             runtimeErrors.Clear()
+            advisories.Clear()
 
             // Route by envelope: a `$panel` document streams into its named live
             // panel (Phase 466 – its own scoped, hash-chained op stream); a bare
@@ -901,8 +928,23 @@ let runAgentLoop
                   { next with
                       History = working.Value.History }
 
+                // Phase 664 – the emission APPLIED; compute its advisory set
+                // (applied-but-dead intent, e.g. FUARAN090) for the tool
+                // surface, the timeline summary, and the no-tools feedback.
+                advisories.AddRange(Session.preEmitAdvisories next)
+
+                let summary =
+                  let baseSummary = emissionSummary mode next
+
+                  if advisories.Count = 0 then
+                    baseSummary
+                  else
+                    let codes = advisories |> Seq.map _.Code |> Seq.distinct |> String.concat ", "
+
+                    sprintf "%s %d pre-emit advisory(ies): %s." baseSummary advisories.Count codes
+
                 deps.OnSession working.Value
-                deps.Emit(TimelineEntry.Emission(nextSeq (), mode, true, emissionSummary mode next))
+                deps.Emit(TimelineEntry.Emission(nextSeq (), mode, true, summary))
                 do! deps.WaitForPaint()
               | Session.IngestFailed err ->
                 runtimeErrors.Add err
@@ -940,7 +982,37 @@ let runAgentLoop
                           ) ] } ]
 
               return! loop ()
-            | None -> return halt HaltReason.Completed None None
+            | None ->
+              // Phase 664 – the emission applied, the model called no tools, but
+              // the tree carries pre-emit advisories: intent that is dead as
+              // authored (an inert editable grid, an unwired control). Feed the
+              // advisory set back ONCE so the model can self-correct; an
+              // identical set is never fed twice (fingerprint guard), so a model
+              // that keeps the shape deliberately completes normally.
+              let fingerprint =
+                advisories |> Seq.map (fun a -> a.Code + "|" + a.Message) |> String.concat "\n"
+
+              if advisories.Count > 0 && fingerprint <> lastAdvisoryFeedback.Value then
+                lastAdvisoryFeedback.Value <- fingerprint
+
+                let listing =
+                  advisories
+                  |> Seq.map (fun a -> sprintf "- %s (%s): %s" a.Code a.Severity a.Message)
+                  |> String.concat "\n"
+
+                messages.Value <-
+                  messages.Value
+                  @ [ { Role = User
+                        Content =
+                          [ AgentContentBlock.Text(
+                              "Your emission APPLIED and the preview updated, but the tree carries pre-emit advisories – declared intent that does nothing as authored:\n\n"
+                              + listing
+                              + "\n\nEach message names the declarative fix. Emit a corrected tree/op if the intent matters; if the current shape is deliberate, say so and finish."
+                            ) ] } ]
+
+                return! loop ()
+              else
+                return halt HaltReason.Completed None None
           else
             // Sequential (not mapped) because `askUser` is async: it suspends
             // the loop on the human. The read-only tools stay synchronous.
@@ -1017,6 +1089,7 @@ let dispatchToolFlat (treeJson: string) (name: string) (input: obj) : {| Ok: boo
   let ctx: ToolContext =
     { CurrentTreeJson = fun () -> Option.ofObj treeJson
       RuntimeErrors = fun () -> []
+      Advisories = fun () -> []
       Dom = nullDomReader }
 
   let r = dispatchTool ctx name input
@@ -1240,6 +1313,133 @@ let runEmitRepairProbe
          Iterations = result.Iterations
          FinalTreeSet = lastSession.Value.Tree.IsSome
          FinalErrorCount = List.length result.RuntimeErrors |}
+  }
+  |> Async.StartAsPromise
+
+// ─── Phase 664 probes – pre-emit advisories in the loop ──────────────────────
+
+/// A valid grid emission that APPLIES but is inert-editable (FUARAN090):
+/// `editable: true` over a Transform source.
+let private inertEditableEmission =
+  "Here is the grid.\n\n```json\n{\"id\":\"g\",\"kind\":{\"$type\":\"DataGrid\",\"editable\":true,\"rowKeyField\":\"q\",\"columns\":[{\"field\":\"q\",\"kind\":{\"$type\":\"Text\"},\"label\":\"Q\"}],\"source\":{\"$type\":\"Transform\",\"pipeline\":[],\"source\":{\"columns\":{\"q\":{\"validity\":[true],\"values\":[\"Q1\"]}},\"schema\":[{\"name\":\"q\",\"type\":\"string\"}]}}}}\n```"
+
+/// The corrected shape – the same grid over a shared `$state` rows source
+/// (the Phase 663 write-back floor); draws no advisories.
+let private stateEditableEmission =
+  "Corrected.\n\n```json\n{\"id\":\"g\",\"kind\":{\"$type\":\"DataGrid\",\"editable\":true,\"rowKeyField\":\"q\",\"columns\":[{\"field\":\"q\",\"kind\":{\"$type\":\"Text\"},\"label\":\"Q\"}],\"source\":{\"$type\":\"State\",\"key\":\"rows\",\"defaultValue\":[{\"q\":\"Q1\"}]}}}\n```"
+
+/// Count the advisory feedback turns the loop injected (the no-tools leg).
+let private advisoryFeedbackCount (msgs: AgentMessage list) : int =
+  msgs
+  |> List.filter (fun m ->
+    m.Role = User
+    && m.Content
+       |> List.exists (fun b ->
+         match b with
+         | AgentContentBlock.Text t -> t.Contains "pre-emit advisories"
+         | _ -> false))
+  |> List.length
+
+let private emissionSummaries (timeline: ResizeArray<TimelineEntry>) : string list =
+  timeline
+  |> Seq.choose (fun e ->
+    match e with
+    | TimelineEntry.Emission(_, _, _, summary) -> Some summary
+    | _ -> None)
+  |> List.ofSeq
+
+/// Turn 1 emits an inert-editable grid (applies; FUARAN090) with no tools –
+/// the loop must feed the advisory back rather than halting satisfied. Turn 2
+/// emits the corrected `$state`-sourced grid – the loop completes with a clean
+/// advisory slate. Returns flat.
+let runAdvisoryProbe
+  ()
+  : JS.Promise<
+      {| HaltReason: string
+         Iterations: int
+         FeedbackTurns: int
+         FeedbackNamesFuaran090: bool
+         EmissionSummaryNamesFuaran090: bool
+         FinalAdvisoryCount: int |}
+     >
+  =
+  let provider =
+    scriptedAgenticProvider
+      [ AgentOutcome.Ok(
+          [ AgentContentBlock.Text inertEditableEmission ],
+          AgentStopReason.EndTurn,
+          Some { InputTokens = 5; OutputTokens = 5 }
+        )
+        AgentOutcome.Ok(
+          [ AgentContentBlock.Text stateEditableEmission ],
+          AgentStopReason.EndTurn,
+          Some { InputTokens = 5; OutputTokens = 5 }
+        ) ]
+
+  let timeline = ResizeArray<TimelineEntry>()
+  let lastSession = ref Session.empty
+
+  let deps =
+    { probeDeps provider defaultBudget timeline with
+        OnSession = fun s -> lastSession.Value <- s }
+
+  async {
+    let! result = runAgentLoop Session.empty Panels.empty [] "build an editable grid" deps
+
+    let feedbackTexts =
+      result.FinalMessages
+      |> List.collect (fun m ->
+        m.Content
+        |> List.choose (fun b ->
+          match b with
+          | AgentContentBlock.Text t when t.Contains "pre-emit advisories" -> Some t
+          | _ -> None))
+
+    return
+      {| HaltReason = haltReasonStr result.HaltReason
+         Iterations = result.Iterations
+         FeedbackTurns = advisoryFeedbackCount result.FinalMessages
+         FeedbackNamesFuaran090 = feedbackTexts |> List.exists _.Contains("FUARAN090")
+         EmissionSummaryNamesFuaran090 = emissionSummaries timeline |> List.exists _.Contains("FUARAN090")
+         FinalAdvisoryCount = List.length (Session.preEmitAdvisories lastSession.Value) |}
+  }
+  |> Async.StartAsPromise
+
+/// Both turns emit the SAME inert-editable wire – the fingerprint guard must
+/// feed the advisory set exactly once and then complete (warnings can never
+/// burn the budget). Returns flat.
+let runAdvisoryRepeatProbe
+  ()
+  : JS.Promise<
+      {| HaltReason: string
+         Iterations: int
+         FeedbackTurns: int |}
+     >
+  =
+  let provider =
+    scriptedAgenticProvider
+      [ AgentOutcome.Ok(
+          [ AgentContentBlock.Text inertEditableEmission ],
+          AgentStopReason.EndTurn,
+          Some { InputTokens = 5; OutputTokens = 5 }
+        )
+        AgentOutcome.Ok(
+          [ AgentContentBlock.Text inertEditableEmission ],
+          AgentStopReason.EndTurn,
+          Some { InputTokens = 5; OutputTokens = 5 }
+        ) ]
+
+  let timeline = ResizeArray<TimelineEntry>()
+
+  let deps = probeDeps provider defaultBudget timeline
+
+  async {
+    let! result = runAgentLoop Session.empty Panels.empty [] "build an editable grid" deps
+
+    return
+      {| HaltReason = haltReasonStr result.HaltReason
+         Iterations = result.Iterations
+         FeedbackTurns = advisoryFeedbackCount result.FinalMessages |}
   }
   |> Async.StartAsPromise
 

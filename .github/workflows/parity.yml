@@ -77,7 +77,7 @@ jobs:
 
       - name: Build the dual-host artifact
         working-directory: workspace/fuaran-live
-        run: pnpm run build:dual
+        run: pnpm run fable:app && pnpm run build:dual
 
       # Runs the Playwright parity gate against the built dist. Fails the build
       # on any cross-host DOM/CSS divergence.

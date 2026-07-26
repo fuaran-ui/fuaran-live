@@ -22,6 +22,23 @@ body {
   line-height: 1.55;
 }
 
+/* Markdown-emitted anchors carry no class – marked emits a bare <a> – so they
+   fell through to the user-agent's #0000EE (visited #551A8B), measuring 1.93:1
+   against the dark card surface where WCAG AA wants 4.5:1. The Link PRIMITIVE
+   (.fuaran-link) is already tokenised on --fuaran-tone-brand-fg, which the brand
+   theme flips per mode; prose links now ride the same token, so the two agree in
+   either theme instead of one being branded and the other being 1996. */
+.fuaran-kind-markdown a,
+.fuaran-kind-markdown a:visited {
+  color: var(--fuaran-tone-brand-fg, #1e4754);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fuaran-kind-markdown a:hover {
+  color: var(--fuaran-tone-brand-border, #62a5be);
+}
+
 .ds-shell {
   /* Wider content column to match the playground shell (was var(--ds-max-width),
      62rem). The receiver page (.rcv-shell) keeps the narrow token. */

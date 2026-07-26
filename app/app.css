@@ -86,6 +86,23 @@ body {
     sans-serif;
 }
 
+/* Markdown-emitted anchors carry no class – marked emits a bare <a> – so they
+   fell through to the user-agent's #0000EE (visited #551A8B), far under WCAG AA
+   against the dark surface. The Link PRIMITIVE (.fuaran-link) is already
+   tokenised on --fuaran-tone-brand-fg, which the shared brand theme flips per
+   mode; prose links ride the same token so the two agree in either theme.
+   Mirrored in app/showcase/app.css – a change here re-applies there. */
+.fuaran-kind-markdown a,
+.fuaran-kind-markdown a:visited {
+  color: var(--fuaran-tone-brand-fg, #1e4754);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fuaran-kind-markdown a:hover {
+  color: var(--fuaran-tone-brand-border, #62a5be);
+}
+
 .fl-shell {
   min-height: 100vh;
   background: var(--fl-bg);

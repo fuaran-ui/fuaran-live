@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-dotnet
-          path: fuaran
+          path: fuaran-dotnet
 
       - uses: actions/checkout@v4
         with:

@@ -55,9 +55,9 @@ if (errors.length > 0) {
 const required = [
   'app/output/App.js',
   'app/output/Session.js',
-  'app/output/fuaran/src/Fuaran.UI.Ops/Apply.js',
-  'app/output/fuaran/src/Fuaran.UI.Ops/JsonDecode.js',
-  'app/output/fuaran/src/Fuaran.UI.OpStream.Abstractions/CanonicalJson.js',
+  'app/output/fuaran-dotnet/src/Fuaran.UI.Ops/Apply.js',
+  'app/output/fuaran-dotnet/src/Fuaran.UI.Ops/JsonDecode.js',
+  'app/output/fuaran-dotnet/src/Fuaran.UI.OpStream.Abstractions/CanonicalJson.js',
   'app/showcase/output/App.js',
   'app/showcase/output/Receiver.js',
 ];

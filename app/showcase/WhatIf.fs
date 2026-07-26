@@ -153,7 +153,7 @@ let private opSummary (op: TreeOp<unit>) : string =
   match op with
   | TreeOp.UpdateProp(n, path, _) -> sprintf "UpdateProp %s.%s" (idOf n) path
   | TreeOp.ReplaceBinding(n, slot, _) -> sprintf "ReplaceBinding %s.%s" (idOf n) slot
-  | TreeOp.InsertChild(p, _, c) -> sprintf "InsertChild %s ← %s" (idOf p) (idOf c.Id)
+  | TreeOp.InsertChild(p, c) -> sprintf "InsertChild %s ← %s" (idOf p) (idOf c.Id)
   | TreeOp.RemoveNode n -> sprintf "RemoveNode %s" (idOf n)
   | _ -> "op"
 

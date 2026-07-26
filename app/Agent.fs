@@ -1544,8 +1544,11 @@ let runPanelProbe
 
   let rowNode (id: string) (text: string) : Fuaran.UI.Types.Node<obj> = Fuaran.UI.Fuaran.markdown id text
 
-  let insertRowOp (parent: string) (position: int) (row: Fuaran.UI.Types.Node<obj>) : string =
-    Canon.encodeOp (Fuaran.UI.Ops.Types.TreeOp.InsertChild(Fuaran.UI.Types.NodeId parent, position, row))
+  // 0.4.0: InsertChild appends; ReorderChildren states order. Both call sites
+  // below appended anyway (f-root holds one child; "ghost" is a reject probe),
+  // so the position parameter is dropped rather than replaced with a Batch.
+  let insertRowOp (parent: string) (row: Fuaran.UI.Types.Node<obj>) : string =
+    Canon.encodeOp (Fuaran.UI.Ops.Types.TreeOp.InsertChild(Fuaran.UI.Types.NodeId parent, row))
 
   let fence (envelope: string) : string = "\n\n```json\n" + envelope + "\n```"
 
@@ -1561,7 +1564,7 @@ let runPanelProbe
     "Adding the first finding."
     + fence (
       "{\"$panel\":\"findings\",\"op\":"
-      + insertRowOp "f-root" 1 (rowNode "f-row-1" "1. The heading overflows on mobile.")
+      + insertRowOp "f-root" (rowNode "f-row-1" "1. The heading overflows on mobile.")
       + "}"
     )
 
@@ -1569,7 +1572,7 @@ let runPanelProbe
     "Adding another."
     + fence (
       "{\"$panel\":\"findings\",\"op\":"
-      + insertRowOp "ghost" 0 (rowNode "f-row-x" "nope")
+      + insertRowOp "ghost" (rowNode "f-row-x" "nope")
       + "}"
     )
 

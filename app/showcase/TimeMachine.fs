@@ -104,7 +104,7 @@ let private human = Actor.Human "you"
 let private wireStr (s: string) : PropValue = PropValue.Wire(JStr s)
 
 let private turns: Turn list =
-  [ { Op = TreeOp.InsertChild(nid "tm-root", 2, metricCard "tm-m-rev" "Revenue" "£0")
+  [ { Op = TreeOp.InsertChild(nid "tm-root", metricCard "tm-m-rev" "Revenue" "£0")
       Actor = agent
       Label = "Add a Revenue metric"
       Tag = Tag.Normal }
@@ -112,11 +112,11 @@ let private turns: Turn list =
       Actor = agent
       Label = "Fill in the revenue figure"
       Tag = Tag.Normal }
-    { Op = TreeOp.InsertChild(nid "tm-root", 3, metricCard "tm-m-ord" "Orders" "1,204")
+    { Op = TreeOp.InsertChild(nid "tm-root", metricCard "tm-m-ord" "Orders" "1,204")
       Actor = agent
       Label = "Add an Orders metric"
       Tag = Tag.Normal }
-    { Op = TreeOp.InsertChild(nid "tm-root", 4, accountsGrid)
+    { Op = TreeOp.InsertChild(nid "tm-root", accountsGrid)
       Actor = agent
       Label = "Add a top-accounts grid"
       Tag = Tag.Normal }
@@ -124,7 +124,7 @@ let private turns: Turn list =
       Actor = agent
       Label = "Update the note"
       Tag = Tag.Normal }
-    { Op = TreeOp.InsertChild(nid "tm-root", 5, metricCard "tm-m-churn" "Churn" "£128,400")
+    { Op = TreeOp.InsertChild(nid "tm-root", metricCard "tm-m-churn" "Churn" "£128,400")
       Actor = agent
       Label = "Add a Churn metric – but paste the revenue figure in by mistake"
       Tag = Tag.Mistake }
@@ -135,7 +135,6 @@ let private turns: Turn list =
     { Op =
         TreeOp.InsertChild(
           nid "tm-root",
-          6,
           Fuaran.callout
             "tm-cta"
             { Defaults.callout with
@@ -150,7 +149,7 @@ let private turns: Turn list =
       Actor = agent
       Label = "Drop the draft note"
       Tag = Tag.Normal }
-    { Op = TreeOp.InsertChild(nid "tm-accounts", 3, metricCard "tm-acc-4" "Umbrella" "£3,300")
+    { Op = TreeOp.InsertChild(nid "tm-accounts", metricCard "tm-acc-4" "Umbrella" "£3,300")
       Actor = agent
       Label = "Add a fourth account"
       Tag = Tag.Normal }
@@ -227,9 +226,17 @@ let private branches: Branch list =
   [ { Id = "region"
       Name = "Split by region"
       Blurb = "Break the accounts grid out by geography."
+      // 0.4.0: these two were InsertChild(..., 0, ...) — each PREPENDED, so the
+      // rendered pair read EMEA, APAC ahead of the three accounts. InsertChild
+      // now appends, and the old placement is NOT recoverable with a static
+      // ReorderChildren: a branch forks from trunkFrames[k], so tm-accounts holds
+      // three children or four depending where the scrubber is, and an exact
+      // permutation would be rejected as OrderingMismatch at most fork points.
+      // The pair is therefore appended, with the source order swapped so their
+      // relative order (EMEA before APAC) survives.
       Ops =
-        [ TreeOp.InsertChild(nid "tm-accounts", 0, metricCard "tm-br-apac" "APAC" "£4,200")
-          TreeOp.InsertChild(nid "tm-accounts", 0, metricCard "tm-br-emea" "EMEA" "£5,900")
+        [ TreeOp.InsertChild(nid "tm-accounts", metricCard "tm-br-emea" "EMEA" "£5,900")
+          TreeOp.InsertChild(nid "tm-accounts", metricCard "tm-br-apac" "APAC" "£4,200")
           TreeOp.UpdateProp(nid "tm-title", "Text", wireStr "Q3 sales by region") ] }
     { Id = "exec"
       Name = "Executive summary"
@@ -238,9 +245,10 @@ let private branches: Branch list =
         [ TreeOp.RemoveNode(nid "tm-accounts")
           TreeOp.RemoveNode(nid "tm-m-ord")
           TreeOp.UpdateProp(nid "tm-title", "Text", wireStr "Q3 – executive summary")
+          // 0.4.0: was InsertChild(..., 0, ...) — the headline callout used to be
+          // prepended. Same fork-point argument as above; it now appends.
           TreeOp.InsertChild(
             nid "tm-root",
-            0,
             Fuaran.callout
               "tm-br-one"
               { Defaults.callout with

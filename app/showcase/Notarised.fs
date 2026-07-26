@@ -77,22 +77,21 @@ let private analyst = Actor.Human "finance"
 let private wireStr (s: string) : PropValue = PropValue.Wire(JStr s)
 
 let private turns: Turn list =
-  [ { Op = TreeOp.InsertChild(nid "nd-root", 1, metricCard "nd-rev" "Revenue" "£0")
+  [ { Op = TreeOp.InsertChild(nid "nd-root", metricCard "nd-rev" "Revenue" "£0")
       Actor = assistant
       Label = "Add a Revenue metric" }
     { Op = TreeOp.UpdateProp(nid "nd-rev-v", "Text", wireStr "£2.4M")
       Actor = assistant
       Label = "Fill in revenue" }
-    { Op = TreeOp.InsertChild(nid "nd-root", 2, metricCard "nd-margin" "Gross margin" "61%")
+    { Op = TreeOp.InsertChild(nid "nd-root", metricCard "nd-margin" "Gross margin" "61%")
       Actor = assistant
       Label = "Add a Gross margin metric" }
-    { Op = TreeOp.InsertChild(nid "nd-root", 3, metricCard "nd-opex" "Operating expense" "£1.1M")
+    { Op = TreeOp.InsertChild(nid "nd-root", metricCard "nd-opex" "Operating expense" "£1.1M")
       Actor = assistant
       Label = "Add an Operating expense metric" }
     { Op =
         TreeOp.InsertChild(
           nid "nd-root",
-          4,
           Fuaran.callout
             "nd-runway"
             { Defaults.callout with
@@ -108,7 +107,6 @@ let private turns: Turn list =
     { Op =
         TreeOp.InsertChild(
           nid "nd-root",
-          5,
           Fuaran.callout
             "nd-headline"
             { Defaults.callout with
@@ -195,7 +193,7 @@ let private verifyBreak (records: OpRecord<unit> list) : (int * string) option =
 
 let private opTarget (op: TreeOp<unit>) : (string * string) option =
   match op with
-  | TreeOp.InsertChild(_, _, child) -> Some(nodeIdStr child.Id, "created")
+  | TreeOp.InsertChild(_, child) -> Some(nodeIdStr child.Id, "created")
   | TreeOp.UpdateProp(n, path, PropValue.Wire(JStr v)) -> Some(nodeIdStr n, sprintf "set %s = %s" path v)
   | TreeOp.UpdateProp(n, path, _) -> Some(nodeIdStr n, "set " + path)
   | TreeOp.RemoveNode n -> Some(nodeIdStr n, "removed")

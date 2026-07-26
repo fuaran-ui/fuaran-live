@@ -62,7 +62,9 @@ let private progressAt (fraction: float) (status: string) : TreeOp<obj> =
       TreeOp.EditNode(NodeId "ap-status", statusKind status) ]
 
 let private findingRow (n: int) (text: string) : TreeOp<obj> =
-  TreeOp.InsertChild(NodeId "df-root", n, Fuaran.markdown (sprintf "df-row-%d" n) text)
+  // 0.4.0: InsertChild appends. `n` survives as the row id only — the table
+  // grows in order, so appending lands each row exactly where the index did.
+  TreeOp.InsertChild(NodeId "df-root", Fuaran.markdown (sprintf "df-row-%d" n) text)
 
 // ─── the typed question (Phase 465 §18 – the askUser beat) ───────────────────
 //

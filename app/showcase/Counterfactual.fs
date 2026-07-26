@@ -88,7 +88,7 @@ let private applyAll (ops: TreeOp<unit> list) (tree: Node<unit>) : Node<unit> =
 let private opTarget (op: TreeOp<unit>) : string option =
   match op with
   | TreeOp.UpdateProp(n, _, _) -> Some(nodeIdStr n)
-  | TreeOp.InsertChild(_, _, child) -> Some(nodeIdStr child.Id)
+  | TreeOp.InsertChild(_, child) -> Some(nodeIdStr child.Id)
   | TreeOp.RemoveNode n -> Some(nodeIdStr n)
   | _ -> None
 
@@ -111,7 +111,6 @@ let private variants: Variant list =
       Ops =
         [ TreeOp.InsertChild(
             nid "cc-root",
-            4,
             Fuaran.callout
               "cc-offer"
               { Defaults.callout with

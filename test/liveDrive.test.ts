@@ -17,10 +17,17 @@ import {
 // @ts-expect-error untyped Fable output
 import { empty, ingestResult } from '../app/output/Session.js';
 
-// A first emission: a full Dashboard tree (the decoder canonicalises the
-// container to the Box kind + role="Dashboard").
+// A first emission: a dashboard-role Box holding one Metric.
+//
+// This was authored as {"$type":"Dashboard", ...} — one of the four container
+// near-synonyms (Stack / GridLayout / Dashboard / Card) that Phase 673 unified
+// into Box, retiring the superseded-kind-name leniency along with them. Since
+// that commit the shorthand no longer decodes, so every test in this file was
+// failing at `ingestResult`. Restated in the canonical form (see
+// wire-format-fixtures/nodes/dash-empty.json): Dashboard survives as a ROLE,
+// not as a kind.
 const treeWire =
-  '{"id":"root","kind":{"$type":"Dashboard","children":[{"id":"m","kind":{"$type":"Metric","format":{"$type":"Number","decimals":0},"label":"Count","tone":"Brand","value":{"$type":"Static","value":1}}}]}}';
+  '{"id":"root","kind":{"$type":"Box","children":[{"id":"m","kind":{"$type":"Metric","format":{"$type":"Number","decimals":0},"label":"Count","tone":"Brand","value":{"$type":"Static","value":1}}}],"layout":{"$type":"Auto"},"role":"Dashboard"}}';
 // A follow-up op against that tree.
 const opWire =
   '{"$type":"UpdateStyle","style":{"emphasis":"Loud","tone":"Success","weight":"Spacious"},"target":"m"}';
@@ -37,7 +44,7 @@ describe('Phase 295 – serverless live-drive (Stage 1)', () => {
     const envs: string[] = deltaEnvelopes(empty, s);
     expect(envs).toHaveLength(1);
     expect(envelopeKind(envs[0]!)).toBe('tree');
-    // the payload is the canonical tree wire (Dashboard → Box + role)
+    // the payload is the canonical tree wire — role survives the round trip
     expect(envelopePayload(envs[0]!)).toContain('"role":"Dashboard"');
   });
 

@@ -140,7 +140,7 @@ let private ops: RelayOp list =
       Host = Host.Python
       Actor = author
       Note = "Author the base dashboard from the Q3 dataset" }
-    { Op = TreeOp.InsertChild(NodeId "rl-strip", 2, trendMetric)
+    { Op = TreeOp.InsertChild(NodeId "rl-strip", trendMetric)
       Host = Host.TypeScript
       Actor = assistant
       Note = "Add a QoQ trend column" }
@@ -239,7 +239,7 @@ let private stations: Station[] =
        Code =
          "import { insertChild, updateProp, metric } from '@fuaran-ui/ops';\n\n"
          + "// The assistant, running on the TypeScript host, edits the SAME wire.\n"
-         + "stream.apply(insertChild('rl-strip', 2,\n"
+         + "stream.apply(insertChild('rl-strip',\n"
          + "  metric('rl-trend', { label: 'Trend %', value: 8.4 })));   // add a column\n\n"
          + "stream.apply(updateProp('rl-note', 'Body',\n"
          + "  'TODO – write the headline'));   // ...and leaves a placeholder ⚠\n\n"

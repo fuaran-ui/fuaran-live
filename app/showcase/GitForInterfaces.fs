@@ -96,8 +96,8 @@ let private cleanA: TreeOp<unit> list =
 // still fully disjoint from the leaf A touched.
 let private cleanB: TreeOp<unit> list =
   [ TreeOp.UpdateProp(nid "g-users-v", "Text", wireStr "18.2k")
-    TreeOp.InsertChild(nid "g-root", 4, card "g-trend" "Trend" "▲ 12% MoM")
-    TreeOp.InsertChild(nid "g-root", 5, card "g-region" "Top region" "EMEA") ]
+    TreeOp.InsertChild(nid "g-root", card "g-trend" "Trend" "▲ 12% MoM")
+    TreeOp.InsertChild(nid "g-root", card "g-region" "Top region" "EMEA") ]
 
 let private cleanATree = applyAll cleanA baseTree
 let private cleanBTree = applyAll cleanB baseTree
@@ -115,7 +115,7 @@ let private conflictA: TreeOp<unit> list =
 let private conflictB: TreeOp<unit> list =
   [ TreeOp.UpdateProp(nid "g-title", "Text", wireStr "Analytics review")
     TreeOp.UpdateProp(nid "g-users-v", "Text", wireStr "18.2k")
-    TreeOp.InsertChild(nid "g-root", 4, card "g-trend" "Trend" "▲ 12% MoM") ]
+    TreeOp.InsertChild(nid "g-root", card "g-trend" "Trend" "▲ 12% MoM") ]
 
 let private conflictATree = applyAll conflictA baseTree
 let private conflictBTree = applyAll conflictB baseTree

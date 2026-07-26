@@ -69,6 +69,11 @@ jobs:
 
   deploy:
     needs: build
+    # A push builds and uploads the artifact but does NOT publish: publication is
+    # a deliberate act, run via "Run workflow". Same posture as
+    # fuaran-dotnet/catalog-pages.yml, so the estate has one rule rather than
+    # three. (2026-07-26 — lets the repo be pushed freely without deploying.)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

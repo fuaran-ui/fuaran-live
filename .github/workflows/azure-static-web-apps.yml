@@ -86,6 +86,11 @@ jobs:
           VITE_SHOWCASE_ORIGIN: https://fuaran-ui.gallery
 
       - name: Deploy
+        # A push to main builds but does NOT publish — publication is deliberate
+        # (workflow_dispatch). PR previews are intentionally UNAFFECTED: they are
+        # ephemeral, scoped to the PR, and torn down by close_pull_request below.
+        # (2026-07-26 — lets the repo be pushed freely without deploying.)
+        if: github.event_name != 'push'
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}

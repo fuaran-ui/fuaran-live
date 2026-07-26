@@ -32,7 +32,7 @@ fuaran-live/
 │   ├── Ports.fs            #   IAIProvider + EffectPorts seams (port of the former ports.ts)
 │   ├── Byok.fs             #   memory key store + browser effect ports + the Anthropic `fetch` provider
 │   ├── SystemPrompt.fs     #   the system prompt = the language repo's drift-checked prompt pack
-│   │                       #   (fuaran/docs/prompt-pack/system-prompt.md, ?raw sibling import — the
+│   │                       #   (fuaran-dotnet/docs/prompt-pack/system-prompt.md, ?raw sibling import — the
 │   │                       #   eval-measured teaching) + a chat-surface overlay; locked by
 │   │                       #   test/promptPack.test.ts + closedLoop.test.ts
 │   ├── Session.fs          #   in-memory session + closed loop (decode→apply→fold over linked Fuaran.UI.Ops)

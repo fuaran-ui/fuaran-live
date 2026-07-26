@@ -87,7 +87,7 @@ describe('the system prompt teaches the canonical flat wire format', () => {
   it("every fenced example in the prompt decodes/applies through the app's own loop", () => {
     // Pull each ```json … ``` block and ingest it (full trees against an empty
     // session; ops against a session seeded by the prior tree example). The
-    // prompt now inlines the drift-checked prompt pack (fuaran/docs/prompt-pack)
+    // prompt now inlines the drift-checked prompt pack (fuaran-dotnet/docs/prompt-pack)
     // whose examples are pretty-printed and whose prose mentions a fence marker
     // inline, so: fences are LINE-ANCHORED (an inline mention in prose is not a
     // block), and the op test tolerates `"$type": "…"` spacing. The op list is

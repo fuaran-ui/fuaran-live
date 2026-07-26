@@ -46,7 +46,7 @@ jobs:
           path: fuaran-live
 
       # Sibling checkouts (public repos, no token): the Fable app
-      # project-references ../fuaran; the corpus sits at ../wire-format-fixtures.
+      # project-references ../fuaran-dotnet; the corpus sits at ../wire-format-fixtures.
       - uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-dotnet

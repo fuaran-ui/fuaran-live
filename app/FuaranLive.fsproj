@@ -10,7 +10,7 @@
     no TypeScript shell – "built entirely in the language it promotes."
 
     Mirrors the self-contained fable-host project: the F# language tier is consumed
-    by direct ProjectReference into the sibling ../../fuaran checkout (the same
+    by direct ProjectReference into the sibling ../../fuaran-dotnet checkout (the same
     workspace-checkout binding the @fuaran-ui/* link bridge uses), and the Fable
     stack versions are pinned here since this project sits outside fuaran's central
     package management. Compiled only via `dotnet fable`, never `dotnet build`.
@@ -57,16 +57,16 @@
          is NOT linked here – it moved to Fuaran.UI.Ops.Abstractions and now reaches
          this compile transitively via the Fuaran.UI.Renderer ProjectReference
          (Renderer → Telemetry.Abstractions → Ops.Abstractions). -->
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\Introspect.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Introspect.fs">
       <Link>linked\Introspect.fs</Link>
     </Compile>
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\JsonDecode.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\JsonDecode.fs">
       <Link>linked\JsonDecode.fs</Link>
     </Compile>
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\Apply.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Apply.fs">
       <Link>linked\Apply.fs</Link>
     </Compile>
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
       <Link>linked\CanonicalJson.fs</Link>
     </Compile>
     <!-- The op-record + hash-chain slice (Phase 466): each agent panel turn is
@@ -74,13 +74,13 @@
          tamper-evident and replayable in the browser. Fable-safe (the showcase
          project Fable-compiles the whole parent project already). These three
          lean on the Fuaran.Core spine packages added below. -->
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\OpRecord.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\OpRecord.fs">
       <Link>linked\OpRecord.fs</Link>
     </Compile>
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\StreamEntry.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\StreamEntry.fs">
       <Link>linked\StreamEntry.fs</Link>
     </Compile>
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\HashChain.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\HashChain.fs">
       <Link>linked\HashChain.fs</Link>
     </Compile>
     <!-- The §18 elicitation envelope codec (Phase 465) – the typed-question
@@ -88,7 +88,7 @@
          project already Fable-compiles it via its OpStream.Abstractions
          ProjectReference); linked here for the same reason as the files above
          (a full ProjectReference would double-compile the linked modules). -->
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\Elicitation.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\Elicitation.fs">
       <Link>linked\Elicitation.fs</Link>
     </Compile>
     <!-- The canonical wire-format JSON Schema generator – Fable-safe by design (no
@@ -96,7 +96,7 @@
          LINKED so the agent self-debug loop can expose per-kind required-field
          schemas to the model via the getKindSchema tool, instead of forcing it to
          guess field names one decode error at a time. -->
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\SchemaGen.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\SchemaGen.fs">
       <Link>linked\SchemaGen.fs</Link>
     </Compile>
     <!-- The vendored AI-connector wire layer (Phase 576) – a self-contained
@@ -140,12 +140,12 @@
   <ItemGroup>
     <!-- Typed tree + the renderer (transitively pulls Fuaran.UI). The renderer
          carries the parity-locked class vocabulary + reference-CSS contract. -->
-    <ProjectReference Include="..\..\fuaran\src\Fuaran.UI\Fuaran.UI.fsproj" />
-    <ProjectReference Include="..\..\fuaran\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
+    <ProjectReference Include="..\..\fuaran-dotnet\src\Fuaran.UI\Fuaran.UI.fsproj" />
+    <ProjectReference Include="..\..\fuaran-dotnet\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Explicit versions (matched to fuaran/Directory.Packages.props + the
+    <!-- Explicit versions (matched to fuaran-dotnet/Directory.Packages.props + the
          fable-host project), since this sits outside central package management. -->
     <PackageReference Include="Fable.Core" Version="5.0" />
     <PackageReference Include="Fable.Elmish" Version="5.0.2" />
@@ -158,7 +158,7 @@
          than ProjectReferencing Fuaran.UI.Ops, it must carry them itself. Both are
          FSharp.Core-only + Fable-clean (source-packed under fable/), so Fable
          retranspiles the Core skeleton source in-browser. Versions matched to
-         fuaran/Directory.Packages.props. -->
+         fuaran-dotnet/Directory.Packages.props. -->
     <PackageReference Include="Fuaran.Core.Tree" Version="0.1.11" />
     <PackageReference Include="Fuaran.Core.Ops" Version="0.1.11" />
     <!-- The Pattern Bank fast path runs the real Fuaran.Core signature-search

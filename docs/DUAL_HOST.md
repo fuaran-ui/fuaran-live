@@ -65,7 +65,7 @@ own tree:
   pane posts the **shorthand** input and shows the before/after — the bare-string wire
   actually sent, and the verbose canonical form both hosts re-encode it to. The verdict
   distinguishes this green from the round-trip green ("§16 shorthand normalised to
-  identical canonical bytes"): per [`WIRE_FORMAT.md`](../../fuaran/docs/WIRE_FORMAT.md)
+  identical canonical bytes"): per [`WIRE_FORMAT.md`](../../fuaran-dotnet/docs/WIRE_FORMAT.md)
   §16 a conformant host MUST accept the shorthand and normalise it, so
   `canonical ≠ input` here is the claim working, not a divergence.
 
@@ -100,7 +100,7 @@ pnpm run fable:watch         # incremental, for dev
 ```
 
 `dotnet tool restore` (Fable 5 + Fantomas) is required once per checkout; the launcher runs
-it. The Fable host is consumed by **direct ProjectReference into the sibling `../fuaran`
+it. The Fable host is consumed by **direct ProjectReference into the sibling `../fuaran-dotnet`
 checkout** (the same workspace-checkout posture the conformance harness + the `@fuaran-ui/*`
 link bridge use during the bootstrap window) — see `fable-host/FableHost.fsproj`.
 
@@ -127,7 +127,7 @@ fuaran + fuaran-ts + fuaran-live), builds the dual artefact, and runs the gate.
 
 ## Known parity gaps
 
-Per the wire-format forward-coupling rule ([`WIRE_FORMAT.md`](../../../fuaran/docs/WIRE_FORMAT.md) §11),
+Per the wire-format forward-coupling rule ([`WIRE_FORMAT.md`](../../../fuaran-dotnet/docs/WIRE_FORMAT.md) §11),
 a cross-tier divergence is fixed in the F# **and** TS tiers together, in one change-set — never
 patched on one side from the consumer. fuaran-live is where the gate **detects** divergence; the
 fix lands in `fuaran` + `fuaran-ts`.
@@ -139,6 +139,6 @@ _None currently open._
   sentinel (a non-array `Static` options list the encoder could not serialise). The two renderers
   previously diverged — the F# renderer emitted one `<option><opaque></option>`, the TS renderer
   none. Phase 131 settled the cross-host contract: an opaque/non-array options source renders **no
-  concrete options** on every conformant host (recorded in [`WIRE_FORMAT.md`](../../../fuaran/docs/WIRE_FORMAT.md) §5).
+  concrete options** on every conformant host (recorded in [`WIRE_FORMAT.md`](../../../fuaran-dotnet/docs/WIRE_FORMAT.md) §5).
   The F# renderer now strips the decoder's opaque placeholder; the TS renderer already did so via
   its `asArray` coercion. `form-1` is now in the green parity matrix.

@@ -12,7 +12,7 @@
 
     Posture (mirrors tests/projection-conformance/fsharp-harness): the F#
     language tier is consumed by direct ProjectReference into the sibling
-    `../fuaran` checkout, NOT via the published packs – the same workspace-
+    `../fuaran-dotnet` checkout, NOT via the published packs – the same workspace-
     checkout binding the @fuaran-ui/* link bridge uses on the TS side. This
     keeps the Fable host always in step with the exact source that defines
     the canonical contract, with no pack-version staleness window.
@@ -39,7 +39,7 @@
     <ImportDirectoryBuildProps>false</ImportDirectoryBuildProps>
     <ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-    <!-- Fable client convention (mirrors fuaran/samples/demo + catalog): gate
+    <!-- Fable client convention (mirrors fuaran-dotnet/samples/demo + catalog): gate
          Fable-only files via FABLE_COMPILER so Fable transpiles them; DEBUG in
          non-Release. The host is never `dotnet build`-compiled to IL – it only
          ever goes through `dotnet fable` – but the constants keep parity with
@@ -59,7 +59,7 @@
          NOT linked: it moved to Fuaran.UI.Ops.Abstractions and now reaches this
          compile transitively via the Fuaran.UI.Renderer ProjectReference
          (Renderer → Telemetry.Abstractions → Ops.Abstractions). -->
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.Ops\JsonDecode.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\JsonDecode.fs">
       <Link>linked\JsonDecode.fs</Link>
     </Compile>
     <!-- Canonical wire ENCODER – linked Fable-safe (a self-contained structural
@@ -67,7 +67,7 @@
          so the parent's parity view can assert `encode(decode(wire))` is byte-
          identical to the sibling TS host's. Ordered after JsonDecode.fs; depends
          only on the linked Ops Types + Fuaran.Core + Fuaran.UI.Types. -->
-    <Compile Include="..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
       <Link>linked\CanonicalJson.fs</Link>
     </Compile>
     <!-- Phase 324/325 – the typed-data core bridge: exports Fuaran.UI.QueryBinding
@@ -83,14 +83,14 @@
     <!-- Typed tree + the renderer (transitively pulls Fuaran.UI). The renderer
          carries the parity-locked class vocabulary + reference-CSS contract
          this host renders against. -->
-    <ProjectReference Include="..\..\fuaran\src\Fuaran.UI\Fuaran.UI.fsproj" />
-    <ProjectReference Include="..\..\fuaran\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
+    <ProjectReference Include="..\..\fuaran-dotnet\src\Fuaran.UI\Fuaran.UI.fsproj" />
+    <ProjectReference Include="..\..\fuaran-dotnet\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Explicit versions: this project sits outside fuaran's central package
          management, so it pins the Fable-stack versions itself (matched to
-         fuaran/Directory.Packages.props). -->
+         fuaran-dotnet/Directory.Packages.props). -->
     <PackageReference Include="Fable.Core" Version="5.0" />
     <PackageReference Include="Fable.Elmish" Version="5.0.2" />
     <PackageReference Include="Fable.Elmish.React" Version="5.6" />

@@ -5,7 +5,7 @@ open Fable.Core
 // ─── the drift-checked prompt pack, inlined at build time ────────────────────
 //
 // The wire-format TEACHING is the language repo's AI-authoring prompt pack
-// (`fuaran/docs/prompt-pack/system-prompt.md`) – the exact system prompt the
+// (`fuaran-dotnet/docs/prompt-pack/system-prompt.md`) – the exact system prompt the
 // published evaluation measured, whose every wire example is generated from the
 // wire-format-fixtures corpus and drift-checked in the language repo's build
 // (`authoring-pack.fsx --check`). It is inlined here byte-for-byte via a Vite
@@ -26,7 +26,7 @@ open Fable.Core
 // fenced example decodes/applies through the app's own loop) and
 // test/promptPack.test.ts (the pack bytes + its eval-proven teachings are
 // actually inline).
-[<ImportDefault("../../fuaran/docs/prompt-pack/system-prompt.md?raw")>]
+[<ImportDefault("../../fuaran-dotnet/docs/prompt-pack/system-prompt.md?raw")>]
 let private packPrompt: string = jsNative
 
 // The chat-surface overlay. The first paragraph SUPERSEDES the pack's

@@ -5,7 +5,7 @@
 
     Every page is a Fuaran app rendered through the F# `Fuaran.UI.Renderer` – the
     site is exhibit zero for "UI as typed data". The language tier is consumed by
-    direct ProjectReference into the sibling ../../../fuaran checkout (the same
+    direct ProjectReference into the sibling ../../../fuaran-dotnet checkout (the same
     workspace-checkout binding the playground app uses); the Fable stack versions
     are pinned here since this project sits outside fuaran's central package
     management. Compiled only via `dotnet fable`, never `dotnet build`.
@@ -109,24 +109,24 @@
   <ItemGroup>
     <!-- Typed tree + the renderer (transitively pulls Fuaran.UI). The renderer
          carries the parity-locked class vocabulary + reference-CSS contract. -->
-    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI\Fuaran.UI.fsproj" />
-    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
+    <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI\Fuaran.UI.fsproj" />
+    <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
     <!-- Rosetta's F# host runs the real canonical encoder (CanonicalJson.encodeNode)
          + the Fable-safe SHA-256 – the byte-parity oracle the TS/Python hosts match. -->
-    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.OpStream.Abstractions\Fuaran.UI.OpStream.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\Fuaran.UI.OpStream.Abstractions.fsproj" />
     <!-- Infinite Skins' contrast auditor runs the shipped manifest-free WCAG
          derivation (Fuaran.UI.StyleObserver.Flags) over real computed DOM colours.
          The Abstractions project is FSharp.Core-only – Fable-safe. -->
-    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.StyleObserver.Abstractions\Fuaran.UI.StyleObserver.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.StyleObserver.Abstractions\Fuaran.UI.StyleObserver.Abstractions.fsproj" />
     <!-- Kintsugi's "senses" panel also runs the shipped manifest-free LayoutObserver
          overflow derivation over real DOM geometry. FSharp.Core-only – Fable-safe. -->
-    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.LayoutObserver.Abstractions\Fuaran.UI.LayoutObserver.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.LayoutObserver.Abstractions\Fuaran.UI.LayoutObserver.Abstractions.fsproj" />
     <!-- Git for Interfaces runs the real shipped structural 3-way merge engine
          (Fuaran.UI.OpStream.Dag.Merge – TreeMerge.merge3Way / merge3WayWithAuthor)
          in the browser; the engine is Fable-portable (the .NET-only
          Stopwatch/telemetry + DAG-verify paths are guarded). Pulls Fuaran.UI.Ops
          + OpStream.{Abstractions,Replay} + Dag.Abstractions. -->
-    <ProjectReference Include="..\..\..\fuaran\src\Fuaran.UI.OpStream.Dag.Merge\Fuaran.UI.OpStream.Dag.Merge.fsproj" />
+    <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Dag.Merge\Fuaran.UI.OpStream.Dag.Merge.fsproj" />
     <!-- The Pattern Bank runs the real Fuaran.Core signature-search engine
          (FunctionRegistry.findBySignature) – the same engine powering the shipped
          Fuaran.UI.FastPath package. A Fable-source-packed feed package (branch-
@@ -139,7 +139,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Explicit versions (matched to fuaran/Directory.Packages.props + the
+    <!-- Explicit versions (matched to fuaran-dotnet/Directory.Packages.props + the
          playground app project), since this sits outside central package
          management. -->
     <PackageReference Include="Fable.Core" Version="5.0" />

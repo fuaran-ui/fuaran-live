@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-dotnet
-          path: workspace/fuaran
+          path: workspace/fuaran-dotnet
 
       - name: Checkout fuaran-live (this repo)
         uses: actions/checkout@v4

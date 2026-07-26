@@ -230,9 +230,10 @@ body {
   gap: 0.75rem;
 }
 
-/* The two live-artefact cards (conformance + evaluation) read as a pair, so they
-   need the same separation from each other as from the page above them — the
-   cards' own 8px margin is too tight now that both sides are boxed. */
+/* Holds the conformance card alone — evaluation moved to its own page, since it
+   measures model behaviour rather than the page you are on. The flex gap keeps
+   the strip honest if a second page-scoped artefact ever joins it; the cards'
+   own 8px margin is too tight for boxed siblings. */
 .ds-status-strip {
   margin-top: 1rem;
   display: flex;

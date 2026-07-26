@@ -110,8 +110,9 @@ let private note =
     SpecUrl
 
 /// The shared status panel: a Fuaran card wrapping an honest-status callout plus
-/// the note above – the same shape as the evaluation card beside it, so the two
-/// live artefacts read as one pair. Grey (Subdued) on Pending/Stale, green
+/// the note above. It is the ONLY card in the status strip – evaluation moved to
+/// its own page, because this panel certifies the page you are looking at while
+/// that one measures model behaviour. Grey (Subdued) on Pending/Stale, green
 /// (Success) only on a genuine all-pass, red (Critical) on a reported failure.
 /// The tone can only be green when the report says every check passed.
 let panel (state: PanelState) : Node<'Msg> =

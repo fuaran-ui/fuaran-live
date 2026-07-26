@@ -71,7 +71,6 @@
     <Compile Include="Replay.fs" />
     <Compile Include="GoSessions.fs" />
     <Compile Include="Conformance.fs" />
-    <Compile Include="EvalCard.fs" />
     <Compile Include="Rosetta.fs" />
     <Compile Include="Attesor.fs" />
     <Compile Include="Teleport.fs" />

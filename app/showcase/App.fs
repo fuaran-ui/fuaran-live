@@ -60,14 +60,12 @@ type Model =
   { Route: Pages.Route
     Replay: Replay.ReplayState
     Conformance: Conformance.PanelState
-    Eval: EvalCard.CardState
     Dark: bool }
 
 type Msg =
   | HashChanged of string
   | ArtefactResult of Replay.ReplayState
   | ConformanceResult of Conformance.PanelState
-  | EvalResult of EvalCard.CardState
   | ToggleDark
 
 /// The per-route side effects: a demo page with a wired recording kicks the
@@ -109,13 +107,11 @@ let private init () : Model * Cmd<Msg> =
   { Route = route
     Replay = Replay.ReplayState.Loading
     Conformance = Conformance.PanelState.Pending
-    Eval = EvalCard.CardState.Loading
     Dark = dark },
   Cmd.batch
     [ hashListenerCmd
       mathEnhanceCmd
       Conformance.loadCmd ConformanceResult
-      EvalCard.loadCmd EvalResult
       routeCmd route
       Cmd.ofEffect (fun _ -> applyDarkClass dark) ]
 
@@ -130,7 +126,6 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     routeCmd route
   | ArtefactResult r -> { model with Replay = r }, Cmd.none
   | ConformanceResult c -> { model with Conformance = c }, Cmd.none
-  | EvalResult e -> { model with Eval = e }, Cmd.none
   | ToggleDark ->
     let dark = not model.Dark
 
@@ -193,11 +188,16 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
           Html.main
             [ prop.className "ds-main"
               prop.children [ Pages.renderRoute model.Route model.Replay ] ]
+          // Conformance only. The evaluation card left this strip deliberately:
+          // conformance certifies the trees and code on the page you are looking
+          // at, so it belongs beside every demo; evaluation measures how reliably
+          // a MODEL emits conformant Fuaran, which is a language-adoption metric
+          // whose home is the Evaluation page (and fuaran-ui.io, where the
+          // methodology and provenance live). Repeating its headline under every
+          // capability demo diluted it and taxed pages it said nothing about.
           Html.div
             [ prop.className "ds-status-strip"
-              prop.children
-                [ renderNode (Conformance.panel model.Conformance)
-                  renderNode (EvalCard.panel model.Eval) ] ]
+              prop.children [ renderNode (Conformance.panel model.Conformance) ] ]
           Pages.footer (Pages.footerWire model.Route model.Replay) ] ]
 
 Program.mkProgram init update view

@@ -80,6 +80,21 @@ jobs:
       - name: Restore .NET tools (Fable)
         run: dotnet tool restore
 
+      # The showcase's conformance panel renders a PUBLISHED artefact, not a
+      # hand-written badge: this step runs the projection-conformance gate and
+      # writes public/conformance/report.generated.json, which the build below
+      # copies into dist-showcase/. Without it the panel finds no file and shows
+      # its honest grey "no report has been published for this deploy yet" state.
+      #
+      # It runs BEFORE the build (Vite copies public/ at build time) and fails
+      # the deploy when the gate fails — a broken gate must not ship. The Fable
+      # compile is invoked here because the harness executes the projector from
+      # app/output/; the build step below reuses the same cached emission.
+      - name: Publish the conformance report
+        run: |
+          pnpm run fable:app
+          pnpm run conformance:report
+
       - name: Build showcase
         # The showcase's "open the playground" door targets the playground's
         # production origin (falls back to same-origin showcase.html when unset,

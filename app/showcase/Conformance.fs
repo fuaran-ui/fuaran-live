@@ -3,10 +3,12 @@ module Fuaran.Showcase.Conformance
 // ============================================================================
 //  The CI conformance-artifact panel – honest status, never a fake green.
 //
-//  The site's CI runs the cross-implementation wire-format conformance gate + the
-//  SSR-parity suite over the exhibit trees on every deploy and publishes a
-//  versioned report JSON to public/conformance/report.generated.json. This module
-//  loads that report and renders a shared panel. The load-bearing rule: when the
+//  The showcase deploy runs the projection-conformance gate (every Node fixture in
+//  the wire-format corpus, projected to source, executed, and byte-compared on
+//  re-encode) and publishes a versioned report JSON to
+//  public/conformance/report.generated.json — see scripts/conformance-report.mjs
+//  and public/conformance/README.md. This module loads that report and renders a
+//  shared panel. The load-bearing rule: when the
 //  report is MISSING or STALE the panel goes grey and says so – it never
 //  fabricates a pass. "Run the gate yourself" beats "trust the demo".
 // ============================================================================

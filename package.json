@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "conformance": "vitest run -c vitest.conformance.config.ts",
+    "conformance:report": "node scripts/conformance-report.mjs",
     "fable": "dotnet fable fable-host --outDir fable-host/output",
     "fable:watch": "dotnet fable watch fable-host --outDir fable-host/output",
     "build:dual": "pnpm run fable && tsc --noEmit && cross-env VITE_DUAL_HOST=1 vite build",

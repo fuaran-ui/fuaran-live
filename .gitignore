@@ -41,6 +41,12 @@ app/showcase/obj/
 app/showcase/fable_modules/
 app/showcase/*.log
 
+# The conformance-gate report the showcase panel renders. Generated per deploy by
+# `pnpm run conformance:report` (scripts/conformance-report.mjs) and copied into
+# the artifact by Vite; a committed copy would be stale by definition, and a
+# stale green is exactly what the panel exists to avoid.
+public/conformance/report.generated.json
+
 # Playwright (parity test) artefacts
 test-results/
 playwright-report/

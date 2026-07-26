@@ -84,8 +84,13 @@ jobs:
       # executes it against the real packages, and asserts the re-encode is
       # byte-identical. Runs its own vitest config, so it is a distinct gate from
       # the main `Test` step above.
+      # Run it through the publisher rather than bare `pnpm conformance`: the
+      # suite and the exit status are identical, and it additionally exercises
+      # scripts/conformance-report.mjs, the step the showcase deploy depends on
+      # to publish public/conformance/report.generated.json. A publisher that
+      # breaks should fail here, not at deploy time.
       - name: Conformance (projection ↔ wire-format corpus)
-        run: pnpm run conformance
+        run: pnpm run conformance:report
 
       - name: Build
         run: pnpm build

@@ -213,8 +213,14 @@ body {
   gap: 0.75rem;
 }
 
+/* The two live-artefact cards (conformance + evaluation) read as a pair, so they
+   need the same separation from each other as from the page above them — the
+   cards' own 8px margin is too tight now that both sides are boxed. */
 .ds-status-strip {
   margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .ds-footer {

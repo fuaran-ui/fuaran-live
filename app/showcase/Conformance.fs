@@ -90,11 +90,23 @@ let SpecUrl = "https://fuaran-ui.io/guide/wire-format"
 /// "85 of 85 checks pass" invites the reader to guess what was checked – and the
 /// honest claim is narrower and more interesting than the guess: the gate is a
 /// byte-comparison against the specification corpus, so conformance here is
-/// measured, not asserted. Kept accurate rather than flattering – it does NOT
-/// claim cross-host conformance or a rendering audit.
+/// measured, not asserted.
+///
+/// Ordered benefit-first deliberately. The mechanism is the reason to believe it,
+/// but it is not the reason to care – a reader who stops after the first line
+/// should already have the point (the code on these pages is real, and it
+/// travels). The closing paragraph is load-bearing in the other direction: this
+/// report does NOT cover a rendering audit or the full cross-host matrix, and a
+/// panel that exists to refuse a fake green cannot overclaim in its own note.
 let private note =
   sprintf
-    "**What this means.** Every node fixture in the [wire-format specification](%s) corpus is projected to source by this site's own projector, executed against the real `@fuaran-ui/*` packages, and re-encoded – and the bytes must match the fixture exactly. The trees these pages show you are therefore conformant by measurement, not by assertion, and the figures above come from this deploy's own run rather than a hand-written badge."
+    """**What this means.** The code on these pages is certified, not illustrative: copy it out and it reconstructs exactly the tree you were looking at, on any conformant host.
+
+**How it is checked.** Every node fixture in the [wire-format specification](%s) corpus is projected to source by this site's own projector, executed against the real `@fuaran-ui/*` packages, and re-encoded – and the bytes must match the fixture exactly. No structural comparison, no "close enough".
+
+**Why that is worth something.** The oracle is the published specification rather than this implementation's own expectations, and it is the same corpus every other host runs – so portability across hosts is measured, not promised. The figures above come from this deploy's own run and carry its commit, so the claim is checkable rather than a badge.
+
+**What it does not cover.** The node-fixture corpus through this site's projector: not a rendering audit, and not the full cross-host matrix."""
     SpecUrl
 
 /// The shared status panel: a Fuaran card wrapping an honest-status callout plus

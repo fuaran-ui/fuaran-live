@@ -27,9 +27,27 @@ jobs:
       # Sibling checkouts (both repos are public — no token needed): the Fable
       # app project-references ../fuaran-dotnet; the conformance gate reads
       # ../wire-format-fixtures.
+      #
+      # fuaran-dotnet is PINNED to a release tag, and the two siblings are
+      # deliberately pinned differently:
+      #
+      #   - The F# tier is consumed by PROJECT REFERENCE, so its source is part
+      #     of this app's compile. Floating on its default branch meant any
+      #     upstream push could redden this repo with no commit here — which is
+      #     what happened on 2026-07-27, when Phase 330 added a required
+      #     RenderContext field and all six workflows failed on a CI-only
+      #     commit. A tag turns that into a deliberate bump: raise the ref, fix
+      #     what the new contract needs, land it in one reviewed change.
+      #   - The corpus stays UNPINNED on purpose. It is the shared conformance
+      #     gate every host certifies against, and the whole point of giving it
+      #     one home is that all hosts see the same current spec. Pinning it
+      #     would reintroduce exactly the drift that split bought out.
+      #
+      # To bump: raise the ref in all six workflows together (grep the tag).
       - uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-dotnet
+          ref: v0.6.0
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4

@@ -36,7 +36,12 @@ jobs:
       - name: Checkout fuaran (F# tier)
         uses: actions/checkout@v4
         with:
+          # Pinned to a release tag: the F# tier is a PROJECT REFERENCE, so a
+          # floating default branch let any upstream push redden this repo with no
+          # commit here. Rationale + bump procedure in ci.yml. The corpus checkout
+          # stays unpinned deliberately — it is the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
+          ref: v0.6.0
           path: workspace/fuaran-dotnet
 
       - name: Checkout fuaran-live (this repo)

@@ -258,7 +258,8 @@ let private renderTree (n: Node<unit>) : ReactElement =
       InErrorBoundary = false
       Fragments = Render.collectFragments Map.empty n
       ExpandingFragments = Set.empty
-      Scope = None }
+      Scope = None
+      SessionContext = Map.empty }
     n
 
 [<ReactComponent>]

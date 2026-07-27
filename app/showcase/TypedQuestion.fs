@@ -195,7 +195,8 @@ let private renderLive (node: Node<obj>) : ReactElement =
       InErrorBoundary = false
       Fragments = Render.collectFragments Map.empty node
       ExpandingFragments = Set.empty
-      Scope = None }
+      Scope = None
+      SessionContext = Map.empty }
     node
 
 let private renderStatic (n: Node<'msg>) : ReactElement =

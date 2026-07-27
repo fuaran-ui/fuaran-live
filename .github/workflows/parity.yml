@@ -25,13 +25,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Assemble the workspace layout:
-      #   <root>/wire-format-fixtures   (fuaran-specification — the parity fixtures)
+      #   <root>/wire-format-fixtures   (fuaran-ui-specification — the parity fixtures)
       #   <root>/fuaran                 (F# tier — Fable host project reference)
       #   <root>/fuaran-live            (this repo)
-      - name: Checkout the wire-format corpus (fuaran-specification)
+      - name: Checkout the wire-format corpus (fuaran-ui-specification)
         uses: actions/checkout@v4
         with:
-          repository: fuaran-ui/fuaran-specification
+          repository: fuaran-ui/fuaran-ui-specification
           path: workspace/wire-format-fixtures
 
       - name: Checkout fuaran (F# tier)

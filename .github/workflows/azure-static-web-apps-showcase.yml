@@ -54,7 +54,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: fuaran-ui/fuaran-specification
+          repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
 
       - uses: pnpm/action-setup@v4

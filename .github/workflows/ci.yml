@@ -4,7 +4,7 @@ name: CI
 # pnpm-lock.yaml is authoritative (installs are --frozen-lockfile). The F#/Fable
 # app project-references the sibling F# tier, and the conformance gate reads the
 # shared wire-format corpus, so both public repos are checked out as siblings.
-# Local verification: clone fuaran-dotnet as ../fuaran-dotnet and fuaran-specification
+# Local verification: clone fuaran-dotnet as ../fuaran-dotnet and fuaran-ui-specification
 # as ../wire-format-fixtures, then `pnpm install && pnpm run build && pnpm test`.
 
 on:
@@ -34,7 +34,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: fuaran-ui/fuaran-specification
+          repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
 
       - uses: pnpm/action-setup@v4

@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 # Builds the static dist/ and publishes it to GitHub Pages. The app is fully
 # static — no server, no secrets; the visitor supplies their own provider key
 # at runtime, client-side only. The F#/Fable app project-references the
-# sibling F# tier, so the public fuaran-dotnet + fuaran-specification repos
+# sibling F# tier, so the public fuaran-dotnet + fuaran-ui-specification repos
 # are checked out as siblings (see ci.yml).
 
 on:
@@ -36,7 +36,7 @@ jobs:
           path: fuaran-dotnet
       - uses: actions/checkout@v4
         with:
-          repository: fuaran-ui/fuaran-specification
+          repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
       - uses: pnpm/action-setup@v4
         with:

@@ -152,6 +152,7 @@
     <Compile Include="PatternBank.fs" />
     <Compile Include="navigator\OpLog.fs" />
     <Compile Include="navigator\PropertyEditor.fs" />
+    <Compile Include="navigator\StructuralEdit.fs" />
     <Compile Include="navigator\Navigator.fs" />
     <Compile Include="navigator\ProjectionSync.fs" />
     <Compile Include="navigator\Refine.fs" />

@@ -513,35 +513,46 @@ type CommitOutcome =
   /// candidate tree was never folded in.
   | Rejected of message: string
 
-/// Build the op, apply it to a CANDIDATE, gate the candidate on the validator,
-/// and only then fold it into the session. Pure; never throws.
-let commit (session: Session.SessionState) (node: Node<obj>) (field: Field) (raw: string) : CommitOutcome =
+/// **The navigator's one edit gate**, generic over the op — apply it to a
+/// CANDIDATE tree, refuse on a defect the edit INTRODUCES, and only then fold.
+/// It landed here because the property panel was the first route to need it, but
+/// nothing about it is property-specific: the structural edits (Phase 713) go
+/// through this same function rather than restating the gate, so "what the
+/// navigator will accept" has exactly one definition and cannot drift into two.
+/// Pure; never throws.
+let commitOp (session: Session.SessionState) (op: TreeOp<obj>) : CommitOutcome =
   match session.Tree with
   | None -> Rejected "there is no tree to edit"
   | Some tree ->
+    match ApplyEngine.apply op tree with
+    | Error e -> Rejected e.Message
+    | Ok candidate ->
+      match introduced tree candidate with
+      | [] ->
+        let canonOp = Canon.encodeOp op
+
+        // Phase 712 — the same fold, now attributed. The op is recorded
+        // against `navigatorActor` (a `Human`), which is what makes "what did
+        // the person change, as opposed to the model" answerable from the
+        // stream afterwards rather than only from memory. `recordOp` also
+        // truncates any redo tail: committing after undoing abandons the
+        // undone branch.
+        Committed
+          { session with
+              Tree = Some candidate
+              Ops = session.Ops @ [ canonOp ]
+              Snapshots = session.Snapshots @ [ candidate ]
+              Log = Session.recordOp session Session.navigatorActor op canonOp }
+      | defects -> Rejected(String.concat "; " defects)
+
+/// Build the op a field change becomes, then run it through the gate above.
+let commit (session: Session.SessionState) (node: Node<obj>) (field: Field) (raw: string) : CommitOutcome =
+  match session.Tree with
+  | None -> Rejected "there is no tree to edit"
+  | Some _ ->
     match opFor node field raw with
     | Error message -> Rejected message
-    | Ok op ->
-      match ApplyEngine.apply op tree with
-      | Error e -> Rejected e.Message
-      | Ok candidate ->
-        match introduced tree candidate with
-        | [] ->
-          let canonOp = Canon.encodeOp op
-
-          // Phase 712 — the same fold, now attributed. The op is recorded
-          // against `navigatorActor` (a `Human`), which is what makes "what did
-          // the person change, as opposed to the model" answerable from the
-          // stream afterwards rather than only from memory. `recordOp` also
-          // truncates any redo tail: committing a field after undoing abandons
-          // the undone branch.
-          Committed
-            { session with
-                Tree = Some candidate
-                Ops = session.Ops @ [ canonOp ]
-                Snapshots = session.Snapshots @ [ candidate ]
-                Log = Session.recordOp session Session.navigatorActor op canonOp }
-        | defects -> Rejected(String.concat "; " defects)
+    | Ok op -> commitOp session op
 
 // ─── flat diagnostic surface (cross-boundary friendly) ───────────────────────
 //

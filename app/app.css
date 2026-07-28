@@ -2031,3 +2031,46 @@ body {
   margin: 0.35rem 0 0;
 }
 
+
+/* ─── Navigator structural edits (Phase 713) ────────────────────────────────── */
+
+/* The structural row sits between the node card and the walk controls: it acts
+   on the node the card describes, so it belongs beside it rather than in the
+   navigation strip below. As with the property panel, there is deliberately no
+   per-kind rule — the palette's contents are derived, so its styling is one
+   generic shape. */
+
+.fl-nav-structural {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fl-nav-palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--fuaran-color-border, var(--ds-border));
+  border-radius: 6px;
+}
+
+.fl-nav-palette .fl-nav-field-input {
+  width: auto;
+  min-width: 9rem;
+}
+
+/* Carrying a node while you walk is a MODE, and a mode the user can forget
+   they are in — so it is stated in place, not hinted at by a changed cursor. */
+
+.fl-nav-held {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--fuaran-color-text-muted);
+}
+
+.fl-nav-structural .fl-nav-field-error {
+  grid-column: auto;
+}

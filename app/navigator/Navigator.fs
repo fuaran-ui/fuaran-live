@@ -407,8 +407,16 @@ let private publishCursor (path: string array) : unit =
 
 let private helpHint =
   "↓/j next · ↑/k previous · ←/h parent · →/l first child · Home root · \
+n insert · m pick up/drop · Alt+↑/↓ reorder · Delete remove (twice to confirm) · Esc cancel · \
 Ctrl+Z undo · Ctrl+Shift+Z redo. \
 The walk is depth-first and stops at both ends — it does not wrap."
+
+/// A placement in words, for the placement select and the destination readout.
+let private describePlacement (placement: StructuralEdit.Placement) : string =
+  match placement with
+  | StructuralEdit.Placement.Last -> "at the end"
+  | StructuralEdit.Placement.Before anchor -> "before #" + idText anchor
+  | StructuralEdit.Placement.After anchor -> "after #" + idText anchor
 
 let private emptyState: ReactElement =
   Html.div
@@ -429,6 +437,19 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
   let tree = session.Tree
   let stored, setStored = React.useState (None: NavCursor option)
 
+  // The structural editor (Phase 713). Five pieces of local state, and only one
+  // of them survives a cursor move: `held` — carrying a node while you walk to
+  // its new parent IS the pick-up/drop interaction, so it is cleared by a drop
+  // or by Escape, never by the walk. The other four are reset the moment focus
+  // lands elsewhere (the effect below), so an armed removal or a placement
+  // naming a sibling of the node you just left can never be committed.
+  let paletteOpen, setPaletteOpen = React.useState false
+  let placementSel, setPlacementSel = React.useState ""
+  let kindSel, setKindSel = React.useState ""
+  let removeArmed, setRemoveArmed = React.useState false
+  let structuralError, setStructuralError = React.useState (None: string option)
+  let held, setHeld = React.useState (None: string option)
+
   let cursor = tree |> Option.map (fun root -> reresolve root stored)
 
   // Re-apply the highlight after EVERY render (no dependency array): React owns
@@ -448,10 +469,154 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
   // `publishCursor` swallows an unchanged path, so this does not churn.
   React.useEffect (fun () -> cursor |> Option.map cursorIds |> Option.defaultValue [||] |> publishCursor)
 
+  // Phase 713 — a new focus means a new destination, so the placement anchor,
+  // the chosen kind, the armed removal and the last refusal all go. Same
+  // reasoning (and same shape) as the property panel's draft reset one level
+  // down: state keyed to a node must not outlive the cursor's stay on it.
+  let focusedKey = cursor |> Option.map focusedText |> Option.defaultValue ""
+
+  React.useEffect (
+    (fun () ->
+      setPlacementSel ""
+      setKindSel ""
+      setRemoveArmed false
+      setStructuralError None),
+    [| box focusedKey |]
+  )
+
   let move (f: Node<obj> -> NavCursor -> NavCursor) =
     match tree, cursor with
     | Some root, Some c -> setStored (Some(f root c))
     | _ -> ()
+
+  // ── the structural destination ─────────────────────────────────────────────
+  //
+  // Where an insertion would land: inside the focused node when it takes
+  // children, otherwise beside it under its parent — the reading of "insert
+  // here" that is useful at a leaf, which is where the cursor mostly is. The
+  // placement select overrides the second half of that answer; `placementSel`
+  // empty means "whatever the cursor implies", so the readout stays live as the
+  // walk moves rather than freezing on the first node visited.
+
+  let insertTarget =
+    match tree, cursor with
+    | Some root, Some c ->
+      focusedId c
+      |> Option.bind (StructuralEdit.defaultTarget root)
+      |> Option.map (fun target ->
+        if placementSel = "" then
+          target
+        else
+          { target with
+              Placement = StructuralEdit.parsePlacement placementSel })
+    | _ -> None
+
+  // The palette runs a decode + apply + validate per candidate kind, so it is
+  // computed only while the panel is open and memoised on everything it depends
+  // on — the destination and the tree itself. The tree's canonical JSON is the
+  // honest key: an edit anywhere can change what is legal here, and a cheaper
+  // key (an op count, a child count) would be a guess about which edits matter.
+  let paletteKey =
+    match insertTarget with
+    | Some target when paletteOpen ->
+      idText target.ParentId
+      + "|"
+      + StructuralEdit.placementSpec target.Placement
+      + "|"
+      + OpLog.canonicalTree session
+    | _ -> ""
+
+  let paletteEntries =
+    React.useMemo (
+      (fun () ->
+        match insertTarget with
+        | Some target when paletteKey <> "" -> StructuralEdit.palette session target
+        | _ -> []),
+      [| box paletteKey |]
+    )
+
+  /// The kind the Insert button would use: the explicit choice while it is still
+  /// on offer, else the first thing offered.
+  let chosenKind =
+    if paletteEntries |> List.exists (fun entry -> entry.Kind = kindSel) then
+      kindSel
+    else
+      paletteEntries |> List.tryHead |> Option.map _.Kind |> Option.defaultValue ""
+
+  // ── the one structural commit path ─────────────────────────────────────────
+  //
+  // Every structural action funnels through here: on acceptance the cursor is
+  // landed DELIBERATELY (the caller says where) and the session is handed to
+  // `onEdit` — the same channel a property commit and an undo use, so every
+  // other pane follows a structural edit exactly as it follows any other. On
+  // refusal nothing moves and the reason is shown inline; the session was never
+  // mutated in the first place, so there is nothing to restore.
+  let structural (landing: NodeId option) (result: PropertyEditor.CommitOutcome) =
+    match result with
+    | PropertyEditor.Committed next ->
+      setStructuralError None
+      setRemoveArmed false
+
+      match landing, next.Tree with
+      | Some id, Some root ->
+        match pathTo root id with
+        | Some path -> setStored (Some { Path = path })
+        | None -> ()
+      | _ -> ()
+
+      onEdit next
+    | PropertyEditor.Rejected message -> setStructuralError (Some message)
+
+  let doInsert () =
+    match insertTarget, paletteEntries |> List.tryFind (fun entry -> entry.Kind = chosenKind) with
+    | Some target, Some entry -> structural (Some entry.Node.Id) (StructuralEdit.insert session target entry.Node)
+    | _ -> ()
+
+  let doRemove () =
+    match tree, cursor |> Option.bind focusedId with
+    | Some root, Some id ->
+      // Computed BEFORE the op, while the node is still there to have
+      // neighbours; applied after, so focus lands where the user was looking.
+      let landing = StructuralEdit.fallbackAfterRemove root id
+      structural landing (StructuralEdit.remove session id)
+    | _ -> ()
+
+  let doNudge (delta: int) =
+    match cursor |> Option.bind focusedId with
+    | Some id -> structural (Some id) (StructuralEdit.nudge session id delta)
+    | None -> ()
+
+  let doDrop () =
+    match tree, held, cursor |> Option.bind focusedId with
+    | Some root, Some heldId, Some focus ->
+      let moved = NodeId heldId
+
+      match StructuralEdit.defaultTarget root focus with
+      | Some target when StructuralEdit.canDrop root moved target.ParentId ->
+        setHeld None
+        structural (Some moved) (StructuralEdit.move session target moved)
+      | Some _ -> setStructuralError (Some "a node cannot move into itself or into something inside it")
+      | None -> setStructuralError (Some "there is nowhere here to drop it")
+    | _ -> ()
+
+  /// Pick the focused node up, or — when something is already held — drop it
+  /// here. One key, because it is one gesture.
+  let doPickUpOrDrop () =
+    match held, tree, cursor |> Option.bind focusedId with
+    | Some _, _, _ -> doDrop ()
+    | None, Some root, Some id ->
+      if (Introspect.findParent id root).IsSome then
+        setHeld (Some(idText id))
+        setStructuralError None
+      else
+        setStructuralError (Some "the root node has nowhere to move to")
+    | _ -> ()
+
+  let doCancel () =
+    setHeld None
+    setRemoveArmed false
+    setPaletteOpen false
+    setStructuralError None
 
   // Undo/redo rebuild the session by REPLAY (see `OpLog`) and hand the result
   // back through `onEdit`, the same channel a property commit uses — so every
@@ -473,6 +638,17 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
         stepHistory (if ev.shiftKey then OpLog.redo else OpLog.undo)
         true
       | _ when ev.ctrlKey || ev.metaKey -> false
+      // Phase 713 — Alt+↑/↓ reorder the focused node among its siblings. Alt is
+      // claimed before the bare arrows below for the same reason Ctrl is: the
+      // plain arrow is already a walk binding, and a guard that ran after it
+      // would never be reached.
+      | "ArrowUp" when ev.altKey ->
+        doNudge -1
+        true
+      | "ArrowDown" when ev.altKey ->
+        doNudge 1
+        true
+      | _ when ev.altKey -> false
       | "ArrowDown"
       | "j" ->
         move next
@@ -494,6 +670,28 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
          | Some root -> setStored (Some(atRoot root))
          | None -> ())
 
+        true
+      // Phase 713 — the structural gestures. `Delete` arms on the first press
+      // and commits on the second: a subtree removal is the one edit here whose
+      // undo, though real, costs the user a moment of alarm, and an in-UI
+      // confirmation says so without reaching for a native dialog (which would
+      // put a second browser dependency in a module whose only DOM touch is the
+      // preview highlight).
+      | "n"
+      | "N" ->
+        setPaletteOpen (not paletteOpen)
+        setStructuralError None
+        true
+      | "m"
+      | "M" ->
+        doPickUpOrDrop ()
+        true
+      | "Delete"
+      | "Backspace" ->
+        if removeArmed then doRemove () else setRemoveArmed true
+        true
+      | "Escape" ->
+        doCancel ()
         true
       | _ -> false
 
@@ -580,11 +778,145 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
                   Html.pre [ prop.className "fl-code fl-nav-props"; prop.text (propSummary node) ]
                   PropertyPanel session node onEdit ] ]
 
+      // ── the structural panel (Phase 713) ──────────────────────────────────
+      //
+      // Everything on it is derived: the destination from the cursor, the
+      // placement options from the destination parent's actual children, and
+      // the kind list from the schema (filtered to what would really be
+      // accepted here). Nothing is enumerated by hand, so a kind added to the
+      // language and a child added to the tree both show up with no edit here.
+      let structuralPanel =
+        let destination =
+          match insertTarget with
+          | None -> Html.span [ prop.className "fl-nav-count"; prop.text "nowhere to insert from here" ]
+          | Some target ->
+            Html.span
+              [ prop.className "fl-nav-count"
+                prop.text ("into #" + idText target.ParentId + ", " + describePlacement target.Placement) ]
+
+        let placementSelect =
+          match insertTarget with
+          | None -> Html.none
+          | Some target ->
+            let options =
+              ("last", "at the end")
+              :: [ for kid in StructuralEdit.childIdsOf root target.ParentId do
+                     let id = idText kid
+                     yield "before:" + id, "before #" + id
+                     yield "after:" + id, "after #" + id ]
+
+            Html.select
+              [ prop.className "fl-nav-field-input"
+                prop.ariaLabel "Where the new node goes"
+                prop.value (StructuralEdit.placementSpec target.Placement)
+                prop.onChange (fun (v: string) -> setPlacementSel v)
+                prop.children [ for value, label in options -> Html.option [ prop.value value; prop.text label ] ] ]
+
+        let kindSelect =
+          match paletteEntries with
+          | [] ->
+            Html.span
+              [ prop.className "fl-nav-field-why"
+                prop.text "nothing can be inserted here — this node holds no children" ]
+          | entries ->
+            Html.select
+              [ prop.className "fl-nav-field-input"
+                prop.ariaLabel "What to insert"
+                prop.value chosenKind
+                prop.onChange (fun (v: string) -> setKindSel v)
+                prop.children [ for entry in entries -> Html.option [ prop.value entry.Kind; prop.text entry.Kind ] ] ]
+
+        let paletteBlock =
+          if not paletteOpen then
+            Html.none
+          else
+            Html.div
+              [ prop.className "fl-nav-palette"
+                prop.children
+                  [ destination
+                    placementSelect
+                    kindSelect
+                    Html.button
+                      [ prop.className "fl-btn"
+                        prop.text "Insert"
+                        prop.disabled (String.length chosenKind = 0)
+                        prop.title
+                          "Appends, or emits Batch [InsertChild, ReorderChildren] when the placement is not last"
+                        prop.onClick (fun _ -> doInsert ()) ] ] ]
+
+        let carrying =
+          match held with
+          | None -> Html.none
+          | Some id ->
+            Html.p
+              [ prop.className "fl-nav-held"
+                prop.role "status"
+                prop.text (
+                  "Carrying #"
+                  + id
+                  + " — walk to where it should go and press Drop (m). The move appends; a placement that is not last \
+adds a ReorderChildren naming every sibling."
+                ) ]
+
+        let refusal =
+          match structuralError with
+          | None -> Html.none
+          | Some message -> Html.p [ prop.className "fl-nav-field-error"; prop.role "alert"; prop.text message ]
+
+        Html.div
+          [ prop.className "fl-nav-structural"
+            prop.children
+              [ Html.div
+                  [ prop.className "fl-nav-controls"
+                    prop.children
+                      [ Html.button
+                          [ prop.className (if paletteOpen then "fl-btn" else "fl-btn ghost")
+                            prop.text "＋ Insert…"
+                            prop.title "n — choose a kind and a placement"
+                            prop.onClick (fun _ ->
+                              setPaletteOpen (not paletteOpen)
+                              setStructuralError None) ]
+                        Html.button
+                          [ prop.className "fl-btn ghost"
+                            prop.text (
+                              match held with
+                              | Some _ -> "▼ Drop here"
+                              | None -> "✥ Pick up"
+                            )
+                            prop.title "m — pick the focused node up, then walk to its new parent and drop it"
+                            prop.onClick (fun _ -> doPickUpOrDrop ()) ]
+                        Html.button
+                          [ prop.className "fl-btn ghost"
+                            prop.text "⤒ Move up"
+                            prop.title "Alt+↑ — ReorderChildren naming the full sibling order"
+                            prop.onClick (fun _ -> doNudge -1) ]
+                        Html.button
+                          [ prop.className "fl-btn ghost"
+                            prop.text "⤓ Move down"
+                            prop.title "Alt+↓ — ReorderChildren naming the full sibling order"
+                            prop.onClick (fun _ -> doNudge 1) ]
+                        Html.button
+                          [ prop.className (if removeArmed then "fl-btn" else "fl-btn ghost")
+                            prop.text (if removeArmed then "Confirm remove" else "🗑 Remove")
+                            prop.title "Delete — press twice; the whole subtree goes, and Ctrl+Z brings it back"
+                            prop.onClick (fun _ -> if removeArmed then doRemove () else setRemoveArmed true) ]
+                        (if removeArmed then
+                           Html.button
+                             [ prop.className "fl-btn ghost"
+                               prop.text "Cancel"
+                               prop.onClick (fun _ -> setRemoveArmed false) ]
+                         else
+                           Html.none) ] ]
+                paletteBlock
+                carrying
+                refusal ] ]
+
       Html.div
         [ prop.className "fl-nav-body"
           prop.children
             [ crumbs
               card
+              structuralPanel
               Html.div
                 [ prop.className "fl-nav-controls"
                   prop.children

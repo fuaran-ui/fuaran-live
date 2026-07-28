@@ -1,0 +1,442 @@
+// Phase 713 – the Navigator's structural edits (insert / remove / move /
+// reorder), exercised headlessly over the Fable output. The module lives in
+// app/navigator/StructuralEdit.fs and compiles to
+// app/output/navigator/StructuralEdit.js; this drives it in node via vitest,
+// following the Phase 710/711/712 pattern (flat string/array projections across
+// the Fable boundary, every fixture fed through the REAL strict decoder via the
+// session's own ingest path, so nothing here is a hand-waved shape).
+//
+// The suite's central claim is the 0.4.0 placement rule: membership and order
+// are SEPARATE ops, `InsertChild` / `MoveNode` append, and placing anywhere but
+// last is `Batch [InsertChild …, ReorderChildren …]` stating the order by
+// naming ids. So the strongest assertion here is a negative one — no integer
+// position appears anywhere in any op this module emits, ever — and it is made
+// by sweeping the canonical JSON of every op the whole suite produces.
+//
+// The second claim is that undo covers STRUCTURE for free: the ops go through
+// the same recorded channel a property edit uses, so Phase 712's replay undoes
+// a subtree removal exactly as it undoes a heading level, byte-for-byte.
+//
+// Requires `pnpm run fable:app` (the app build) to have produced app/output/.
+
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+// Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
+// @ts-expect-error untyped Fable output
+import { empty, ingestResult } from '../app/output/Session.js';
+import {
+  // @ts-expect-error untyped Fable output
+  paletteKinds,
+  // @ts-expect-error untyped Fable output
+  insertAt,
+  // @ts-expect-error untyped Fable output
+  removeAt,
+  // @ts-expect-error untyped Fable output
+  moveTo,
+  // @ts-expect-error untyped Fable output
+  nudgeAt,
+  // @ts-expect-error untyped Fable output
+  childIds,
+  // @ts-expect-error untyped Fable output
+  defaultTargetSpec,
+  // @ts-expect-error untyped Fable output
+  fallbackIdAfterRemove,
+  // @ts-expect-error untyped Fable output
+  canDropAt,
+  // @ts-expect-error untyped Fable output
+  lastOpJson,
+} from '../app/output/navigator/StructuralEdit.js';
+import {
+  // @ts-expect-error untyped Fable output
+  undoN,
+  // @ts-expect-error untyped Fable output
+  redoN,
+  // @ts-expect-error untyped Fable output
+  canonicalTree,
+  // @ts-expect-error untyped Fable output
+  originKinds,
+  // @ts-expect-error untyped Fable output
+  originIds,
+  // @ts-expect-error untyped Fable output
+  logKinds,
+  // @ts-expect-error untyped Fable output
+  verifyResult,
+} from '../app/output/navigator/OpLog.js';
+
+// ─── fixtures ────────────────────────────────────────────────────────────────
+
+// root ▸ (a, card ▸ (x, y), c) – two levels, so a move has somewhere to go.
+const baseTree =
+  '{"id":"root","kind":{"$type":"Box","children":[' +
+  '{"id":"a","kind":{"$type":"Markdown","text":"A"}},' +
+  '{"id":"card","kind":{"$type":"Box","children":[' +
+  '{"id":"x","kind":{"$type":"Markdown","text":"X"}},' +
+  '{"id":"y","kind":{"$type":"Markdown","text":"Y"}}],' +
+  '"layout":{"$type":"Auto"},"role":"Card"}},' +
+  '{"id":"c","kind":{"$type":"Markdown","text":"C"}}],' +
+  '"layout":{"$type":"Auto"},"role":"Dashboard"}}';
+
+function session(wire: string) {
+  const r = ingestResult(empty, wire);
+  if (!r.Ok) {
+    throw new Error(`fixture did not decode: ${r.Error}\n${wire}`);
+  }
+  return r.Next;
+}
+
+const seeded = () => session(baseTree);
+
+/** Every op emitted anywhere in this file, collected for the sweep at the end. */
+const emitted: string[] = [];
+
+/** Run a structural entry point, record whatever op it emitted, hand back the result. */
+function act(result: { Ok: boolean; Error: string; Next: unknown }) {
+  if (result.Ok) {
+    emitted.push(lastOpJson(result.Next));
+  }
+  return result;
+}
+
+const op = (s: unknown) => JSON.parse(lastOpJson(s));
+
+// ─── the palette is derived, not written ─────────────────────────────────────
+
+describe('the insert palette is derived from the schema', () => {
+  it('offers a substantial set of kinds under a Box', () => {
+    const kinds = paletteKinds(seeded(), 'root', 'last') as string[];
+    // The exact membership is a function of the schema, not of this file – so
+    // the assertion is a floor, not a list. A palette that collapsed to a
+    // handful would mean the synthesiser had stopped understanding the schema.
+    expect(kinds.length).toBeGreaterThan(10);
+    expect(kinds).toContain('Heading');
+    expect(kinds).toContain('Markdown');
+    expect(kinds).toContain('Box');
+  });
+
+  it('offers nothing under a kind that takes no children', () => {
+    // `a` is a Markdown: InsertChild cannot reach into it, so the gate the
+    // palette runs refuses every candidate and the offer set is empty. This is
+    // the "validator-checked before offer" claim: the palette and the button
+    // are the same code path, so they cannot disagree.
+    expect(paletteKinds(seeded(), 'a', 'last')).toEqual([]);
+  });
+
+  it('names no node kind in its own source', () => {
+    // The source lock, mirroring Phase 711's: the module derives its vocabulary
+    // and must not carry a hand-maintained one. `Node` / `NodeKind` are the
+    // schema's own structural def names, which the walk legitimately follows.
+    const source = readFileSync(
+      fileURLToPath(new URL('../app/navigator/StructuralEdit.fs', import.meta.url)),
+      'utf8',
+    );
+    for (const kind of ['Heading', 'Markdown', 'Metric', 'DataGrid', 'Badge', 'Chart', 'Tabs']) {
+      expect(source).not.toContain(kind);
+    }
+  });
+});
+
+// ─── insertion, and the placement rule ───────────────────────────────────────
+
+describe('insertion states placement by naming ids', () => {
+  it('emits a bare InsertChild when the node goes last', () => {
+    const r = act(insertAt(seeded(), 'root', 'last', 'Heading'));
+    expect(r.Ok).toBe(true);
+
+    const emittedOp = op(r.Next);
+    expect(emittedOp.$type).toBe('InsertChild');
+    expect(emittedOp.parentId).toBe('root');
+    expect((childIds(r.Next, 'root') as string[]).slice(0, 3)).toEqual(['a', 'card', 'c']);
+    expect(childIds(r.Next, 'root')).toHaveLength(4);
+  });
+
+  it('emits exactly Batch [InsertChild, ReorderChildren] when it goes before a sibling', () => {
+    const r = act(insertAt(seeded(), 'root', 'before:card', 'Heading'));
+    expect(r.Ok).toBe(true);
+
+    const batch = op(r.Next);
+    expect(batch.$type).toBe('Batch');
+    expect(batch.ops.map((o: { $type: string }) => o.$type)).toEqual([
+      'InsertChild',
+      'ReorderChildren',
+    ]);
+
+    // The order is stated by naming every sibling id, in the wanted order.
+    const inserted = batch.ops[0].child.id as string;
+    expect(batch.ops[1].parentId).toBe('root');
+    expect(batch.ops[1].newOrder).toEqual(['a', inserted, 'card', 'c']);
+    expect(childIds(r.Next, 'root')).toEqual(['a', inserted, 'card', 'c']);
+  });
+
+  it('places after a sibling by the same route', () => {
+    const r = act(insertAt(seeded(), 'root', 'after:a', 'Markdown'));
+    expect(r.Ok).toBe(true);
+
+    const batch = op(r.Next);
+    const inserted = batch.ops[0].child.id as string;
+    expect(childIds(r.Next, 'root')).toEqual(['a', inserted, 'card', 'c']);
+  });
+
+  it('does not emit a reorder that restates the append', () => {
+    // "after the last sibling" IS the append, so the second leg would say
+    // nothing – and an op that says nothing is noise in a provenance log.
+    const r = act(insertAt(seeded(), 'root', 'after:c', 'Markdown'));
+    expect(r.Ok).toBe(true);
+    expect(op(r.Next).$type).toBe('InsertChild');
+  });
+
+  it('mints an id that is fresh against the whole tree, every time', () => {
+    let s = seeded();
+    const before = new Set(childIds(s, 'root') as string[]);
+
+    const first = act(insertAt(s, 'root', 'last', 'Heading'));
+    expect(first.Ok).toBe(true);
+    const second = act(insertAt(first.Next, 'root', 'last', 'Heading'));
+    expect(second.Ok).toBe(true);
+
+    const after = childIds(second.Next, 'root') as string[];
+    const minted = after.filter((id) => !before.has(id));
+    expect(minted).toHaveLength(2);
+    expect(new Set(minted).size).toBe(2);
+    // …and neither collides with anything that was already in the tree.
+    for (const id of minted) {
+      expect(['root', 'a', 'card', 'x', 'y', 'c']).not.toContain(id);
+    }
+  });
+
+  it('refuses to insert into a kind that takes no children, changing nothing', () => {
+    const s = seeded();
+    const before = canonicalTree(s);
+    const r = insertAt(s, 'a', 'last', 'Heading');
+
+    expect(r.Ok).toBe(false);
+    expect(r.Error).not.toBe('');
+    expect(canonicalTree(r.Next)).toBe(before);
+    expect(logKinds(r.Next)).toEqual(logKinds(s));
+  });
+});
+
+// ─── removal, and where the cursor lands ─────────────────────────────────────
+
+describe('removal falls back to a surviving neighbour', () => {
+  it('removes the focused node', () => {
+    const r = act(removeAt(seeded(), 'card'));
+    expect(r.Ok).toBe(true);
+    expect(op(r.Next).$type).toBe('RemoveNode');
+    expect(childIds(r.Next, 'root')).toEqual(['a', 'c']);
+  });
+
+  it('prefers the previous sibling, then the next, then the parent', () => {
+    const s = seeded();
+    expect(fallbackIdAfterRemove(s, 'card')).toBe('a'); // previous
+    expect(fallbackIdAfterRemove(s, 'a')).toBe('card'); // no previous → next
+    expect(fallbackIdAfterRemove(s, 'c')).toBe('card'); // previous
+    expect(fallbackIdAfterRemove(s, 'root')).toBe(''); // the root has no parent
+  });
+
+  it('falls back to the parent when the last child goes', () => {
+    let s = seeded();
+    s = act(removeAt(s, 'x')).Next;
+    expect(fallbackIdAfterRemove(s, 'y')).toBe('card');
+  });
+
+  it('refuses to remove the root, changing nothing', () => {
+    const s = seeded();
+    const before = canonicalTree(s);
+    const r = removeAt(s, 'root');
+
+    expect(r.Ok).toBe(false);
+    expect(canonicalTree(r.Next)).toBe(before);
+  });
+});
+
+// ─── moving ──────────────────────────────────────────────────────────────────
+
+describe('a move appends, and states any other placement by id', () => {
+  it('emits a bare MoveNode when the node lands last', () => {
+    const r = act(moveTo(seeded(), 'a', 'card', 'last'));
+    expect(r.Ok).toBe(true);
+    expect(op(r.Next).$type).toBe('MoveNode');
+    expect(childIds(r.Next, 'card')).toEqual(['x', 'y', 'a']);
+    expect(childIds(r.Next, 'root')).toEqual(['card', 'c']);
+  });
+
+  it('emits Batch [MoveNode, ReorderChildren] for any other placement', () => {
+    const r = act(moveTo(seeded(), 'a', 'card', 'before:y'));
+    expect(r.Ok).toBe(true);
+
+    const batch = op(r.Next);
+    expect(batch.$type).toBe('Batch');
+    expect(batch.ops.map((o: { $type: string }) => o.$type)).toEqual([
+      'MoveNode',
+      'ReorderChildren',
+    ]);
+    expect(batch.ops[1].newOrder).toEqual(['x', 'a', 'y']);
+    expect(childIds(r.Next, 'card')).toEqual(['x', 'a', 'y']);
+  });
+
+  it('re-places a node within its current parent', () => {
+    const r = act(moveTo(seeded(), 'c', 'root', 'before:a'));
+    expect(r.Ok).toBe(true);
+    expect(childIds(r.Next, 'root')).toEqual(['c', 'a', 'card']);
+  });
+
+  it('will not drop a node into itself or its own descendant', () => {
+    const s = seeded();
+    expect(canDropAt(s, 'card', 'card')).toBe(false);
+    expect(canDropAt(s, 'card', 'x')).toBe(false); // x takes no children anyway
+    expect(canDropAt(s, 'a', 'card')).toBe(true);
+
+    const r = moveTo(s, 'root', 'card', 'last');
+    expect(r.Ok).toBe(false);
+    expect(canonicalTree(r.Next)).toBe(canonicalTree(s));
+  });
+});
+
+// ─── sibling reordering ──────────────────────────────────────────────────────
+
+describe('reordering names the full sibling order', () => {
+  it('moves the focused node up one place', () => {
+    const r = act(nudgeAt(seeded(), 'card', -1));
+    expect(r.Ok).toBe(true);
+
+    const emittedOp = op(r.Next);
+    expect(emittedOp.$type).toBe('ReorderChildren');
+    expect(emittedOp.parentId).toBe('root');
+    expect(emittedOp.newOrder).toEqual(['card', 'a', 'c']);
+    expect(childIds(r.Next, 'root')).toEqual(['card', 'a', 'c']);
+  });
+
+  it('moves the focused node down one place', () => {
+    const r = act(nudgeAt(seeded(), 'a', 1));
+    expect(r.Ok).toBe(true);
+    expect(op(r.Next).newOrder).toEqual(['card', 'a', 'c']);
+  });
+
+  it('says so at either end rather than silently doing nothing', () => {
+    const s = seeded();
+    const up = nudgeAt(s, 'a', -1);
+    expect(up.Ok).toBe(false);
+    expect(up.Error).toContain('first');
+
+    const down = nudgeAt(s, 'c', 1);
+    expect(down.Ok).toBe(false);
+    expect(down.Error).toContain('last');
+
+    const root = nudgeAt(s, 'root', -1);
+    expect(root.Ok).toBe(false);
+  });
+});
+
+// ─── the destination a cursor implies ────────────────────────────────────────
+
+describe('the destination a focused node implies', () => {
+  it('is inside the node when it takes children', () => {
+    expect(defaultTargetSpec(seeded(), 'card')).toBe('card|last');
+    expect(defaultTargetSpec(seeded(), 'root')).toBe('root|last');
+  });
+
+  it('is beside the node when it does not', () => {
+    expect(defaultTargetSpec(seeded(), 'a')).toBe('root|after:a');
+    expect(defaultTargetSpec(seeded(), 'x')).toBe('card|after:x');
+  });
+});
+
+// ─── undo covers structure, because it never knew about props ────────────────
+
+describe('undo restores the prior structure byte-identically', () => {
+  const roundTrip = (label: string, edit: (s: unknown) => { Ok: boolean; Next: unknown }) =>
+    it(label, () => {
+      const s = seeded();
+      const before = canonicalTree(s);
+
+      const r = edit(s);
+      expect(r.Ok).toBe(true);
+      expect(canonicalTree(r.Next)).not.toBe(before);
+
+      expect(canonicalTree(undoN(r.Next, 1))).toBe(before);
+      // …and forward again, so the op really is the whole difference.
+      expect(canonicalTree(redoN(undoN(r.Next, 1), 1))).toBe(canonicalTree(r.Next));
+    });
+
+  roundTrip('after an insert', (s) => act(insertAt(s, 'root', 'before:card', 'Heading')));
+  roundTrip('after a removal of a whole subtree', (s) => act(removeAt(s, 'card')));
+  roundTrip('after a move', (s) => act(moveTo(s, 'a', 'card', 'before:y')));
+  roundTrip('after a reorder', (s) => act(nudgeAt(s, 'card', -1)));
+
+  it('undoes a mixed run of structural edits in one sweep', () => {
+    let s = seeded();
+    const before = canonicalTree(s);
+
+    s = act(insertAt(s, 'card', 'before:y', 'Heading')).Next;
+    s = act(nudgeAt(s, 'a', 1)).Next;
+    s = act(moveTo(s, 'c', 'card', 'last')).Next;
+    s = act(removeAt(s, 'x')).Next;
+
+    expect(canonicalTree(s)).not.toBe(before);
+    expect(canonicalTree(undoN(s, 4))).toBe(before);
+  });
+});
+
+// ─── provenance ──────────────────────────────────────────────────────────────
+
+describe('structural ops are recorded like every other edit', () => {
+  it('attributes them to the navigator as a human actor', () => {
+    let s = seeded();
+    s = act(insertAt(s, 'root', 'last', 'Heading')).Next;
+    s = act(nudgeAt(s, 'a', 1)).Next;
+
+    expect(originKinds(s)).toEqual(['human', 'human']);
+    expect(originIds(s)).toEqual(['navigator', 'navigator']);
+    expect(logKinds(s)).toEqual(['InsertChild', 'ReorderChildren']);
+  });
+
+  it('keeps the session reconstructible from its base plus the ops', () => {
+    let s = seeded();
+    s = act(insertAt(s, 'card', 'before:x', 'Heading')).Next;
+    s = act(removeAt(s, 'y')).Next;
+
+    const report = verifyResult(s);
+    expect(report.ReplayOk).toBe(true);
+    expect(report.ChainOk).toBe(true);
+    expect(report.Steps).toBe(2);
+  });
+});
+
+// ─── the negative claim, swept over everything above ─────────────────────────
+
+describe('no emitted op carries an integer position', () => {
+  it('never writes position / newPosition, and never an ordinal in place of an id', () => {
+    // Guard the guard: if the suite above stopped emitting, this would pass
+    // vacuously and prove nothing.
+    expect(emitted.length).toBeGreaterThan(10);
+
+    const forbidden = (value: unknown, path: string): void => {
+      if (Array.isArray(value)) {
+        value.forEach((v, i) => forbidden(v, `${path}[${i}]`));
+        return;
+      }
+      if (value !== null && typeof value === 'object') {
+        for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+          expect(key, `${path}.${key}`).not.toBe('position');
+          expect(key, `${path}.${key}`).not.toBe('newPosition');
+          forbidden(v, `${path}.${key}`);
+        }
+      }
+    };
+
+    for (const json of emitted) {
+      expect(json).not.toBe('');
+      forbidden(JSON.parse(json), 'op');
+    }
+
+    // Every `newOrder` entry is an id string, never a number – the whole point
+    // of the rule is that order is stated in the tree's own identity model.
+    for (const json of emitted) {
+      for (const match of json.matchAll(/"newOrder":\[(.*?)\]/g)) {
+        expect(match[1]).not.toMatch(/(^|,)\s*-?\d/);
+      }
+    }
+  });
+});

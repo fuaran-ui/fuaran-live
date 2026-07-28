@@ -170,6 +170,23 @@ describe('every applied op is recorded with its origin', () => {
     expect(recorded(s)).toBe(0);
     expect(cursor(s)).toBe(0);
   });
+
+  it('leaves no redo tail behind when a new base arrives', () => {
+    let s = seeded();
+    s = edit(s, 'h', 'Text', 'One');
+    s = edit(s, 'h', 'Text', 'Two');
+    s = undoN(s, 2);
+    expect(canRedo(s)).toBe(true);
+
+    // Every new-base path goes through `Session.rebase` (a full-tree emission
+    // here; a loaded example in the shell). Clearing the ops but keeping the
+    // record would leave `canRedo` saying yes about ops recorded against a tree
+    // that is gone — which reads as correct right up to the moment someone
+    // presses redo, and then replays against the wrong base.
+    s = ingest(s, baseTree);
+    expect(canRedo(s)).toBe(false);
+    expect(recorded(s)).toBe(0);
+  });
 });
 
 // ─── undo / redo by replay ───────────────────────────────────────────────────

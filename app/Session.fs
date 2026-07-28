@@ -133,6 +133,22 @@ let baseHash (session: SessionState) : string =
   | Some tree -> HashChain.sha256Hex (Canon.encodeNode tree)
   | None -> HashChain.genesisPreviousHash
 
+/// Re-point the session at a new base tree: the op sequence, the snapshots and
+/// the attributed record all reset together, because none of them can replay
+/// against a tree they were not built from.
+///
+/// This exists as ONE function rather than three field assignments at each call
+/// site because the three must move together and nothing checks that they did.
+/// A site that cleared `Ops` and `Snapshots` but kept `Log` would look correct
+/// and leave a redo tail pointing at a base that no longer exists — `canRedo`
+/// would say yes and the replay would be against the wrong tree.
+let rebase (tree: Node<obj>) (session: SessionState) : SessionState =
+  { session with
+      Tree = Some tree
+      Ops = []
+      Snapshots = [ tree ]
+      Log = [] }
+
 /// The `Log` that results from appending one freshly-applied op. Truncates the
 /// redo tail first — a new edit made after an undo abandons the undone branch
 /// (linear history; DAG branching is deliberately out of scope) — then chains
@@ -276,18 +292,11 @@ let ingestBy (actor: Actor) (session: SessionState) (rawAssistantText: string) :
         let tree = WireTree.reify node
 
         // A full-tree emission is a new base: the op sequence that built the old
-        // tree cannot replay against it, so the record resets with `Ops` and
-        // `Snapshots` rather than accumulating across the discontinuity. The
-        // export of a reset session is therefore honest about what it can
-        // reproduce — this base plus these ops — and nothing more.
-        Ingested(
-          "tree",
-          { session with
-              Tree = Some tree
-              Ops = []
-              Snapshots = [ tree ]
-              Log = [] }
-        )
+        // tree cannot replay against it, so the record resets rather than
+        // accumulating across the discontinuity. The export of a reset session is
+        // therefore honest about what it can reproduce — this base plus these
+        // ops — and nothing more.
+        Ingested("tree", rebase tree session)
 
 /// `ingestBy` with the closed loop's default origin — an `Agent` op whose model
 /// id is unknown at this seam (see `modelActor`). The signature is unchanged from

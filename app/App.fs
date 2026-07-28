@@ -824,11 +824,11 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
           ParityTs = None
           ParityFs = None
           ParityFixture = None
-          Session =
-            { model.Session with
-                Tree = Some tree
-                Ops = []
-                Snapshots = [ tree ] } }
+          // A loaded example is a new base — op sequence, snapshots and the
+          // attributed record reset together (Phase 712's `rebase`), so a redo
+          // tail can never survive to be replayed against a tree it was not
+          // recorded against.
+          Session = Session.rebase tree model.Session }
 
     let delta =
       if model.Presenting || model.Pair.Status = WebRtc.PeerState.Connected then

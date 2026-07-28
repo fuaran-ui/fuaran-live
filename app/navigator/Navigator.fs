@@ -40,6 +40,12 @@ open Fuaran.UI.Types
 module Introspect = Fuaran.UI.Ops.Introspect
 module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 
+/// The host's effect seam, bound to the browser implementation exactly as the
+/// shell binds it. The export itself takes the `EffectPorts` INTERFACE
+/// (`OpLog.download`), so the seam is intact and a different host swaps its own;
+/// this binding only picks the default for the pane the browser mounts.
+let private effects = Byok.browserEffectPorts
+
 // ─── the cursor model (pure — no DOM, no React) ──────────────────────────────
 
 /// A cursor over a Fuaran tree, addressed **by id**: the path of `NodeId`s from
@@ -447,9 +453,26 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
     | Some root, Some c -> setStored (Some(f root c))
     | _ -> ()
 
+  // Undo/redo rebuild the session by REPLAY (see `OpLog`) and hand the result
+  // back through `onEdit`, the same channel a property commit uses — so every
+  // other pane follows a time-step exactly as it follows an edit, and the
+  // cursor re-resolves against the rebuilt tree by the Phase 710 fallback rule
+  // (`cursor` is re-derived from `session.Tree` on each render, so a node the
+  // undo removed hands focus to its deepest surviving ancestor rather than to
+  // whatever now sits at the old position).
+  let stepHistory (f: Session.SessionState -> Session.SessionState option) = f session |> Option.iter onEdit
+
   let onKeyDown (ev: Browser.Types.KeyboardEvent) =
     let handled =
+      // Modified keys first: the plain-letter moves below are single-key
+      // bindings, so Ctrl+Z must be claimed before `ev.key` is matched bare.
+      // Browsers report the letter case-shifted while Shift is held, hence both.
       match ev.key with
+      | "z"
+      | "Z" when ev.ctrlKey || ev.metaKey ->
+        stepHistory (if ev.shiftKey then OpLog.redo else OpLog.undo)
+        true
+      | _ when ev.ctrlKey || ev.metaKey -> false
       | "ArrowDown"
       | "j" ->
         move next
@@ -476,6 +499,45 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
 
     if handled then
       ev.preventDefault ()
+
+  // The history row: where the session stands in its recorded op sequence, the
+  // two replay steps, and the export. The readout is deliberately explicit
+  // ("3 of 5 ops") rather than a bare pair of arrows — the whole claim of this
+  // tab is that the session IS its op stream, so saying where you are in that
+  // stream is the honest thing to put on screen.
+  let historyControls =
+    let applied = OpLog.cursor session
+    let total = OpLog.recorded session
+
+    Html.div
+      [ prop.className "fl-nav-controls"
+        prop.children
+          [ Html.span
+              [ prop.className "fl-nav-count"
+                prop.text (
+                  if total = 0 then
+                    "no ops recorded"
+                  else
+                    sprintf "op %d of %d" applied total
+                ) ]
+            Html.button
+              [ prop.className "fl-btn ghost"
+                prop.text "↶ Undo"
+                prop.disabled (not (OpLog.canUndo session))
+                prop.title "Ctrl+Z — replay the session to the previous op"
+                prop.onClick (fun _ -> stepHistory OpLog.undo) ]
+            Html.button
+              [ prop.className "fl-btn ghost"
+                prop.text "↷ Redo"
+                prop.disabled (not (OpLog.canRedo session))
+                prop.title "Ctrl+Shift+Z — replay one op forward"
+                prop.onClick (fun _ -> stepHistory OpLog.redo) ]
+            Html.button
+              [ prop.className "fl-btn ghost"
+                prop.text "Download session op log"
+                prop.title
+                  "The base tree, every applied op with its origin, and the final tree — as canonical wire JSON"
+                prop.onClick (fun _ -> OpLog.download effects session) ] ] ]
 
   let body =
     match tree, cursor with
@@ -541,7 +603,8 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
                       Html.button
                         [ prop.className "fl-btn ghost"
                           prop.text "First child ▸"
-                          prop.onClick (fun _ -> move firstChild) ] ] ] ] ]
+                          prop.onClick (fun _ -> move firstChild) ] ] ]
+              historyControls ] ]
     | _ -> emptyState
 
   Html.div

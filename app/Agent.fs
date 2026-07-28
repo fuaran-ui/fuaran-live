@@ -922,7 +922,10 @@ let runAgentLoop
                 emissionError <- Some err.Message
                 deps.Emit(TimelineEntry.PanelEmission(nextSeq (), payload.PanelId, "panel", false, false, err.Message))
             | None ->
-              match Session.ingest working.Value text with
+              // Phase 712 — the loop knows which model produced this text, so
+              // the op it applies is recorded against that model rather than a
+              // bare "an agent did it". Same reasoning as `panelAuthor` above.
+              match Session.ingestBy (Session.modelActor deps.Model) working.Value text with
               | Session.Ingested(mode, next) ->
                 working.Value <-
                   { next with

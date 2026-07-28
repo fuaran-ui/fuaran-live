@@ -527,11 +527,20 @@ let commit (session: Session.SessionState) (node: Node<obj>) (field: Field) (raw
       | Ok candidate ->
         match introduced tree candidate with
         | [] ->
+          let canonOp = Canon.encodeOp op
+
+          // Phase 712 — the same fold, now attributed. The op is recorded
+          // against `navigatorActor` (a `Human`), which is what makes "what did
+          // the person change, as opposed to the model" answerable from the
+          // stream afterwards rather than only from memory. `recordOp` also
+          // truncates any redo tail: committing a field after undoing abandons
+          // the undone branch.
           Committed
             { session with
                 Tree = Some candidate
-                Ops = session.Ops @ [ Canon.encodeOp op ]
-                Snapshots = session.Snapshots @ [ candidate ] }
+                Ops = session.Ops @ [ canonOp ]
+                Snapshots = session.Snapshots @ [ candidate ]
+                Log = Session.recordOp session Session.navigatorActor op canonOp }
         | defects -> Rejected(String.concat "; " defects)
 
 // ─── flat diagnostic surface (cross-boundary friendly) ───────────────────────

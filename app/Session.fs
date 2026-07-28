@@ -23,6 +23,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fuaran.UI.Types
 open Fuaran.UI.Ops.Types
+open Fuaran.UI.OpStream.Abstractions
 open Fuaran.Live.Ports
 
 module Decode = Fuaran.UI.Ops.JsonDecode
@@ -30,6 +31,60 @@ module ApplyEngine = Fuaran.UI.Ops.Apply
 module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 
 type ConversationTurn = { Role: ProviderRole; Content: string }
+
+// ─── the attributed op record (Phase 712) ────────────────────────────────────
+//
+// `Ops` below already records WHAT changed; what it cannot answer is WHO changed
+// it. That question is the whole point of a provenance-bearing editor: a session
+// in which a human retyped a heading and a model rewrote a chart is a different
+// artefact from one the model produced alone, and only the record can tell them
+// apart afterwards.
+//
+// The attribution rides the estate's SHIPPED contract rather than a second
+// vocabulary invented here: `Actor` (Human / Agent, from the op-stream
+// abstractions) is the same DU the panel chain records and the same one the
+// other hosts encode byte-identically. Folding it through
+// `HashChain.computeHash` puts it INSIDE the hash, so re-attributing an op after
+// the fact breaks the chain — attribution is tamper-evident, not merely written
+// down. That is the difference between a log and provenance.
+
+/// A fixed timestamp, so the session chain is CONTENT-ADDRESSED — a pure
+/// function of prev-hash + sequence + actor + op, exactly as the panel chain is
+/// (Phase 466). Replaying the same ops in the same order reproduces the same
+/// hashes, which is what makes an exported log checkable by whoever receives it;
+/// a wall-clock stamp would make every replay disagree with the original.
+/// Public because verification has to hash with the same value the record was
+/// written with — a verifier that supplies its own timestamp checks nothing.
+let chainTimestamp =
+  System.DateTimeOffset(2020, 1, 1, 0, 0, 0, System.TimeSpan.Zero)
+
+/// The top-level `$type` of a canonical op document — the op's kind, for display.
+[<Emit("(function(j){ try { var t = JSON.parse(j).$type; return (typeof t === 'string') ? t : 'op'; } catch(e){ return 'op'; } })($0)")>]
+let private opKindOf (canonJson: string) : string = jsNative
+
+/// The origin marker for an op a HUMAN authored — a navigator property-panel
+/// commit. One stable id: the playground has no accounts, so claiming a user
+/// identity would be a fiction; what is true and useful is the surface.
+let navigatorActor: Actor = Actor.Human "navigator"
+
+/// The origin marker for an op the MODEL emitted through the closed loop.
+/// `model` is the provider's model id where the caller knows it (`ingestBy`);
+/// the plain `ingest` path is not told which model produced the text, and
+/// records an empty model rather than guessing one — an `Agent` attribution
+/// with an unknown model is honest, a fabricated model id is not.
+let modelActor (model: string) : Actor = Actor.Agent(model, "", "emission")
+
+/// One applied op's worth of provenance: its position in the session stream,
+/// its canonical bytes, who authored it, and the hash chaining it to its
+/// predecessor. Mirrors the panel chain's `ChainEntry` (Phase 466) — same
+/// primitive, same `computeHash` call, one scope up.
+type LogEntry =
+  { Seq: int
+    OpJson: string
+    OpKind: string
+    Actor: Actor
+    Hash: string
+    Prev: string }
 
 type SessionState =
   {
@@ -44,6 +99,14 @@ type SessionState =
     /// apply engine, so the replay is op-by-op and exact. Reset on a full-tree
     /// replacement.
     Snapshots: Node<obj> list
+    /// The attributed, hash-chained record of the session's ops (Phase 712) —
+    /// one entry per op of `Ops`, in the same order, **plus any redo tail**.
+    ///
+    /// The undo cursor is not stored: it IS `List.length Ops`. Entries at or past
+    /// that index are undone-but-redoable, which is why this list can be longer
+    /// than `Ops` and never shorter. A new edit made while undone truncates the
+    /// tail (`recordOp`), so the history stays linear — see `OpLog`.
+    Log: LogEntry list
     /// The conversation transcript.
     History: ConversationTurn list
   }
@@ -52,7 +115,51 @@ let empty: SessionState =
   { Tree = None
     Ops = []
     Snapshots = []
+    Log = []
     History = [] }
+
+// ─── recording ───────────────────────────────────────────────────────────────
+
+/// The tree the recorded sequence replays from — `Snapshots[0]`, the session's
+/// base. `None` before the first emission.
+let baseTree (session: SessionState) : Node<obj> option = List.tryHead session.Snapshots
+
+/// The chain seed: the content hash of the base tree, so the chain is BOUND to
+/// the tree it started from — an op log replayed against a different base does
+/// not verify, rather than verifying against the wrong thing. Genesis before
+/// there is a base at all.
+let baseHash (session: SessionState) : string =
+  match baseTree session with
+  | Some tree -> HashChain.sha256Hex (Canon.encodeNode tree)
+  | None -> HashChain.genesisPreviousHash
+
+/// The `Log` that results from appending one freshly-applied op. Truncates the
+/// redo tail first — a new edit made after an undo abandons the undone branch
+/// (linear history; DAG branching is deliberately out of scope) — then chains
+/// the new entry onto whatever is now the head. Pure: returns the list, applies
+/// nothing, and never throws.
+let recordOp (session: SessionState) (actor: Actor) (op: TreeOp<obj>) (canonOp: string) : LogEntry list =
+  let cursor = List.length session.Ops
+  let kept = session.Log |> List.truncate cursor
+
+  let prev =
+    kept
+    |> List.tryLast
+    |> Option.map (fun e -> e.Hash)
+    |> Option.defaultValue (baseHash session)
+
+  let seq = cursor + 1
+
+  let hash =
+    HashChain.computeHash prev op seq chainTimestamp actor None OpResultEnvelope.Success
+
+  kept
+  @ [ { Seq = seq
+        OpJson = canonOp
+        OpKind = opKindOf canonOp
+        Actor = actor
+        Hash = hash
+        Prev = prev } ]
 
 // ─── leaf string helpers (verbatim port of session.ts, as inline JS) ─────────
 
@@ -117,8 +224,10 @@ type IngestOutcome =
 
 /// Decode + apply a model emission against the current session, returning the next
 /// session on success or a typed error on failure. Pure – never mutates `session`,
-/// never throws.
-let ingest (session: SessionState) (rawAssistantText: string) : IngestOutcome =
+/// never throws. `actor` is the origin recorded against the applied op (Phase 712)
+/// – an emission is an `Agent` op; the navigator's own edits record as `Human`
+/// through `PropertyEditor.commit`.
+let ingestBy (actor: Actor) (session: SessionState) (rawAssistantText: string) : IngestOutcome =
   let json = extractJsonRaw rawAssistantText
 
   if isNull json then
@@ -143,12 +252,19 @@ let ingest (session: SessionState) (rawAssistantText: string) : IngestOutcome =
           match ApplyEngine.apply op tree with
           | Error e -> IngestFailed { Kind = "apply"; Message = e.Message }
           | Ok newTree ->
+            let canonOp = Canon.encodeOp op
+
+            // The redo tail (if the user had undone anything) is truncated by
+            // `recordOp`, so `Ops` and the applied prefix of `Log` stay the same
+            // sequence — a model emission after an undo abandons the undone
+            // branch exactly as a human edit does.
             Ingested(
               "op",
               { session with
                   Tree = Some newTree
-                  Ops = session.Ops @ [ Canon.encodeOp op ]
-                  Snapshots = session.Snapshots @ [ newTree ] }
+                  Ops = session.Ops @ [ canonOp ]
+                  Snapshots = session.Snapshots @ [ newTree ]
+                  Log = recordOp session actor op canonOp }
             )
     else
       match Decode.decodeNode json with
@@ -159,13 +275,25 @@ let ingest (session: SessionState) (rawAssistantText: string) : IngestOutcome =
         // raw `Node<obj>` the session cache + renderer + apply engine work over.
         let tree = WireTree.reify node
 
+        // A full-tree emission is a new base: the op sequence that built the old
+        // tree cannot replay against it, so the record resets with `Ops` and
+        // `Snapshots` rather than accumulating across the discontinuity. The
+        // export of a reset session is therefore honest about what it can
+        // reproduce — this base plus these ops — and nothing more.
         Ingested(
           "tree",
           { session with
               Tree = Some tree
               Ops = []
-              Snapshots = [ tree ] }
+              Snapshots = [ tree ]
+              Log = [] }
         )
+
+/// `ingestBy` with the closed loop's default origin — an `Agent` op whose model
+/// id is unknown at this seam (see `modelActor`). The signature is unchanged from
+/// before Phase 712, so every existing call site keeps working.
+let ingest (session: SessionState) (rawAssistantText: string) : IngestOutcome =
+  ingestBy (modelActor "") session rawAssistantText
 
 // ─── pre-emit advisories (Phase 664) ─────────────────────────────────────────
 //

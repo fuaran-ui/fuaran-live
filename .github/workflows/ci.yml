@@ -93,8 +93,12 @@ jobs:
           pnpm run fable:app
           pnpm run fable
 
-      - name: Test
-        run: pnpm test
+      # `pnpm test` chains the unit suite AND the conformance suite (the local
+      # one-command gate). CI runs the unit leg alone here because the
+      # conformance leg runs once below through the publisher — running the
+      # full corpus suite twice per build buys nothing.
+      - name: Test (unit suite)
+        run: pnpm run test:unit
 
       # The multi-language source projector (app/Projection.fs) is kept honest by
       # the codegen-conformance harness: for every Node fixture in the shared

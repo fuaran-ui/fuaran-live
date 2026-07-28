@@ -78,6 +78,17 @@ that fails a plain `dotnet build` immediately with this explanation (design-time
 `-p:SkipFableOnlyGuard=true` bypasses it). The Fable compile via `scripts/fable-app.mjs` is the
 typecheck gate.
 
+**Test gate — `pnpm test` runs BOTH vitest suites, and both are required before any commit.** It
+chains `test:unit` (`vitest.config.ts`, the `test/` suite) and `conformance`
+(`vitest.conformance.config.ts`, the `tests/projection-conformance/` harness, which executes the
+Fable-compiled projector's generated source against the real `@fuaran-ui/*` packages and asserts a
+byte-identical re-encode over every Node fixture in the sibling `../wire-format-fixtures` corpus).
+The split exists because a projection change can break the byte round-trip while the entire unit
+suite stays green — the conformance leg is the only local check that catches it, so it rides the
+default `pnpm test` rather than being a separate opt-in run. Both legs consume Fable output, so
+`pnpm run fable:app` must have run first. CI runs the same two suites (`ci.yml` runs the unit leg
+plus the conformance publisher; `conformance.yml` is the dedicated corpus gate).
+
 ## Dependencies
 
 The `@fuaran-ui/*` packages resolve from the public npm registry (`^0.1.0`). The committed

@@ -34,8 +34,13 @@ Or drive the package manager directly:
 pnpm install
 pnpm dev        # serve on 24040
 pnpm build      # static dist/
-pnpm test       # vitest
+pnpm test       # the full test gate: unit suite + wire-format conformance suite
 ```
+
+`pnpm test` runs both vitest suites: the unit tests (`test/`) and the projection-conformance
+suite (`tests/projection-conformance/`), which re-encodes every Node fixture in the sibling
+`../wire-format-fixtures` corpus byte-identically. Both consume the Fable-compiled output, so
+run `pnpm run fable:app` (or `pnpm build`) first. `pnpm run test:unit` runs the unit leg alone.
 
 The static build runs from any plain static host, or directly from `file://` (`base: './'` emits relative asset URLs).
 

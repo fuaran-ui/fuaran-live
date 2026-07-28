@@ -47,7 +47,12 @@ import {
   canDropAt,
   // @ts-expect-error untyped Fable output
   lastOpJson,
+  // @ts-expect-error untyped Fable output
+  schemaKinds,
+  // @ts-expect-error untyped Fable output
+  defaultWireFor,
 } from '../app/output/navigator/StructuralEdit.js';
+import { decodeNode, encodeNode } from '@fuaran-ui/ops';
 import {
   // @ts-expect-error untyped Fable output
   undoN,
@@ -401,6 +406,84 @@ describe('structural ops are recorded like every other edit', () => {
     expect(report.ReplayOk).toBe(true);
     expect(report.ChainOk).toBe(true);
     expect(report.Steps).toBe(2);
+  });
+});
+
+// ─── the emitter lock ────────────────────────────────────────────────────────
+//
+// The synthesiser hand-shapes wire JSON in JS, which makes it an in-page wire
+// emitter in this repo's sense, so it ships with its lock (CLAUDE.md
+// "Emitter-lock convention"). It is registered in the standing inventory at
+// test/emitterLocks.test.ts, which points back here.
+//
+// The lock is NOT the plain byte-identical round-trip the showcase emitters use,
+// and the reason is worth stating because it was measured rather than assumed.
+// The synthesiser emits each kind's REQUIRED fields and nothing else — a minimal
+// emission in the §16 lenient-accept family — and the decoder normalises six of
+// them UPWARD: it materialises defaulted optionals the schema does not mark
+// required (`Chart.stacked`, `Tabs.activeIndex`, `Stepper.onSelect`) and the
+// typed empty payload of a slot-typed `Static` binding (`Map`/`Select`/
+// `Sparkline` sources). Asserting byte-identity would therefore assert a bar the
+// format does not hold this input to. The other 34 kinds ARE byte-identical.
+//
+// So the lock makes the two claims that are genuinely load-bearing:
+//
+//   1. every synthesised default decodes through the real strict decoder, and
+//      normalisation reaches a FIXED POINT in one pass (a shape that normalised
+//      differently on each pass would be unstable on the wire);
+//   2. normalisation is ADDITIVE ONLY — every key and value the synthesiser
+//      emitted survives into the canonical form unchanged. That is the assertion
+//      that catches the drift class the convention exists for: a union branch
+//      spelled non-canonically (a `{"$type":"Literal"}` envelope where canon is
+//      a bare string) decodes fine but is REPLACED on re-encode, so the emitted
+//      value would not survive and this lock goes red.
+
+/** Every key/value in `emitted` appears, deeply equal, in `canonical`. */
+function survives(emitted: unknown, canonical: unknown, path: string): void {
+  if (Array.isArray(emitted)) {
+    expect(Array.isArray(canonical), path).toBe(true);
+    expect((canonical as unknown[]).length, `${path}.length`).toBe(emitted.length);
+    emitted.forEach((v, i) => survives(v, (canonical as unknown[])[i], `${path}[${i}]`));
+    return;
+  }
+  if (emitted !== null && typeof emitted === 'object') {
+    expect(canonical !== null && typeof canonical === 'object', path).toBe(true);
+    for (const [key, v] of Object.entries(emitted as Record<string, unknown>)) {
+      expect(canonical as Record<string, unknown>, `${path}.${key} survives`).toHaveProperty(key);
+      survives(v, (canonical as Record<string, unknown>)[key], `${path}.${key}`);
+    }
+    return;
+  }
+  expect(canonical, path).toBe(emitted);
+}
+
+describe('the synthesised defaults are strictly decodable and normalisation-stable', () => {
+  it('decodes, reaches a fixed point, and loses nothing it emitted', () => {
+    const s = seeded();
+    const kinds = schemaKinds() as string[];
+    expect(kinds.length).toBeGreaterThan(20);
+
+    let locked = 0;
+    for (const kind of kinds) {
+      const wire = defaultWireFor(s, kind) as string;
+      if (wire === '') {
+        continue; // not synthesisable, and so never offered — nothing to lock.
+      }
+
+      const first = decodeNode(wire);
+      expect(first.ok, `${kind} decodes: ${first.ok ? '' : first.error.code}`).toBe(true);
+
+      const canonical = encodeNode(first.value);
+      const second = decodeNode(canonical);
+      expect(second.ok, `${kind} re-decodes`).toBe(true);
+      expect(encodeNode(second.value), `${kind} normalisation is a fixed point`).toBe(canonical);
+
+      survives(JSON.parse(wire), JSON.parse(canonical), kind);
+      locked++;
+    }
+
+    // Guard the guard: an empty sweep would pass while locking nothing.
+    expect(locked).toBeGreaterThan(30);
   });
 });
 

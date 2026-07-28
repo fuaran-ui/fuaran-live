@@ -377,24 +377,36 @@ let private sentinelCount (json: string) : int =
 /// module knows one kind from another, and a source lock in the suite says so.
 let private stemOf (disc: string) : string = disc.ToLowerInvariant()
 
+/// The raw synthesised wire JSON for `disc`, sentinels replaced by fresh ids —
+/// the bytes this module hand-shapes, before any decoder has seen them. `""`
+/// when the kind cannot be synthesised.
+///
+/// Exposed because it is an **in-page wire emitter** in the repo's sense, and
+/// the convention is that every one ships with its lock: the suite decodes this
+/// with the real strict decoder and asserts it re-encodes to itself, so the
+/// synthesiser is both decodable AND already canonical. A union whose first
+/// branch happened to be a non-canonical spelling (the `{"$type":"Literal"}`
+/// envelope over a bare string, say) would survive decode and fail that lock —
+/// which is exactly the drift the convention exists to catch.
+let defaultNodeWire (root: Node<obj>) (disc: string) : string =
+  let raw = template disc
+
+  if raw = "" then
+    ""
+  else
+    mintIds root (stemOf disc) (sentinelCount raw)
+    |> List.mapi (fun i minted -> i, minted)
+    |> List.fold
+      (fun (json: string) (i, minted) -> json.Replace("\"" + sentinel + string i + "\"", "\"" + minted + "\""))
+      raw
+
 /// The minimal default node for `disc`, with fresh ids, read back through the
 /// REAL strict decoder — so what the palette holds is a node the decoder
 /// accepts, not a shape this module believes in.
 let defaultNodeFor (root: Node<obj>) (disc: string) : Node<obj> option =
-  let raw = template disc
-
-  if raw = "" then
-    None
-  else
-    let ids = mintIds root (stemOf disc) (sentinelCount raw)
-
-    let filled =
-      ids
-      |> List.mapi (fun i minted -> i, minted)
-      |> List.fold
-        (fun (json: string) (i, minted) -> json.Replace("\"" + sentinel + string i + "\"", "\"" + minted + "\""))
-        raw
-
+  match defaultNodeWire root disc with
+  | "" -> None
+  | filled ->
     match Decode.decodeNode filled with
     | Error _ -> None
     | Ok wire -> Some(WireTree.reify wire)
@@ -479,6 +491,17 @@ let placementSpec (placement: Placement) : string =
 let private targetOf (parentId: string) (placement: string) : Target =
   { ParentId = NodeId parentId
     Placement = parsePlacement placement }
+
+/// Every kind discriminator the canonical schema knows — the palette's whole
+/// vocabulary source, before any per-destination filtering.
+let schemaKinds () : string array = kindsOf (Agent.getKindSchema None)
+
+/// The raw synthesised wire JSON for one kind, addressed by plain string — the
+/// emitter lock's subject (see `defaultNodeWire`).
+let defaultWireFor (session: Session.SessionState) (kind: string) : string =
+  match session.Tree with
+  | None -> ""
+  | Some root -> defaultNodeWire root kind
 
 /// A parent's structural child ids, as plain strings.
 let childIds (session: Session.SessionState) (parentId: string) : string array =

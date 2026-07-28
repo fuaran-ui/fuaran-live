@@ -50,6 +50,23 @@
 //       surface (metric/markdown/grid=DataGrid/dashboard). Headless here via a
 //       pandas-free default cell.
 //
+//  LOCKED ELSEWHERE (a canonical emitter whose lock lives with its own suite):
+//    4. app/navigator/StructuralEdit.fs `synthesiseJs` - the navigator's insert
+//       palette builds a minimal-valid node per kind by walking the canonical schema
+//       and emitting its REQUIRED fields as wire JSON. Locked in
+//       structuralEdit.test.ts (it needs the Fable app output, which this file does
+//       not otherwise load), and NOT by plain byte-identity: a required-fields-only
+//       emission is a §16 lenient-accept shape, and the decoder normalises six kinds
+//       upward (defaulted optionals `Chart.stacked` / `Tabs.activeIndex` /
+//       `Stepper.onSelect`, and the typed empty payload of a slot-typed `Static`).
+//       The lock asserts the two claims that survive that: strict decode reaching a
+//       FIXED POINT in one normalisation pass, and normalisation being ADDITIVE ONLY
+//       (every emitted key/value survives unchanged) - which is what catches the
+//       surviving-Literal-envelope class this file exists for.
+//       MUTATION-VERIFIED: returning `{"$type":"Literal",text}` from the string leg
+//       of `synthesiseJs` -> decode ok, re-encode collapses to the bare string, the
+//       emitted value does not survive (lock red). Reverted.
+//
 //  DELIBERATE EXCLUSIONS (named, with reasons):
 //    - public/relay/py-host.py - a SHA-256 HASHER. It RECEIVES a station's wire bytes
 //      and returns hashlib's digest; it authors no wire. (relay-hosts.ts is the same:

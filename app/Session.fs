@@ -409,3 +409,208 @@ let lastMessageContent (session: SessionState) (prompt: string) : string =
   match List.tryLast (buildMessages session prompt) with
   | Some m -> m.Content
   | None -> ""
+
+/// EVERY message `buildMessages` produces, as a plain array — the accumulated
+/// conversation as the provider would receive it. `lastMessageContent` answers
+/// "what is injected"; this answers "what else is carried", which is the
+/// question the refine loop turns on.
+let allMessageContents (session: SessionState) (prompt: string) : string array =
+  buildMessages session prompt |> List.map _.Content |> Array.ofList
+
+// ─── "refine from here" — the EDITED tree as the next emission's context ─────
+//
+// The playground's ordinary turn resumes the model's own conversation: the
+// accumulated message list is replayed, and the newest thing in it is the
+// model's last emission. That is exactly the wrong baseline once a human has
+// been through the navigator, because the tree on screen is no longer what the
+// model last said — it is what the human APPROVED, and the difference between
+// the two is the whole of the correction the human just made.
+//
+// Refining "from here" therefore does two things, and both are subtractive
+// rather than clever:
+//
+//  1. It drops the accumulated transcript and sends ONE message carrying the
+//     CURRENT tree. The model's stale emission is not summarised, not
+//     down-weighted — it is absent, so there is nothing for the next emission
+//     to revert to. This reuses `buildMessages`' existing injection seam
+//     verbatim (a history-free session), rather than opening a second path that
+//     could word the same thing differently.
+//
+//  2. It states the human's edits as CONSTRAINTS in the system prompt. The
+//     edits are already IN the tree, so the summary is not the source of truth
+//     and is never load-bearing — it is emphasis, telling the model which parts
+//     of the tree it was handed are deliberate. That framing is what makes
+//     truncation safe: dropping a line loses emphasis, never data.
+//
+// The correction trail comes from the Phase 712 record, which is why the
+// attribution had to be tamper-evident before this could be built: "the human's
+// ops since the last emission" is a claim about provenance, and a log anyone
+// could rewrite afterwards would make it a guess.
+
+/// The human's ops since the last model emission — the trailing run of `Human`
+/// entries in the APPLIED prefix of the record (the redo tail is excluded for
+/// the same reason the export excludes it: an undone op did not happen).
+///
+/// "Since the last emission" is literally that: everything after the last
+/// `Agent` entry. A full-tree emission rebases the session, so the record is
+/// empty and every entry in it is post-emission by construction; an op emission
+/// leaves an `Agent` entry to cut at.
+let humanOpsSinceEmission (session: SessionState) : LogEntry list =
+  let applied = session.Log |> List.truncate (List.length session.Ops)
+
+  let lastAgent =
+    applied
+    |> List.mapi (fun i e -> i, e)
+    |> List.filter (fun (_, e) ->
+      match e.Actor with
+      | Agent _ -> true
+      | Human _ -> false)
+    |> List.tryLast
+    |> Option.map fst
+
+  let after =
+    match lastAgent with
+    | Some i -> applied |> List.skip (i + 1)
+    | None -> applied
+
+  after
+  |> List.filter (fun e ->
+    match e.Actor with
+    | Human _ -> true
+    | Agent _ -> false)
+
+/// The character budget for the correction block. ~4 characters per token is the
+/// usual rule of thumb across the providers this playground offers, so this is
+/// roughly a 300-token ceiling — small enough that the block can never crowd out
+/// the tree it annotates, which is the thing the model actually has to read.
+[<Literal>]
+let correctionBudgetChars = 1200
+
+/// The per-value ceiling inside one line. A pasted paragraph is a legitimate
+/// edit and would otherwise consume the whole budget by itself.
+[<Literal>]
+let correctionValueChars = 72
+
+/// A named field of a canonical op document, as text: a JSON string yields its
+/// value, anything else its compact JSON, an absent field the empty string.
+[<Emit("""(function(j,f){ try { var v = JSON.parse(j)[f];
+  if (v === undefined || v === null) return '';
+  return (typeof v === 'string') ? v : JSON.stringify(v); } catch(e){ return ''; } })($0,$1)""")>]
+let private opField (canonJson: string) (field: string) : string = jsNative
+
+/// How many sub-ops a canonical `Batch` document carries (`0` for anything else).
+[<Emit("(function(j){ try { var o = JSON.parse(j); return Array.isArray(o.ops) ? o.ops.length : 0; } catch(e){ return 0; } })($0)")>]
+let private batchCount (canonJson: string) : int = jsNative
+
+/// Flatten to one line and cap at `limit`, marking any elision. Newlines are
+/// stripped rather than escaped because these lines are read as prose by a
+/// model, not parsed.
+let private oneLine (limit: int) (text: string) : string =
+  let flat = text.Replace('\n', ' ').Replace('\r', ' ').Trim()
+
+  if flat.Length <= limit then
+    flat
+  else
+    flat.Substring(0, max 1 (limit - 1)) + "…"
+
+/// One recorded op as a sentence a model can act on. Reads the canonical op
+/// document by field name rather than re-decoding to the typed DU: the wire
+/// field names are the format's own stable contract, so a `TreeOp` case added
+/// to the vocabulary degrades to "<Kind> on #<target>" instead of failing to
+/// compile or silently disappearing from the summary.
+let correctionLine (entry: LogEntry) : string =
+  let target = opField entry.OpJson "target"
+  let at = if target = "" then "" else " on #" + target
+
+  match entry.OpKind with
+  | "UpdateProp" ->
+    let path = opField entry.OpJson "path"
+    let value = oneLine correctionValueChars (opField entry.OpJson "value")
+    sprintf "set %s%s to \"%s\"" (if path = "" then "a property" else path) at value
+  | "EditNode" -> sprintf "changed the kind of the node%s" at
+  | "UpdateStyle" -> sprintf "restyled the node%s" at
+  | "UpdateState" -> sprintf "changed the loading/empty/error behaviour%s" at
+  | "ReplaceBinding" -> sprintf "rebound %s%s" (opField entry.OpJson "slot") at
+  | "RemoveNode" -> sprintf "removed the node%s" at
+  | "MoveNode" -> sprintf "moved the node%s under #%s" at (opField entry.OpJson "newParentId")
+  | "InsertChild" -> sprintf "inserted a child under #%s" (opField entry.OpJson "parentId")
+  | "ReorderChildren" -> sprintf "reordered the children of #%s" (opField entry.OpJson "parentId")
+  | "Batch" -> sprintf "applied %d edits together" (batchCount entry.OpJson)
+  | other -> sprintf "%s%s" other at
+
+/// The human's corrections as budget-capped lines, oldest elided first.
+///
+/// **The truncation rule, and why it drops the OLDEST.** Later edits supersede
+/// earlier ones — on the same node literally, and in intent generally, because
+/// the last thing the human touched is the thing they were still deciding. So
+/// the tail is kept and the head is dropped, with the elision stated in place
+/// ("N earlier edit(s) omitted") rather than left for the model to infer. Every
+/// dropped edit is still present in the tree above it, and the marker says so;
+/// a silent truncation would let the model read the block as exhaustive and
+/// treat an un-mentioned edit as fair game.
+let correctionLines (session: SessionState) : string list =
+  let all = humanOpsSinceEmission session |> List.map correctionLine
+
+  let kept =
+    all
+    |> List.rev
+    |> List.fold
+      (fun (acc, used) line ->
+        let cost = line.Length + 3
+
+        if used + cost <= correctionBudgetChars then
+          (line :: acc, used + cost)
+        else
+          (acc, correctionBudgetChars + 1))
+      ([], 0)
+    |> fst
+
+  let dropped = List.length all - List.length kept
+
+  if dropped > 0 then
+    sprintf "(%d earlier edit(s) omitted for brevity — they are already reflected in the tree above.)" dropped
+    :: kept
+  else
+    kept
+
+/// The system-prompt suffix for a refine turn: the human's corrections, framed
+/// as constraints. Empty when the human has made no edits since the last
+/// emission — an empty "the human changed:" heading would be a lie the model
+/// would try to honour.
+let refineSystemSuffix (session: SessionState) : string =
+  match correctionLines session with
+  | [] -> ""
+  | lines ->
+    "\n\n# The person has edited this UI by hand\n\n"
+    + "The tree you have been given is THEIR version, not your last emission. They:\n\n"
+    + (lines |> List.map (fun l -> "- " + l) |> String.concat "\n")
+    + "\n\nTreat those choices as decided. Keep them exactly as they are unless the request below "
+    + "explicitly asks you to change them, and do not reinstate anything you emitted earlier that "
+    + "they have since altered."
+
+/// The single user message a "refine from here" turn sends: the CURRENT
+/// (human-edited) tree as canonical wire JSON, then the ask. Built by
+/// `buildMessages` against a history-free session, so the tree injection is the
+/// SAME seam the ordinary loop uses — the only difference is which tree it
+/// carries and what is absent around it.
+let refinePrompt (session: SessionState) (userPrompt: string) : string =
+  lastMessageContent { session with History = [] } userPrompt
+
+// ─── flat diagnostic surface for the refine loop ─────────────────────────────
+
+/// The correction lines as a plain array (an F# list has no `.length` across
+/// the Fable boundary).
+let correctionLineArray (session: SessionState) : string array = correctionLines session |> Array.ofList
+
+/// How many human ops stand between the last emission and now — the "edited (n
+/// human ops)" readout, and the test's handle on the trail.
+let humanOpCount (session: SessionState) : int =
+  humanOpsSinceEmission session |> List.length
+
+/// The budget constants as READABLE values. A `[<Literal>]` is inlined at every
+/// use site and never reaches the module's exports, so a test that imported the
+/// literal directly would silently receive `undefined` and assert nothing — the
+/// budget check would pass whatever the budget was.
+let correctionBudget: int = correctionBudgetChars
+
+let correctionValueCap: int = correctionValueChars

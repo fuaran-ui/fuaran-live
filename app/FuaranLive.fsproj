@@ -91,6 +91,22 @@
     <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\Elicitation.fs">
       <Link>linked\Elicitation.fs</Link>
     </Compile>
+    <!-- The structural tree diff (Phase 715): "what did the model change against
+         the version I approved?" is the question the refine loop has to answer,
+         and it is answered with the SHIPPED diff rather than a local one, so the
+         playground's notion of a change is the estate's. `TreeDiff.fs` names
+         `ReplayError` in `StepDiffsError`, so `Replay.fs` (small, Fable-clean,
+         no extra deps) is linked ahead of it; `stepDiffs` itself is behind
+         `#if !FABLE_COMPILER` and simply is not part of this compile. Linked
+         rather than ProjectReferenced for the same reason as everything above –
+         a ref to Fuaran.UI.OpStream.Replay would drag in Fuaran.UI.Ops and
+         double-compile the linked modules. -->
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Replay\Replay.fs">
+      <Link>linked\Replay.fs</Link>
+    </Compile>
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Replay\TreeDiff.fs">
+      <Link>linked\TreeDiff.fs</Link>
+    </Compile>
     <!-- The canonical wire-format JSON Schema generator – Fable-safe by design (no
          reflection, no System.Text.Json; a self-contained structural hand-walk).
          LINKED so the agent self-debug loop can expose per-kind required-field
@@ -138,6 +154,7 @@
     <Compile Include="navigator\PropertyEditor.fs" />
     <Compile Include="navigator\Navigator.fs" />
     <Compile Include="navigator\ProjectionSync.fs" />
+    <Compile Include="navigator\Refine.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

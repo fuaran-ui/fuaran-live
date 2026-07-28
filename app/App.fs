@@ -205,6 +205,14 @@ type Model =
     /// id – pending ones render as live form rows in the transcript; resolved
     /// ones stay as frozen records with their typed outcome.
     Asks: Map<string, Ask.AskRecord>
+    /// The navigator loop's captured baseline (Phase 715): the canonical bytes
+    /// of the human-edited tree at the instant "refine from here" was pressed,
+    /// plus the ids they had touched. `Some` from that instant until the next
+    /// ordinary Send — it is what the returning emission is diffed against, so
+    /// "did it keep my edits?" is answered by comparison rather than by
+    /// assertion. `None` means no refinement is in play and no comparison is
+    /// offered.
+    RefineBaseline: Refine.Baseline option
   }
 
 type Msg =
@@ -225,6 +233,11 @@ type Msg =
   // engine — so it must live-drive to a paired device exactly like a model
   // emission does. Distinct case only so the provenance is readable.
   | NavigatorEdit of Session.SessionState
+  // "Refine from here" (Phase 715): re-prompt with the human-EDITED tree as the
+  // emission context instead of the model's last emission. Distinct from `Send`
+  // because it deliberately does not resume the accumulated conversation — the
+  // stale emission is dropped rather than argued with.
+  | RefineFromHere of string
   | AgentPanels of Panels.PanelStore
   | AgentDone of Agent.AgentRunResult
   | DemoSend
@@ -317,6 +330,10 @@ let private startAgentCmd
   (priorMessages: AgentMessage list)
   (prompt: string)
   (model: string)
+  // Appended to the agent system prompt for this run only (`""` for an ordinary
+  // Send). Phase 715 uses it to state the human's navigator edits as
+  // constraints; the seam itself is the loop's own and predates that.
+  (systemSuffix: string)
   : Cmd<Msg> =
   Cmd.ofEffect (fun dispatch ->
     agentAbort.Value <- false
@@ -333,7 +350,7 @@ let private startAgentCmd
         ShouldAbort = fun () -> agentAbort.Value
         WaitForPaint = Agent.waitForPaint
         Now = Agent.nowMs
-        SystemSuffix = ""
+        SystemSuffix = systemSuffix
         // The askUser seam: suspend the loop on a continuation, mount the ask
         // row (AskOpened), and resume when the row resolves (AskResolved →
         // the stored continuation fires with the outcome wire).
@@ -672,7 +689,8 @@ let private init () : Model * Cmd<Msg> =
              Role = Some PairRole.Joiner }
        else
          pairEmpty)
-    Asks = Map.empty },
+    Asks = Map.empty
+    RefineBaseline = None },
   // Register the client-only enhancers once; run an initial KaTeX pass in case a
   // permalink restored a tree carrying an equation. In audience mode also
   // subscribe to the live-drive channel.
@@ -955,7 +973,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
           RunIteration = 0
           Elapsed = 0 },
       Cmd.batch
-        [ startAgentCmd (Demo.createProvider ()) model.Session model.Panels [] Demo.prompt "scripted-demo"
+        [ startAgentCmd (Demo.createProvider ()) model.Session model.Panels [] Demo.prompt "scripted-demo" ""
           tickCmd ]
   | AgentDone result ->
     { model with
@@ -1090,12 +1108,63 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             RunTokensIn = 0
             RunTokensOut = 0
             RunIteration = 0
-            Elapsed = 0 },
+            Elapsed = 0
+            // An ordinary Send is not a refinement: retire any captured
+            // baseline rather than leave the navigator comparing this run's
+            // emission against a version nobody asked about.
+            RefineBaseline = None },
         // Resume from the accumulated context; do NOT clear the transcript or the
         // session token/cost tally – the conversation persists across runs. Only
         // the per-run counters reset (each Send is one budgeted run).
         Cmd.batch
-          [ startAgentCmd prov model.Session model.Panels model.AgentMessages prompt model.Model
+          [ startAgentCmd prov model.Session model.Panels model.AgentMessages prompt model.Model ""
+            tickCmd ]
+      | _ ->
+        { model with
+            Error =
+              Some
+                { Source = "agent"
+                  Message = "Set your API key to send." } },
+        Cmd.none
+  // Phase 715 — the navigator loop's re-prompt. Three differences from `Send`,
+  // all of them the point of the feature:
+  //
+  //  1. `priorMessages` is `[]`. The accumulated conversation ends with the
+  //     model's own last emission, which is precisely the baseline being
+  //     replaced; resuming it would hand the model back the thing the human
+  //     just corrected and invite it to restore it.
+  //  2. The prompt is `Session.refinePrompt` — the CURRENT tree injected through
+  //     the loop's existing seam, so the context demonstrably carries the edited
+  //     version.
+  //  3. The system prompt gains `Session.refineSystemSuffix` — the human's ops
+  //     since the last emission, framed as decided constraints.
+  //
+  // The baseline is captured BEFORE the run starts, from the session the run is
+  // about to be given, so the later comparison is against the exact bytes that
+  // were sent.
+  | RefineFromHere prompt ->
+    if model.AgentRunning || prompt.Trim() = "" || Option.isNone model.Session.Tree then
+      model, Cmd.none
+    else
+      match Map.tryFind model.ProviderId agenticById with
+      | Some prov when model.KeyPresent ->
+        { model with
+            AgentRunning = true
+            Error = None
+            RunTokensIn = 0
+            RunTokensOut = 0
+            RunIteration = 0
+            Elapsed = 0
+            RefineBaseline = Refine.baselineOf model.Session prompt },
+        Cmd.batch
+          [ startAgentCmd
+              prov
+              model.Session
+              model.Panels
+              []
+              (Session.refinePrompt model.Session prompt)
+              model.Model
+              (Session.refineSystemSuffix model.Session)
             tickCmd ]
       | _ ->
         { model with
@@ -2151,9 +2220,18 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                               // Phase 714: the walk with the live source projections beside
                               // it. `beside` wraps the built element, so this composition does
                               // not depend on what `Navigator.view` itself takes.
-                              (ProjectionSync.beside
-                                (Navigator.view model.Session (NavigatorEdit >> dispatch))
-                                model.Session.Tree)
+                              // Phase 715 wraps that again with the loop pane — same posture,
+                              // same reason: emitted → edited → re-prompted, without leaving
+                              // the tab.
+                              (Refine.below
+                                (ProjectionSync.beside
+                                  (Navigator.view model.Session (NavigatorEdit >> dispatch))
+                                  model.Session.Tree)
+                                model.Session
+                                model.RefineBaseline
+                                model.AgentRunning
+                                model.KeyPresent
+                                (RefineFromHere >> dispatch))
                             toolDetails "Output – source projection" false (outputPane model dispatch) ] ] ] ]
             // Secondary tools – collapsed by default; Examples opens on first run.
             Html.section

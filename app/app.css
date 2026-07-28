@@ -1977,3 +1977,57 @@ body {
 .fl-ps-empty {
   font-size: 0.85rem;
 }
+
+
+/* ─── the navigator's refine loop (Phase 715) ────────────────────────────────
+   The loop pane sits under the walk + projections, so the cycle reads top to
+   bottom: see the tree, edit it, ask for the next version. Deliberately plain —
+   it borrows the navigator's own control/typography classes, because a second
+   visual language inside one tab would make the loop look like a separate
+   feature rather than the same one continuing. */
+
+.fl-nav-loop {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fl-rf {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-top: 1px solid var(--ds-rule, rgba(128, 128, 128, 0.3));
+  padding-top: 0.75rem;
+}
+
+/* The stage strip — the whole affordance in one line. */
+
+.fl-rf-stage {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.fl-rf-input {
+  min-height: 3rem;
+}
+
+.fl-rf-trail,
+.fl-rf-result {
+  font-size: 0.85rem;
+}
+
+.fl-rf-changes {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.fl-rf-change {
+  font-family: var(--ds-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+}
+
+.fl-rf-retention {
+  margin: 0.35rem 0 0;
+}
+

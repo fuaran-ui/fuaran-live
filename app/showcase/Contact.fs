@@ -41,7 +41,7 @@ let private contactEmail = String.concat "@" [ "andrew"; "fuaran.com" ]
 /// a fuaran-ui.io page). The subscribe section renders ONLY when this is non-empty,
 /// so shipping it blank is safe – set the URL here to turn it on. The list is stored
 /// with the provider, never by this site, so the "nothing uploaded" promise holds.
-let private subscribeUrl = ""
+let private subscribeUrl = "https://buttondown.com/fuaran-ui"
 
 /// The visitor's note, as a Fuaran tree – the live preview + the wire source.
 let private noteTree (name: string) (message: string) : Node<unit> =

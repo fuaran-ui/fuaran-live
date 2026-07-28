@@ -1978,7 +1978,6 @@ body {
   font-size: 0.85rem;
 }
 
-
 /* ─── the navigator's refine loop (Phase 715) ────────────────────────────────
    The loop pane sits under the walk + projections, so the cycle reads top to
    bottom: see the tree, edit it, ask for the next version. Deliberately plain —
@@ -2031,6 +2030,147 @@ body {
   margin: 0.35rem 0 0;
 }
 
+/* ── The accessibility lens (Phase 717) ────────────────────────────────────
+   The navigator's walk, turned into an audit. The badge rides the card head on
+   every walk (lens open or not), so the plain walk still reports what it passes;
+   the lens panel replaces the general property panel when the audit is on. */
+
+.fl-a11y-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* Clean and flagged must not look alike at a glance — the whole readout of a
+   walk is which of the two you are looking at. */
+
+.fl-a11y-badge-ok {
+  color: var(--ds-muted);
+  border-color: var(--ds-border);
+}
+
+.fl-a11y-badge-flagged {
+  color: var(--ds-danger, #b42318);
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.fl-a11y-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fl-a11y-lens {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.fl-a11y-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fl-a11y-flags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.fl-a11y-flag {
+  border: 1px solid var(--ds-border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fl-a11y-flag-error {
+  border-left-color: var(--ds-danger, #b42318);
+}
+
+.fl-a11y-flag-warning {
+  border-left-color: var(--ds-warning, #b54708);
+}
+
+.fl-a11y-flag-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.fl-a11y-code {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.fl-a11y-sev {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ds-muted);
+}
+
+.fl-a11y-flag-msg {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+/* An unfixable finding is still a finding — say why no field is offered rather
+   than showing an input that could not help. */
+
+.fl-a11y-unfixable {
+  margin: 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ds-muted);
+}
+
+.fl-a11y-attrs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.fl-a11y-attrs li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.82rem;
+}
+
+.fl-a11y-attr {
+  font-weight: 600;
+}
+
+.fl-a11y-attr-value {
+  color: var(--ds-muted);
+  overflow-wrap: anywhere;
+}
+
+.fl-a11y-none,
+.fl-a11y-declared,
+.fl-a11y-pass {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ds-muted);
+  line-height: 1.45;
+}
 
 /* ─── Navigator structural edits (Phase 713) ────────────────────────────────── */
 

@@ -407,6 +407,7 @@ let private publishCursor (path: string array) : unit =
 
 let private helpHint =
   "↓/j next · ↑/k previous · ←/h parent · →/l first child · Home root · \
+a accessibility lens · f/F next/previous finding · \
 n insert · m pick up/drop · Alt+↑/↓ reorder · Delete remove (twice to confirm) · Esc cancel · \
 Ctrl+Z undo · Ctrl+Shift+Z redo. \
 The walk is depth-first and stops at both ends — it does not wrap."
@@ -436,6 +437,12 @@ let private emptyState: ReactElement =
 let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState -> unit) : ReactElement =
   let tree = session.Tree
   let stored, setStored = React.useState (None: NavCursor option)
+
+  // The accessibility lens (Phase 717). One flag: when it is on, the card's
+  // property panel is replaced by `A11yWalk.panel` and the walk gains
+  // flag-order navigation. The lens is a self-contained module — everything
+  // this pane knows about it is this boolean and the four call sites below.
+  let a11yLens, setA11yLens = React.useState false
 
   // The structural editor (Phase 713). Five pieces of local state, and only one
   // of them survives a cursor move: `held` — carrying a node while you walk to
@@ -618,6 +625,18 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
     setPaletteOpen false
     setStructuralError None
 
+  // Flag-order navigation (Phase 717). The lens answers "which node is flagged
+  // next" in the walk's own order; jumping there is the cursor's business, so
+  // the two stay on their own sides of the seam. No further flag is a no-op —
+  // the same stop-do-not-wrap rule the plain walk follows.
+  let moveFlag (pick: Node<obj> -> string -> string option) =
+    match tree, cursor with
+    | Some root, Some c ->
+      match pick root (focusedText c) with
+      | Some id -> setStored (Some(jumpTo root c (NodeId id)))
+      | None -> ()
+    | _ -> ()
+
   // Undo/redo rebuild the session by REPLAY (see `OpLog`) and hand the result
   // back through `onEdit`, the same channel a property commit uses — so every
   // other pane follows a time-step exactly as it follows an edit, and the
@@ -670,6 +689,19 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
          | Some root -> setStored (Some(atRoot root))
          | None -> ())
 
+        true
+      // Phase 717 — the lens and its flag-order walk. `a` toggles the audit;
+      // `f` / `F` step the findings rather than the tree, so a long tree audits
+      // in flag order instead of DFS order.
+      | "a"
+      | "A" ->
+        setA11yLens (not a11yLens)
+        true
+      | "f" ->
+        moveFlag A11yWalk.nextFlaggedId
+        true
+      | "F" ->
+        moveFlag A11yWalk.prevFlaggedId
         true
       // Phase 713 — the structural gestures. `Delete` arms on the first press
       // and commits on the second: a subtree removal is the one edit here whose
@@ -774,9 +806,16 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
                           Html.code [ prop.className "fl-nav-id"; prop.text ("#" + idText node.Id) ]
                           Html.span
                             [ prop.className "fl-nav-count"
-                              prop.text (sprintf "node %d of %d" here total) ] ] ]
+                              prop.text (sprintf "node %d of %d" here total) ]
+                          // Phase 717 — the cursor badge: this node's finding
+                          // count, shown whether or not the lens is open, so
+                          // the plain walk still reports what it passes.
+                          A11yWalk.badge root node ] ]
                   Html.pre [ prop.className "fl-code fl-nav-props"; prop.text (propSummary node) ]
-                  PropertyPanel session node onEdit ] ]
+                  (if a11yLens then
+                     A11yWalk.panel session root node onEdit
+                   else
+                     PropertyPanel session node onEdit) ] ]
 
       // ── the structural panel (Phase 713) ──────────────────────────────────
       //
@@ -936,6 +975,8 @@ adds a ReorderChildren naming every sibling."
                         [ prop.className "fl-btn ghost"
                           prop.text "First child ▸"
                           prop.onClick (fun _ -> move firstChild) ] ] ]
+              // Phase 717 — the lens toggle + the walk's audit summary.
+              A11yWalk.toggle tree a11yLens (fun () -> setA11yLens (not a11yLens))
               historyControls ] ]
     | _ -> emptyState
 

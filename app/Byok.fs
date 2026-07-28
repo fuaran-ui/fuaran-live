@@ -4,7 +4,7 @@ module Fuaran.Live.Byok
 //  BYOK providers + effect ports – Phase 327: the portable AI-connector
 //  wire layer, vendored in-repo as `FuaranLive.AiWire` (Phase 576).
 //
-//  The three providers no longer hand-roll their request/response JSON via raw
+//  The providers no longer hand-roll their request/response JSON via raw
 //  `createObj` / dynamic `?` interop. Every request body is built as a
 //  `FuaranLive.AiWire` `JsonValue` and serialized by the canonical byte-stable
 //  `JsonHost.serialize`; every response is parsed by the host-bridged
@@ -12,11 +12,11 @@ module Fuaran.Live.Byok
 //  accessors – the SAME portable model a .NET server host runs over. The
 //  bytes travel through the shared `IHttpTransport` egress seam, implemented
 //  here once as a browser `fetch` transport: the key rides ONLY a header to the
-//  one provider origin (the CSP `connect-src` allow-list pins the three), read
+//  one provider origin (the CSP `connect-src` allow-list pins them), read
 //  per call (never captured), held memory-only (never persisted).
 //
-//  All three providers now implement `SendAgentic` (multi-turn tool-use), so
-//  the self-debug loop is multi-provider – Claude, GPT, and Gemini alike. The
+//  All providers implement `SendAgentic` (multi-turn tool-use), so the
+//  self-debug loop is multi-provider – Claude, GPT, Gemini, and Kimi alike. The
 //  ordered `AgentContentBlock` model (Ports.fs) is fuaran-live's richer
 //  projection over the shared flat `AIProviderResponse`; the per-provider
 //  block↔wire translation lives here (Anthropic content blocks; OpenAI
@@ -81,7 +81,7 @@ let browserEffectPorts: EffectPorts =
 //
 // One direct browser `fetch` per provider, no SDK. The user's key rides ONLY a
 // header to that provider's single origin (the CSP `connect-src` allow-list pins
-// the three origins). Mirrored in src/byok/origins.ts, which vite.config.ts
+// the origins). Mirrored in src/byok/origins.ts, which vite.config.ts
 // imports to build the CSP.
 
 [<Literal>]
@@ -92,6 +92,9 @@ let OPENAI_ORIGIN = "https://api.openai.com"
 
 [<Literal>]
 let GEMINI_ORIGIN = "https://generativelanguage.googleapis.com"
+
+[<Literal>]
+let KIMI_ORIGIN = "https://api.moonshot.ai"
 
 // Frontier-only, one model per provider (operator decision 2026-07-15): lower
 // model tiers emit measurably worse wire JSON, so the picker offers exactly one
@@ -107,6 +110,11 @@ let DEFAULT_OPENAI_MODEL = "gpt-5.6-sol"
 
 [<Literal>]
 let DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"
+
+// Moonshot is Kimi K3 – the flagship (1M context), the eval's fourth-family
+// probe (pilot 5 addendum, 2026-07-21): base-40 one-shot 84.2% at low effort.
+[<Literal>]
+let DEFAULT_KIMI_MODEL = "kimi-k3"
 
 // ─── measured reasoning postures ─────────────────────────────────────────────
 //
@@ -127,6 +135,14 @@ let private anthropicPostureFields: (string * JsonValue) list =
 let private openAiPostureFields: (string * JsonValue) list =
   [ "reasoning_effort", jstr "low" ]
 
+// Kimi K3 rides the same OpenAI-compatible `reasoning_effort` dial, and the
+// eval's fourth-family probe measured the SAME low-effort posture as the
+// recommended default: the dial transfers (a 46× deliberation collapse vs the
+// runaway provider default, judge parity both sides), landing base-40 one-shot
+// at 84.2% with 189 reasoning tokens/cell on the hard stratum.
+let private kimiPostureFields: (string * JsonValue) list =
+  [ "reasoning_effort", jstr "low" ]
+
 // ─── prompt caching (cost posture) ───────────────────────────────────────────
 //
 // The system prompt is the full drift-checked prompt pack (~15k tokens), so
@@ -143,6 +159,9 @@ let private openAiPostureFields: (string * JsonValue) list =
 //   CachedContent API needs a server-side resource lifecycle (create / TTL /
 //   storage billing) that does not fit a client-only BYOK page, so it is
 //   deliberately not used.
+// - Kimi (Moonshot): AUTOMATIC – repeated prefixes bill at the cached-input
+//   rate with no request field to set; `prompt_cache_key` is an OpenAI-specific
+//   routing hint and is not sent to Moonshot.
 
 /// The Anthropic `system` field as a content-block array with the ephemeral
 /// cache breakpoint (a bare string cannot carry `cache_control`).
@@ -168,7 +187,10 @@ let private anthropicVersion = "2023-06-01"
 let private modelPricing: (string * float * float) list =
   [ DEFAULT_CLAUDE_MODEL, 15.0, 75.0
     DEFAULT_OPENAI_MODEL, 5.0, 30.0
-    DEFAULT_GEMINI_MODEL, 1.50, 9.0 ]
+    DEFAULT_GEMINI_MODEL, 1.50, 9.0
+    // Kimi K3 – confirmed 2026-07-16 from the official per-model pricing page
+    // (platform.kimi.ai; single tier, 1M context).
+    DEFAULT_KIMI_MODEL, 3.0, 15.0 ]
 
 /// Approximate USD cost of a token mix against the indicative price table, or
 /// None for a model the table doesn't know (the readout then shows tokens only).
@@ -489,9 +511,29 @@ let createAnthropicProvider (getKey: unit -> string option) : IAgenticProvider =
         } }
 
 // ============================================================================
-//  OpenAI (Chat Completions: system is a leading message; Bearer auth;
-//  tool-use via `tools` + assistant `tool_calls` + `tool`-role results)
+//  The OpenAI-compatible seam (Chat Completions: system is a leading message;
+//  Bearer auth; tool-use via `tools` + assistant `tool_calls` + `tool`-role
+//  results). Several vendors serve this wire format at their own origin, so
+//  ONE body builder + provider factory is parameterised by a vendor config –
+//  OpenAI itself is the first instantiation, Moonshot (Kimi) the second.
+//  Adding a vendor = a config + a registry descriptor + an origins.ts entry.
 // ============================================================================
+
+/// One OpenAI-compatible vendor.
+type private OpenAiCompatibleConfig =
+  {
+    Id: string
+    Label: string
+    DefaultModel: string
+    /// The single origin this vendor's key ever travels to.
+    Origin: string
+    /// The output-token cap's wire name: OpenAI's current reasoning models
+    /// reject the legacy `max_tokens` ("use 'max_completion_tokens'");
+    /// Moonshot documents `max_tokens`.
+    MaxTokensField: string
+    /// The measured posture + cache fields appended to every request body.
+    ExtraFields: (string * JsonValue) list
+  }
 
 let private openAiUsage (json: JsonValue) : ProviderUsage option =
   match JsonValue.tryField "usage" json with
@@ -629,7 +671,7 @@ let private openAiMessages (m: AgentMessage) : JsonValue list =
 
     toolResults @ userText
 
-let private openAiAgenticBody (request: AgentRequest) : JsonValue =
+let private openAiCompatibleAgenticBody (cfg: OpenAiCompatibleConfig) (request: AgentRequest) : JsonValue =
   let systemMsg = jobj [ "role", jstr "system"; "content", jstr request.System ]
   let turns = request.Messages |> List.collect openAiMessages
 
@@ -646,19 +688,21 @@ let private openAiAgenticBody (request: AgentRequest) : JsonValue =
 
   jobj (
     [ "model", jstr request.Model
-      "max_tokens", jint request.MaxTokens
+      cfg.MaxTokensField, jint request.MaxTokens
       "messages", jarr (systemMsg :: turns)
       "tools", jarr tools
       "tool_choice", jstr "auto" ]
-    @ openAiPostureFields
-    @ openAiCacheFields
+    @ cfg.ExtraFields
   )
 
-let createOpenAIProvider (getKey: unit -> string option) : IAgenticProvider =
+let private createOpenAiCompatibleProvider
+  (cfg: OpenAiCompatibleConfig)
+  (getKey: unit -> string option)
+  : IAgenticProvider =
   { new IAgenticProvider with
-      member _.Id = "openai"
-      member _.Label = "GPT (OpenAI)"
-      member _.DefaultModel = DEFAULT_OPENAI_MODEL
+      member _.Id = cfg.Id
+      member _.Label = cfg.Label
+      member _.DefaultModel = cfg.DefaultModel
 
       member _.Send(request) =
         sendWith getKey (fun key ->
@@ -672,13 +716,12 @@ let createOpenAIProvider (getKey: unit -> string option) : IAgenticProvider =
             let body =
               jobj (
                 [ "model", jstr request.Model
-                  "max_tokens", jint request.MaxTokens
+                  cfg.MaxTokensField, jint request.MaxTokens
                   "messages", jarr (systemMsg :: turns) ]
-                @ openAiPostureFields
-                @ openAiCacheFields
+                @ cfg.ExtraFields
               )
 
-            match! postJson (OPENAI_ORIGIN + "/v1/chat/completions") [ "authorization", "Bearer " + key ] body with
+            match! postJson (cfg.Origin + "/v1/chat/completions") [ "authorization", "Bearer " + key ] body with
             | Result.Error e -> return ProviderOutcome.Error e
             | Result.Ok json -> return ProviderOutcome.Ok(openAiText json, openAiUsage json)
           })
@@ -691,13 +734,39 @@ let createOpenAIProvider (getKey: unit -> string option) : IAgenticProvider =
           | Some key ->
             match!
               postJson
-                (OPENAI_ORIGIN + "/v1/chat/completions")
+                (cfg.Origin + "/v1/chat/completions")
                 [ "authorization", "Bearer " + key ]
-                (openAiAgenticBody request)
+                (openAiCompatibleAgenticBody cfg request)
             with
             | Result.Error e -> return AgentOutcome.Error e
             | Result.Ok json -> return AgentOutcome.Ok(openAiBlocks json, openAiStop json, openAiUsage json)
         } }
+
+let private openAiConfig: OpenAiCompatibleConfig =
+  { Id = "openai"
+    Label = "GPT (OpenAI)"
+    DefaultModel = DEFAULT_OPENAI_MODEL
+    Origin = OPENAI_ORIGIN
+    MaxTokensField = "max_completion_tokens"
+    ExtraFields = openAiPostureFields @ openAiCacheFields }
+
+/// Moonshot (Kimi) – OpenAI-compatible per its migration guide (endpoint + key
+/// convention confirmed 2026-07-16 from platform.kimi.ai docs, via the eval
+/// suite's seam). No `prompt_cache_key` (its caching is automatic with no
+/// routing hint) and the documented `max_tokens` cap name.
+let private kimiConfig: OpenAiCompatibleConfig =
+  { Id = "kimi"
+    Label = "Kimi (Moonshot)"
+    DefaultModel = DEFAULT_KIMI_MODEL
+    Origin = KIMI_ORIGIN
+    MaxTokensField = "max_tokens"
+    ExtraFields = kimiPostureFields }
+
+let createOpenAIProvider: (unit -> string option) -> IAgenticProvider =
+  createOpenAiCompatibleProvider openAiConfig
+
+let createKimiProvider: (unit -> string option) -> IAgenticProvider =
+  createOpenAiCompatibleProvider kimiConfig
 
 // ============================================================================
 //  Gemini (generateContent: system_instruction; roles user|model; tool-use via
@@ -829,6 +898,21 @@ let private geminiContent (m: AgentMessage) : JsonValue =
 let private geminiUrl (model: string) =
   GEMINI_ORIGIN + "/v1beta/models/" + model + ":generateContent"
 
+/// Gemini's `function_declarations[].parameters` is a restricted OpenAPI
+/// schema subset, not full JSON Schema: it rejects `additionalProperties`
+/// (Anthropic and OpenAI both accept it) with "Unknown name" at decode time.
+/// Strip that key recursively; the constraint it carried is advisory to the
+/// model, so dropping it for this provider loses nothing the host enforces.
+let rec private geminiSchemaValue (json: JsonValue) : JsonValue =
+  match json with
+  | JObject fields ->
+    fields
+    |> List.filter (fun (k, _) -> k <> "additionalProperties")
+    |> List.map (fun (k, v) -> k, geminiSchemaValue v)
+    |> JObject
+  | JArray items -> JArray(items |> List.map geminiSchemaValue)
+  | other -> other
+
 // NOTE (measured posture): the Gemini bodies deliberately carry NO thinking
 // config – the published evaluation measured reduced thinking as harmful to
 // output quality on the Gemini family (its deliberation is content-load-
@@ -840,7 +924,7 @@ let private geminiAgenticBody (request: AgentRequest) : JsonValue =
       jobj
         [ "name", jstr t.Name
           "description", jstr t.Description
-          "parameters", toolSchema t ])
+          "parameters", geminiSchemaValue (toolSchema t) ])
 
   jobj
     [ "system_instruction", jobj [ "parts", jarr [ jobj [ "text", jstr request.System ] ] ]
@@ -891,7 +975,7 @@ let createGeminiProvider (getKey: unit -> string option) : IAgenticProvider =
 
 /// One selectable provider: its id, the label the picker shows, its default
 /// model, a factory that builds the adapter against a per-provider key reader,
-/// and the agentic factory. As of Phase 327 ALL THREE providers are agentic
+/// and the agentic factory. As of Phase 327 ALL providers are agentic
 /// (tool-use via the shared `FuaranLive.AiWire` mappers), so each carries
 /// `CreateAgentic = Some _` and can drive the self-debug loop.
 /// A selectable model for a provider. `Frontier` flags the most-capable tier –
@@ -918,7 +1002,7 @@ type ProviderDescriptor =
   }
 
 /// The providers offered in the picker, in display order. Claude is the default;
-/// all three are agentic. ONE frontier model per provider (the operator decision
+/// all are agentic. ONE frontier model per provider (the operator decision
 /// recorded at the DEFAULT_* literals) – the picker is a single combined
 /// model-forward choice, so `Models` is a single entry each and the UI never
 /// shows a separate tier dropdown.
@@ -952,7 +1036,17 @@ let providers: ProviderDescriptor list =
             Frontier = true } ]
       Origin = GEMINI_ORIGIN
       Create = (fun getKey -> createGeminiProvider getKey :> IAIProvider)
-      CreateAgentic = Some createGeminiProvider } ]
+      CreateAgentic = Some createGeminiProvider }
+    { Id = "kimi"
+      Label = "Kimi (Moonshot)"
+      DefaultModel = DEFAULT_KIMI_MODEL
+      Models =
+        [ { Id = DEFAULT_KIMI_MODEL
+            Label = "Kimi K3"
+            Frontier = true } ]
+      Origin = KIMI_ORIGIN
+      Create = (fun getKey -> createKimiProvider getKey :> IAIProvider)
+      CreateAgentic = Some createKimiProvider } ]
 
 [<Literal>]
 let defaultProviderId = "anthropic"
@@ -984,9 +1078,14 @@ let agenticRequestBodyFlat (providerId: string) : string =
         [ { Name = "getNodeState"
             Description = "read a node"
             InputSchema =
+              // `additionalProperties` is deliberately present: Anthropic and
+              // the OpenAI-compatible vendors pass it through; Gemini's body
+              // builder must STRIP it (its schema subset rejects the key) –
+              // both behaviours are locked by the vitest suite.
               createObj
                 [ "type" ==> "object"
-                  "properties" ==> createObj [ "nodeId" ==> createObj [ "type" ==> "string" ] ] ] } ]
+                  "properties" ==> createObj [ "nodeId" ==> createObj [ "type" ==> "string" ] ]
+                  "additionalProperties" ==> false ] } ]
       Messages =
         [ { Role = User
             Content = [ AgentContentBlock.Text "build it" ] }
@@ -998,7 +1097,8 @@ let agenticRequestBodyFlat (providerId: string) : string =
             Content = [ AgentContentBlock.ToolResult("tu-1", "{\"found\":true}", false) ] } ] }
 
   match providerId with
-  | "openai" -> JsonHost.serialize (openAiAgenticBody request)
+  | "openai" -> JsonHost.serialize (openAiCompatibleAgenticBody openAiConfig request)
+  | "kimi" -> JsonHost.serialize (openAiCompatibleAgenticBody kimiConfig request)
   | "gemini" -> JsonHost.serialize (geminiAgenticBody request)
   | _ -> JsonHost.serialize (anthropicAgenticBody request)
 
@@ -1019,7 +1119,8 @@ let parseAgenticResponseFlat
 
   let blocks, stop, usage =
     match providerId with
-    | "openai" -> openAiBlocks json, openAiStop json, openAiUsage json
+    | "openai"
+    | "kimi" -> openAiBlocks json, openAiStop json, openAiUsage json
     | "gemini" -> geminiBlocks json, geminiStop json, geminiUsage json
     | _ -> anthropicBlocks json, anthropicStop json, anthropicUsage json
 

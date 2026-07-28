@@ -38,8 +38,8 @@ opens is the BYOK call to the provider origin you selected.
    re-paste the key for each session, by design — there is no "remember me".
 3. **One egress point per provider.** The key leaves the browser only as the
    provider's auth header on the call to the provider you selected — `x-api-key`
-   for Claude (`src/byok/anthropic.ts`), `Authorization: Bearer` for OpenAI
-   (`src/byok/openai.ts`), `x-goog-api-key` for Gemini (`src/byok/gemini.ts`).
+   for Claude, `Authorization: Bearer` for OpenAI and Kimi (Moonshot),
+   `x-goog-api-key` for Gemini.
    Each adapter routes every call through a single egress helper, and each fetches
    exactly one origin (the set in `src/byok/origins.ts`). The key is never placed
    in a URL, a request body, a log line, or any other request. Keys for different
@@ -66,7 +66,7 @@ The shipped production build carries a strict Content-Security-Policy injected i
 
 ```
 default-src 'self';
-connect-src 'self' https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com;
+connect-src 'self' https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://api.moonshot.ai;
 img-src 'self' data:;
 style-src 'self' 'unsafe-inline';
 script-src 'self';
@@ -79,7 +79,8 @@ frame-ancestors 'none'
 ```
 
 The load-bearing line is the **`connect-src`** allow-list, which names only the
-app itself plus the supported BYOK provider origins (Claude / OpenAI / Gemini):
+app itself plus the supported BYOK provider origins (Claude / OpenAI / Gemini /
+Kimi):
 the browser will refuse to open a network connection to any origin other than
 those. The list is generated from `src/byok/origins.ts` — the same constants the
 adapters fetch — so the policy and the egress code cannot drift apart. This is the

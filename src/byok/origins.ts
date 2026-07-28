@@ -14,7 +14,13 @@
 export const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 export const OPENAI_ORIGIN = 'https://api.openai.com';
 export const GEMINI_ORIGIN = 'https://generativelanguage.googleapis.com';
+export const KIMI_ORIGIN = 'https://api.moonshot.ai';
 
 /** Every origin a BYOK key may egress to – the exact `connect-src` allow-list
  *  (besides 'self'). No wildcards: the chosen provider's origin only. */
-export const PROVIDER_ORIGINS = [ANTHROPIC_ORIGIN, OPENAI_ORIGIN, GEMINI_ORIGIN] as const;
+export const PROVIDER_ORIGINS = [
+  ANTHROPIC_ORIGIN,
+  OPENAI_ORIGIN,
+  GEMINI_ORIGIN,
+  KIMI_ORIGIN,
+] as const;

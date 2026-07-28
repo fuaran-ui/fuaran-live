@@ -8,7 +8,8 @@ import { PROVIDER_ORIGINS } from './src/byok/origins';
 
 // ─── Content-Security-Policy ─────────────────────────────────────────────────
 // The shipped static app is locked down: the only origins it may open a network
-// connection to are the BYOK provider endpoints (Claude / OpenAI / Gemini). This
+// connection to are the BYOK provider endpoints (Claude / OpenAI / Gemini /
+// Kimi). This
 // is the structural guard behind the "the key never leaves for any non-provider
 // origin" posture — a strict connect-src means even a compromised dependency
 // cannot exfiltrate the key to an attacker origin. The allow-list is the exact

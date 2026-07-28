@@ -1,6 +1,6 @@
 // Phase 327 – the multi-provider connector wire mapping, exercised headlessly
-// over the Fable output. Byok.fs re-expresses all three providers (Claude / GPT
-// / Gemini) over the vendored `FuaranLive.AiWire` portable `JsonValue` model + the
+// over the Fable output. Byok.fs re-expresses the providers (Claude / GPT /
+// Gemini / Kimi) over the vendored `FuaranLive.AiWire` portable `JsonValue` model + the
 // `IHttpTransport` egress seam, and every provider now implements `SendAgentic`
 // (tool-use). The pure request-build + response-parse halves (no `fetch`) are
 // the smoke surface: `agenticRequestBodyFlat` / `parseAgenticResponseFlat`
@@ -50,6 +50,25 @@ const cannedResponse: Record<string, string> = {
     ],
     usage: { prompt_tokens: 10, completion_tokens: 5 },
   }),
+  // Kimi (Moonshot) is OpenAI-compatible – same response wire shape as openai.
+  kimi: JSON.stringify({
+    choices: [
+      {
+        message: {
+          content: 'hi',
+          tool_calls: [
+            {
+              id: 'tc',
+              type: 'function',
+              function: { name: 'getNodeState', arguments: '{"nodeId":"n1"}' },
+            },
+          ],
+        },
+        finish_reason: 'tool_calls',
+      },
+    ],
+    usage: { prompt_tokens: 10, completion_tokens: 5 },
+  }),
   gemini: JSON.stringify({
     candidates: [
       {
@@ -69,7 +88,7 @@ const cannedResponse: Record<string, string> = {
 };
 
 describe('the multi-provider agentic response parse (shared JsonValue model)', () => {
-  for (const provider of ['anthropic', 'openai', 'gemini']) {
+  for (const provider of ['anthropic', 'openai', 'gemini', 'kimi']) {
     it(`${provider}: parses text + tool_use blocks, stop reason, and usage`, () => {
       const r = parseAgenticResponseFlat(provider, cannedResponse[provider]);
       expect(r.Blocks).toBe(2);
@@ -113,6 +132,27 @@ describe('the multi-provider agentic request build (block → wire per provider)
     expect(body).toContain('"prompt_cache_key":"fuaran-live"');
   });
 
+  it('openai caps output via max_completion_tokens, never the legacy max_tokens', () => {
+    // GPT-5.x reasoning models 400 on `max_tokens` ("Use 'max_completion_tokens'
+    // instead") – the 2026-07-28 live failure. The legacy name must not come back.
+    const body = agenticRequestBodyFlat('openai');
+    expect(body).toContain('"max_completion_tokens":1024');
+    expect(body).not.toContain('"max_tokens"');
+  });
+
+  it('kimi is OpenAI-compatible with the measured low-effort posture', () => {
+    // The eval's fourth-family probe: the effort dial transfers, low is the
+    // recommended posture. Moonshot documents `max_tokens` (not the OpenAI
+    // reasoning-model rename) and has no `prompt_cache_key` routing hint.
+    const body = agenticRequestBodyFlat('kimi');
+    expect(body).toContain('tool_calls');
+    expect(body).toContain('"tool_choice":"auto"');
+    expect(body).toContain('"reasoning_effort":"low"');
+    expect(body).toContain('"max_tokens":1024');
+    expect(body).not.toContain('max_completion_tokens');
+    expect(body).not.toContain('prompt_cache_key');
+  });
+
   it('gemini builds functionDeclarations + name-keyed functionCall/functionResponse', () => {
     const body = agenticRequestBodyFlat('gemini');
     expect(body).toContain('functionDeclarations');
@@ -120,6 +160,16 @@ describe('the multi-provider agentic request build (block → wire per provider)
     expect(body).toContain('functionResponse');
     expect(body).toContain('"role":"model"');
     expect(body).toContain('"role":"user"');
+  });
+
+  it('gemini strips additionalProperties from tool schemas (its subset rejects it)', () => {
+    // Gemini's function_declarations parameters are a restricted OpenAPI
+    // subset: `additionalProperties` 400s ("Unknown name") – the 2026-07-28
+    // live failure. The representative request's tool schema carries the key,
+    // so the other providers must pass it through and Gemini must drop it.
+    expect(agenticRequestBodyFlat('gemini')).not.toContain('additionalProperties');
+    expect(agenticRequestBodyFlat('anthropic')).toContain('"additionalProperties":false');
+    expect(agenticRequestBodyFlat('openai')).toContain('"additionalProperties":false');
   });
 });
 

@@ -2148,7 +2148,12 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                             toolDetails
                               "Navigator – walk and edit the tree"
                               false
-                              (Navigator.view model.Session (NavigatorEdit >> dispatch))
+                              // Phase 714: the walk with the live source projections beside
+                              // it. `beside` wraps the built element, so this composition does
+                              // not depend on what `Navigator.view` itself takes.
+                              (ProjectionSync.beside
+                                (Navigator.view model.Session (NavigatorEdit >> dispatch))
+                                model.Session.Tree)
                             toolDetails "Output – source projection" false (outputPane model dispatch) ] ] ] ]
             // Secondary tools – collapsed by default; Examples opens on first run.
             Html.section

@@ -1855,3 +1855,125 @@ body {
   border-radius: 3px;
   background: color-mix(in srgb, var(--ds-accent) 8%, transparent);
 }
+
+/* ─── Navigator ⇄ source-projection sync (Phase 714) ───────────────────────── */
+
+/* The tab is a two-column split above the breakpoint and stacked below it. The
+   walk keeps its natural width; the projections take the extra room, because
+   they are the thing that scrolls. */
+
+.fl-nav-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 62rem) {
+  .fl-nav-tab {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  }
+}
+
+.fl-nav-tab-walk {
+  min-width: 0;
+}
+
+.fl-ps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.fl-ps-intro {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--fuaran-color-text-muted);
+}
+
+.fl-ps-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.fl-ps-toggle {
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--fuaran-color-border, #dad2c0);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fuaran-color-text-muted);
+  cursor: pointer;
+}
+
+.fl-ps-toggle:hover {
+  color: var(--ds-accent);
+  border-color: var(--ds-accent);
+}
+
+.fl-ps-toggle-on {
+  color: var(--ds-accent);
+  border-color: var(--ds-accent);
+  font-weight: 600;
+}
+
+.fl-ps-panes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.fl-ps-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.fl-ps-pane-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.fl-ps-lang {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* Where the highlight landed — a line range, and the enclosing node's id when
+   this language does not project the focused node itself. */
+
+.fl-ps-where {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--fuaran-color-text-muted);
+}
+
+.fl-ps-code {
+  max-height: 15rem;
+  white-space: pre;
+}
+
+/* The mapped construct. A background wash rather than an outline: the span can
+   run over many lines, and an outline around a multi-line inline range is not a
+   shape anyone can read. */
+
+.fl-ps-hit {
+  background: color-mix(in srgb, var(--ds-accent) 26%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+/* Nearest-enclosing, not exact — dimmer, so the two facts do not look alike. */
+
+.fl-ps-hit-enclosing {
+  background: color-mix(in srgb, var(--ds-accent) 12%, transparent);
+}
+
+.fl-ps-empty {
+  font-size: 0.85rem;
+}

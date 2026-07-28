@@ -360,10 +360,48 @@ let private highlight (nodeId: string) (scopeSelector: string) : bool = jsNative
 /// The CSS selector of the live-preview container the highlight is scoped to.
 let previewScope = ".fl-preview-root"
 
+// ─── cursor-changed subscription (the Phase 714 hook) ────────────────────────
+//
+// The Navigator OWNS the cursor; panes outside it — the source-projection sync
+// — need to follow it. Lifting the cursor into the app model would make every
+// pane a party to the walk and would put a projection concern inside the
+// cursor's state, so instead the pane PUBLISHES its id-path and interested
+// views subscribe. One-way and read-only: a subscriber can watch the walk,
+// never steer it, and the Navigator's own behaviour is unchanged whether anyone
+// is listening or not.
+//
+// The three module-level mutables are a subscriber registry rather than state:
+// the browser is single-threaded, the list is only appended to and filtered,
+// and `lastPath` exists so a pane mounted mid-walk is handed the current
+// position at once instead of waiting for the next keystroke.
+
+let mutable private cursorSubs: (int * (string array -> unit)) list = []
+let mutable private nextSubId = 0
+let mutable private lastPath: string array = [||]
+
+/// Subscribe to cursor moves; the returned thunk unsubscribes. The current path
+/// is delivered immediately, so a late subscriber starts in step.
+let subscribeCursor (f: string array -> unit) : unit -> unit =
+  let id = nextSubId
+  nextSubId <- nextSubId + 1
+  cursorSubs <- cursorSubs @ [ id, f ]
+  f lastPath
+  fun () -> cursorSubs <- cursorSubs |> List.filter (fun (i, _) -> i <> id)
+
+/// Publish the cursor's id-path. Idempotent: an unchanged path is swallowed, so
+/// the after-every-render call below costs nothing when the cursor has not moved.
+let private publishCursor (path: string array) : unit =
+  if path <> lastPath then
+    lastPath <- path
+
+    for _, f in cursorSubs do
+      f path
+
 // ─── the tab view ────────────────────────────────────────────────────────────
 
 let private helpHint =
-  "↓/j next · ↑/k previous · ←/h parent · →/l first child · Home root. \
+  "↓/j next · ↑/k previous · ←/h parent · →/l first child · Home root · \
+Ctrl+Z undo · Ctrl+Shift+Z redo. \
 The walk is depth-first and stops at both ends — it does not wrap."
 
 let private emptyState: ReactElement =
@@ -396,6 +434,13 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
       cursor |> Option.bind focusedId |> Option.map idText |> Option.defaultValue ""
 
     highlight target previewScope |> ignore)
+
+  // Phase 714 hook — publish the cursor's id-path so the source-projection panes
+  // can follow the walk. Same no-dependency-array reasoning as the highlight
+  // above: `cursor` is re-derived from the session's tree on every render, so an
+  // edit that moves the focused node re-publishes the re-resolved path.
+  // `publishCursor` swallows an unchanged path, so this does not churn.
+  React.useEffect (fun () -> cursor |> Option.map cursorIds |> Option.defaultValue [||] |> publishCursor)
 
   let move (f: Node<obj> -> NavCursor -> NavCursor) =
     match tree, cursor with

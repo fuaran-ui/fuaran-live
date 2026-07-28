@@ -78,6 +78,131 @@ let languageTag (target: Target) : string =
   | Target.Rust -> "rust"
   | Target.Swift -> "swift"
 
+// ─── node spans: the id → text-range side map (Phase 714) ─────────────────────
+//
+// The Navigator needs to know WHICH characters of a projection belong to which
+// wire node, so walking the tree can light up the corresponding construct in
+// every language at once. The generators are pure bottom-up string
+// concatenation, so an absolute offset is not knowable while the walk is in
+// progress — but NESTING is. Each of the four node emitters therefore wraps its
+// own output in invisible sentinels carrying the node's id, and one post-pass
+// strips them while recording the (id, start, length) each pair enclosed.
+//
+// That is exact where a text search would not be: two sibling constructs that
+// happen to project to the same source get distinct spans, and a nested node's
+// span is genuinely inside its parent's. It also costs each emitter one line,
+// rather than threading an offset accumulator through 800 lines of per-kind
+// TypeScript emission — which is the difference between a change that can be
+// reviewed and one that cannot.
+//
+// **Marking is off unless a span map was asked for, and the plain entry points
+// strip regardless.** Both halves of that are load-bearing, and the corpus is
+// why: the node fixture `btn-json-payloads` carries a literal U+0001 INSIDE a
+// string payload, deliberately, to pin control-character escaping. So a sentinel
+// scheme cannot assume tree content is sentinel-free, and an earlier draft that
+// scrubbed content to make the assumption true broke that fixture's byte
+// round-trip — quietly, in the one leg with a conformance gate to catch it.
+// The resolution keeps the guarantee where it matters: `projectTo` and the
+// `toX` family never mark at all, so they emit exactly what they always did;
+// `projectSpans` marks for one walk and REFUSES to mark a tree that already
+// contains a sentinel, returning that projection with an empty side map (no
+// highlight is the honest answer; a wrong highlight over corrupted text is not).
+
+/// A mapped construct in a projection: the wire node id, and the half-open
+/// `[Start, Start + Length)` character range of the projected source that the
+/// node occupies.
+type Span =
+  { NodeId: string
+    Start: int
+    Length: int }
+
+/// A projection and its id → span side map.
+type Projected = { Text: string; Spans: Span list }
+
+// C0 controls 1–3: unprintable, and absent from every language's source
+// vocabulary. Tree CONTENT may still carry them — the corpus proves it — which
+// is what the guard in `projectSpans` is for.
+let private spanOpenCh = '\u0001'
+let private spanIdEndCh = '\u0002'
+let private spanCloseCh = '\u0003'
+let private spanOpen = string spanOpenCh
+let private spanIdEnd = string spanIdEndCh
+let private spanClose = string spanCloseCh
+
+/// Whether a string carries a character the sentinel scheme uses — the guard's
+/// test, applied to a whole wire document before any marking is switched on.
+let private carriesSentinel (s: string) : bool =
+  s.IndexOf spanOpen >= 0 || s.IndexOf spanIdEnd >= 0 || s.IndexOf spanClose >= 0
+
+/// Whether the walk currently in progress is marking. Module-level and mutable
+/// deliberately, and the only state in this module:
+///
+///  • it is a per-WALK setting, not a per-node one, so passing it as a parameter
+///    would mean threading a boolean through four recursive walkers including
+///    the 800-line per-kind TypeScript emitter — a large diff for no behaviour;
+///  • the browser is single-threaded and every walk is synchronous, so there is
+///    no interleaving to reason about; and
+///  • `projectSpans` is its only writer and sets/clears it around one call in a
+///    `try`/`finally`, so it is false everywhere else even if a walk throws.
+let mutable private marking = false
+
+/// Wrap a rendered node in the sentinels that record it as `id`'s span — when
+/// the walk in progress is marking. An id-less construct is returned untouched;
+/// it is simply not in the side map.
+let private markSpan (id: string) (body: string) : string =
+  if marking && id <> "" then
+    spanOpen + id + spanIdEnd + body + spanClose
+  else
+    body
+
+/// Strip every sentinel from a marked projection, returning the clean text and
+/// the spans the sentinels enclosed. Total: unbalanced or absent sentinels
+/// degrade to "no spans", never a throw — a projection that cannot be mapped
+/// still renders.
+let private stripSpans (marked: string) : string * Span list =
+  if marked.IndexOf spanOpen < 0 then
+    marked, []
+  else
+    let parts = ResizeArray<string>()
+    let spans = ResizeArray<Span>()
+    let stack = ResizeArray<string * int>()
+    let n = marked.Length
+    let mutable clean = 0
+    let mutable i = 0
+
+    while i < n do
+      let c = marked.[i]
+
+      if c = spanOpenCh then
+        match marked.IndexOf(spanIdEnd, i + 1) with
+        | j when j < 0 -> i <- n // malformed — abandon the rest rather than guess
+        | j ->
+          stack.Add(marked.Substring(i + 1, j - i - 1), clean)
+          i <- j + 1
+      elif c = spanCloseCh then
+        if stack.Count > 0 then
+          let id, start = stack[stack.Count - 1]
+          stack.RemoveAt(stack.Count - 1)
+
+          spans.Add
+            { NodeId = id
+              Start = start
+              Length = clean - start }
+
+        i <- i + 1
+      else
+        // Copy the whole run of plain characters in one slice.
+        let mutable j = i
+
+        while j < n && marked[j] <> spanOpenCh && marked[j] <> spanCloseCh do
+          j <- j + 1
+
+        parts.Add(marked.Substring(i, j - i))
+        clean <- clean + (j - i)
+        i <- j
+
+    String.concat "" parts, List.ofSeq spans
+
 // ─── casing + literal helpers (Fable-safe) ────────────────────────────────────
 
 let private pad (depth: int) : string = System.String(' ', depth * 2)
@@ -148,6 +273,14 @@ let private isNode (v: JsonValue) : bool =
   | Some _ -> v |> JsonValue.tryField "kind" |> Option.bind dollarType |> Option.isSome
   | None -> false
 
+/// Wrap a rendered node in its span sentinels, keyed by the wire `id` — the one
+/// line each of the four node emitters spends on the Phase 714 side map. A value
+/// with no id is returned untouched.
+let private markNode (v: JsonValue) (body: string) : string =
+  match v |> JsonValue.tryField "id" |> Option.bind JsonValue.asString with
+  | Some id -> markSpan id body
+  | None -> body
+
 /// Descend through a nested `kind` wrapper (category kinds carry an inner kind)
 /// to the innermost kind object – the one whose `$type` names the constructor.
 let rec private resolveKind (kindObj: JsonValue) : JsonValue =
@@ -202,7 +335,7 @@ and private renderNode (spec: LangSpec) (depth: int) (v: JsonValue) : string =
       |> List.map (fun (k, vv) -> k, renderValue spec (depth + 1) vv)
     | _ -> []
 
-  spec.Node kindName id fields depth
+  markSpan id (spec.Node kindName id fields depth)
 
 // ─── TypeScript (@fuaran-ui/ui) ───────────────────────────────────────────────
 
@@ -434,7 +567,9 @@ let rec private vbChildren (depth: int) (fieldName: string) (v: JsonValue) : str
   | JArray items -> items |> List.collect (vbChildren depth fieldName)
   | _ -> [ "<!-- " + fieldName + " (sketched) -->" ]
 
-and private vbNode (depth: int) (v: JsonValue) : string =
+and private vbNode (depth: int) (v: JsonValue) : string = markNode v (vbNodeRaw depth v)
+
+and private vbNodeRaw (depth: int) (v: JsonValue) : string =
   let id =
     v
     |> JsonValue.tryField "id"
@@ -1459,6 +1594,9 @@ let rec private tsDrawingConv (key: string) (v: JsonValue) : string =
 // ── The per-kind node emitter ─────────────────────────────────────────────────
 
 let rec private tsNodeExpr (depth: int) (nodeV: JsonValue) : string =
+  markNode nodeV (tsNodeExprRaw depth nodeV)
+
+and private tsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
   let id = optStr "id" nodeV |> Option.defaultValue ""
   let kindObj = fieldD "kind" nodeV
   let kindType = dollarType kindObj |> Option.defaultValue ""
@@ -2367,7 +2505,9 @@ and private goObj (depth: int) (members: (string * JsonValue) list) : string =
     + pad depth
     + "}}"
 
-and private goNode (depth: int) (v: JsonValue) : string =
+and private goNode (depth: int) (v: JsonValue) : string = markNode v (goNodeRaw depth v)
+
+and private goNodeRaw (depth: int) (v: JsonValue) : string =
   let id =
     v
     |> JsonValue.tryField "id"
@@ -2657,33 +2797,20 @@ let private project (spec: LangSpec) (wireJson: string) : string =
   | Some tree -> renderValue spec 0 tree
   | None -> "/* no decodable tree yet */"
 
-/// The bare projected TypeScript expression (no header) – the input of the
-/// `tests/projection-conformance/` harness, which executes it against the real
-/// `@fuaran-ui/ui` surface and asserts a byte-identical canonical re-encode.
-let projectTypeScriptExpr (wireJson: string) : string =
+// There is exactly ONE walk per language, and both entry points ride it: the
+// plain projection (`projectTo` and the `toX` family) runs it with marking off,
+// and `projectSpans` runs the same walk with marking on. So the text a
+// highlighted pane shows is byte-for-byte the text the Output box shows — the
+// drift a second, "span-aware" projector would have invited cannot arise,
+// because there is no second projector.
+
+let private tsExprWalk (wireJson: string) : string =
   match JsonHost.parse wireJson with
   | Some tree when isNode tree -> tsNodeExpr 0 tree
   | Some tree -> renderValue tsSpec 0 tree
   | None -> "/* no decodable tree yet */"
 
-let toTypeScript (wireJson: string) : string =
-  "// The current tree as TypeScript (@fuaran-ui/ui) smart-constructor source.\n"
-  + "// Verified projection: executing this source re-encodes byte-identically to the canonical\n"
-  + "// wire JSON for every corpus-covered kind (closures/handlers are structural placeholders).\n\n"
-  + projectTypeScriptExpr wireJson
-
-let toPython (wireJson: string) : string =
-  hashHeader "Python (fuaran_py.ui)" + project pySpec wireJson
-
-let toFSharp (wireJson: string) : string =
-  header "F# (Fuaran.UI)" + project fsSpec wireJson
-
-let toCSharp (wireJson: string) : string =
-  header "C# (Fuaran.UI.CSharp)" + project csSpec wireJson
-
-/// VB is the one target that does not ride the generic `LangSpec` walker – its
-/// XML-literal shape has its own `vbNode` projector.
-let toVisualBasic (wireJson: string) : string =
+let private vbWalk (wireJson: string) : string =
   let body =
     match JsonHost.parse wireJson with
     | Some tree when isNode tree -> vbNode 0 tree
@@ -2692,9 +2819,7 @@ let toVisualBasic (wireJson: string) : string =
 
   tickHeader "VB (Fuaran.UI.VisualBasic)" + body
 
-/// Go rides a bespoke walk (like VB): its host has no per-kind builder, so the
-/// tree is assembled as structural `wire.Node` / `wire.Obj` with wrapped values.
-let toGo (wireJson: string) : string =
+let private goWalk (wireJson: string) : string =
   let body =
     match JsonHost.parse wireJson with
     | Some tree when isNode tree -> goNode 0 tree
@@ -2703,48 +2828,277 @@ let toGo (wireJson: string) : string =
 
   header "Go (wire structural model)" + body
 
-let toKotlin (wireJson: string) : string =
-  header "Kotlin (fuaran-ui – decode-only host)" + project ktSpec wireJson
+/// The one walk per target, headers included — so when it runs marking, a
+/// span's offsets index exactly the text a pane displays rather than a
+/// header-less fragment of it. JSON has no generator to instrument (it is the
+/// canonical encoding re-indented by the host) and never marks; its spans come
+/// from `jsonSpans` below.
+let private walkFor (target: Target) (wireJson: string) : string =
+  match target with
+  | Target.Json -> toJson wireJson
+  | Target.TypeScript ->
+    "// The current tree as TypeScript (@fuaran-ui/ui) smart-constructor source.\n"
+    + "// Verified projection: executing this source re-encodes byte-identically to the canonical\n"
+    + "// wire JSON for every corpus-covered kind (closures/handlers are structural placeholders).\n\n"
+    + tsExprWalk wireJson
+  | Target.Python -> hashHeader "Python (fuaran_py.ui)" + project pySpec wireJson
+  | Target.FSharp -> header "F# (Fuaran.UI)" + project fsSpec wireJson
+  | Target.CSharp -> header "C# (Fuaran.UI.CSharp)" + project csSpec wireJson
+  | Target.VisualBasic -> vbWalk wireJson
+  | Target.Go -> goWalk wireJson
+  | Target.Kotlin -> header "Kotlin (fuaran-ui – decode-only host)" + project ktSpec wireJson
+  | Target.Rust -> header "Rust (fuaran-rs)" + project rustSpec wireJson
+  | Target.Swift -> header "Swift (FuaranUI – decode-only host)" + project swiftSpec wireJson
 
-let toRust (wireJson: string) : string =
-  header "Rust (fuaran-rs)" + project rustSpec wireJson
+/// The bare projected TypeScript expression (no header) – the input of the
+/// `tests/projection-conformance/` harness, which executes it against the real
+/// `@fuaran-ui/ui` surface and asserts a byte-identical canonical re-encode.
+let projectTypeScriptExpr (wireJson: string) : string = tsExprWalk wireJson
 
-let toSwift (wireJson: string) : string =
-  header "Swift (FuaranUI – decode-only host)" + project swiftSpec wireJson
+let toTypeScript (wireJson: string) : string = walkFor Target.TypeScript wireJson
+
+let toPython (wireJson: string) : string = walkFor Target.Python wireJson
+
+let toFSharp (wireJson: string) : string = walkFor Target.FSharp wireJson
+
+let toCSharp (wireJson: string) : string = walkFor Target.CSharp wireJson
+
+/// VB is the one target that does not ride the generic `LangSpec` walker – its
+/// XML-literal shape has its own `vbNode` projector.
+let toVisualBasic (wireJson: string) : string = walkFor Target.VisualBasic wireJson
+
+/// Go rides a bespoke walk (like VB): its host has no per-kind builder, so the
+/// tree is assembled as structural `wire.Node` / `wire.Obj` with wrapped values.
+let toGo (wireJson: string) : string = walkFor Target.Go wireJson
+
+let toKotlin (wireJson: string) : string = walkFor Target.Kotlin wireJson
+
+let toRust (wireJson: string) : string = walkFor Target.Rust wireJson
+
+let toSwift (wireJson: string) : string = walkFor Target.Swift wireJson
 
 /// Project the wire tree to a target language's source – the single entry the
 /// Output pane calls. Every target now renders (no more "coming soon").
-let projectTo (target: Target) (wireJson: string) : string =
+let projectTo (target: Target) (wireJson: string) : string = walkFor target wireJson
+
+// ─── the id → span side map (Phase 714) ───────────────────────────────────────
+
+/// The JSON tab is the canonical encoding re-indented by the host engine, so
+/// there is no generator to instrument – its spans are recovered by a
+/// string-aware brace scan instead. Every object carrying both a string `id` and
+/// a `kind` member is a node, and its span is that object's own braces. Reading
+/// the rendered text (rather than re-emitting it with sentinels) keeps the JSON
+/// tab byte-for-byte what it has always been.
+let private jsonSpans (text: string) : Span list =
+  let spans = ResizeArray<Span>()
+  // One frame per open brace: where it started, the id it declared, and whether
+  // it declared a `kind` (the two together are what makes an object a node).
+  let starts = ResizeArray<int>()
+  let ids = ResizeArray<string>()
+  let kinds = ResizeArray<bool>()
+  let n = text.Length
+
+  // Read the string literal beginning at the quote `q`; returns its contents and
+  // the index just past the closing quote. Escapes are copied verbatim – node
+  // ids and key names carry none, and the scan only needs the delimiters right.
+  let readString (q: int) : string * int =
+    let parts = ResizeArray<string>()
+    let mutable j = q + 1
+    let mutable finish = -1
+
+    while finish < 0 && j < n do
+      if text[j] = '\\' && j + 1 < n then
+        parts.Add(text.Substring(j, 2))
+        j <- j + 2
+      elif text[j] = '"' then
+        finish <- j + 1
+      else
+        parts.Add(string text[j])
+        j <- j + 1
+
+    String.concat "" parts, (if finish < 0 then n else finish)
+
+  let skipWs (j: int) : int =
+    let mutable k = j
+
+    while k < n && (text[k] = ' ' || text[k] = '\n' || text[k] = '\r' || text[k] = '\t') do
+      k <- k + 1
+
+    k
+
+  let mutable i = 0
+
+  while i < n do
+    match text[i] with
+    | '{' ->
+      starts.Add i
+      ids.Add ""
+      kinds.Add false
+      i <- i + 1
+    | '}' ->
+      if starts.Count > 0 then
+        let last = starts.Count - 1
+        let start = starts[last]
+        let id = ids[last]
+        let isNodeObj = kinds[last] && id <> ""
+        starts.RemoveAt last
+        ids.RemoveAt last
+        kinds.RemoveAt last
+
+        if isNodeObj then
+          spans.Add
+            { NodeId = id
+              Start = start
+              Length = i + 1 - start }
+
+      i <- i + 1
+    | '"' ->
+      let token, afterToken = readString i
+      let afterWs = skipWs afterToken
+
+      if afterWs < n && text[afterWs] = ':' && starts.Count > 0 then
+        let last = starts.Count - 1
+        let valueAt = skipWs (afterWs + 1)
+
+        if token = "kind" then
+          kinds[last] <- true
+        elif token = "id" && valueAt < n && text[valueAt] = '"' then
+          ids[last] <- fst (readString valueAt)
+
+      i <- afterToken
+    | _ -> i <- i + 1
+
+  List.ofSeq spans
+
+/// A target's projection together with its id → span side map – what the
+/// Navigator's projection panes render.
+///
+/// A tree whose own content carries a sentinel character projects normally with
+/// an EMPTY map: the text stays byte-exact and the panes simply show no
+/// highlight. The alternative – marking anyway – would hand back a wrong span
+/// over text the strip had mangled, which is worse than no highlight in every
+/// direction that matters.
+let projectSpans (target: Target) (wireJson: string) : Projected =
   match target with
-  | Target.Json -> toJson wireJson
-  | Target.TypeScript -> toTypeScript wireJson
-  | Target.Python -> toPython wireJson
-  | Target.FSharp -> toFSharp wireJson
-  | Target.CSharp -> toCSharp wireJson
-  | Target.VisualBasic -> toVisualBasic wireJson
-  | Target.Go -> toGo wireJson
-  | Target.Kotlin -> toKotlin wireJson
-  | Target.Rust -> toRust wireJson
-  | Target.Swift -> toSwift wireJson
+  | Target.Json ->
+    // The brace scan reads the rendered text and is indifferent to what the
+    // strings inside it contain, so JSON needs no guard and no marking.
+    let text = toJson wireJson
+
+    { Text = text; Spans = jsonSpans text }
+  | _ when carriesSentinel wireJson ->
+    { Text = projectTo target wireJson
+      Spans = [] }
+  | _ ->
+    let marked =
+      try
+        marking <- true
+        walkFor target wireJson
+      finally
+        marking <- false
+
+    let text, spans = stripSpans marked
+
+    { Text = text; Spans = spans }
+
+/// The span a node id maps to. When an id is projected more than once (a nested
+/// generic-sketch fallback, or a tree that repeats a node), the earliest and
+/// widest occurrence wins – the one a reader would point at.
+let spanFor (projected: Projected) (nodeId: string) : Span option =
+  projected.Spans
+  |> List.filter (fun s -> s.NodeId = nodeId)
+  |> List.sortBy (fun s -> s.Start, -s.Length)
+  |> List.tryHead
+
+/// Nearest-enclosing resolution over a cursor id-path (root → focused, exactly
+/// as the Navigator carries it): the focused node's own span where this language
+/// projects it, else the closest ancestor that it does. A node folded into its
+/// parent's construct – one sitting in a `state` slot the illustrative walkers
+/// never visit, say – therefore highlights the construct that contains it rather
+/// than nothing at all.
+let spanForPath (projected: Projected) (idPath: string list) : Span option =
+  idPath |> List.rev |> List.tryPick (spanFor projected)
+
+/// The 1-based inclusive line range a span covers – what a pane reports beside
+/// its language label without re-deriving offsets.
+let lineRange (text: string) (span: Span) : int * int =
+  let countNl (s: string) =
+    s |> Seq.filter ((=) '\n') |> Seq.length
+
+  let start = max 0 (min span.Start text.Length)
+  let length = max 0 (min span.Length (text.Length - start))
+  let startLine = 1 + countNl (text.Substring(0, start))
+
+  startLine, startLine + countNl (text.Substring(start, length))
 
 // ─── flat test surface (headless unit coverage) ──────────────────────────────
+
+/// The `Target` a flat target name selects – the vitest surface's vocabulary.
+let private targetNamed (targetName: string) : Target =
+  match targetName with
+  | "json" -> Target.Json
+  | "typescript" -> Target.TypeScript
+  | "python" -> Target.Python
+  | "fsharp" -> Target.FSharp
+  | "csharp" -> Target.CSharp
+  | "vb" -> Target.VisualBasic
+  | "go" -> Target.Go
+  | "kotlin" -> Target.Kotlin
+  | "rust" -> Target.Rust
+  | "swift" -> Target.Swift
+  | _ -> Target.Json
 
 /// Project by target name ("json"/"typescript"/"python"/"fsharp"/"csharp"/"vb")
 /// – a flat string surface assertable from vitest over the Fable output, so the
 /// projector's never-crash + per-language shape are testable headlessly.
 let projectByName (targetName: string) (wireJson: string) : string =
-  let target =
-    match targetName with
-    | "json" -> Target.Json
-    | "typescript" -> Target.TypeScript
-    | "python" -> Target.Python
-    | "fsharp" -> Target.FSharp
-    | "csharp" -> Target.CSharp
-    | "vb" -> Target.VisualBasic
-    | "go" -> Target.Go
-    | "kotlin" -> Target.Kotlin
-    | "rust" -> Target.Rust
-    | "swift" -> Target.Swift
-    | _ -> Target.Json
+  projectTo (targetNamed targetName) wireJson
 
-  projectTo target wireJson
+/// Every node id this language's projection maps, in document order – the side
+/// map, flattened for the Fable boundary.
+let spanIdsByName (targetName: string) (wireJson: string) : string array =
+  let projected = projectSpans (targetNamed targetName) wireJson
+
+  projected.Spans
+  |> List.sortBy (fun s -> s.Start)
+  |> List.map (fun s -> s.NodeId)
+  |> Array.ofList
+
+/// The projected source a node id maps to, or `""` when this language does not
+/// project the node at all.
+let spanTextByName (targetName: string) (wireJson: string) (nodeId: string) : string =
+  let projected = projectSpans (targetNamed targetName) wireJson
+
+  match spanFor projected nodeId with
+  | Some s -> projected.Text.Substring(s.Start, s.Length)
+  | None -> ""
+
+/// The projected source the nearest-enclosing resolution of a cursor id-path
+/// (root → focused) lands on, or `""` when nothing on the path is projected.
+let spanPathTextByName (targetName: string) (wireJson: string) (idPath: string array) : string =
+  let projected = projectSpans (targetNamed targetName) wireJson
+
+  match spanForPath projected (List.ofArray idPath) with
+  | Some s -> projected.Text.Substring(s.Start, s.Length)
+  | None -> ""
+
+/// The id the nearest-enclosing resolution actually landed on – the focused node
+/// when this language projects it, an ancestor when it does not, `""` when
+/// nothing on the path is projected.
+let spanPathIdByName (targetName: string) (wireJson: string) (idPath: string array) : string =
+  let projected = projectSpans (targetNamed targetName) wireJson
+
+  match spanForPath projected (List.ofArray idPath) with
+  | Some s -> s.NodeId
+  | None -> ""
+
+/// The 1-based inclusive `[start; end]` line range of the nearest-enclosing
+/// span, or an empty array when nothing on the path is projected.
+let spanPathLinesByName (targetName: string) (wireJson: string) (idPath: string array) : int array =
+  let projected = projectSpans (targetNamed targetName) wireJson
+
+  match spanForPath projected (List.ofArray idPath) with
+  | Some s ->
+    let a, b = lineRange projected.Text s
+    [| a; b |]
+  | None -> [||]

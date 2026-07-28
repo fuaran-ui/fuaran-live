@@ -1634,3 +1634,138 @@ body {
 .pg-tool-body {
   padding: 0 1rem 1rem;
 }
+
+/* ─── Navigator — tree cursor + rendered-node highlight (Phase 710) ────────── */
+
+.fl-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  outline: none;
+}
+
+.fl-nav:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+}
+
+.fl-nav-intro,
+.fl-nav-help {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--fuaran-color-text-muted);
+}
+
+.fl-nav-help {
+  font-size: 0.75rem;
+}
+
+.fl-nav-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* The breadcrumb: root → focused node, one clickable segment per ancestor. */
+
+.fl-nav-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.fl-nav-crumb {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fuaran-color-text-muted);
+  cursor: pointer;
+}
+
+.fl-nav-crumb:hover {
+  color: var(--ds-accent);
+  border-color: var(--fuaran-color-border, #dad2c0);
+}
+
+.fl-nav-crumb + .fl-nav-crumb::before {
+  content: '›';
+  margin-right: 0.4rem;
+  color: var(--fuaran-color-text-muted);
+}
+
+.fl-nav-crumb-active {
+  color: var(--ds-accent);
+  font-weight: 600;
+  border-color: var(--ds-accent);
+}
+
+/* The read-only node card. */
+
+.fl-nav-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  border: var(--ds-border);
+  border-radius: 0.6rem;
+  background: var(--fuaran-color-elevated, #fcfaf4);
+}
+
+.fl-nav-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.fl-nav-kind {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.fl-nav-id {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--fuaran-color-text-muted);
+}
+
+.fl-nav-count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--fuaran-color-text-muted);
+}
+
+.fl-nav-props {
+  max-height: 14rem;
+}
+
+.fl-nav-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.fl-nav-controls .fl-btn {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.6rem;
+}
+
+.fl-nav-empty {
+  font-size: 0.85rem;
+}
+
+/* The in-place highlight on the rendered node the cursor is on. An outline
+   (not a border) so the highlighted element's own layout is untouched — the
+   preview must not reflow as the cursor walks. */
+
+.fl-preview-root [data-fuaran-node-id].fl-nav-focus {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ds-accent) 8%, transparent);
+}

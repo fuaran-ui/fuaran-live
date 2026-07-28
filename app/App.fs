@@ -1464,9 +1464,17 @@ let private conversationPane (model: Model) (dispatch: Msg -> unit) : ReactEleme
                       prop.onClick (fun _ -> dispatch DemoSend) ] ] ] ] ]
 
 let private previewPane (model: Model) : ReactElement =
+  // The `.fl-preview-root` wrapper is the Navigator's highlight scope (Phase
+  // 710): it is how "the rendered element carrying this node id" is resolved to
+  // the SESSION tree rather than to a same-id node in some other tree rendered
+  // elsewhere on the page (a transcript panel, an ask envelope). Purely a
+  // scoping hook — it carries no layout of its own.
   match model.Session.Tree with
   | None -> Html.div [ prop.className "fl-empty"; prop.text "Your generated UI renders here." ]
-  | Some tree -> Render.renderWithSources BindingResolver.empty ignore tree
+  | Some tree ->
+    Html.div
+      [ prop.className "fl-preview-root"
+        prop.children [ Render.renderWithSources BindingResolver.empty ignore tree ] ]
 
 let private inspectorPane (model: Model) : ReactElement =
   let json = Session.treeJson model.Session
@@ -2130,6 +2138,7 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                         prop.children
                           [ paneCard "Live preview" (previewPane model)
                             toolDetails "Inspector – wire JSON" false (inspectorPane model)
+                            toolDetails "Navigator – walk the tree" false (Navigator.view model.Session.Tree)
                             toolDetails "Output – source projection" false (outputPane model dispatch) ] ] ] ]
             // Secondary tools – collapsed by default; Examples opens on first run.
             Html.section

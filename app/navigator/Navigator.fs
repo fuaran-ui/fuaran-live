@@ -10,10 +10,17 @@ module Fuaran.Live.Navigator
 //  the path from the root, and the node the cursor is on is outlined in place in
 //  the rendered preview via its `data-fuaran-node-id` attribute.
 //
-//  Read-only. Nothing here mutates the tree; the cursor is a PROJECTION over the
-//  session tree, never a copy of it — the session stays the single source of
-//  truth, and every derived value (the DFS order, the path, the node card) is
-//  recomputed from the current tree on each render.
+//  The cursor is a PROJECTION over the session tree, never a copy of it — the
+//  session stays the single source of truth, and every derived value (the DFS
+//  order, the path, the node card) is recomputed from the current tree on each
+//  render.
+//
+//  The card is no longer read-only: it carries a schema-DERIVED property panel
+//  (`PropertyEditor`), and committing a field emits a `TreeOp` through the
+//  public apply engine, validator-gated before the session sees it. Nothing in
+//  this module edits a tree by hand — the only way a byte moves is an op. The
+//  panel's whole field set comes from the introspection + schema surfaces, so a
+//  `NodeKind` added to the language is editable here with no edit to this file.
 //
 //  The cursor is ID-ADDRESSED THROUGHOUT, never positional. Its whole state is a
 //  path of `NodeId`s from the root to the focused node; there is no index, no
@@ -198,6 +205,130 @@ let propSummary (node: Node<obj>) : string =
   with _ ->
     "– this node's properties could not be projected to wire JSON –"
 
+// ─── the editable property panel ─────────────────────────────────────────────
+//
+// Every row here is derived — see `PropertyEditor`. This component owns only two
+// pieces of local state: the in-progress DRAFT text of the field being typed
+// into, and the inline error of the last refused commit. Both are keyed by the
+// field's op path and both are cleared when the cursor moves to another node, so
+// a draft can never be committed against a node the user has since left.
+//
+// Commit points differ by control on purpose: a select or a checkbox commits on
+// change (the value is already legal — the options came from the schema), while
+// a text or number box commits on Enter or on blur (so a partially-typed value
+// is not run through the validator on every keystroke).
+
+/// The panel's own state key for a field.
+let private draftKey (field: PropertyEditor.Field) : string = field.Group + "/" + field.Path
+
+[<ReactComponent>]
+let private PropertyPanel
+  (session: Session.SessionState)
+  (node: Node<obj>)
+  (onEdit: Session.SessionState -> unit)
+  : ReactElement =
+  let drafts, setDrafts = React.useState (Map.empty: Map<string, string>)
+  let failure, setFailure = React.useState (None: (string * string) option)
+
+  let nodeKey = idText node.Id
+
+  // A new focus means new fields: drop drafts + the inline error rather than
+  // carry one node's half-typed value onto another's panel.
+  React.useEffect (
+    (fun () ->
+      setDrafts Map.empty
+      setFailure None),
+    [| box nodeKey |]
+  )
+
+  let commit (field: PropertyEditor.Field) (raw: string) =
+    match PropertyEditor.commit session node field raw with
+    | PropertyEditor.Committed next ->
+      // Drop the draft so the row re-reads its value from the applied tree —
+      // what is on screen after a commit is the tree, not what was typed.
+      setDrafts (Map.remove (draftKey field) drafts)
+      setFailure None
+      onEdit next
+    | PropertyEditor.Rejected message -> setFailure (Some(draftKey field, message))
+
+  let row (field: PropertyEditor.Field) =
+    let key = draftKey field
+    let draft = drafts |> Map.tryFind key |> Option.defaultValue field.Current
+
+    let control =
+      match field.Editor with
+      | PropertyEditor.Editor.ReadOnly reason ->
+        Html.div
+          [ prop.className "fl-nav-field-ro"
+            prop.title reason
+            prop.children
+              [ Html.code [ prop.className "fl-nav-field-value"; prop.text field.Current ]
+                Html.span [ prop.className "fl-nav-field-why"; prop.text reason ] ] ]
+      | PropertyEditor.Editor.Choice options ->
+        Html.select
+          [ prop.className "fl-nav-field-input"
+            prop.value field.Current
+            prop.onChange (fun (v: string) -> commit field v)
+            prop.children [ for option in options -> Html.option [ prop.value option; prop.text option ] ] ]
+      | PropertyEditor.Editor.Toggle ->
+        Html.input
+          [ prop.className "fl-nav-field-check"
+            prop.type' "checkbox"
+            prop.isChecked (field.Current = "true")
+            prop.onChange (fun (b: bool) -> commit field (if b then "true" else "false")) ]
+      | PropertyEditor.Editor.Text
+      | PropertyEditor.Editor.Integer
+      | PropertyEditor.Editor.Number ->
+        let numeric = field.Editor <> PropertyEditor.Editor.Text
+
+        Html.input
+          [ prop.className "fl-nav-field-input"
+            prop.type' (if numeric then "number" else "text")
+            if field.Editor = PropertyEditor.Editor.Integer then
+              prop.step 1
+            prop.value draft
+            prop.onChange (fun (v: string) -> setDrafts (Map.add key v drafts))
+            prop.onBlur (fun _ ->
+              if draft <> field.Current then
+                commit field draft)
+            prop.onKeyDown (fun ev ->
+              if ev.key = "Enter" then
+                ev.preventDefault ()
+                commit field draft) ]
+
+    let error =
+      match failure with
+      | Some(failedKey, message) when failedKey = key ->
+        [ Html.p [ prop.className "fl-nav-field-error"; prop.role "alert"; prop.text message ] ]
+      | _ -> []
+
+    Html.div
+      [ prop.key key
+        prop.className "fl-nav-field"
+        prop.children (
+          [ Html.label [ prop.className "fl-nav-field-label"; prop.text field.Label ]
+            control ]
+          @ error
+        ) ]
+
+  let derived = PropertyEditor.fields node
+
+  let group (name: string) =
+    match derived |> List.filter (fun f -> f.Group = name) with
+    | [] -> []
+    | rows ->
+      [ Html.div
+          [ prop.key name
+            prop.className "fl-nav-group"
+            prop.children (
+              Html.h4 [ prop.className "fl-nav-group-title"; prop.text name ]
+              :: (rows |> List.map row)
+            ) ] ]
+
+  Html.div
+    [ prop.className "fl-nav-edit"
+      prop.children (group "Properties" @ group "Contained data" @ group "Style") ]
+
 // ─── rendered-node highlight (the only DOM touch in this module) ─────────────
 
 /// Outline the rendered element carrying `nodeId` and scroll it into view,
@@ -244,10 +375,14 @@ let private emptyState: ReactElement =
                 "No tree yet. Generate a UI (or load an example) and the navigator will walk it — every node in depth-first order, highlighted in the live preview as you go." ] ] ]
 
 /// The Navigator tab. Holds only the id-path cursor; every other value on screen
-/// is derived from `tree` on each render, so a tree that changes under the
-/// cursor re-resolves rather than going stale.
+/// is derived from the session's tree on each render, so a tree that changes
+/// under the cursor re-resolves rather than going stale — including when the
+/// change is one the panel below just committed. `onEdit` hands the post-op
+/// session back to the host, which is what keeps the rendered view, the
+/// inspector and every other tab on the same tree (one source of truth).
 [<ReactComponent>]
-let NavigatorPane (tree: Node<obj> option) : ReactElement =
+let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState -> unit) : ReactElement =
+  let tree = session.Tree
   let stored, setStored = React.useState (None: NavCursor option)
 
   let cursor = tree |> Option.map (fun root -> reresolve root stored)
@@ -335,7 +470,8 @@ let NavigatorPane (tree: Node<obj> option) : ReactElement =
                           Html.span
                             [ prop.className "fl-nav-count"
                               prop.text (sprintf "node %d of %d" here total) ] ] ]
-                  Html.pre [ prop.className "fl-code fl-nav-props"; prop.text (propSummary node) ] ] ]
+                  Html.pre [ prop.className "fl-code fl-nav-props"; prop.text (propSummary node) ]
+                  PropertyPanel session node onEdit ] ]
 
       Html.div
         [ prop.className "fl-nav-body"
@@ -373,9 +509,12 @@ let NavigatorPane (tree: Node<obj> option) : ReactElement =
         [ Html.p
             [ prop.className "fl-nav-intro"
               prop.text
-                "Walk the tree the model emitted. Click here, then use the keyboard — the node under the cursor is outlined in the live preview above." ]
+                "Walk the tree the model emitted, and edit it. Click here, then use the keyboard — the node under the \
+cursor is outlined in the live preview above, and its properties are editable in the card below. Every edit becomes a \
+tree op, checked before it is applied." ]
           Html.p [ prop.className "fl-nav-help"; prop.text helpHint ]
           body ] ]
 
 /// The tab's entry point — what the playground shell mounts.
-let view (tree: Node<obj> option) : ReactElement = NavigatorPane tree
+let view (session: Session.SessionState) (onEdit: Session.SessionState -> unit) : ReactElement =
+  NavigatorPane session onEdit

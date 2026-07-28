@@ -134,6 +134,7 @@
     <Compile Include="Live.fs" />
     <Compile Include="WebRtc.fs" />
     <Compile Include="PatternBank.fs" />
+    <Compile Include="navigator\PropertyEditor.fs" />
     <Compile Include="navigator\Navigator.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>

@@ -219,6 +219,12 @@ type Msg =
   | CompareDone of Compare.CompareResult
   | AgentEmit of Agent.TimelineEntry
   | AgentSession of Session.SessionState
+  // A Navigator property-panel commit (Phase 711). It carries the SAME payload
+  // as `AgentSession` and shares its handler: an edit from the panel is an
+  // ordinary session advance — one validator-gated op applied through the public
+  // engine — so it must live-drive to a paired device exactly like a model
+  // emission does. Distinct case only so the provenance is readable.
+  | NavigatorEdit of Session.SessionState
   | AgentPanels of Panels.PanelStore
   | AgentDone of Agent.AgentRunResult
   | DemoSend
@@ -918,6 +924,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     { model with
         AgentTimeline = model.AgentTimeline @ [ e ] },
     Cmd.none
+  | NavigatorEdit s
   | AgentSession s ->
     // While presenting (same-machine window and/or a paired device), push the
     // delta (new ops, or a full-tree replacement) so the audience re-renders live.
@@ -2138,7 +2145,10 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                         prop.children
                           [ paneCard "Live preview" (previewPane model)
                             toolDetails "Inspector – wire JSON" false (inspectorPane model)
-                            toolDetails "Navigator – walk the tree" false (Navigator.view model.Session.Tree)
+                            toolDetails
+                              "Navigator – walk and edit the tree"
+                              false
+                              (Navigator.view model.Session (NavigatorEdit >> dispatch))
                             toolDetails "Output – source projection" false (outputPane model dispatch) ] ] ] ]
             // Secondary tools – collapsed by default; Examples opens on first run.
             Html.section

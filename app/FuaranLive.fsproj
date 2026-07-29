@@ -48,10 +48,18 @@
 
   <ItemGroup>
     <!-- The Fable-safe slice of the Ops apply engine + the canonical-JSON codec,
-         LINKED (not ProjectReferenced – a ref to Fuaran.UI.Ops would also pull the
-         .NET-only ErrorRender.fs and break the Fable compile, exactly as the
-         parity fable-host documents). These give the closed loop its decode →
-         apply → encode core in the browser. Compile order = dependency order.
+         LINKED (not ProjectReferenced). Fuaran.UI.Ops is Fable-compilable in full –
+         ErrorRender.fs carries a complete `#else` Fable arm (a hand-rolled JSON
+         builder mirroring JsonDecode.fs's no-System.Text.Json stance), and the
+         fuaran-dotnet samples take a plain ProjectReference to it and compile
+         green. The reason to LINK is not portability but compile topology: this
+         repo drives two independent Fable graphs (the playground and the
+         showcase), and a ProjectReference would compile the shared Ops modules
+         once per graph. Linking the exact files each graph needs keeps one copy
+         per graph and the emitted surface minimal.
+
+         These give the closed loop its decode → apply → encode core in the
+         browser. Compile order = dependency order.
 
          NB: the `Fuaran.UI.Ops.Types` module (TreeOp / Spec / the WireTree marker)
          is NOT linked here – it moved to Fuaran.UI.Ops.Abstractions and now reaches

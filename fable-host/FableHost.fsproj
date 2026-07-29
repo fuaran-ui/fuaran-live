@@ -19,11 +19,13 @@
 
     Decoder source – linked, not ProjectReferenced. The canonical wire
     decoder lives in `Fuaran.UI.Ops/JsonDecode.fs` and is explicitly Fable-
-    compatible (hand-rolled parser, no System.Text.Json). But a
-    ProjectReference to `Fuaran.UI.Ops` would also pull `Apply.fs` +
-    `ErrorRender.fs`, which are .NET-only (Utf8JsonWriter / MemoryStream) and
-    break the Fable compile. So the Fable-safe Ops source the decoder needs –
-    `JsonDecode.fs` – is linked directly. The `Fuaran.UI.Ops.Types` module
+    compatible (hand-rolled parser, no System.Text.Json). `Apply.fs` and
+    `ErrorRender.fs` are Fable-compatible too – ErrorRender.fs's
+    `#if !FABLE_COMPILER` Utf8JsonWriter path has a complete `#else` arm, so a
+    ProjectReference to `Fuaran.UI.Ops` would compile. It is still linked
+    rather than referenced because this parity host only needs the decoder:
+    linking exactly one file keeps the host's Fable graph minimal instead of
+    dragging the whole apply engine through it. The `Fuaran.UI.Ops.Types` module
     (TreeOp/Spec + the WireTree marker) moved to Fuaran.UI.Ops.Abstractions and
     reaches this compile transitively through the Fuaran.UI.Renderer
     ProjectReference (Renderer → Telemetry.Abstractions → Ops.Abstractions), so it

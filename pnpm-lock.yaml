@@ -8,18 +8,24 @@ importers:
 
   .:
     dependencies:
+      '@fuaran-ui/ai-tools':
+        specifier: ^0.3.0
+        version: 0.3.0(@fuaran-ui/schema@0.3.0)(react@19.2.8)
+      '@fuaran-ui/charts':
+        specifier: ^0.3.0
+        version: 0.3.0(@fuaran-ui/ops@0.3.0(@fuaran-ui/schema@0.3.0))(@fuaran-ui/schema@0.3.0)
       '@fuaran-ui/ops':
-        specifier: ^0.2.0
-        version: 0.2.0(@fuaran-ui/schema@0.2.0)
+        specifier: ^0.3.0
+        version: 0.3.0(@fuaran-ui/schema@0.3.0)
       '@fuaran-ui/renderer':
-        specifier: ^0.2.0
-        version: 0.2.0(@fuaran-ui/ai-tools@0.2.0(@fuaran-ui/schema@0.2.0)(react@19.2.8))(@fuaran-ui/charts@0.2.0(@fuaran-ui/ops@0.2.0(@fuaran-ui/schema@0.2.0))(@fuaran-ui/schema@0.2.0))(@fuaran-ui/ops@0.2.0(@fuaran-ui/schema@0.2.0))(@fuaran-ui/schema@0.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: ^0.3.0
+        version: 0.3.0(@fuaran-ui/ai-tools@0.3.0(@fuaran-ui/schema@0.3.0)(react@19.2.8))(@fuaran-ui/charts@0.3.0(@fuaran-ui/ops@0.3.0(@fuaran-ui/schema@0.3.0))(@fuaran-ui/schema@0.3.0))(@fuaran-ui/ops@0.3.0(@fuaran-ui/schema@0.3.0))(@fuaran-ui/schema@0.3.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@fuaran-ui/schema':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.3.0
+        version: 0.3.0
       '@fuaran-ui/ui':
-        specifier: ^0.2.0
-        version: 0.2.0(@fuaran-ui/schema@0.2.0)
+        specifier: ^0.3.0
+        version: 0.3.0(@fuaran-ui/schema@0.3.0)
       katex:
         specifier: ^0.16.11
         version: 0.16.47
@@ -446,47 +452,47 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fuaran-ui/ai-tools@0.2.0':
-    resolution: {integrity: sha512-Sa0LbOPhRjs2wyqCuivzQ9eDxam2iNycu5nEjYflhtzLXyPlMgxnkxjAYWAt7VuEFb4wg3wHwmgqs8KMnxAfdw==}
+  '@fuaran-ui/ai-tools@0.3.0':
+    resolution: {integrity: sha512-79+9UNkkEIYqitEE8zDkex8C7iWJotb1yiqIYQ3I+0SU97pkH2njEVMBrNDoQ7h8nLePsgdvx77A6K8WzDIqKg==}
     peerDependencies:
-      '@fuaran-ui/schema': ^0.2.0
+      '@fuaran-ui/schema': ^0.3.0
       react: ^19.0.0
     peerDependenciesMeta:
       react:
         optional: true
 
-  '@fuaran-ui/charts@0.2.0':
-    resolution: {integrity: sha512-sRYiE41Mg26+s64/XJRz17dX/cKiCcFbuSb/6anrtF+lWZ5ymHRM8z0GNNGj1XZEuut5xtFt8cXCQXlgCp+vFw==}
+  '@fuaran-ui/charts@0.3.0':
+    resolution: {integrity: sha512-0pOtqATD5eR8paZgxgnX6mCDeDkICMEYvw1M7uPKohzevI/p6BluzID6I3lch9a3yp0TOsUrLFulQa8K4504Bg==}
     peerDependencies:
-      '@fuaran-ui/ops': ^0.2.0
-      '@fuaran-ui/schema': ^0.2.0
+      '@fuaran-ui/ops': ^0.3.0
+      '@fuaran-ui/schema': ^0.3.0
 
-  '@fuaran-ui/ops@0.2.0':
-    resolution: {integrity: sha512-Sn5I7DIFCv9WbzNmwxMHODwhtXD7DBAJus3Nnc4hQaVLrBwaj6ibkfZz3WUalkedsKAOLZl2cSM5/+HWWTpvrw==}
+  '@fuaran-ui/ops@0.3.0':
+    resolution: {integrity: sha512-oWz10garR6HhNTUhEu4NAbcF0Ul2i7ZmI93TkJ9AMCrmFbUav7XcxhHyDr9KePeXYEmYIRyUEd4pnnxSfCJn6Q==}
     peerDependencies:
-      '@fuaran-ui/schema': ^0.2.0
+      '@fuaran-ui/schema': ^0.3.0
 
-  '@fuaran-ui/renderer@0.2.0':
-    resolution: {integrity: sha512-XV1w4+ILzRZmOZ2uavqMM3uC/yhbCRPsaLlyhacmNEtDJvR+C+qV23jCElH+WCleRL5XC+IFOWotxWS67s84Ag==}
+  '@fuaran-ui/renderer@0.3.0':
+    resolution: {integrity: sha512-S+sWAkwqVocjuUyzQW7EeYU+Vo8TJX+ZDP6MnD+Tgx1N+xtSHHQkh7I8JCqJ7u9zOMe57LopgllqAh39PsOn6w==}
     peerDependencies:
-      '@fuaran-ui/ai-tools': ^0.2.0
-      '@fuaran-ui/charts': ^0.2.0
-      '@fuaran-ui/ops': ^0.2.0
-      '@fuaran-ui/schema': ^0.2.0
-      '@fuaran-ui/telemetry': ^0.2.0
+      '@fuaran-ui/ai-tools': ^0.3.0
+      '@fuaran-ui/charts': ^0.3.0
+      '@fuaran-ui/ops': ^0.3.0
+      '@fuaran-ui/schema': ^0.3.0
+      '@fuaran-ui/telemetry': ^0.3.0
       react: ^19.0.0
       react-dom: ^19.0.0
     peerDependenciesMeta:
       '@fuaran-ui/telemetry':
         optional: true
 
-  '@fuaran-ui/schema@0.2.0':
-    resolution: {integrity: sha512-zREoxlUOY60f3noCnjpNGc82+oZ4ei6LAhtR5jBeqz4dSqN5K63A0PtkYlFneIkec/DsAbwILMAwo7qTJYGxbQ==}
+  '@fuaran-ui/schema@0.3.0':
+    resolution: {integrity: sha512-E9Q0NFl2wGdQJaDtb1V9MG/SrEQpRRQlhjH9XHHkueK+DqxfVcK22aYCfd3b8HJ7EjmNpYKksgCw3IdfCJl3/w==}
 
-  '@fuaran-ui/ui@0.2.0':
-    resolution: {integrity: sha512-7xe2uO7+vl7rLBlMRfcdFYWLnUixm+RsLmzKJVxepExSnugv+pEpZ/d4y+ekjXJSzwM1IOgICITCCNNvqTE5zA==}
+  '@fuaran-ui/ui@0.3.0':
+    resolution: {integrity: sha512-R1YKHZfGvkdJvszH36VsN2L521zeWrJEgaATMTLhSf6xNJ4yT03ftXDOnXLB/mxYWbYoLLOQ1y090v3UzRy7LA==}
     peerDependencies:
-      '@fuaran-ui/schema': ^0.2.0
+      '@fuaran-ui/schema': ^0.3.0
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1352,36 +1358,36 @@ snapshots:
   '@esbuild/win32-x64@0.25.12':
     optional: true
 
-  '@fuaran-ui/ai-tools@0.2.0(@fuaran-ui/schema@0.2.0)(react@19.2.8)':
+  '@fuaran-ui/ai-tools@0.3.0(@fuaran-ui/schema@0.3.0)(react@19.2.8)':
     dependencies:
-      '@fuaran-ui/schema': 0.2.0
+      '@fuaran-ui/schema': 0.3.0
     optionalDependencies:
       react: 19.2.8
 
-  '@fuaran-ui/charts@0.2.0(@fuaran-ui/ops@0.2.0(@fuaran-ui/schema@0.2.0))(@fuaran-ui/schema@0.2.0)':
+  '@fuaran-ui/charts@0.3.0(@fuaran-ui/ops@0.3.0(@fuaran-ui/schema@0.3.0))(@fuaran-ui/schema@0.3.0)':
     dependencies:
-      '@fuaran-ui/ops': 0.2.0(@fuaran-ui/schema@0.2.0)
-      '@fuaran-ui/schema': 0.2.0
+      '@fuaran-ui/ops': 0.3.0(@fuaran-ui/schema@0.3.0)
+      '@fuaran-ui/schema': 0.3.0
 
-  '@fuaran-ui/ops@0.2.0(@fuaran-ui/schema@0.2.0)':
+  '@fuaran-ui/ops@0.3.0(@fuaran-ui/schema@0.3.0)':
     dependencies:
-      '@fuaran-ui/schema': 0.2.0
+      '@fuaran-ui/schema': 0.3.0
 
-  '@fuaran-ui/renderer@0.2.0(@fuaran-ui/ai-tools@0.2.0(@fuaran-ui/schema@0.2.0)(react@19.2.8))(@fuaran-ui/charts@0.2.0(@fuaran-ui/ops@0.2.0(@fuaran-ui/schema@0.2.0))(@fuaran-ui/schema@0.2.0))(@fuaran-ui/ops@0.2.0(@fuaran-ui/schema@0.2.0))(@fuaran-ui/schema@0.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@fuaran-ui/renderer@0.3.0(@fuaran-ui/ai-tools@0.3.0(@fuaran-ui/schema@0.3.0)(react@19.2.8))(@fuaran-ui/charts@0.3.0(@fuaran-ui/ops@0.3.0(@fuaran-ui/schema@0.3.0))(@fuaran-ui/schema@0.3.0))(@fuaran-ui/ops@0.3.0(@fuaran-ui/schema@0.3.0))(@fuaran-ui/schema@0.3.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@fuaran-ui/ai-tools': 0.2.0(@fuaran-ui/schema@0.2.0)(react@19.2.8)
-      '@fuaran-ui/charts': 0.2.0(@fuaran-ui/ops@0.2.0(@fuaran-ui/schema@0.2.0))(@fuaran-ui/schema@0.2.0)
-      '@fuaran-ui/ops': 0.2.0(@fuaran-ui/schema@0.2.0)
-      '@fuaran-ui/schema': 0.2.0
+      '@fuaran-ui/ai-tools': 0.3.0(@fuaran-ui/schema@0.3.0)(react@19.2.8)
+      '@fuaran-ui/charts': 0.3.0(@fuaran-ui/ops@0.3.0(@fuaran-ui/schema@0.3.0))(@fuaran-ui/schema@0.3.0)
+      '@fuaran-ui/ops': 0.3.0(@fuaran-ui/schema@0.3.0)
+      '@fuaran-ui/schema': 0.3.0
       katex: 0.16.47
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@fuaran-ui/schema@0.2.0': {}
+  '@fuaran-ui/schema@0.3.0': {}
 
-  '@fuaran-ui/ui@0.2.0(@fuaran-ui/schema@0.2.0)':
+  '@fuaran-ui/ui@0.3.0(@fuaran-ui/schema@0.3.0)':
     dependencies:
-      '@fuaran-ui/schema': 0.2.0
+      '@fuaran-ui/schema': 0.3.0
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

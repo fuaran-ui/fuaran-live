@@ -1258,6 +1258,7 @@ let private ctrlDefault (kind: string) : string =
   | "Choice"
   | "SegmentedChoice" -> "undefined"
   | "Range" -> "[0, 0]"
+  | "DateRange" -> "['', '']"
   | _ -> "''" // Text / TextArea / Date
 
 let private tsAutoBindValue (ab: AutoBind) (kind: string) : string =
@@ -1267,7 +1268,9 @@ let private tsAutoBindValue (ab: AutoBind) (kind: string) : string =
 
 /// The control's `value` binding: the wire's explicit value if present, else the
 /// reconstructed auto-binding. `Range`'s explicit value rides as a `{min,max}`
-/// object (the `Static` pair) and re-hydrates as `binding.static([min, max])`.
+/// object (the `Static` pair) and re-hydrates as `binding.static([min, max])`;
+/// `DateRange`'s rides as `{from,to}` (the 0.7.0 string pair) and re-hydrates as
+/// `binding.static([from, to])`.
 let private tsFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
   match JsonValue.tryField "value" v with
   | Some valV ->
@@ -1277,6 +1280,26 @@ let private tsFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
       + numLit (numOf "min" valV)
       + ", "
       + numLit (numOf "max" valV)
+      + "])"
+    | "DateRange" when (dollarType valV).IsNone ->
+      "binding.static([" + qs (strOf "from" valV) + ", " + qs (strOf "to" valV) + "])"
+    | "DateRange" when
+      (dollarType valV) = Some "State"
+      && (match JsonValue.tryField "defaultValue" valV with
+          | Some d -> (dollarType d).IsNone && (JsonValue.tryField "from" d).IsSome
+          | None -> false)
+      ->
+      // A State binding whose defaultValue is the wire's `{from,to}` pair: the
+      // in-memory shape is the TUPLE (the `Range` precedent), so the generic
+      // object-literal projection would hand the encoder a shape it cannot take.
+      let d = fieldD "defaultValue" valV
+
+      "binding.state("
+      + qs (strOf "key" valV)
+      + ", ["
+      + qs (strOf "from" d)
+      + ", "
+      + qs (strOf "to" d)
       + "])"
     | _ -> tsBinding Opq.Scalar valV
   | None -> tsAutoBindValue ab kind
@@ -1349,6 +1372,14 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
   | "Date" ->
     tsInline (
       [ "kind", qs "Date" ]
+      @ handler "onChange"
+      @ [ "value", value
+          "variant", qs (strOf "variant" v)
+          "constraints", tsConstraints true v ]
+    )
+  | "DateRange" ->
+    tsInline (
+      [ "kind", qs "DateRange" ]
       @ handler "onChange"
       @ [ "value", value
           "variant", qs (strOf "variant" v)

@@ -2214,3 +2214,10 @@ body {
 .fl-nav-structural .fl-nav-field-error {
   grid-column: auto;
 }
+
+/* Phase 718 — the Navigator tool's link across to the showcase page that
+   explains the same walk on a canned tree, keyless. */
+.pg-tool-crosslink {
+  margin: 0.8rem 0 0;
+  font-size: 0.8rem;
+}

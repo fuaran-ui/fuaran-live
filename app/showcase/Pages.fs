@@ -23,17 +23,10 @@ let private renderNode (n: Node<'msg>) : ReactElement =
   Render.renderWithSources BindingResolver.empty ignore n
 
 /// The playground lives on its own origin (D8/D10 – one repo, two origins). The
-/// door + the footer exit both link here. Prefer the build-time setting; fall
-/// back to the canonical permalink domain when unset (dev: both entries on one
-/// Vite server, so the domain is the honest target for a real cross-door hop).
-let playgroundOrigin: string =
-  let configured: string =
-    emitJsExpr () "((import.meta.env && import.meta.env.VITE_PLAYGROUND_ORIGIN) || '')"
-
-  if configured = "" then
-    "https://fuaran-ui.live"
-  else
-    configured
+/// door + the footer exit both link here. Defined in `Pillars` since Phase 718 —
+/// the Navigator page also links across, and it is compiled ahead of this module.
+/// Re-exported here so the existing call sites read unchanged.
+let playgroundOrigin: string = Pillars.playgroundOrigin
 
 // ─── routing ──────────────────────────────────────────────────────────────
 
@@ -330,6 +323,7 @@ let renderRoute (route: Route) (replay: Replay.ReplayState) : ReactElement =
   | DemoPage d when d.Id = "hand-on-the-wheel" -> HandOnTheWheel.page
   | DemoPage d when d.Id = "locale-lens" -> LocaleLens.page
   | DemoPage d when d.Id = "go-sessions" -> GoSessions.page
+  | DemoPage d when d.Id = "navigator" -> Navigator.page
   | DemoPage d -> demoPage d replay
   | EvaluationPage -> Evaluation.page
   | ContactPage -> Contact.page

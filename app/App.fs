@@ -2177,6 +2177,26 @@ let private toolDetails (title: string) (openByDefault: bool) (body: ReactElemen
         [ Html.summary [ prop.text title ]
           Html.div [ prop.className "pg-tool-body"; prop.children [ body ] ] ] ]
 
+/// This tab's current URL fragment, used only to decide whether a deep link
+/// asked for a particular tool. Read once per render; no listener — arriving at
+/// `#navigator` is a page load, not an in-app navigation.
+[<Emit("(window.location.hash || '')")>]
+let private locationHash () : string = jsNative
+
+/// `toolDetails` plus an anchor id, so a cross-door link can name a tool and
+/// have it open on arrival. The showcase's Navigator page links to `#navigator`;
+/// without the open-on-target the visitor would land on a closed disclosure and
+/// have to find it, which is not the "one click" the link promises.
+let private anchoredToolDetails (anchor: string) (title: string) (body: ReactElement) : ReactElement =
+  Html.details
+    [ prop.className "pg-tool"
+      prop.id anchor
+      if locationHash () = "#" + anchor then
+        prop.custom ("open", true)
+      prop.children
+        [ Html.summary [ prop.text title ]
+          Html.div [ prop.className "pg-tool-body"; prop.children [ body ] ] ] ]
+
 let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
   if model.IsAudience then
     audienceView model
@@ -2214,24 +2234,36 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                         prop.children
                           [ paneCard "Live preview" (previewPane model)
                             toolDetails "Inspector – wire JSON" false (inspectorPane model)
-                            toolDetails
+                            anchoredToolDetails
+                              "navigator"
                               "Navigator – walk and edit the tree"
-                              false
                               // Phase 714: the walk with the live source projections beside
                               // it. `beside` wraps the built element, so this composition does
                               // not depend on what `Navigator.view` itself takes.
                               // Phase 715 wraps that again with the loop pane — same posture,
                               // same reason: emitted → edited → re-prompted, without leaving
                               // the tab.
-                              (Refine.below
-                                (ProjectionSync.beside
-                                  (Navigator.view model.Session (NavigatorEdit >> dispatch))
-                                  model.Session.Tree)
-                                model.Session
-                                model.RefineBaseline
-                                model.AgentRunning
-                                model.KeyPresent
-                                (RefineFromHere >> dispatch))
+                              (Html.div
+                                [ prop.children
+                                    [ Refine.below
+                                        (ProjectionSync.beside
+                                          (Navigator.view model.Session (NavigatorEdit >> dispatch))
+                                          model.Session.Tree)
+                                        model.Session
+                                        model.RefineBaseline
+                                        model.AgentRunning
+                                        model.KeyPresent
+                                        (RefineFromHere >> dispatch)
+                                      // Phase 718 — the other half of the cross-link. The
+                                      // showcase's Navigator page is the same walk on a canned
+                                      // tree with no key, which is the better first look.
+                                      Html.p
+                                        [ prop.className "pg-tool-crosslink"
+                                          prop.children
+                                            [ Html.a
+                                                [ prop.href (showcaseHref + "#/demo/navigator")
+                                                  prop.text
+                                                    "See the Navigator explained step by step, on a canned tree (no key needed) →" ] ] ] ] ])
                             toolDetails "Output – source projection" false (outputPane model dispatch) ] ] ] ]
             // Secondary tools – collapsed by default; Examples opens on first run.
             Html.section

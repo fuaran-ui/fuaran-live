@@ -9,6 +9,22 @@ module Fuaran.Showcase.Pillars
 //  in `demos` below + its page function in Pages.fs.
 // ============================================================================
 
+open Fable.Core.JsInterop
+
+/// The playground lives on its own origin (D8/D10 – one repo, two origins).
+/// Prefer the build-time setting; fall back to the canonical permalink domain
+/// when unset (dev: both entries on one Vite server, so the domain is the honest
+/// target for a real cross-door hop). Defined here rather than in `Pages` because
+/// pages compiled ahead of `Pages` link across too — the Navigator page's handoff.
+let playgroundOrigin: string =
+  let configured: string =
+    emitJsExpr () "((import.meta.env && import.meta.env.VITE_PLAYGROUND_ORIGIN) || '')"
+
+  if configured = "" then
+    "https://fuaran-ui.live"
+  else
+    configured
+
 [<RequireQualifiedAccess>]
 type Pillar =
   | Value
@@ -269,6 +285,14 @@ let demos: Demo list =
         "The same page, a new key: BYOK becomes BYOS. Play a recorded Go-server session with zero setup, or run one Go binary and drive the live session from the browser – validator reject and last-good-tree included."
       Route = "go-sessions"
       ReplayId = Some "go-sessions"
+      Live = true }
+    { Id = "navigator"
+      Title = "The Navigator"
+      Pillar = Pillar.Machine
+      Wow =
+        "Edit a running app through its own wire format: walk it with a cursor, retitle a button, resize a heading, undo — and watch each action turn into the operation it actually is, in canonical bytes."
+      Route = "navigator"
+      ReplayId = None
       Live = true }
     { Id = "locale-lens"
       Title = "The Locale Lens"

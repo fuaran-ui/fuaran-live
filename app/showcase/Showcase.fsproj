@@ -100,6 +100,7 @@
     <Compile Include="TypedQuestion.fs" />
     <Compile Include="HandOnTheWheel.fs" />
     <Compile Include="LocaleLens.fs" />
+    <Compile Include="Navigator.fs" />
     <Compile Include="Receiver.fs" />
     <Compile Include="Pages.fs" />
     <Compile Include="App.fs" />

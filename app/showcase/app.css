@@ -7551,3 +7551,300 @@ polygon.gi-dag-pending {
   font-size: 0.9rem;
   color: var(--fuaran-color-text, #1c1c22);
 }
+
+/* ─── The Navigator (Phase 718) ─────────────────────────────────────────────
+   Edit a running app through its own wire format. Two columns above the
+   breakpoint — the walked tree on the left, what it emitted on the right —
+   stacked below it, because the emitted op has to sit BESIDE the action to
+   make its point and stacking is the honest fallback when it cannot. */
+
+.nv-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.nv-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+.nv-lede {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+
+/* the guided rail */
+.nv-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-step {
+  border: var(--ds-border);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--fuaran-color-surface, #f5f5f8);
+  opacity: 0.55;
+}
+.nv-step-now {
+  opacity: 1;
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 1px var(--ds-accent) inset;
+}
+.nv-step-done {
+  opacity: 1;
+}
+.nv-step-title {
+  font-weight: 650;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+.nv-step-say {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+
+.nv-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nv-btn {
+  border: var(--ds-border);
+  border-radius: 0.45rem;
+  background: var(--fuaran-color-surface, #f5f5f8);
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.nv-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.nv-btn-primary {
+  background: var(--fuaran-color-accent, #3358d4);
+  border-color: transparent;
+  color: #fff;
+}
+.nv-freeplay {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* the stage: walked tree | emitted data */
+.nv-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .nv-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.nv-left,
+.nv-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.nv-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+}
+.nv-crumb {
+  border: var(--ds-border);
+  border-radius: 0.35rem;
+  background: transparent;
+  padding: 0.12rem 0.4rem;
+  font: inherit;
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.nv-crumb-on {
+  background: var(--fuaran-color-accent, #3358d4);
+  border-color: transparent;
+  color: #fff;
+}
+.nv-pos {
+  margin-left: auto;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+
+.nv-preview {
+  border: var(--ds-border);
+  border-radius: 0.75rem;
+  padding: 0.9rem;
+  background: var(--fuaran-color-bg, #fff);
+  overflow-x: auto;
+}
+
+/* The in-place outline on the rendered node the cursor is on. An outline, not a
+   border, so the preview never reflows as the cursor walks. */
+.nv-preview [data-fuaran-node-id].nv-focus {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ds-accent) 8%, transparent);
+}
+
+.nv-free {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.nv-free-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+.nv-free-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+.nv-free-count {
+  font-size: 0.75rem;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+
+/* what you did, as data */
+.nv-emit,
+.nv-node {
+  border: var(--ds-border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+.nv-emit-head,
+.nv-node-head {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  background: var(--fuaran-color-surface, #f5f5f8);
+  border-bottom: var(--ds-border);
+}
+.nv-emit-none {
+  margin: 0;
+  padding: 0.7rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+.nv-emit-code,
+.nv-node-code {
+  margin: 0;
+  padding: 0.7rem;
+  overflow-x: auto;
+  background: #14161c;
+  color: #e8e8ee;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.nv-node-code {
+  max-height: 15rem;
+  overflow-y: auto;
+}
+
+/* the three source projections */
+.nv-projs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.nv-projs-head {
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.nv-projs-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.6rem;
+}
+.nv-proj {
+  border: var(--ds-border);
+  border-radius: 0.6rem;
+  overflow: hidden;
+  min-width: 0;
+}
+.nv-proj-lang {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  background: var(--fuaran-color-surface, #f5f5f8);
+  border-bottom: var(--ds-border);
+}
+.nv-proj-code {
+  margin: 0;
+  padding: 0.6rem;
+  max-height: 17rem;
+  overflow: auto;
+  background: #14161c;
+  color: #e8e8ee;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+.nv-proj-hit {
+  background: color-mix(in srgb, var(--ds-accent) 45%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+/* the handoff into the real playground navigator */
+.nv-handoff {
+  border: var(--ds-border);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: var(--fuaran-color-surface, #f5f5f8);
+}
+.nv-handoff h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+.nv-handoff p {
+  margin: 0 0 0.7rem;
+  max-width: 68ch;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+.nv-door {
+  display: inline-block;
+  border-radius: 0.5rem;
+  background: var(--fuaran-color-accent, #3358d4);
+  padding: 0.4rem 0.9rem;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nv-honesty {
+  font-size: 0.85rem;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+.nv-honesty summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.nv-honesty li {
+  margin-bottom: 0.35rem;
+  line-height: 1.5;
+}

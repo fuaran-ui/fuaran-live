@@ -64,11 +64,23 @@
     <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\JsonDecode.fs">
       <Link>linked\JsonDecode.fs</Link>
     </Compile>
+    <!-- Reflection-free shape helpers – the THIRD linked Ops file the header's
+         forward-coupling note anticipated. CanonicalJson.fs below calls
+         `Introspect.canonicalForm` / `canonicalFormKind`: since the tier's
+         hand-written node encoder was deleted in favour of the generated one,
+         the §16 canonical-form projection runs ABOVE the structural encoder
+         rather than inline. Without this link the host fails to Fable-compile
+         with FS0039 'Introspect is not defined' — which is exactly how it
+         surfaced. Ordered before CanonicalJson.fs (its consumer) and, like the
+         app project's link list, needs nothing from JsonDecode.fs. -->
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Introspect.fs">
+      <Link>linked\Introspect.fs</Link>
+    </Compile>
     <!-- Canonical wire ENCODER – linked Fable-safe (a self-contained structural
          hand-walk, no System.Text.Json). The host re-encodes the tree it decoded
          so the parent's parity view can assert `encode(decode(wire))` is byte-
          identical to the sibling TS host's. Ordered after JsonDecode.fs; depends
-         only on the linked Ops Types + Fuaran.Core + Fuaran.UI.Types. -->
+         on the linked Ops Types + Introspect + Fuaran.Core + Fuaran.UI.Types. -->
     <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
       <Link>linked\CanonicalJson.fs</Link>
     </Compile>

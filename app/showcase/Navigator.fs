@@ -35,6 +35,13 @@ module Fuaran.Showcase.Navigator
 //  insert/move/remove palette, the accessibility walk, and re-prompting from the
 //  cursor. Those are one click away at the bottom of this page; nothing here
 //  imitates them.
+//
+//  The WALK, though, is not imitated either – it is the same code. `Cursor` is
+//  the session-free module the playground's Navigator tab also drives, linked
+//  into this project because it depends on the typed tree and the traversal
+//  surface and on nothing else. This page carried a hand-mirrored copy of those
+//  semantics until Phase 744; there is now one definition, so the two entries
+//  cannot disagree about what "next" means.
 // ============================================================================
 
 open Fable.Core
@@ -49,6 +56,7 @@ module Introspect = Fuaran.UI.Ops.Introspect
 module Apply = Fuaran.UI.Ops.Apply
 module CJson = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 module Projection = Fuaran.Live.Projection
+module Cursor = Fuaran.Live.Cursor
 
 // ─── the canned tree (19 nodes across the common kinds) ──────────────────────
 
@@ -132,81 +140,13 @@ let private baseTree: Node<unit> =
                 Label = lit "Request sign-off"
                 Variant = ButtonVariant.Primary } ] }
 
-// ─── the cursor (pure — a path of ids, exactly as the playground's is) ───────
-
-/// A cursor over the tree, addressed **by id**: the path from the root down to
-/// the focused node. Ids only — no index, no ordinal, no captured node, which is
-/// what lets it survive an edit that reshapes the tree around it.
-type private Cursor = { Path: string list }
-
-let private focusedId (c: Cursor) : string option = List.tryLast c.Path
-
-/// Every id-path in the tree, DFS pre-order, root first — the canonical walk
-/// order, built over the shipped traversal surface so nodes held in non-list
-/// positions are walked too, not just structural children.
-let rec private pathsFrom (trail: string list) (node: Node<unit>) : string list list =
-  let here = trail @ [ node.Id ]
-  here :: (Introspect.descendantNodes node |> List.collect (pathsFrom here))
-
-let private allPaths (root: Node<unit>) : string list list = pathsFrom [] root
-
-let private atRoot (root: Node<unit>) : Cursor = { Path = [ root.Id ] }
-
-let private pathTo (root: Node<unit>) (id: string) : string list option =
-  allPaths root |> List.tryFind (fun p -> List.tryLast p = Some id)
-
-/// Re-resolve a possibly-stale cursor against the CURRENT tree: the deepest id
-/// on the stored path that still exists wins. Total — always returns a cursor
-/// addressing a node that is really there.
-let private reresolve (root: Node<unit>) (c: Cursor) : Cursor =
-  c.Path
-  |> List.rev
-  |> List.tryPick (pathTo root)
-  |> Option.map (fun p -> { Path = p })
-  |> Option.defaultValue (atRoot root)
-
-let rec private findNode (root: Node<unit>) (id: string) : Node<unit> option =
-  if root.Id = id then
-    Some root
-  else
-    Introspect.descendantNodes root |> List.tryPick (fun n -> findNode n id)
-
-let private focusedNode (root: Node<unit>) (c: Cursor) : Node<unit> option =
-  focusedId c |> Option.bind (findNode root)
-
-// Ends STOP, they do not wrap — so holding a key walks the tree exactly once and
-// comes to rest somewhere knowable.
-let private step (delta: int) (root: Node<unit>) (c: Cursor) : Cursor =
-  let paths = allPaths root
-
-  match paths |> List.tryFindIndex (fun p -> p = c.Path) with
-  | None -> reresolve root c
-  | Some i ->
-    let j = i + delta
-
-    if j < 0 || j >= List.length paths then
-      c
-    else
-      { Path = paths[j] }
-
-let private parentOf (c: Cursor) : Cursor =
-  if List.length c.Path <= 1 then
-    c
-  else
-    { Path = c.Path |> List.truncate (List.length c.Path - 1) }
-
-let private firstChild (root: Node<unit>) (c: Cursor) : Cursor =
-  match focusedNode root c with
-  | None -> reresolve root c
-  | Some node ->
-    match Introspect.descendantNodes node with
-    | [] -> c
-    | child :: _ -> { Path = c.Path @ [ child.Id ] }
-
-let private position (root: Node<unit>) (c: Cursor) : int * int =
-  let paths = allPaths root
-  let idx = paths |> List.tryFindIndex (fun p -> p = c.Path) |> Option.defaultValue 0
-  idx + 1, List.length paths
+// ─── the cursor ──────────────────────────────────────────────────────────────
+//
+// There is nothing here, and that is the point. The cursor — the path-of-ids
+// state, the DFS next/prev, parent/first-child, the end-stop rule and the
+// re-resolution fallback — is `Fuaran.Live.Cursor`, aliased as `Cursor` above
+// and linked into this project. This page used to restate all of it; see that
+// module's header for the semantics, which are now written down exactly once.
 
 // ─── the op log (the log is the truth; undo replays a prefix) ────────────────
 
@@ -233,7 +173,7 @@ let private treeAfter (ops: TreeOp<unit> list) : Node<unit> =
 /// What a step DOES to the log, and what it therefore has to show. `Move` is the
 /// honest odd one out: it changes the cursor and emits nothing.
 type private StepAction =
-  | Move of (Node<unit> -> Cursor -> Cursor)
+  | Move of (Node<unit> -> Cursor.NavCursor -> Cursor.NavCursor)
   | Emit of TreeOp<unit>
   | Undo
   | Project
@@ -254,7 +194,7 @@ let private steps: Step list =
   [ { Title = "Walk"
       Say =
         "Step the cursor through the tree in DFS pre-order. The cursor is a path of ids re-resolved against the current tree on every render — it holds no index and no captured node. Nothing is emitted, because nothing changed."
-      Action = Move(fun root c -> step 1 root c)
+      Action = Move Cursor.next
       LogAt = 0
       At = "nv-root" }
     { Title = "Edit a label"
@@ -364,20 +304,23 @@ let private NavigatorView () : ReactElement =
   // backwards would not undo the log. Free play scrubs `logPos` directly.
   let done_, setDone = React.useState 0
   let logPos, setLogPos = React.useState 0
-  let cursor, setCursor = React.useState (atRoot baseTree)
+  let cursor, setCursor = React.useState (Cursor.atRoot baseTree)
 
   let ops = logAfter logPos
   let tree = treeAfter ops
-  let live = reresolve tree cursor
-  let focus = focusedId live |> Option.defaultValue tree.Id
-  let idx, total = position tree live
+  let live = Cursor.reresolve tree (Some cursor)
+
+  let focus =
+    Cursor.focusedId live |> Option.map Cursor.idText |> Option.defaultValue tree.Id
+
+  let idx, total = Cursor.position tree live
   let freePlay = done_ >= stepCount
 
   // Keep the in-place outline on the node the cursor is on. Re-run whenever the
   // cursor or the tree moves — the rendered DOM is what carries the ids.
   React.useEffect ((fun () -> highlight focus |> ignore), [| box focus; box (List.length ops) |])
 
-  let move (f: Node<unit> -> Cursor -> Cursor) : unit = setCursor (f tree live)
+  let move (f: Node<unit> -> Cursor.NavCursor -> Cursor.NavCursor) : unit = setCursor (f tree live)
 
   let runStep () : unit =
     if done_ < stepCount then
@@ -386,10 +329,7 @@ let private NavigatorView () : ReactElement =
       let next =
         match s.Action with
         | Move f -> f tree live
-        | _ ->
-          pathTo tree s.At
-          |> Option.map (fun p -> { Path = p })
-          |> Option.defaultValue live
+        | _ -> Cursor.jumpToText tree live s.At
 
       setCursor next
       setLogPos s.LogAt
@@ -398,7 +338,7 @@ let private NavigatorView () : ReactElement =
   let reset () : unit =
     setDone 0
     setLogPos 0
-    setCursor (atRoot baseTree)
+    setCursor (Cursor.atRoot baseTree)
 
   // ── what the current (or last-run) step emitted ──
   let lastStep = if done_ = 0 then None else Some steps[done_ - 1]
@@ -483,19 +423,19 @@ let private NavigatorView () : ReactElement =
                   [ Html.span [ prop.className "nv-free-label"; prop.text "Walk" ]
                     Html.button
                       [ prop.className "nv-btn"
-                        prop.onClick (fun _ -> move (step -1))
+                        prop.onClick (fun _ -> move Cursor.prev)
                         prop.text "◀ prev" ]
                     Html.button
                       [ prop.className "nv-btn"
-                        prop.onClick (fun _ -> move (step 1))
+                        prop.onClick (fun _ -> move Cursor.next)
                         prop.text "next ▶" ]
                     Html.button
                       [ prop.className "nv-btn"
-                        prop.onClick (fun _ -> setCursor (parentOf live))
+                        prop.onClick (fun _ -> move Cursor.parent)
                         prop.text "▲ parent" ]
                     Html.button
                       [ prop.className "nv-btn"
-                        prop.onClick (fun _ -> move firstChild)
+                        prop.onClick (fun _ -> move Cursor.firstChild)
                         prop.text "▼ first child" ] ] ]
             Html.div
               [ prop.className "nv-free-group"
@@ -527,16 +467,20 @@ let private NavigatorView () : ReactElement =
         // the compiler).
         prop.children (
           [ for id in live.Path ->
+              let text = Cursor.idText id
+
               Html.button
-                [ prop.className (if id = focus then "nv-crumb nv-crumb-on" else "nv-crumb")
-                  prop.onClick (fun _ -> pathTo tree id |> Option.iter (fun p -> setCursor { Path = p }))
-                  prop.text id ] ]
+                [ prop.className (if text = focus then "nv-crumb nv-crumb-on" else "nv-crumb")
+                  prop.onClick (fun _ -> setCursor (Cursor.jumpTo tree live id))
+                  prop.text text ] ]
           @ [ Html.span [ prop.className "nv-pos"; prop.text (sprintf "node %d of %d" idx total) ] ]
         ) ]
 
   let nodePanel =
     let json =
-      focusedNode tree live |> Option.map CJson.encodeNode |> Option.defaultValue "{}"
+      Cursor.focusedNode tree live
+      |> Option.map CJson.encodeNode
+      |> Option.defaultValue "{}"
 
     Html.div
       [ prop.className "nv-node"
@@ -557,7 +501,7 @@ let private NavigatorView () : ReactElement =
                 prop.text "The same tree as source, in three host languages — following the cursor" ]
             Html.div
               [ prop.className "nv-projs-row"
-                prop.children [ for t, label in shownTargets -> projectionPane t label wire live.Path ] ] ] ]
+                prop.children [ for t, label in shownTargets -> projectionPane t label wire (Cursor.pathText live) ] ] ] ]
 
   // `StepAction` carries a function in `Move`, so it has no structural equality —
   // ask by pattern, not by `=`.

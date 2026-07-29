@@ -67,6 +67,15 @@
     <Compile Include="..\Projection.fs">
       <Link>Projection.fs</Link>
     </Compile>
+    <!-- The session-free cursor core (Phase 744) – the ONE definition of the
+         walk over a Fuaran tree, shared with the playground's Navigator tab.
+         It depends on the typed tree + the Introspect traversal surface and
+         nothing else (no key store, no effect ports, no session), which is
+         exactly what lets this zero-egress entry link it rather than mirror
+         it – the drift class the Navigator page used to carry. -->
+    <Compile Include="..\navigator\Cursor.fs">
+      <Link>navigator\Cursor.fs</Link>
+    </Compile>
     <Compile Include="Pillars.fs" />
     <Compile Include="Replay.fs" />
     <Compile Include="GoSessions.fs" />

@@ -1,9 +1,14 @@
 // Phase 710 – the Navigator's cursor model, exercised headlessly over the Fable
-// output. The model lives in app/navigator/Navigator.fs and compiles to
-// app/output/navigator/Navigator.js; this drives it in node via vitest. The flat
-// `walkIds` / `cursorIds` / `focusedText` helpers project the F# list + NodeId DU
-// results to assertable plain values across the Fable boundary – the same idiom
-// `Session.ingestResult` uses for the closed loop.
+// output. Phase 744 extracted the model out of app/navigator/Navigator.fs into
+// the session-free app/navigator/Cursor.fs, so this suite now drives
+// app/output/navigator/Cursor.js – the module that OWNS the walk, and the one
+// both entries of the site link. The assertions are unchanged: the walk they
+// describe did not move, only the file it lives in. (`propSummary` stays with
+// the tab – it reaches for the session's pretty-printer – so it is still
+// imported from Navigator.js.) The flat `walkIds` / `cursorIds` / `focusedText`
+// helpers project the F# list + NodeId DU results to assertable plain values
+// across the Fable boundary – the same idiom `Session.ingestResult` uses for
+// the closed loop.
 //
 // The point of the suite is the identity rule: the cursor is addressed BY ID, so
 // a tree replacement must re-resolve it (or fall back to the nearest surviving
@@ -43,10 +48,10 @@ import {
   // @ts-expect-error untyped Fable output
   focusedText,
   // @ts-expect-error untyped Fable output
-  propSummary,
-  // @ts-expect-error untyped Fable output
   focusedNode,
-} from '../app/output/navigator/Navigator.js';
+} from '../app/output/navigator/Cursor.js';
+// @ts-expect-error untyped Fable output
+import { propSummary } from '../app/output/navigator/Navigator.js';
 
 // nav-root ▸ nav-card ▸ (nav-a, nav-b), then nav-c – five nodes, DFS pre-order.
 const baseTree =

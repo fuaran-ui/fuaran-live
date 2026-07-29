@@ -150,6 +150,13 @@
     <Compile Include="Live.fs" />
     <Compile Include="WebRtc.fs" />
     <Compile Include="PatternBank.fs" />
+    <!-- The session-free cursor core (Phase 744): the walk's canonical
+         definition — path-of-ids state, DFS moves, end-stop, re-resolution.
+         Depends on the typed tree + the linked Introspect traversal surface and
+         nothing else, so the showcase project links the very same file (see
+         showcase\Showcase.fsproj) instead of mirroring it. Compile-ordered
+         ahead of every consumer. -->
+    <Compile Include="navigator\Cursor.fs" />
     <Compile Include="navigator\OpLog.fs" />
     <Compile Include="navigator\PropertyEditor.fs" />
     <Compile Include="navigator\StructuralEdit.fs" />

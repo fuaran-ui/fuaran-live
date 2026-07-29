@@ -31,11 +31,21 @@ module Fuaran.Live.Navigator
 //  path — root in the worst case. A positional cursor would silently land on a
 //  different node instead, which is exactly the failure the identity rule exists
 //  to prevent.
+//
+//  The cursor itself lives in `Cursor.fs` and is `open`ed below — a
+//  session-free module with no key store, no effect ports and no React, so the
+//  zero-egress showcase can link the SAME walk this tab drives rather than
+//  mirroring it. This module is the tab: the session, the panels, the DOM
+//  highlight and the keyboard.
 // ============================================================================
 
 open Fable.Core
 open Feliz
 open Fuaran.UI.Types
+// The walk itself — path-of-ids state, DFS next/prev, parent/first-child,
+// end-stop, re-resolution. `open`ed rather than qualified so every call site
+// below reads exactly as it did when the cursor lived in this file.
+open Fuaran.Live.Cursor
 
 module Introspect = Fuaran.UI.Ops.Introspect
 module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
@@ -45,146 +55,6 @@ module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 /// (`OpLog.download`), so the seam is intact and a different host swaps its own;
 /// this binding only picks the default for the pane the browser mounts.
 let private effects = Byok.browserEffectPorts
-
-// ─── the cursor model (pure — no DOM, no React) ──────────────────────────────
-
-/// A cursor over a Fuaran tree, addressed **by id**: the path of `NodeId`s from
-/// the root down to the focused node (so `Path` is never empty for a live
-/// cursor, and its last element is the focus). Ids only — no index, no ordinal,
-/// no captured node.
-type NavCursor = { Path: NodeId list }
-
-/// The focused node's id.
-let focusedId (cursor: NavCursor) : NodeId option = List.tryLast cursor.Path
-
-/// The raw string of a `NodeId` (the wire spelling, and the value the renderer
-/// emits as `data-fuaran-node-id`).
-let idText (NodeId s) : string = s
-
-/// Every id-path in `root`'s subtree, in **DFS pre-order** — the canonical walk
-/// order the cursor's next/prev step through. Built over
-/// `Introspect.descendantNodes` (the traversal surface), so nodes held in
-/// non-list positions are walked too, not just structural children.
-let rec private pathsFrom (trail: NodeId list) (node: Node<obj>) : NodeId list list =
-  let here = trail @ [ (NodeId node.Id) ]
-  here :: (Introspect.descendantNodes node |> List.collect (pathsFrom here))
-
-/// Every id-path in the tree, DFS pre-order, root first.
-let allPaths (root: Node<obj>) : NodeId list list = pathsFrom [] root
-
-/// The cursor sitting on the tree's root.
-let atRoot (root: Node<obj>) : NavCursor = { Path = [ (NodeId root.Id) ] }
-
-/// The canonical path to `id` in `root`, or `None` when the id is absent.
-let pathTo (root: Node<obj>) (id: NodeId) : NodeId list option =
-  allPaths root |> List.tryFind (fun p -> List.tryLast p = Some id)
-
-/// Re-resolve a (possibly stale) cursor against the CURRENT tree — the identity
-/// rule made operational. The deepest id on the stored path that still exists
-/// anywhere in the new tree wins, and its canonical path in the new tree is
-/// recomputed; when nothing on the path survives, the cursor falls back to the
-/// root. Total: always returns a cursor addressing a node that is really there.
-let reresolve (root: Node<obj>) (stored: NavCursor option) : NavCursor =
-  match stored with
-  | None -> atRoot root
-  | Some cursor ->
-    cursor.Path
-    |> List.rev
-    |> List.tryPick (pathTo root)
-    |> Option.map (fun p -> { Path = p })
-    |> Option.defaultValue (atRoot root)
-
-/// The node a (re-resolved) cursor is focused on.
-let focusedNode (root: Node<obj>) (cursor: NavCursor) : Node<obj> option =
-  focusedId cursor |> Option.bind (fun id -> Introspect.findNode id root)
-
-/// The nodes on the cursor's path, root → focused — the breadcrumb's data.
-/// Ids that have vanished are dropped rather than rendered as dead segments.
-let breadcrumb (root: Node<obj>) (cursor: NavCursor) : Node<obj> list =
-  cursor.Path |> List.choose (fun id -> Introspect.findNode id root)
-
-// ─── moves ───────────────────────────────────────────────────────────────────
-//
-// **Ends STOP, they do not wrap.** `next` on the last node in DFS order and
-// `prev` on the root are no-ops that return the cursor unchanged. Stopping was
-// chosen over wrapping so that holding a key walks the tree exactly once and
-// comes to rest at a knowable place; the tab's help hint says so.
-
-let private step (delta: int) (root: Node<obj>) (cursor: NavCursor) : NavCursor =
-  let paths = allPaths root
-
-  match paths |> List.tryFindIndex (fun p -> p = cursor.Path) with
-  | None -> reresolve root (Some cursor)
-  | Some i ->
-    let j = i + delta
-
-    if j < 0 || j >= List.length paths then
-      cursor
-    else
-      { Path = paths[j] }
-
-/// The next node in DFS pre-order; unchanged at the end of the walk.
-let next (root: Node<obj>) (cursor: NavCursor) : NavCursor = step 1 root cursor
-
-/// The previous node in DFS pre-order; unchanged at the root.
-let prev (root: Node<obj>) (cursor: NavCursor) : NavCursor = step -1 root cursor
-
-/// The focused node's parent; unchanged at the root.
-let parent (_root: Node<obj>) (cursor: NavCursor) : NavCursor =
-  if List.length cursor.Path <= 1 then
-    cursor
-  else
-    { Path = cursor.Path |> List.truncate (List.length cursor.Path - 1) }
-
-/// The focused node's first child (structural or non-list position); unchanged
-/// at a leaf.
-let firstChild (root: Node<obj>) (cursor: NavCursor) : NavCursor =
-  match focusedNode root cursor with
-  | None -> reresolve root (Some cursor)
-  | Some node ->
-    match Introspect.descendantNodes node with
-    | [] -> cursor
-    | child :: _ -> { Path = cursor.Path @ [ (NodeId child.Id) ] }
-
-/// Jump the cursor to an id already on screen (a breadcrumb click). A missing
-/// id leaves the cursor where it is.
-let jumpTo (root: Node<obj>) (cursor: NavCursor) (id: NodeId) : NavCursor =
-  match pathTo root id with
-  | Some p -> { Path = p }
-  | None -> cursor
-
-/// The cursor's 1-based position in the DFS walk and the walk's length — the
-/// "node 4 of 17" readout. Derived, never stored.
-let position (root: Node<obj>) (cursor: NavCursor) : int * int =
-  let paths = allPaths root
-
-  let idx =
-    paths |> List.tryFindIndex (fun p -> p = cursor.Path) |> Option.defaultValue 0
-
-  idx + 1, List.length paths
-
-// ─── flat diagnostic surface (cross-boundary friendly) ───────────────────────
-//
-// `NodeId` is a single-case DU and the walk is an F# list — both awkward to
-// assert on from the JS side of the Fable boundary. These project the same
-// values to plain string arrays, exactly as `Session.ingestResult` does for the
-// closed loop, so the cursor model is testable headlessly over the Fable output.
-
-/// Every node id in the tree, DFS pre-order — the walk, as plain strings.
-let walkIds (root: Node<obj>) : string array =
-  allPaths root |> List.choose List.tryLast |> List.map idText |> Array.ofList
-
-/// The cursor's id-path, root → focused, as plain strings.
-let cursorIds (cursor: NavCursor) : string array =
-  cursor.Path |> List.map idText |> Array.ofList
-
-/// The focused node's id as a plain string (`""` for an empty cursor).
-let focusedText (cursor: NavCursor) : string =
-  focusedId cursor |> Option.map idText |> Option.defaultValue ""
-
-/// `jumpTo`, keyed by the plain id string — a `NodeId` is a single-case DU and
-/// cannot be forged across the boundary by hand.
-let jumpToText (root: Node<obj>) (cursor: NavCursor) (id: string) : NavCursor = jumpTo root cursor (NodeId id)
 
 // ─── the read-only node card ─────────────────────────────────────────────────
 

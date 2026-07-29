@@ -46,12 +46,14 @@ jobs:
       # project-references ../fuaran-dotnet; the corpus sits at ../wire-format-fixtures.
       - uses: actions/checkout@v4
         with:
-          # Pinned to a release tag: the F# tier is a PROJECT REFERENCE, so a
+          # Pinned to an exact ref: the F# tier is a PROJECT REFERENCE, so a
           # floating default branch let any upstream push redden this repo with no
-          # commit here. Rationale + bump procedure in ci.yml. The corpus checkout
-          # stays unpinned deliberately — it is the shared conformance gate.
+          # commit here. A COMMIT SHA rather than a release tag — no tag yet carries
+          # the Phases 692-694 flattened NodeKind this repo authors against.
+          # Rationale + bump procedure in ci.yml. The corpus checkout stays unpinned
+          # deliberately — it is the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: v0.6.0
+          ref: 6fa6b7d2b485cbf7ee1d207eb08972e775402c7b
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4

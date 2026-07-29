@@ -25,52 +25,33 @@ import { describe, it, expect } from 'vitest';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 import {
-  // @ts-expect-error untyped Fable output
   empty,
-  // @ts-expect-error untyped Fable output
   ingestResult,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/Session.js';
 // @ts-expect-error untyped Fable output
 import { commitAt } from '../app/output/navigator/PropertyEditor.js';
 import {
-  // @ts-expect-error untyped Fable output
   cursor,
-  // @ts-expect-error untyped Fable output
   recorded,
-  // @ts-expect-error untyped Fable output
   canUndo,
-  // @ts-expect-error untyped Fable output
   canRedo,
-  // @ts-expect-error untyped Fable output
   undoN,
-  // @ts-expect-error untyped Fable output
   redoN,
-  // @ts-expect-error untyped Fable output
   originKinds,
-  // @ts-expect-error untyped Fable output
   originIds,
-  // @ts-expect-error untyped Fable output
   logKinds,
-  // @ts-expect-error untyped Fable output
   logHashes,
-  // @ts-expect-error untyped Fable output
   appliedOps,
-  // @ts-expect-error untyped Fable output
   snapshotCount,
-  // @ts-expect-error untyped Fable output
   canonicalTree,
-  // @ts-expect-error untyped Fable output
   exportJson,
-  // @ts-expect-error untyped Fable output
   exportedTree,
-  // @ts-expect-error untyped Fable output
   replayExport,
-  // @ts-expect-error untyped Fable output
   verifyResult,
-  // @ts-expect-error untyped Fable output
   exportFilename,
-  // @ts-expect-error untyped Fable output
   download,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/OpLog.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
@@ -367,9 +348,13 @@ describe('the exported log replays to reproduce the final tree', () => {
 
     download(ports, s);
     expect(calls).toHaveLength(1);
-    expect(calls[0][0]).toBe(exportFilename);
-    expect(calls[0][2]).toBe('application/json');
-    expect(replayExport(calls[0][1])).toBe(canonicalTree(s));
+    const [call] = calls;
+    if (call === undefined) {
+      throw new Error('the download seam was never called');
+    }
+    expect(call[0]).toBe(exportFilename);
+    expect(call[2]).toBe('application/json');
+    expect(replayExport(call[1])).toBe(canonicalTree(s));
   });
 
   it('names the download generically', () => {

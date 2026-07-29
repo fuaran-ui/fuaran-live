@@ -32,44 +32,30 @@ import { describe, it, expect } from 'vitest';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 import {
-  // @ts-expect-error untyped Fable output
   empty,
-  // @ts-expect-error untyped Fable output
   ingestResult,
-  // @ts-expect-error untyped Fable output
   refinePrompt,
-  // @ts-expect-error untyped Fable output
   refineSystemSuffix,
-  // @ts-expect-error untyped Fable output
   correctionLineArray,
-  // @ts-expect-error untyped Fable output
   humanOpCount,
-  // @ts-expect-error untyped Fable output
   correctionBudget,
-  // @ts-expect-error untyped Fable output
   lastMessageContent,
-  // @ts-expect-error untyped Fable output
   allMessageContents,
-  // @ts-expect-error untyped Fable output
   withTurn,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/Session.js';
 // @ts-expect-error untyped Fable output
 import { commitAt } from '../app/output/navigator/PropertyEditor.js';
 // @ts-expect-error untyped Fable output
 import { ProviderRole } from '../app/output/Ports.js';
 import {
-  // @ts-expect-error untyped Fable output
   baselineOf,
-  // @ts-expect-error untyped Fable output
   changeLines,
-  // @ts-expect-error untyped Fable output
   retainedIds,
-  // @ts-expect-error untyped Fable output
   overwrittenIds,
-  // @ts-expect-error untyped Fable output
   stage,
-  // @ts-expect-error untyped Fable output
   stageLabel,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/Refine.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
@@ -261,8 +247,12 @@ describe('the correction block is capped, and says what it dropped', () => {
     const lines = correctionLineArray(s) as string[];
 
     expect(lines).toHaveLength(1);
-    expect(lines[0].length).toBeLessThan(200);
-    expect(lines[0]).toContain('…');
+    const [line] = lines;
+    if (line === undefined) {
+      throw new Error('expected one correction line');
+    }
+    expect(line.length).toBeLessThan(200);
+    expect(line).toContain('…');
   });
 });
 

@@ -25,30 +25,19 @@ import { describe, it, expect } from 'vitest';
 // @ts-expect-error untyped Fable output
 import { empty, ingestResult } from '../app/output/Session.js';
 import {
-  // @ts-expect-error untyped Fable output
   atRoot,
-  // @ts-expect-error untyped Fable output
   next,
-  // @ts-expect-error untyped Fable output
   prev,
-  // @ts-expect-error untyped Fable output
   parent,
-  // @ts-expect-error untyped Fable output
   firstChild,
-  // @ts-expect-error untyped Fable output
   jumpToText,
-  // @ts-expect-error untyped Fable output
   reresolve,
-  // @ts-expect-error untyped Fable output
   position,
-  // @ts-expect-error untyped Fable output
   walkIds,
-  // @ts-expect-error untyped Fable output
   cursorIds,
-  // @ts-expect-error untyped Fable output
   focusedText,
-  // @ts-expect-error untyped Fable output
   focusedNode,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/Cursor.js';
 // @ts-expect-error untyped Fable output
 import { propSummary } from '../app/output/navigator/Navigator.js';

@@ -30,46 +30,31 @@ import { fileURLToPath } from 'node:url';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 import {
-  // @ts-expect-error untyped Fable output
   empty,
-  // @ts-expect-error untyped Fable output
   ingestResult,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/Session.js';
 import {
-  // @ts-expect-error untyped Fable output
   flagSummary,
-  // @ts-expect-error untyped Fable output
   flaggedIds,
-  // @ts-expect-error untyped Fable output
   flagCount,
-  // @ts-expect-error untyped Fable output
   summary,
-  // @ts-expect-error untyped Fable output
   flagsAt,
-  // @ts-expect-error untyped Fable output
   ariaAt,
-  // @ts-expect-error untyped Fable output
   declaredTrait,
-  // @ts-expect-error untyped Fable output
   nextFlagText,
-  // @ts-expect-error untyped Fable output
   prevFlagText,
-  // @ts-expect-error untyped Fable output
   quickFixAt,
-  // @ts-expect-error untyped Fable output
   interactiveKindNames,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/A11yWalk.js';
 import {
-  // @ts-expect-error untyped Fable output
   undo,
-  // @ts-expect-error untyped Fable output
   originKinds,
-  // @ts-expect-error untyped Fable output
   originIds,
-  // @ts-expect-error untyped Fable output
   logKinds,
-  // @ts-expect-error untyped Fable output
   canonicalTree,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/OpLog.js';
 // @ts-expect-error untyped Fable output
 import { findNode } from '../app/output/fuaran-dotnet/src/Fuaran.UI.Ops/Introspect.js';

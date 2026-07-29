@@ -22,8 +22,10 @@ import { describe, it, expect } from 'vitest';
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 // A NAMESPACE import, one line each: the missing-declaration error lands on the
 // module specifier, so `@ts-expect-error` has to sit directly above the line
-// carrying it. A wrapped multi-name import moves the specifier down and leaves
-// the directive reported as unused (which is what test/navigator.test.ts does).
+// carrying it. In a wrapped multi-name import the specifier sits on the closing
+// `} from '...'` line, so the directive goes on the last line INSIDE the braces
+// — one per IMPORT, never one per name (a per-name directive suppresses nothing
+// and is itself reported unused, TS2578).
 // @ts-expect-error untyped Fable output
 import * as P from '../app/output/Projection.js';
 // @ts-expect-error untyped Fable output

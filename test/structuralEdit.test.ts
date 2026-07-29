@@ -27,47 +27,30 @@ import { fileURLToPath } from 'node:url';
 // @ts-expect-error untyped Fable output
 import { empty, ingestResult } from '../app/output/Session.js';
 import {
-  // @ts-expect-error untyped Fable output
   paletteKinds,
-  // @ts-expect-error untyped Fable output
   insertAt,
-  // @ts-expect-error untyped Fable output
   removeAt,
-  // @ts-expect-error untyped Fable output
   moveTo,
-  // @ts-expect-error untyped Fable output
   nudgeAt,
-  // @ts-expect-error untyped Fable output
   childIds,
-  // @ts-expect-error untyped Fable output
   defaultTargetSpec,
-  // @ts-expect-error untyped Fable output
   fallbackIdAfterRemove,
-  // @ts-expect-error untyped Fable output
   canDropAt,
-  // @ts-expect-error untyped Fable output
   lastOpJson,
-  // @ts-expect-error untyped Fable output
   schemaKinds,
-  // @ts-expect-error untyped Fable output
   defaultWireFor,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/StructuralEdit.js';
 import { decodeNode, encodeNode } from '@fuaran-ui/ops';
 import {
-  // @ts-expect-error untyped Fable output
   undoN,
-  // @ts-expect-error untyped Fable output
   redoN,
-  // @ts-expect-error untyped Fable output
   canonicalTree,
-  // @ts-expect-error untyped Fable output
   originKinds,
-  // @ts-expect-error untyped Fable output
   originIds,
-  // @ts-expect-error untyped Fable output
   logKinds,
-  // @ts-expect-error untyped Fable output
   verifyResult,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/OpLog.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
@@ -470,12 +453,19 @@ describe('the synthesised defaults are strictly decodable and normalisation-stab
         continue; // not synthesisable, and so never offered — nothing to lock.
       }
 
+      // Narrow through the result union rather than asserting on `.ok` — an
+      // `expect` does not tell the compiler anything, so `.value` below is only
+      // reachable behind a real guard. The failure carries the same detail.
       const first = decodeNode(wire);
-      expect(first.ok, `${kind} decodes: ${first.ok ? '' : first.error.code}`).toBe(true);
+      if (!first.ok) {
+        throw new Error(`${kind} does not decode: ${first.error.code}`);
+      }
 
       const canonical = encodeNode(first.value);
       const second = decodeNode(canonical);
-      expect(second.ok, `${kind} re-decodes`).toBe(true);
+      if (!second.ok) {
+        throw new Error(`${kind} does not re-decode: ${second.error.code}`);
+      }
       expect(encodeNode(second.value), `${kind} normalisation is a fixed point`).toBe(canonical);
 
       survives(JSON.parse(wire), JSON.parse(canonical), kind);

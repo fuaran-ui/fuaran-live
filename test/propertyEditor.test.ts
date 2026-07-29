@@ -23,18 +23,13 @@ import { fileURLToPath } from 'node:url';
 // @ts-expect-error untyped Fable output
 import { empty, ingestResult, treeJson } from '../app/output/Session.js';
 import {
-  // @ts-expect-error untyped Fable output
   fieldSummary,
-  // @ts-expect-error untyped Fable output
   editablePaths,
-  // @ts-expect-error untyped Fable output
   readOnlyReason,
-  // @ts-expect-error untyped Fable output
   choiceOptions,
-  // @ts-expect-error untyped Fable output
   commitAt,
-  // @ts-expect-error untyped Fable output
   opLog,
+  // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/PropertyEditor.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────

@@ -49,11 +49,7 @@ let private metricCard (id: string) (label: string) (value: string) : Node<unit>
 let private initialTree: Node<unit> =
   Fuaran.box
     "nd-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Q3 finance review")
       Children =
@@ -193,7 +189,7 @@ let private verifyBreak (records: OpRecord<unit> list) : (int * string) option =
 
 let private opTarget (op: TreeOp<unit>) : (string * string) option =
   match op with
-  | TreeOp.InsertChild(_, child) -> Some(nodeIdStr child.Id, "created")
+  | TreeOp.InsertChild(_, child) -> Some(child.Id, "created")
   | TreeOp.UpdateProp(n, path, PropValue.Wire(JStr v)) -> Some(nodeIdStr n, sprintf "set %s = %s" path v)
   | TreeOp.UpdateProp(n, path, _) -> Some(nodeIdStr n, "set " + path)
   | TreeOp.RemoveNode n -> Some(nodeIdStr n, "removed")

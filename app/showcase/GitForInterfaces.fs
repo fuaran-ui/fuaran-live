@@ -52,11 +52,7 @@ let private card (id: string) (label: string) (value: string) : Node<unit> =
 let private baseTree: Node<unit> =
   Fuaran.box
     "g-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = None
       Children =

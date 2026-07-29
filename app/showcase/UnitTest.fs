@@ -31,7 +31,7 @@ module LFlags = Fuaran.UI.LayoutObserver.Flags
 [<Emit("performance.now()")>]
 let private perfNow () : float = jsNative
 
-let private idOf (n: Node<unit>) : string = let (NodeId s) = n.Id in s
+let private idOf (n: Node<unit>) : string = n.Id
 
 // ─── The app under test – a channel dashboard, mutated per the break toggles ─
 
@@ -75,34 +75,29 @@ let private gridNode (b: Breaks) : Node<unit> =
   let grid =
     Fuaran.box
       "channel-grid"
-      { Layout =
-          BoxLayout.Grid
-            { Cols = 4
-              TemplateColumns = Some template
-              Gap = Some 10 }
+      { Layout = LayoutMode.Grid(4, Some template, Some 10)
         Role = BoxRole.Group
         Heading = None
         Children = cells }
 
   // Override the node's typed state behaviour – an OnEmpty slot the machine can
   // assert on (present unless the NoOnEmpty break strips it).
+  let state = grid.State |> Option.defaultValue Defaults.stateBehaviour
+
   { grid with
       State =
-        { grid.State with
-            OnEmpty =
-              if b.NoOnEmpty then
-                None
-              else
-                Some(Fuaran.markdown "channel-grid-empty" "_No channels yet._") } }
+        Some
+          { state with
+              OnEmpty =
+                if b.NoOnEmpty then
+                  None
+                else
+                  Some(Fuaran.markdown "channel-grid-empty" "_No channels yet._") } }
 
 let private appTree (b: Breaks) : Node<unit> =
   Fuaran.box
     "app-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Channel performance")
       Children =
@@ -126,7 +121,7 @@ let private appTree (b: Breaks) : Node<unit> =
 
 let rec private childrenOf (n: Node<unit>) : Node<unit> list =
   match n.Kind with
-  | NodeKind.Layout(LayoutKind.Box s) -> s.Children
+  | NodeKind.Box s -> s.Children
   | _ -> []
 
 let rec private flatten (n: Node<unit>) : Node<unit> list =
@@ -144,7 +139,7 @@ let private buttonDispatches (tree: Node<unit>) (id: string) : bool option =
   findById tree id
   |> Option.bind (fun n ->
     match n.Kind with
-    | NodeKind.Input(InputKind.Button s) -> Some(dispatches s.OnClick)
+    | NodeKind.Button s -> Some(dispatches s.OnClick)
     | _ -> None)
 
 let private allIds (tree: Node<unit>) : string list = flatten tree |> List.map idOf
@@ -240,7 +235,7 @@ let private aHasOnEmpty (id: string) : Assertion =
         match findById ctx.Tree id with
         | None -> fail (sprintf "no node with id \"%s\"" id) None
         | Some node ->
-          if node.State.OnEmpty.IsSome then
+          if node.State |> Option.bind _.OnEmpty |> Option.isSome then
             ok "OnEmpty present"
           else
             fail "no OnEmpty state" (Some "add an OnEmpty slot so the empty case renders") }

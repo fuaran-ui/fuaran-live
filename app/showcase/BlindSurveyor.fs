@@ -43,11 +43,7 @@ let private tile (nid: string) (label: string) (value: string) : Node<unit> =
 let private appTree (patched: bool) : Node<unit> =
   Fuaran.box
     "bs-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Regional revenue")
       Children =
@@ -59,11 +55,7 @@ let private appTree (patched: bool) : Node<unit> =
                 Body = TextSource.Literal "Four regional tiles. Drag the rig – the ledger reads the geometry." }
           Fuaran.box
             "bs-grid"
-            { Layout =
-                BoxLayout.Grid
-                  { Cols = 4
-                    TemplateColumns = Some(if patched then fixedTemplate else brokenTemplate)
-                    Gap = Some 12 }
+            { Layout = LayoutMode.Grid(4, Some(if patched then fixedTemplate else brokenTemplate), Some 12)
               Role = BoxRole.Group
               Heading = None
               Children =

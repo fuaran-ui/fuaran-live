@@ -101,7 +101,7 @@ let idText (NodeId s) : string = s
 let childIdsOf (root: Node<obj>) (parentId: NodeId) : NodeId list =
   Introspect.findNode parentId root
   |> Option.bind (fun parent -> Introspect.getChildren parent.Kind)
-  |> Option.map (List.map _.Id)
+  |> Option.map (List.map (fun c -> (NodeId c.Id)))
   |> Option.defaultValue []
 
 /// Place `moved` within `order` (which already contains it) per `placement`.
@@ -137,7 +137,7 @@ let defaultTarget (root: Node<obj>) (focused: NodeId) : Target option =
     | None ->
       Introspect.findParent focused root
       |> Option.map (fun (parent, _) ->
-        { ParentId = parent.Id
+        { ParentId = (NodeId parent.Id)
           Placement = Placement.After focused })
 
 // ─── op construction ─────────────────────────────────────────────────────────
@@ -147,8 +147,8 @@ let defaultTarget (root: Node<obj>) (focused: NodeId) : Target option =
 /// naming every sibling id; the reorder leg is dropped when appending already
 /// produces that order.
 let insertOp (root: Node<obj>) (target: Target) (child: Node<obj>) : TreeOp<obj> =
-  let appended = childIdsOf root target.ParentId @ [ child.Id ]
-  let wanted = reposition appended child.Id target.Placement
+  let appended = childIdsOf root target.ParentId @ [ (NodeId child.Id) ]
+  let wanted = reposition appended (NodeId child.Id) target.Placement
   let insert = TreeOp.InsertChild(target.ParentId, child)
 
   if wanted = appended then
@@ -180,7 +180,7 @@ let nudgeOp (root: Node<obj>) (nodeId: NodeId) (delta: int) : Result<TreeOp<obj>
   match Introspect.findParent nodeId root with
   | None -> Error "the root node has no siblings to reorder"
   | Some(parent, index) ->
-    let ids = childIdsOf root parent.Id
+    let ids = childIdsOf root (NodeId parent.Id)
     let swapWith = index + delta
 
     if swapWith < 0 || swapWith >= List.length ids then
@@ -198,7 +198,7 @@ let nudgeOp (root: Node<obj>) (nodeId: NodeId) (delta: int) : Result<TreeOp<obj>
           elif i = swapWith then ids[index]
           else id)
 
-      Ok(TreeOp.ReorderChildren(parent.Id, reordered))
+      Ok(TreeOp.ReorderChildren(NodeId parent.Id, reordered))
 
 /// Where the cursor should land once `nodeId` is removed: the previous sibling,
 /// else the next, else the parent. Computed BEFORE the removal (the node is
@@ -211,14 +211,15 @@ let fallbackAfterRemove (root: Node<obj>) (nodeId: NodeId) : NodeId option =
   | Some(parent, index) ->
     // Indices below `index` are unmoved by the removal; the node that was at
     // `index + 1` is at `index` afterwards.
-    let survivors = childIdsOf root parent.Id |> List.filter (fun id -> id <> nodeId)
+    let survivors =
+      childIdsOf root (NodeId parent.Id) |> List.filter (fun id -> id <> nodeId)
 
     if index - 1 >= 0 && index - 1 < List.length survivors then
       Some survivors[index - 1]
     elif index < List.length survivors then
       Some survivors[index]
     else
-      Some parent.Id
+      Some(NodeId parent.Id)
 
 /// Whether `moved` may legally be dropped under `parentId`: a parent that takes
 /// children, that is not the node itself, and that is not inside it (a move

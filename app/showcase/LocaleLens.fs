@@ -135,7 +135,7 @@ let private factRow (nid: string) (label: string) (help: string option) (value: 
         Help = help |> Option.map TextSource.Literal }
 
 let private briefingTree (epochSeconds: float) (unit: RelativeTimeUnit) (count: float) : Node<unit> =
-  let at = Binding.Static epochSeconds
+  let at = Binding.Static(Some epochSeconds)
 
   Fuaran.card
     "ll-briefing"
@@ -152,17 +152,17 @@ let private briefingTree (epochSeconds: float) (unit: RelativeTimeUnit) (count: 
               "ll-count"
               "Countdown"
               (Some(sprintf "stored as a signed count: %s %s" (unitName unit) (string count)))
-              (binding.format (Binding.Static count) (localeFormat.relativeTime unit) locale.ambient)
+              (binding.format (Binding.Static(Some count)) (localeFormat.relativeTime unit) locale.ambient)
             factRow
               "ll-guests"
               "Expected guests"
               None
-              (binding.format (Binding.Static 1234567.) (localeFormat.number None) locale.ambient)
+              (binding.format (Binding.Static(Some 1234567.)) (localeFormat.number None) locale.ambient)
             factRow
               "ll-price"
               "Ticket price"
               (Some "the ISO-4217 code is data; the symbol and its position are not")
-              (binding.format (Binding.Static 149.5) (localeFormat.currency "EUR") locale.ambient)
+              (binding.format (Binding.Static(Some 149.5)) (localeFormat.currency "EUR") locale.ambient)
             factRow
               "ll-contract"
               "Contract date – pinned"

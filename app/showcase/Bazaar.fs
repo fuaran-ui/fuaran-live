@@ -5,7 +5,7 @@ module Fuaran.Showcase.Bazaar
 //  Pillar: "the app is a value" × "the machine can see the UI".
 //
 //  Every stall is a real little Fuaran app plus a capability manifest – its
-//  nutrition label, in the shipped `CapabilityTag` vocabulary. Mount a stall into
+//  nutrition label, in the shipped capability-tag vocabulary. Mount a stall into
 //  the workspace and its tree runs live inside its own scope. Each guest is
 //  DEFAULT-DENY: a capability it wants is blocked until you grant it explicitly,
 //  and a capability it never declared – an over-reach – is refused outright, with
@@ -13,7 +13,8 @@ module Fuaran.Showcase.Bazaar
 //  (undeclared, denied) are two different things, and the gate treats them so.
 //  The composed workspace is itself an app – export its wire JSON.
 //
-//  Honest scope: the capability manifests use the real `CapabilityTag` type; the
+//  Honest scope: the capability manifests use the shipped `MountSpec.Capabilities`
+//  vocabulary (plain tag strings, as the wire carries them); the
 //  gate is the documented per-mount default-deny policy (a guest action reaches
 //  the host only if its capability is granted; an empty grant is deny-all). Guest
 //  trees render live in their scopes; the composition exports as real canonical
@@ -32,7 +33,7 @@ module CJson = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 
 // ─── Capability vocabulary (plain words over the raw tags) ───────────────────
 
-let private plainLabel (CapabilityTag t) : string =
+let private plainLabel (t: string) : string =
   match t with
   | "read:state" -> "read app state"
   | "read:filters" -> "read your filters"
@@ -41,7 +42,7 @@ let private plainLabel (CapabilityTag t) : string =
   | "storage" -> "use local storage"
   | other -> other
 
-let private tagStr (CapabilityTag t) : string = t
+let private tagStr (t: string) : string = t
 
 // ─── The stalls – real little apps + declared manifests ──────────────────────
 
@@ -63,11 +64,7 @@ let private callout (id: string) (tone: ToneVariant) (heading: string) (body: st
 let private row (id: string) (children: Node<unit> list) : Node<unit> =
   Fuaran.box
     id
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Horizontal
-            Wrap = true
-            Gap = Some 8 }
+    { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 8)
       Role = BoxRole.Group
       Heading = None
       Children = children }
@@ -76,22 +73,22 @@ type private Stall =
   { Key: string
     Name: string
     Blurb: string
-    Manifest: CapabilityTag list // what it declares it needs
-    Requests: CapabilityTag list // what it actually tries to use
+    Manifest: string list // what it declares it needs
+    Requests: string list // what it actually tries to use
     Tree: string -> Node<unit> } // built with a per-instance id prefix
 
 let private stalls: Stall list =
   [ { Key = "kpi"
       Name = "Revenue KPI"
       Blurb = "A single headline number."
-      Manifest = [ CapabilityTag "read:state" ]
-      Requests = [ CapabilityTag "read:state" ]
+      Manifest = [ "read:state" ]
+      Requests = [ "read:state" ]
       Tree = fun p -> card (p + "kpi") "Revenue" "£128k" }
     { Key = "orders"
       Name = "Orders grid"
       Blurb = "A small orders table."
-      Manifest = [ CapabilityTag "read:state"; CapabilityTag "read:filters" ]
-      Requests = [ CapabilityTag "read:filters" ]
+      Manifest = [ "read:state"; "read:filters" ]
+      Requests = [ "read:filters" ]
       Tree =
         fun p ->
           row
@@ -102,32 +99,32 @@ let private stalls: Stall list =
     { Key = "alert"
       Name = "Status banner"
       Blurb = "A live status callout."
-      Manifest = [ CapabilityTag "read:state" ]
-      Requests = [ CapabilityTag "read:state" ]
+      Manifest = [ "read:state" ]
+      Requests = [ "read:state" ]
       Tree = fun p -> callout (p + "alert") ToneVariant.Success "All systems normal" "No incidents in the last 24h." }
     { Key = "notes"
       Name = "Scratch notes"
       Blurb = "A notepad that remembers."
-      Manifest = [ CapabilityTag "read:state"; CapabilityTag "storage" ]
-      Requests = [ CapabilityTag "storage" ]
+      Manifest = [ "read:state"; "storage" ]
+      Requests = [ "storage" ]
       Tree = fun p -> callout (p + "notes") ToneVariant.Subdued "Notes" "Draft the Q3 plan · review with finance." }
     { Key = "bars"
       Name = "Region split"
       Blurb = "Revenue by region."
-      Manifest = [ CapabilityTag "read:state" ]
-      Requests = [ CapabilityTag "read:state" ]
+      Manifest = [ "read:state" ]
+      Requests = [ "read:state" ]
       Tree = fun p -> row (p + "bars") [ card (p + "b1") "EMEA" "£5.9k"; card (p + "b2") "APAC" "£4.2k" ] }
     { Key = "newsletter"
       Name = "Digest sender"
       Blurb = "Reads your KPIs – and ASKS to email them (over-declares)."
-      Manifest = [ CapabilityTag "read:state"; CapabilityTag "send:out" ]
-      Requests = [ CapabilityTag "read:state" ]
+      Manifest = [ "read:state"; "send:out" ]
+      Requests = [ "read:state" ]
       Tree = fun p -> card (p + "news") "Weekly digest" "ready to compose" }
     { Key = "tracker"
       Name = "Free analytics"
       Blurb = "Looks harmless – but REACHES for a capability it never declared."
-      Manifest = [ CapabilityTag "read:state" ]
-      Requests = [ CapabilityTag "read:state"; CapabilityTag "send:out" ]
+      Manifest = [ "read:state" ]
+      Requests = [ "read:state"; "send:out" ]
       Tree = fun p -> card (p + "trk") "Visitors" "1,204 today" } ]
 
 // ─── The per-mount default-deny gate ─────────────────────────────────────────
@@ -141,7 +138,7 @@ type private Verdict =
 // The documented policy: a guest action reaches the host only if its capability
 // is in the granted set; a capability the guest never declared is refused as an
 // over-reach regardless of grants.
-let private gate (manifest: CapabilityTag list) (granted: Set<string>) (req: CapabilityTag) : Verdict =
+let private gate (manifest: string list) (granted: Set<string>) (req: string) : Verdict =
   if not (List.contains req manifest) then Verdict.Denied
   elif Set.contains (tagStr req) granted then Verdict.Allowed
   else Verdict.Blocked
@@ -168,7 +165,7 @@ let private BazaarView () : ReactElement =
     setMounted (mounted |> List.filter (fun m -> m.Instance <> inst))
     setGranted (Map.remove inst granted)
 
-  let grant (inst: int) (t: CapabilityTag) : unit =
+  let grant (inst: int) (t: string) : unit =
     let cur = Map.tryFind inst granted |> Option.defaultValue Set.empty
     setGranted (Map.add inst (Set.add (tagStr t) cur) granted)
 
@@ -177,11 +174,7 @@ let private BazaarView () : ReactElement =
     let hostTree =
       Fuaran.box
         "bazaar-workspace"
-        { Layout =
-            BoxLayout.Flex
-              { Direction = Vertical
-                Wrap = false
-                Gap = None }
+        { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
           Role = BoxRole.Dashboard
           Heading = Some(TextSource.Literal "My composition")
           Children = mounted |> List.map (fun m -> m.Stall.Tree(sprintf "g%d-" m.Instance)) }

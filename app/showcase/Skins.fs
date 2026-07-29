@@ -138,27 +138,19 @@ let private metric (nid: string) (label: string) (value: float) (tone: ToneVaria
     nid
     { Defaults.metric with
         Label = TextSource.Literal label
-        Value = Binding.Static value
+        Value = Binding.Static(Some value)
         Tone = tone }
 
 let private appTree: Node<unit> =
   Fuaran.box
     "sk-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Acme Billing")
       Children =
         [ Fuaran.box
             "sk-metrics"
-            { Layout =
-                BoxLayout.Flex
-                  { Direction = Horizontal
-                    Wrap = true
-                    Gap = None }
+            { Layout = LayoutMode.Flex(Orientation.Horizontal, true, None)
               Role = BoxRole.Group
               Heading = None
               Children =

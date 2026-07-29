@@ -47,11 +47,7 @@ let private metricCard (id: string) (label: string) (value: string) : Node<unit>
 let private accountsGrid: Node<unit> =
   Fuaran.box
     "tm-accounts"
-    { Layout =
-        BoxLayout.Grid
-          { Cols = 3
-            TemplateColumns = None
-            Gap = Some 10 }
+    { Layout = LayoutMode.Grid(3, None, Some 10)
       Role = BoxRole.Group
       Heading = None
       Children =
@@ -62,11 +58,7 @@ let private accountsGrid: Node<unit> =
 let private initialTree: Node<unit> =
   Fuaran.box
     "tm-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = None
       Children =

@@ -58,17 +58,13 @@ let private metricNode (id: string) (label: string) (value: float) (tone: ToneVa
     id
     { Defaults.metric with
         Label = TextSource.Literal label
-        Value = Binding.Static value
+        Value = Binding.Static(Some value)
         Tone = tone }
 
 let private tree: Node<unit> =
   Fuaran.box
     "rw-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = Some 16 }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 16)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Team dashboard")
       Children =

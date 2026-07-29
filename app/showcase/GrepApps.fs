@@ -33,7 +33,7 @@ let private metric (id: string) (label: string) (value: float) (tone: ToneVarian
     id
     { Defaults.metric with
         Label = TextSource.Literal label
-        Value = Binding.Static value
+        Value = Binding.Static(Some value)
         Tone = tone }
 
 let private card (id: string) (heading: string) (value: string) : Node<unit> =
@@ -62,11 +62,7 @@ let private button (id: string) (label: string) (act: Action<unit>) : Node<unit>
 let private gridBox (id: string) (children: Node<unit> list) : Node<unit> =
   Fuaran.box
     id
-    { Layout =
-        BoxLayout.Grid
-          { Cols = 3
-            TemplateColumns = None
-            Gap = Some 8 }
+    { Layout = LayoutMode.Grid(3, None, Some 8)
       Role = BoxRole.Group
       Heading = None
       Children = children }
@@ -74,11 +70,7 @@ let private gridBox (id: string) (children: Node<unit> list) : Node<unit> =
 let private dash (id: string) (heading: string) (children: Node<unit> list) : Node<unit> =
   Fuaran.box
     id
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal heading)
       Children = children }
@@ -173,7 +165,7 @@ let private corpus: App list =
 
 // ─── Structural facts + predicates ───────────────────────────────────────────
 
-let private idOf (n: Node<unit>) : string = let (NodeId s) = n.Id in s
+let private idOf (n: Node<unit>) : string = n.Id
 
 let private toneStr (t: ToneVariant) : string =
   match t with
@@ -204,25 +196,25 @@ type private Fact =
 
 let private childrenOf (n: Node<unit>) : Node<unit> list =
   match n.Kind with
-  | NodeKind.Layout(LayoutKind.Box s) -> s.Children
+  | NodeKind.Box s -> s.Children
   | _ -> []
 
 let private factOf (n: Node<unit>) : Fact =
   let kind, tone, text, disp =
     match n.Kind with
-    | NodeKind.Layout(LayoutKind.Box s) ->
+    | NodeKind.Box s ->
       let k =
         match s.Layout with
-        | BoxLayout.Grid _ -> "Grid"
+        | LayoutMode.Grid _ -> "Grid"
         | _ -> "Box"
 
       k, "Default", (s.Heading |> Option.map txt |> Option.defaultValue ""), false
-    | NodeKind.Display(DisplayKind.Metric s) -> "Metric", toneStr s.Tone, txt s.Label, false
-    | NodeKind.Display(DisplayKind.Callout s) ->
+    | NodeKind.Metric s -> "Metric", toneStr s.Tone, txt s.Label, false
+    | NodeKind.Callout s ->
       "Callout", toneStr s.Tone, (s.Heading |> Option.map txt |> Option.defaultValue "") + " " + txt s.Body, false
-    | NodeKind.Display(DisplayKind.Markdown s) -> "Markdown", "Default", txt s.Text, false
-    | NodeKind.Display(DisplayKind.Heading s) -> "Heading", "Default", txt s.Text, false
-    | NodeKind.Input(InputKind.Button s) -> "Button", "Default", txt s.Label, dispatches s.OnClick
+    | NodeKind.Markdown s -> "Markdown", "Default", txt s.Text, false
+    | NodeKind.Heading s -> "Heading", "Default", txt s.Text, false
+    | NodeKind.Button s -> "Button", "Default", txt s.Label, dispatches s.OnClick
     | _ -> "Other", "Default", "", false
 
   { Id = idOf n
@@ -252,7 +244,7 @@ let private dashboardWide (app: App) : string list =
   flatten app.Tree
   |> List.filter (fun n ->
     match n.Kind with
-    | NodeKind.Layout(LayoutKind.Box s) -> s.Role = BoxRole.Dashboard && List.length s.Children >= 3
+    | NodeKind.Box s -> s.Role = BoxRole.Dashboard && List.length s.Children >= 3
     | _ -> false)
   |> List.map idOf
 

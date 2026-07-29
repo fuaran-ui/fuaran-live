@@ -116,7 +116,7 @@ module internal PatternBankEngine =
               Of = "revenue" } ]
         ) ]
 
-    Fuaran.UI.Types.Binding.Transform(DataSource.Embedded table, pipeline, [])
+    Fuaran.UI.Types.Binding.Transform(DataSource.Embedded table, pipeline, None)
 
 
 module PatternBank =
@@ -132,7 +132,7 @@ module PatternBank =
       id
       { Defaults.metric with
           Label = TextSource.Literal label
-          Value = Binding.Static value
+          Value = Binding.Static(Some value)
           Format = fmt
           Tone = tone }
 
@@ -169,7 +169,7 @@ module PatternBank =
     Fuaran.stack
       id
       { Defaults.stack with
-          Orientation = Vertical
+          Orientation = Orientation.Vertical
           Children = children }
 
   let private dashboardNode (id: string) (title: string) (children: Node<obj> list) : Node<obj> =

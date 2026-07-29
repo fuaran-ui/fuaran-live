@@ -58,7 +58,7 @@ let private opSummary (op: TreeOp<obj>) : string =
   | TreeOp.EditNode(n, _) -> sprintf "EditNode  %s" (idOf n)
   | TreeOp.UpdateStyle(n, _) -> sprintf "UpdateStyle  %s" (idOf n)
   | TreeOp.UpdateState(n, _) -> sprintf "UpdateState  %s" (idOf n)
-  | TreeOp.InsertChild(p, c) -> sprintf "InsertChild  %s ← %s" (idOf p) (idOf c.Id)
+  | TreeOp.InsertChild(p, c) -> sprintf "InsertChild  %s ← %s" (idOf p) c.Id
   | TreeOp.RemoveNode n -> sprintf "RemoveNode  %s" (idOf n)
   | TreeOp.MoveNode(n, p) -> sprintf "MoveNode  %s → %s" (idOf n) (idOf p)
   | TreeOp.ReorderChildren(p, _) -> sprintf "ReorderChildren  %s" (idOf p)

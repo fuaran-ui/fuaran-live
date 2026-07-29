@@ -54,16 +54,15 @@ let private renderNode (n: Node<unit>) : ReactElement =
 // ─── The artefact + the scripted, hash-chained op flow ───────────────────────
 
 let private metricNode (nid: string) (label: string) (value: float) : Node<unit> =
-  { Id = NodeId nid
+  { Id = nid
     Kind =
-      NodeKind.Display(
-        DisplayKind.Metric
-          { Defaults.metric with
-              Label = TextSource.Literal label
-              Value = Binding.Static value }
+      NodeKind.Metric(
+        { Defaults.metric with
+            Label = TextSource.Literal label
+            Value = Binding.Static(Some value) }
       )
-    State = Defaults.stateBehaviour
-    Style = Defaults.style
+    State = None
+    Style = None
     Accessibility = None
     Motion = None
     ExtraAttributes = None }
@@ -73,11 +72,7 @@ let private metricNode (nid: string) (label: string) (value: float) : Node<unit>
 let private seedTree: Node<unit> =
   Fuaran.box
     "rl-seed"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Group
       Heading = None
       Children = [] }
@@ -85,21 +80,13 @@ let private seedTree: Node<unit> =
 let private genesisTree: Node<unit> =
   Fuaran.box
     "rl-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = Some 14 }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 14)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Q3 revenue")
       Children =
         [ Fuaran.box
             "rl-strip"
-            { Layout =
-                BoxLayout.Flex
-                  { Direction = Horizontal
-                    Wrap = true
-                    Gap = Some 12 }
+            { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 12)
               Role = BoxRole.Group
               Heading = None
               Children =
@@ -294,18 +281,18 @@ let private recordHost (i: int) : Host = (List.item i ops).Host
 let rec private collectText (n: Node<unit>) : string list =
   let here =
     match n.Kind with
-    | NodeKind.Display(DisplayKind.Callout c) ->
+    | NodeKind.Callout c ->
       (match c.Heading with
        | Some(TextSource.Literal h) -> [ h ]
        | _ -> [])
       @ (match c.Body with
          | TextSource.Literal b -> [ b ]
          | _ -> [])
-    | NodeKind.Display(DisplayKind.Markdown m) ->
+    | NodeKind.Markdown m ->
       match m.Text with
       | TextSource.Literal t -> [ t ]
       | _ -> []
-    | NodeKind.Display(DisplayKind.Heading h) ->
+    | NodeKind.Heading h ->
       match h.Text with
       | TextSource.Literal t -> [ t ]
       | _ -> []
@@ -313,7 +300,7 @@ let rec private collectText (n: Node<unit>) : string list =
 
   let kids =
     match n.Kind with
-    | NodeKind.Layout(LayoutKind.Box s) -> s.Children
+    | NodeKind.Box s -> s.Children
     | _ -> []
 
   here @ (kids |> List.collect collectText)
@@ -336,7 +323,7 @@ let private esc (s: string) : string =
 
 let rec private emailNode (n: Node<unit>) : string =
   match n.Kind with
-  | NodeKind.Layout(LayoutKind.Box s) ->
+  | NodeKind.Box s ->
     let head =
       match s.Heading |> Option.map txt with
       | Some h when h <> "" ->
@@ -345,7 +332,7 @@ let rec private emailNode (n: Node<unit>) : string =
 
     let horizontal =
       match s.Layout with
-      | BoxLayout.Flex f -> f.Direction = Horizontal
+      | LayoutMode.Flex(dir, _, _) -> dir = Orientation.Horizontal
       | _ -> false
 
     if horizontal then
@@ -363,17 +350,17 @@ let rec private emailNode (n: Node<unit>) : string =
           cells
     else
       head + (s.Children |> List.map emailNode |> String.concat "")
-  | NodeKind.Display(DisplayKind.Metric m) ->
+  | NodeKind.Metric m ->
     let value =
       match m.Value with
-      | Binding.Static x -> numText x
+      | Binding.Static(Some x) -> numText x
       | _ -> ""
 
     sprintf
       "<div style=\"font:12px Arial,sans-serif;color:#7a7a86;text-transform:uppercase;letter-spacing:.4px\">%s</div><div style=\"font:700 22px Arial,sans-serif;color:#1c1c22;margin-top:2px\">%s</div>"
       (esc (txt m.Label))
       (esc value)
-  | NodeKind.Display(DisplayKind.Callout c) ->
+  | NodeKind.Callout c ->
     let h =
       match c.Heading |> Option.map txt with
       | Some x when x <> "" -> sprintf "<strong style=\"color:#1c1c22\">%s</strong><br>" (esc x)
@@ -383,7 +370,7 @@ let rec private emailNode (n: Node<unit>) : string =
       "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%%;margin:10px 0\"><tr><td style=\"padding:12px 14px;background:#eef2ff;border-left:4px solid #3358d4;font:15px/1.5 Arial,sans-serif;color:#2a2a34\">%s%s</td></tr></table>"
       h
       (esc (txt c.Body))
-  | NodeKind.Display(DisplayKind.Markdown m) ->
+  | NodeKind.Markdown m ->
     sprintf "<p style=\"font:15px/1.5 Arial,sans-serif;color:#3a3a44;margin:8px 0\">%s</p>" (esc (txt m.Text))
   | _ -> ""
 

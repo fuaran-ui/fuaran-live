@@ -54,11 +54,7 @@ let private card (id: string) (label: string) (value: string) : Node<unit> =
 let private baseTree: Node<unit> =
   Fuaran.box
     "cc-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = Some 10 }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 10)
       Role = BoxRole.Dashboard
       Heading = None
       Children =
@@ -88,7 +84,7 @@ let private applyAll (ops: TreeOp<unit> list) (tree: Node<unit>) : Node<unit> =
 let private opTarget (op: TreeOp<unit>) : string option =
   match op with
   | TreeOp.UpdateProp(n, _, _) -> Some(nodeIdStr n)
-  | TreeOp.InsertChild(_, child) -> Some(nodeIdStr child.Id)
+  | TreeOp.InsertChild(_, child) -> Some(child.Id)
   | TreeOp.RemoveNode n -> Some(nodeIdStr n)
   | _ -> None
 
@@ -132,16 +128,15 @@ let private variantTree (v: Variant) : Node<unit> = applyAll v.Ops baseTree
 let rec private reId (prefix: string) (n: Node<unit>) : Node<unit> =
   let newKind =
     match n.Kind with
-    | NodeKind.Layout(LayoutKind.Box s) ->
-      NodeKind.Layout(
-        LayoutKind.Box
-          { s with
-              Children = s.Children |> List.map (reId prefix) }
+    | NodeKind.Box s ->
+      NodeKind.Box(
+        { s with
+            Children = s.Children |> List.map (reId prefix) }
       )
     | other -> other
 
   { n with
-      Id = NodeId(prefix + nodeIdStr n.Id)
+      Id = prefix + n.Id
       Kind = newKind }
 
 let private renderTree (n: Node<unit>) : ReactElement =

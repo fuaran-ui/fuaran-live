@@ -103,11 +103,7 @@ let private card (id: string) (heading: string) (value: string) : Node<unit> =
 let private group (id: string) (heading: string) (children: Node<unit> list) : Node<unit> =
   Fuaran.box
     id
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Horizontal
-            Wrap = true
-            Gap = Some 8 }
+    { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 8)
       Role = BoxRole.Group
       Heading = Some(TextSource.Literal heading)
       Children = children }
@@ -117,11 +113,7 @@ let private planTree (prefix: string) (a: Assumptions) : Node<unit> =
 
   Fuaran.box
     (prefix + "root")
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = None
       Children =
@@ -153,7 +145,7 @@ let private opSummary (op: TreeOp<unit>) : string =
   match op with
   | TreeOp.UpdateProp(n, path, _) -> sprintf "UpdateProp %s.%s" (idOf n) path
   | TreeOp.ReplaceBinding(n, slot, _) -> sprintf "ReplaceBinding %s.%s" (idOf n) slot
-  | TreeOp.InsertChild(p, c) -> sprintf "InsertChild %s ← %s" (idOf p) (idOf c.Id)
+  | TreeOp.InsertChild(p, c) -> sprintf "InsertChild %s ← %s" (idOf p) c.Id
   | TreeOp.RemoveNode n -> sprintf "RemoveNode %s" (idOf n)
   | _ -> "op"
 

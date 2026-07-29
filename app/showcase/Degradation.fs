@@ -55,11 +55,7 @@ let private scrollCard (i: int) : Node<unit> =
 let private exhibit: Node<unit> =
   Fuaran.box
     "dl-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = None
       Children =
@@ -96,7 +92,7 @@ let private exhibit: Node<unit> =
           Fuaran.modal
             "dl-modal"
             { Defaults.modal with
-                Open = Binding.Static true
+                Open = Binding.Static(Some true)
                 Heading = Some(TextSource.Literal "Note")
                 Dismissable = true
                 Children =

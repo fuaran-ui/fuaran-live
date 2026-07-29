@@ -65,11 +65,7 @@ let private gridNode (fault: Fault) : Node<unit> =
 
   Fuaran.box
     "k-grid"
-    { Layout =
-        BoxLayout.Grid
-          { Cols = 3
-            TemplateColumns = template
-            Gap = Some 10 }
+    { Layout = LayoutMode.Grid(3, template, Some 10)
       Role = BoxRole.Group
       Heading = None
       Children = cells }
@@ -99,11 +95,7 @@ let private buttonNode (fault: Fault) : Node<unit> =
 let private appTree (fault: Fault) : Node<unit> =
   Fuaran.box
     "k-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Orders")
       Children =

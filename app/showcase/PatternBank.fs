@@ -132,7 +132,7 @@ module internal PatternBankEngine =
               Of = "revenue" } ]
         ) ]
 
-    Fuaran.UI.Types.Binding.Transform(DataSource.Embedded table, pipeline, [])
+    Fuaran.UI.Types.Binding.Transform(DataSource.Embedded table, pipeline, None)
 
 
 module PatternBank =
@@ -155,7 +155,7 @@ module PatternBank =
       id
       { Defaults.metric with
           Label = TextSource.Literal label
-          Value = Binding.Static value }
+          Value = Binding.Static(Some value) }
 
   let private computeMetricNode (id: string) (label: string) : Node<unit> =
     Fuaran.metric
@@ -167,11 +167,7 @@ module PatternBank =
   let private vbox (id: string) (role: BoxRole) (heading: TextSource option) (children: Node<unit> list) : Node<unit> =
     Fuaran.box
       id
-      { Layout =
-          BoxLayout.Flex
-            { Direction = Vertical
-              Wrap = false
-              Gap = Some 12 }
+      { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 12)
         Role = role
         Heading = heading
         Children = children }
@@ -179,11 +175,7 @@ module PatternBank =
   let private hbox (id: string) (children: Node<unit> list) : Node<unit> =
     Fuaran.box
       id
-      { Layout =
-          BoxLayout.Flex
-            { Direction = Horizontal
-              Wrap = true
-              Gap = Some 12 }
+      { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 12)
         Role = BoxRole.Group
         Heading = None
         Children = children }

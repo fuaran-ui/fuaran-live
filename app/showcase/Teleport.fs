@@ -174,7 +174,7 @@ let private exemplarTree (w: Wizard) : Node<unit> =
           [ Fuaran.stepper
               "tp-steps"
               { Defaults.stepper<unit> with
-                  ActiveStep = Binding.Static(clampStep w.Step)
+                  ActiveStep = Binding.Static(Some(clampStep w.Step))
                   Children =
                     [ Fuaran.markdown "tp-s0" stepTitles.[0]
                       Fuaran.markdown "tp-s1" stepTitles.[1]
@@ -182,11 +182,7 @@ let private exemplarTree (w: Wizard) : Node<unit> =
             Fuaran.markdown "tp-progress" progress
             Fuaran.box
               "tp-fields"
-              { Layout =
-                  BoxLayout.Flex
-                    { Direction = Vertical
-                      Wrap = false
-                      Gap = None }
+              { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
                 Role = BoxRole.Group
                 Heading = None
                 Children =

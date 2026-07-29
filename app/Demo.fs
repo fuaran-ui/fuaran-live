@@ -42,7 +42,7 @@ let private progressTree: Node<obj> =
           [ Fuaran.progress
               "ap-bar"
               { Defaults.progress with
-                  Fraction = Binding.Static 0.1
+                  Fraction = Binding.Static(Some 0.1)
                   Label = Some(TextSource.Literal "Scanning the design")
                   Tone = ToneVariant.Brand }
             Fuaran.markdown "ap-status" "_Scanning 1 of 3 sections…_" ] }
@@ -58,7 +58,7 @@ let private statusKind (text: string) : NodeKind<obj> = (Fuaran.markdown "ap-sta
 
 let private progressAt (fraction: float) (status: string) : TreeOp<obj> =
   TreeOp.Batch
-    [ TreeOp.ReplaceBinding(NodeId "ap-bar", "Fraction", Binding.Static(box fraction))
+    [ TreeOp.ReplaceBinding(NodeId "ap-bar", "Fraction", Binding.Static(Some(box fraction)))
       TreeOp.EditNode(NodeId "ap-status", statusKind status) ]
 
 let private findingRow (n: int) (text: string) : TreeOp<obj> =
@@ -76,11 +76,11 @@ let private findingRow (n: int) (text: string) : TreeOp<obj> =
 
 let private askSections: SelectOption list =
   [ { Value = "layout"
-      Label = TextSource.Literal "Layout & typography" }
+      Label = "Layout & typography" }
     { Value = "data-bindings"
-      Label = TextSource.Literal "Data bindings" }
+      Label = "Data bindings" }
     { Value = "empty-states"
-      Label = TextSource.Literal "Empty states" } ]
+      Label = "Empty states" } ]
 
 let private askTree: Node<obj> =
   Fuaran.stack
@@ -94,7 +94,7 @@ let private askTree: Node<obj> =
               "da-section"
               { Defaults.select with
                   Label = TextSource.Literal "Deep-dive section"
-                  Source = Binding.Static askSections
+                  Source = Binding.Static(Some askSections)
                   Value = Binding.State("da-section-value", Some "data-bindings") } ] }
 
 let private askEnvelopeWire: string =
@@ -121,13 +121,7 @@ let private jsonParse (json: string) : obj = jsNative
 /// The label of a section value, for the closing turn's text.
 let private sectionLabel (value: string) : string =
   askSections
-  |> List.tryPick (fun o ->
-    if o.Value = value then
-      match o.Label with
-      | TextSource.Literal t -> Some t
-      | _ -> None
-    else
-      None)
+  |> List.tryPick (fun o -> if o.Value = value then Some o.Label else None)
   |> Option.defaultValue value
 
 /// The closing text, tailored to the threaded outcome the loop handed back –

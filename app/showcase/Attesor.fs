@@ -51,27 +51,19 @@ let private metric (id: string) (label: string) (value: float) (tone: ToneVarian
     id
     { Defaults.metric with
         Label = TextSource.Literal label
-        Value = Binding.Static value
+        Value = Binding.Static(Some value)
         Tone = tone }
 
 let private exemplar: Node<obj> =
   Fuaran.box
     "at-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Team pulse")
       Children =
         [ Fuaran.box
             "at-strip"
-            { Layout =
-                BoxLayout.Flex
-                  { Direction = Horizontal
-                    Wrap = true
-                    Gap = Some 12 }
+            { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 12)
               Role = BoxRole.Group
               Heading = None
               Children =

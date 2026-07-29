@@ -444,7 +444,13 @@ let opFor (node: Node<obj>) (field: Field) (raw: string) : Result<TreeOp<obj>, s
 
       match Decode.decodeNode patched with
       | Error e -> Error e.Message
-      | Ok wire -> Ok(TreeOp.UpdateStyle(node.Id, (WireTree.reify wire).Style))
+      | Ok wire ->
+        Ok(
+          TreeOp.UpdateStyle(
+            NodeId node.Id,
+            (WireTree.reify wire).Style |> Option.defaultValue Fuaran.UI.Defaults.style
+          )
+        )
     | Route.Prop ->
       let payload =
         match field.Editor with
@@ -474,7 +480,7 @@ let opFor (node: Node<obj>) (field: Field) (raw: string) : Result<TreeOp<obj>, s
         | Editor.ReadOnly reason -> Error("read-only — " + reason)
 
       payload
-      |> Result.map (fun value -> TreeOp.UpdateProp(node.Id, field.Path, PropValue.Wire value))
+      |> Result.map (fun value -> TreeOp.UpdateProp(NodeId node.Id, field.Path, PropValue.Wire value))
 
 // ─── the validator gate ──────────────────────────────────────────────────────
 

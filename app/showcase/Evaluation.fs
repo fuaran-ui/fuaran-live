@@ -174,7 +174,7 @@ let private metricNode
     id
     { Defaults.metric with
         Label = TextSource.Literal label
-        Value = Binding.Static value
+        Value = Binding.Static(Some value)
         Format = fmt
         Tone = tone
         Subtext =

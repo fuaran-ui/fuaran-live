@@ -78,16 +78,15 @@ let private holesObj (h: Holes) : obj =
 //  reproduce stays a small, faithful envelope.
 
 let private metricNode (nid: string) (label: string) (value: float) : Node<unit> =
-  { Id = NodeId nid
+  { Id = nid
     Kind =
-      NodeKind.Display(
-        DisplayKind.Metric
-          { Defaults.metric with
-              Label = TextSource.Literal label
-              Value = Binding.Static value }
+      NodeKind.Metric(
+        { Defaults.metric with
+            Label = TextSource.Literal label
+            Value = Binding.Static(Some value) }
       )
-    State = Defaults.stateBehaviour
-    Style = Defaults.style
+    State = None
+    Style = None
     Accessibility = None
     Motion = None
     ExtraAttributes = None }
@@ -95,21 +94,13 @@ let private metricNode (nid: string) (label: string) (value: float) : Node<unit>
 let private exemplarTree (h: Holes) : Node<unit> =
   Fuaran.box
     "rosetta-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Revenue snapshot")
       Children =
         [ Fuaran.box
             "rosetta-strip"
-            { Layout =
-                BoxLayout.Flex
-                  { Direction = Horizontal
-                    Wrap = true
-                    Gap = None }
+            { Layout = LayoutMode.Flex(Orientation.Horizontal, true, None)
               Role = BoxRole.Group
               Heading = None
               Children =

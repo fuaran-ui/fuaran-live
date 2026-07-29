@@ -1705,10 +1705,9 @@ let runPanelProbe
 /// through the shipped codec, so the probe drives the REAL envelope path.
 let private probeEnvelopeWire () : string =
   let flavourOptions: Fuaran.UI.Types.SelectOption list =
-    [ { Value = "compact"
-        Label = Fuaran.UI.Types.TextSource.Literal "Compact" }
+    [ { Value = "compact"; Label = "Compact" }
       { Value = "detailed"
-        Label = Fuaran.UI.Types.TextSource.Literal "Detailed" } ]
+        Label = "Detailed" } ]
 
   let tree: Fuaran.UI.Types.Node<obj> =
     Fuaran.UI.Fuaran.stack
@@ -1720,7 +1719,7 @@ let private probeEnvelopeWire () : string =
                 "ask-flavour"
                 { Fuaran.UI.Defaults.select with
                     Label = Fuaran.UI.Types.TextSource.Literal "Flavour"
-                    Source = Fuaran.UI.Types.Binding.Static flavourOptions
+                    Source = Fuaran.UI.Types.Binding.Static(Some flavourOptions)
                     Value = Fuaran.UI.Types.Binding.State("ask-flavour-value", Some "compact") } ] }
 
   let envelope: ElicitationEnvelope =

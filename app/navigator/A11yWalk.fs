@@ -266,7 +266,7 @@ let nodeFlags (root: Node<obj>) (node: Node<obj>) : Flag list =
   if json = "" then
     []
   else
-    let id = idText node.Id
+    let id = idText (NodeId node.Id)
     let disc = displayOf (valueAt json "kind.$type")
     let required = requiredRows node disc
 
@@ -399,7 +399,7 @@ let flagCount (root: Node<obj>) : int = List.length (treeFlags root)
 /// visits every flag exactly once and comes to rest somewhere knowable. An
 /// unknown `fromId` starts the search from the top.
 let nextFlaggedId (root: Node<obj>) (fromId: string) : string option =
-  let order = walk root |> List.map (fun n -> idText n.Id)
+  let order = walk root |> List.map (fun n -> idText (NodeId n.Id))
   let flagged = flaggedIds root |> Set.ofArray
 
   match order |> List.tryFindIndex (fun id -> id = fromId) with
@@ -409,7 +409,7 @@ let nextFlaggedId (root: Node<obj>) (fromId: string) : string option =
 /// The previous flagged node before `fromId` in walk order, or `None` at the
 /// start. Same stop-at-the-end rule.
 let prevFlaggedId (root: Node<obj>) (fromId: string) : string option =
-  let order = walk root |> List.map (fun n -> idText n.Id)
+  let order = walk root |> List.map (fun n -> idText (NodeId n.Id))
   let flagged = flaggedIds root |> Set.ofArray
 
   match order |> List.tryFindIndex (fun id -> id = fromId) with
@@ -564,7 +564,7 @@ let private LensPanel
   let drafts, setDrafts = React.useState (Map.empty: Map<string, string>)
   let failure, setFailure = React.useState (None: (string * string) option)
 
-  let nodeKey = idText node.Id
+  let nodeKey = idText (NodeId node.Id)
 
   // A new focus means a new node's findings: drop drafts + the inline error
   // rather than carry one node's half-typed fix onto another's.

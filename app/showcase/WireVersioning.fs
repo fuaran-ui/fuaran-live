@@ -224,7 +224,7 @@ let private widgetNode (i: int) (w: Engine.Widget) : Node<unit> =
       (sprintf "wv-w-%d" i)
       { Defaults.metric with
           Label = TextSource.Literal l
-          Value = Binding.Static(float v)
+          Value = Binding.Static(Some(float v))
           Format = CellFormat.Number(Some 0)
           Tone = ToneVariant.Brand }
   | Engine.WCallout(h, b) ->

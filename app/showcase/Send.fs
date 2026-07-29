@@ -50,22 +50,14 @@ let private kpi (id: string) (label: string) (value: string) : Node<unit> =
 let private artefact: Node<unit> =
   Fuaran.box
     "sm-root"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = None }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Weekly performance")
       Children =
         [ Fuaran.markdown "sm-intro" "Your Monday digest – the very same dashboard you can open live."
           Fuaran.box
             "sm-kpis"
-            { Layout =
-                BoxLayout.Flex
-                  { Direction = Horizontal
-                    Wrap = true
-                    Gap = Some 12 }
+            { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 12)
               Role = BoxRole.Group
               Heading = None
               Children =
@@ -82,7 +74,7 @@ let private artefact: Node<unit> =
           Fuaran.tabs
             "sm-tabs"
             { Defaults.tabs with
-                ActiveIndex = Binding.State("sm-active-tab", 0)
+                ActiveIndex = Binding.State("sm-active-tab", Some 0)
                 TabHeaders =
                   Some
                     [ { Defaults.tabHeader with
@@ -123,20 +115,20 @@ let private mdInline (s: string) : string =
 
 let private childrenOf (n: Node<unit>) : Node<unit> list =
   match n.Kind with
-  | NodeKind.Layout(LayoutKind.Box s) -> s.Children
+  | NodeKind.Box s -> s.Children
   | _ -> []
 
 let private isHorizontal (n: Node<unit>) : bool =
   match n.Kind with
-  | NodeKind.Layout(LayoutKind.Box s) ->
+  | NodeKind.Box s ->
     match s.Layout with
-    | BoxLayout.Flex f -> f.Direction = Horizontal
+    | LayoutMode.Flex(dir, _, _) -> dir = Orientation.Horizontal
     | _ -> false
   | _ -> false
 
 let private headingOf (n: Node<unit>) : string option =
   match n.Kind with
-  | NodeKind.Layout(LayoutKind.Box s) -> s.Heading |> Option.map txt
+  | NodeKind.Box s -> s.Heading |> Option.map txt
   | _ -> None
 
 // A KPI cell = a Box with a heading + exactly one Markdown value child.
@@ -144,7 +136,7 @@ let private asKpi (n: Node<unit>) : (string * string) option =
   match headingOf n, childrenOf n with
   | Some label, [ v ] ->
     match v.Kind with
-    | NodeKind.Display(DisplayKind.Markdown m) -> Some(label, txt m.Text)
+    | NodeKind.Markdown m -> Some(label, txt m.Text)
     | _ -> None
   | _ -> None
 
@@ -158,7 +150,7 @@ let rec private emailNode (n: Node<unit>) : string =
   | None ->
 
     match n.Kind with
-    | NodeKind.Layout(LayoutKind.Box s) ->
+    | NodeKind.Box s ->
       let head =
         match s.Heading |> Option.map txt with
         | Some h when h <> "" ->
@@ -180,11 +172,11 @@ let rec private emailNode (n: Node<unit>) : string =
             cells
       else
         head + (s.Children |> List.map emailNode |> String.concat "")
-    | NodeKind.Display(DisplayKind.Heading h) ->
+    | NodeKind.Heading h ->
       sprintf "<h2 style=\"font:700 20px Arial,sans-serif;color:#1c1c22;margin:0 0 8px\">%s</h2>" (esc (txt h.Text))
-    | NodeKind.Display(DisplayKind.Markdown m) ->
+    | NodeKind.Markdown m ->
       sprintf "<p style=\"font:15px/1.5 Arial,sans-serif;color:#3a3a44;margin:8px 0\">%s</p>" (mdInline (txt m.Text))
-    | NodeKind.Display(DisplayKind.Callout c) ->
+    | NodeKind.Callout c ->
       let h =
         match c.Heading |> Option.map txt with
         | Some x when x <> "" -> sprintf "<strong style=\"color:#1c1c22\">%s</strong><br>" (esc x)
@@ -194,7 +186,7 @@ let rec private emailNode (n: Node<unit>) : string =
         "<table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%%;margin:10px 0\"><tr><td style=\"padding:12px 14px;background:#eef2ff;border-left:4px solid #3358d4;font:15px/1.5 Arial,sans-serif;color:#2a2a34\">%s%s</td></tr></table>"
         h
         (esc (txt c.Body))
-    | NodeKind.Layout(LayoutKind.Tabs t) ->
+    | NodeKind.Tabs t ->
       // Email cannot run the tab switcher, so Tabs degrade to STACKED SECTIONS:
       // every pane rendered sequentially under its tab label. Nothing hidden,
       // nothing to click – the typed tree makes the degradation a policy, not
@@ -215,7 +207,7 @@ let rec private emailNode (n: Node<unit>) : string =
           (esc (headerFor i c))
           (emailNode c))
       |> String.concat ""
-    | NodeKind.Input(InputKind.Button b) ->
+    | NodeKind.Button b ->
       sprintf
         "<a href=\"#/demo/send-me\" style=\"display:inline-block;margin:10px 0;padding:11px 18px;background:#3358d4;color:#fff;text-decoration:none;border-radius:6px;font:600 14px Arial,sans-serif\">▸ %s – open the live dashboard</a>"
         (esc (txt b.Label))

@@ -96,7 +96,7 @@ let private askTree (round: int) : Node<obj> =
                   Fields =
                     [ { Id = "tq-canary-field"
                         Label = TextSource.Literal "Canary share (%)"
-                        Kind = FormFieldKind.Number(Binding.State(canaryKey, 10.0), None)
+                        Kind = FormFieldKind.Number(Some(Binding.State(canaryKey, Some 10.0)), None)
                         Required = true
                         Help =
                           Some(TextSource.Literal "A whole percentage. Try 12.5 – the contract says integers only.") }
@@ -104,24 +104,25 @@ let private askTree (round: int) : Node<obj> =
                         Label = TextSource.Literal "Environment"
                         Kind =
                           FormFieldKind.Choice(
-                            Binding.Static
-                              [ { Value = "staging"
-                                  Label = TextSource.Literal "Staging" }
-                                { Value = "production"
-                                  Label = TextSource.Literal "Production" } ],
-                            Binding.State(envKey, Some "staging"),
+                            Binding.Static(
+                              Some
+                                [ { Value = "staging"; Label = "Staging" }
+                                  { Value = "production"
+                                    Label = "Production" } ]
+                            ),
+                            Some(Binding.State(envKey, Some "staging")),
                             None
                           )
                         Required = true
                         Help = None }
                       { Id = "tq-note-field"
                         Label = TextSource.Literal "Note for the log"
-                        Kind = FormFieldKind.Text(Binding.State(noteKey, ""), None)
+                        Kind = FormFieldKind.Text(Some(Binding.State(noteKey, Some "")), None)
                         Required = false
                         Help = Some(TextSource.Literal "Optional – up to 120 characters.") } ]
                   OnSubmit = Action.SetState(commitKey, JStr(envelopeId round))
                   SubmitLabel = TextSource.Literal "Send the typed answer"
-                  Disabled = Some(Binding.State(frozenKey round, false)) } ] }
+                  Disabled = Some(Binding.State(frozenKey round, Some false)) } ] }
 
 // ─── The answer contract (which state entries ARE the answer, typed) ─────────
 

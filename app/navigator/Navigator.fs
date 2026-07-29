@@ -66,14 +66,14 @@ let idText (NodeId s) : string = s
 /// `Introspect.descendantNodes` (the traversal surface), so nodes held in
 /// non-list positions are walked too, not just structural children.
 let rec private pathsFrom (trail: NodeId list) (node: Node<obj>) : NodeId list list =
-  let here = trail @ [ node.Id ]
+  let here = trail @ [ (NodeId node.Id) ]
   here :: (Introspect.descendantNodes node |> List.collect (pathsFrom here))
 
 /// Every id-path in the tree, DFS pre-order, root first.
 let allPaths (root: Node<obj>) : NodeId list list = pathsFrom [] root
 
 /// The cursor sitting on the tree's root.
-let atRoot (root: Node<obj>) : NavCursor = { Path = [ root.Id ] }
+let atRoot (root: Node<obj>) : NavCursor = { Path = [ (NodeId root.Id) ] }
 
 /// The canonical path to `id` in `root`, or `None` when the id is absent.
 let pathTo (root: Node<obj>) (id: NodeId) : NodeId list option =
@@ -144,7 +144,7 @@ let firstChild (root: Node<obj>) (cursor: NavCursor) : NavCursor =
   | Some node ->
     match Introspect.descendantNodes node with
     | [] -> cursor
-    | child :: _ -> { Path = cursor.Path @ [ child.Id ] }
+    | child :: _ -> { Path = cursor.Path @ [ (NodeId child.Id) ] }
 
 /// Jump the cursor to an id already on screen (a breadcrumb click). A missing
 /// id leaves the cursor where it is.
@@ -198,9 +198,11 @@ let private shallow (node: Node<obj>) : Node<obj> =
   { node with
       Kind = kind
       State =
-        { node.State with
-            OnLoading = None
-            OnEmpty = None } }
+        node.State
+        |> Option.map (fun s ->
+          { s with
+              OnLoading = None
+              OnEmpty = None }) }
 
 /// The node's own properties as canonical wire JSON, pretty-printed — the
 /// summary the card shows. The wire format is the honest description of a node,
@@ -236,7 +238,7 @@ let private PropertyPanel
   let drafts, setDrafts = React.useState (Map.empty: Map<string, string>)
   let failure, setFailure = React.useState (None: (string * string) option)
 
-  let nodeKey = idText node.Id
+  let nodeKey = idText (NodeId node.Id)
 
   // A new focus means new fields: drop drafts + the inline error rather than
   // carry one node's half-typed value onto another's panel.
@@ -576,7 +578,8 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
 
   let doInsert () =
     match insertTarget, paletteEntries |> List.tryFind (fun entry -> entry.Kind = chosenKind) with
-    | Some target, Some entry -> structural (Some entry.Node.Id) (StructuralEdit.insert session target entry.Node)
+    | Some target, Some entry ->
+      structural (Some(NodeId entry.Node.Id)) (StructuralEdit.insert session target entry.Node)
     | _ -> ()
 
   let doRemove () =
@@ -781,16 +784,16 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
             prop.children
               [ for node in breadcrumb root c do
                   Html.button
-                    [ prop.key (idText node.Id)
+                    [ prop.key (idText (NodeId node.Id))
                       prop.className (
-                        if focusedId c = Some node.Id then
+                        if focusedId c = Some(NodeId node.Id) then
                           "fl-nav-crumb fl-nav-crumb-active"
                         else
                           "fl-nav-crumb"
                       )
-                      prop.title (idText node.Id)
+                      prop.title (idText (NodeId node.Id))
                       prop.text (Introspect.kindName node.Kind)
-                      prop.onClick (fun _ -> setStored (Some(jumpTo root c node.Id))) ] ] ]
+                      prop.onClick (fun _ -> setStored (Some(jumpTo root c (NodeId node.Id)))) ] ] ]
 
       let card =
         match focusedNode root c with
@@ -803,7 +806,7 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
                     [ prop.className "fl-nav-card-head"
                       prop.children
                         [ Html.span [ prop.className "fl-nav-kind"; prop.text (Introspect.kindName node.Kind) ]
-                          Html.code [ prop.className "fl-nav-id"; prop.text ("#" + idText node.Id) ]
+                          Html.code [ prop.className "fl-nav-id"; prop.text ("#" + idText (NodeId node.Id)) ]
                           Html.span
                             [ prop.className "fl-nav-count"
                               prop.text (sprintf "node %d of %d" here total) ]

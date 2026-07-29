@@ -190,11 +190,7 @@ let private dashboardNode (out: Table) : Node<unit> =
 
   Fuaran.box
     "ls-dash"
-    { Layout =
-        BoxLayout.Flex
-          { Direction = Vertical
-            Wrap = false
-            Gap = Some 12 }
+    { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 12)
       Role = BoxRole.Dashboard
       Heading = Some(TextSource.Literal "Regional performance – computed live")
       Children =
@@ -216,11 +212,7 @@ let private dashboardNode (out: Table) : Node<unit> =
 
             Fuaran.box
               (sprintf "ls-region-%d" i)
-              { Layout =
-                  BoxLayout.Flex
-                    { Direction = Horizontal
-                      Wrap = true
-                      Gap = Some 10 }
+              { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 10)
                 Role = BoxRole.Group
                 Heading = Some(TextSource.Literal region)
                 Children = cards } ] }

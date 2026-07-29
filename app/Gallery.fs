@@ -20,7 +20,7 @@ let private metric (id: string) (label: string) (value: float) (fmt: CellFormat)
     id
     { Defaults.metric with
         Label = TextSource.Literal label
-        Value = Binding.Static value
+        Value = Binding.Static(Some value)
         Format = fmt
         Tone = tone }
 
@@ -122,7 +122,7 @@ let private statStack: Node<obj> =
   Fuaran.stack
     "ex-stats"
     { Defaults.stack with
-        Orientation = Vertical
+        Orientation = Orientation.Vertical
         Children =
           [ Fuaran.heading
               "ex-stats-title"

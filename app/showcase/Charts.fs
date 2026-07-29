@@ -115,7 +115,7 @@ let private chartNode (kind: ChartKind) (yFields: string list) (variance: bool) 
     "sales-chart"
     { Defaults.chart<Msg> with
         Kind = kind
-        Source = Binding.Transform(DataSource.Embedded(sourceTable rows), buildPipeline variance, [])
+        Source = Binding.Transform(DataSource.Embedded(sourceTable rows), buildPipeline variance, None)
         XField = "quarter"
         YFields = yFields
         Title = Some(TextSource.Literal(titleFor yFields)) }
@@ -132,7 +132,7 @@ let private sourceGrid (rows: Row list) : Node<Msg> =
   Fuaran.grid
     "sales-source"
     { Defaults.grid<Row, Msg> with
-        Source = Binding.Static(Seq.ofList rows)
+        Source = Binding.Static(Some(Seq.ofList rows))
         RowKey = (fun r -> r.Quarter)
         Editable = true
         Columns =

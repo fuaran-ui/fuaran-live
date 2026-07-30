@@ -817,11 +817,7 @@ body {
 }
 
 /* ── source-projection output box (Phase 329) ── */
-.fl-output {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
+/* The tab strip shared by the Source card (formerly the Output box's tabs). */
 .fl-output-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -840,28 +836,6 @@ body {
   border-color: var(--fuaran-tone-brand-border, #99c);
   font-weight: 600;
 }
-.fl-output-body {
-  position: relative;
-}
-.fl-output-copy {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  padding: 0.2rem 0.5rem;
-  cursor: pointer;
-  font-size: 0.7rem;
-}
-.fl-output-code {
-  max-height: 22rem;
-  overflow: auto;
-  white-space: pre;
-  font-size: 0.75rem;
-}
-.fl-output-soon {
-  color: #888;
-  font-style: italic;
-  padding: 0.5rem;
-}
 .fl-dark .fl-output-tab {
   background: var(--fl-bg);
   color: var(--fl-fg);
@@ -869,12 +843,6 @@ body {
 }
 .fl-dark .fl-output-tab-active {
   background: var(--fl-surface);
-}
-.fl-inspector {
-  font-size: 0.75rem;
-  overflow: auto;
-  max-height: 20rem;
-  white-space: pre-wrap;
 }
 .fl-empty {
   color: #888;
@@ -1473,6 +1441,43 @@ body {
   min-width: 0;
 }
 
+/* ── the left column's Conversation | Editor tabs (2026-07-30) ── */
+.pg-ws-tabs {
+  display: flex;
+  gap: 0.4rem;
+  /* Sit flush on the card below – the tabs read as part of it. */
+  margin-bottom: -0.6rem;
+}
+.pg-ws-tab {
+  position: relative;
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.45rem 1.1rem;
+  border: 1px solid var(--fuaran-color-border, #dad2c0);
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--fuaran-color-text-muted);
+  cursor: pointer;
+}
+.pg-ws-tab:hover {
+  color: var(--fuaran-color-text);
+}
+.pg-ws-tab-active {
+  background: var(--fuaran-color-panel);
+  color: var(--fuaran-color-text);
+  font-weight: 600;
+  border-bottom-color: var(--fuaran-color-panel);
+}
+.pg-ws-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-left: 0.45rem;
+  border-radius: 50%;
+  background: var(--ds-accent);
+  vertical-align: middle;
+}
+
 /* ── progressive-disclosure tools ── */
 .pg-tools {
   display: flex;
@@ -1742,52 +1747,26 @@ body {
   background: color-mix(in srgb, var(--ds-accent) 8%, transparent);
 }
 
-/* ─── Navigator ⇄ source-projection sync (Phase 714) ───────────────────────── */
+/* ─── the Source card (Navigator ⇄ source sync, Phase 714; unified tab card
+   2026-07-30) ─────────────────────────────────────────────────────────────── */
 
-/* The tab is a two-column split above the breakpoint and stacked below it. The
-   walk keeps its natural width; the projections take the extra room, because
-   they are the thing that scrolls. */
-
-.fl-nav-tab {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
-  align-items: start;
-}
-
-@media (min-width: 62rem) {
-  .fl-nav-tab {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-  }
-}
-
-.fl-nav-tab-walk {
-  min-width: 0;
-}
-
-.fl-ps {
+.fl-source {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
   min-width: 0;
 }
 
-.fl-ps-intro {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--fuaran-color-text-muted);
+/* The Source card owns the right column's lower half — give the code the room
+   the old side-by-side panes never had. */
+.fl-source .fl-ps-code {
+  max-height: 34rem;
 }
 
-.fl-ps-toggles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.fl-ps-toggle {
+.fl-ps-copy {
   font: inherit;
-  font-size: 0.72rem;
-  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.55rem;
   border: 1px solid var(--fuaran-color-border, #dad2c0);
   border-radius: 999px;
   background: transparent;
@@ -1795,21 +1774,9 @@ body {
   cursor: pointer;
 }
 
-.fl-ps-toggle:hover {
+.fl-ps-copy:hover {
   color: var(--ds-accent);
   border-color: var(--ds-accent);
-}
-
-.fl-ps-toggle-on {
-  color: var(--ds-accent);
-  border-color: var(--ds-accent);
-  font-weight: 600;
-}
-
-.fl-ps-panes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
 }
 
 .fl-ps-pane {

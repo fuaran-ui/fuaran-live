@@ -140,6 +140,14 @@ let pairEmpty: PairState =
     Status = WebRtc.PeerState.New
     Error = None }
 
+/// The left column's two author surfaces (the 2026-07-30 workspace
+/// recomposition): talk to the model, or hand-edit the tree. Tabbed because the
+/// two are modal in practice — you prompt or you edit, not both at once.
+[<RequireQualifiedAccess>]
+type WorkspaceTab =
+  | Conversation
+  | Editor
+
 type Model =
   {
     Session: Session.SessionState
@@ -216,6 +224,17 @@ type Model =
     /// assertion. `None` means no refinement is in play and no comparison is
     /// offered.
     RefineBaseline: Refine.Baseline option
+    /// The left column's active surface (the 2026-07-30 workspace recomposition):
+    /// Conversation (prompt the model) or Editor (the Navigator's walk + property
+    /// / structural editing + the refine loop). Tabs, because the two are modal
+    /// in practice. Deep-linking `#navigator` lands on Editor; starting a run
+    /// (Send / demo / refine) snaps back to Conversation so the streamed
+    /// transcript — including a typed ask that would otherwise block invisibly —
+    /// is on screen.
+    WorkspaceTab: WorkspaceTab
+    /// True when transcript activity arrived while the Editor tab was showing —
+    /// rendered as a dot on the Conversation tab; cleared on selecting it.
+    ConvUnseen: bool
   }
 
 type Msg =
@@ -251,6 +270,8 @@ type Msg =
   | AskOpened of envelopeWire: string
   | AskResolved of elicitationId: string * outcome: ElicitationOutcome
   | SelectOutputTab of Projection.Target
+  // The left column's Conversation | Editor tab (2026-07-30 recomposition).
+  | SelectWorkspaceTab of WorkspaceTab
   // Client-only voice input (Phase 401).
   | ToggleMic
   | VoiceUpdate of finalText: string * interimText: string
@@ -643,6 +664,12 @@ let private parityListenCmd: Cmd<Msg> =
             | _ -> ()
       ))
 
+/// This tab's current URL fragment, used only to decide whether a deep link
+/// asked for a particular surface. Read once at boot; no listener — arriving at
+/// `#navigator` is a page load, not an in-app navigation.
+[<Emit("(window.location.hash || '')")>]
+let private locationHash () : string = jsNative
+
 let private init () : Model * Cmd<Msg> =
   // Restore a shared creation from the URL fragment on load (client-only – the
   // link IS the data). A fresh session otherwise.
@@ -693,7 +720,15 @@ let private init () : Model * Cmd<Msg> =
        else
          pairEmpty)
     Asks = Map.empty
-    RefineBaseline = None },
+    RefineBaseline = None
+    // The showcase's Navigator cross-door (`#navigator`) lands straight on the
+    // Editor surface; everyone else starts in the Conversation.
+    WorkspaceTab =
+      (if locationHash () = "#navigator" then
+         WorkspaceTab.Editor
+       else
+         WorkspaceTab.Conversation)
+    ConvUnseen = false },
   // Register the client-only enhancers once; run an initial KaTeX pass in case a
   // permalink restored a tree carrying an equation. In audience mode also
   // subscribe to the live-drive channel.
@@ -916,7 +951,8 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         SessionCostUsd = 0.0
         SessionCostKnown = true
         Elapsed = 0
-        Error = None },
+        Error = None
+        ConvUnseen = false },
     Cmd.none
   | AgentEmit e ->
     // Accumulate the run + session tallies live as each model call reports its
@@ -943,7 +979,10 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
       | _ -> model
 
     { model with
-        AgentTimeline = model.AgentTimeline @ [ e ] },
+        AgentTimeline = model.AgentTimeline @ [ e ]
+        // Streamed while the Editor tab was up (a background run, or a refine
+        // the visitor tabbed away from) – light the Conversation tab's dot.
+        ConvUnseen = model.ConvUnseen || model.WorkspaceTab = WorkspaceTab.Editor },
     Cmd.none
   | NavigatorEdit s
   | AgentSession s ->
@@ -974,7 +1013,10 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
           RunTokensIn = 0
           RunTokensOut = 0
           RunIteration = 0
-          Elapsed = 0 },
+          Elapsed = 0
+          // The scripted run streams into the transcript – put it on screen.
+          WorkspaceTab = WorkspaceTab.Conversation
+          ConvUnseen = false },
       Cmd.batch
         [ startAgentCmd (Demo.createProvider ()) model.Session model.Panels [] Demo.prompt "scripted-demo" ""
           tickCmd ]
@@ -1063,6 +1105,16 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     else
       model, Cmd.none
   | SelectOutputTab t -> { model with OutputTab = t }, Cmd.none
+  | SelectWorkspaceTab t ->
+    { model with
+        WorkspaceTab = t
+        // Selecting the Conversation acknowledges whatever streamed in.
+        ConvUnseen =
+          (if t = WorkspaceTab.Conversation then
+             false
+           else
+             model.ConvUnseen) },
+    Cmd.none
   | RunParity ->
     match parityInput model with
     | Some(wire, _) ->
@@ -1115,7 +1167,10 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             // An ordinary Send is not a refinement: retire any captured
             // baseline rather than leave the navigator comparing this run's
             // emission against a version nobody asked about.
-            RefineBaseline = None },
+            RefineBaseline = None
+            // A run streams into the transcript – put it on screen.
+            WorkspaceTab = WorkspaceTab.Conversation
+            ConvUnseen = false },
         // Resume from the accumulated context; do NOT clear the transcript or the
         // session token/cost tally – the conversation persists across runs. Only
         // the per-run counters reset (each Send is one budgeted run).
@@ -1158,7 +1213,11 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
             RunTokensOut = 0
             RunIteration = 0
             Elapsed = 0
-            RefineBaseline = Refine.baselineOf model.Session prompt },
+            RefineBaseline = Refine.baselineOf model.Session prompt
+            // The refinement run streams into the transcript – switch across
+            // from the Editor so it (and any typed ask) is visible.
+            WorkspaceTab = WorkspaceTab.Conversation
+            ConvUnseen = false },
         Cmd.batch
           [ startAgentCmd
               prov
@@ -1584,12 +1643,8 @@ let private previewPane (model: Model) : ReactElement =
       [ prop.className "fl-preview-root"
         prop.children [ Render.renderWithSources BindingResolver.empty ignore tree ] ]
 
-let private inspectorPane (model: Model) : ReactElement =
-  let json = Session.treeJson model.Session
-
-  Html.pre
-    [ prop.className "fl-inspector"
-      prop.text (if json = "" then "– no tree yet –" else json) ]
+// The former Inspector pane (the wire JSON in a `<pre>`) is superseded by the
+// Source card's "Wire JSON" tab (2026-07-30 recomposition).
 
 // ─── cross-device pairing panel (Phase 295 Stage 2) ──────────────────────────
 //
@@ -1852,52 +1907,9 @@ let private comparePane (model: Model) (dispatch: Msg -> unit) : ReactElement =
                  prop.text
                    "Runs the current prompt twice – typed Fuaran vs conventional HTML/JS – and checks each emission for validity. The typed arm is verifiably valid or rejected; the freeform arm only plausibly so." ]) ] ]
 
-// ─── source-projection output box (Phase 329) ────────────────────────────────
-
-let private outputPane (model: Model) (dispatch: Msg -> unit) : ReactElement =
-  let wire = Session.treeJson model.Session
-  let hasTree = model.Session.Tree.IsSome
-  let content = Projection.projectTo model.OutputTab wire
-
-  // Dogfood (Phase 294): the projected source is rendered through the `CodeBlock`
-  // primitive – a real language tag, line numbers, and a copy button (wired by
-  // the app-wide copy enhancer) – instead of an ad-hoc `<pre>`. The playground
-  // that shows you Fuaran code is itself built with Fuaran's code primitive.
-  let codeBlock: Node<obj> =
-    Fuaran.codeBlockSpec
-      "fl-output-code-block"
-      { Defaults.codeBlock with
-          Code = content
-          Language = Projection.languageTag model.OutputTab
-          LineNumbers = true
-          Copyable = true }
-
-  Html.div
-    [ prop.className "fl-output"
-      prop.children
-        [ Html.div
-            [ prop.className "fl-output-tabs"
-              prop.children
-                [ for t, label in Projection.targets ->
-                    Html.button
-                      [ prop.key label
-                        prop.className (
-                          if t = model.OutputTab then
-                            "fl-output-tab fl-output-tab-active"
-                          else
-                            "fl-output-tab"
-                        )
-                        prop.text label
-                        prop.onClick (fun _ -> dispatch (SelectOutputTab t)) ] ] ]
-          (if not hasTree then
-             Html.div
-               [ prop.className "fl-empty"
-                 prop.text
-                   "Build a UI – its JSON plus illustrative builder source in all nine host languages (TypeScript, Python, F#, C#, VB, Go, Kotlin, Rust, Swift) appears here." ]
-           else
-             Html.div
-               [ prop.className "fl-output-body"
-                 prop.children [ Render.renderWithSources BindingResolver.empty ignore codeBlock ] ]) ] ]
+// The former Output box (Phase 329's tabbed `CodeBlock` projection) is
+// superseded by the Source card (`ProjectionSync.SourceCard`), which renders
+// the same `Projection` walk with the Navigator's cursor highlighted in it.
 
 // ─── dual-host wire-parity pane (Phase 85 surfaced in-app) ────────────────────
 
@@ -2232,25 +2244,69 @@ let private toolDetails (title: string) (openByDefault: bool) (body: ReactElemen
         [ Html.summary [ prop.text title ]
           Html.div [ prop.className "pg-tool-body"; prop.children [ body ] ] ] ]
 
-/// This tab's current URL fragment, used only to decide whether a deep link
-/// asked for a particular tool. Read once per render; no listener — arriving at
-/// `#navigator` is a page load, not an in-app navigation.
-[<Emit("(window.location.hash || '')")>]
-let private locationHash () : string = jsNative
+// ─── the left-column workspace tabs (2026-07-30 recomposition) ────────────────
 
-/// `toolDetails` plus an anchor id, so a cross-door link can name a tool and
-/// have it open on arrival. The showcase's Navigator page links to `#navigator`;
-/// without the open-on-target the visitor would land on a closed disclosure and
-/// have to find it, which is not the "one click" the link promises.
-let private anchoredToolDetails (anchor: string) (title: string) (body: ReactElement) : ReactElement =
-  Html.details
-    [ prop.className "pg-tool"
-      prop.id anchor
-      if locationHash () = "#" + anchor then
-        prop.custom ("open", true)
+/// The Conversation | Editor tab strip. The Conversation tab carries an
+/// activity dot when transcript entries arrived while the Editor was showing —
+/// a run streams (and can ASK a typed question) regardless of which tab is up.
+let private workspaceTabs (model: Model) (dispatch: Msg -> unit) : ReactElement =
+  let tab (t: WorkspaceTab) (label: string) (dot: bool) : ReactElement =
+    Html.button
+      [ prop.className (
+          if model.WorkspaceTab = t then
+            "pg-ws-tab pg-ws-tab-active"
+          else
+            "pg-ws-tab"
+        )
+        prop.role "tab"
+        prop.ariaSelected (model.WorkspaceTab = t)
+        prop.onClick (fun _ -> dispatch (SelectWorkspaceTab t))
+        prop.children
+          [ Html.span [ prop.text label ]
+            (if dot then
+               Html.span [ prop.className "pg-ws-dot"; prop.title "New activity in the conversation" ]
+             else
+               Html.none) ] ]
+
+  Html.div
+    [ prop.className "pg-ws-tabs"
+      prop.role "tablist"
+      prop.ariaLabel "Workspace surface"
       prop.children
-        [ Html.summary [ prop.text title ]
-          Html.div [ prop.className "pg-tool-body"; prop.children [ body ] ] ] ]
+        [ tab WorkspaceTab.Conversation "Conversation" model.ConvUnseen
+          tab WorkspaceTab.Editor "Editor" false ] ]
+
+/// The Editor surface: the Navigator's walk + property/structural editing with
+/// the refine loop beneath it (Phase 715). The source projections that used to
+/// sit beside the walk now live in the right column's Source card, cursor-synced
+/// across the columns by subscription. `#navigator` (the showcase's cross-door
+/// deep link) selects this tab at boot — the id keeps the anchor resolvable.
+let private editorPane (model: Model) (dispatch: Msg -> unit) : ReactElement =
+  Html.div
+    [ prop.id "navigator"
+      prop.children
+        [ Refine.below
+            (Navigator.view model.Session (NavigatorEdit >> dispatch))
+            model.Session
+            model.RefineBaseline
+            model.AgentRunning
+            model.KeyPresent
+            (RefineFromHere >> dispatch)
+          // Phase 718 — the other half of the cross-link. The showcase's
+          // Navigator page is the same walk on a canned tree with no key,
+          // which is the better first look.
+          Html.p
+            [ prop.className "pg-tool-crosslink"
+              prop.children
+                [ Html.a
+                    [ prop.href (showcaseHref + "#/demo/navigator")
+                      prop.text "See the Navigator explained step by step, on a canned tree (no key needed) →" ] ] ] ] ]
+
+/// The right column's Source card: wire JSON + the nine language projections,
+/// one tab at a time, cursor-synced to the Editor's walk. Supersedes the
+/// Inspector and Output disclosures.
+let private sourcePane (model: Model) (dispatch: Msg -> unit) : ReactElement =
+  ProjectionSync.SourceCard model.Session.Tree model.OutputTab (SelectOutputTab >> dispatch)
 
 let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
   if model.IsAudience then
@@ -2276,50 +2332,27 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
             // Cross-device live-drive (Phase 295 Stage 2) – lifted to the top so a
             // joiner arriving fresh (or via a ?live=pair link) finds it at once.
             Html.div [ prop.className "pg-pairing"; prop.children [ pairPanel model dispatch ] ]
-            // Primary workspace – compose on the left, live preview on the right;
-            // every secondary feature is progressive-disclosure below.
+            // Primary workspace (2026-07-30 recomposition) – the two author
+            // surfaces tabbed on the left (Conversation | Editor), the two
+            // artefact views stacked on the right (rendered preview + the
+            // tabbed Source card); every secondary feature is
+            // progressive-disclosure below.
             Html.div
               [ prop.className "pg-workspace"
                 prop.children
                   [ Html.div
                       [ prop.className "pg-col"
-                        prop.children [ paneCard "Conversation" (conversationPane model dispatch) ] ]
+                        prop.children
+                          [ workspaceTabs model dispatch
+                            (match model.WorkspaceTab with
+                             | WorkspaceTab.Conversation -> paneCard "Conversation" (conversationPane model dispatch)
+                             | WorkspaceTab.Editor ->
+                               paneCard "Editor – walk and edit the tree" (editorPane model dispatch)) ] ]
                     Html.div
                       [ prop.className "pg-col"
                         prop.children
                           [ paneCard "Live preview" (previewPane model)
-                            toolDetails "Inspector – wire JSON" false (inspectorPane model)
-                            anchoredToolDetails
-                              "navigator"
-                              "Navigator – walk and edit the tree"
-                              // Phase 714: the walk with the live source projections beside
-                              // it. `beside` wraps the built element, so this composition does
-                              // not depend on what `Navigator.view` itself takes.
-                              // Phase 715 wraps that again with the loop pane — same posture,
-                              // same reason: emitted → edited → re-prompted, without leaving
-                              // the tab.
-                              (Html.div
-                                [ prop.children
-                                    [ Refine.below
-                                        (ProjectionSync.beside
-                                          (Navigator.view model.Session (NavigatorEdit >> dispatch))
-                                          model.Session.Tree)
-                                        model.Session
-                                        model.RefineBaseline
-                                        model.AgentRunning
-                                        model.KeyPresent
-                                        (RefineFromHere >> dispatch)
-                                      // Phase 718 — the other half of the cross-link. The
-                                      // showcase's Navigator page is the same walk on a canned
-                                      // tree with no key, which is the better first look.
-                                      Html.p
-                                        [ prop.className "pg-tool-crosslink"
-                                          prop.children
-                                            [ Html.a
-                                                [ prop.href (showcaseHref + "#/demo/navigator")
-                                                  prop.text
-                                                    "See the Navigator explained step by step, on a canned tree (no key needed) →" ] ] ] ] ])
-                            toolDetails "Output – source projection" false (outputPane model dispatch) ] ] ] ]
+                            paneCard "Source – the tree as text" (sourcePane model dispatch) ] ] ] ]
             // Secondary tools – collapsed by default; Examples opens on first run.
             Html.section
               [ prop.className "pg-tools"

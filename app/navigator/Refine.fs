@@ -310,9 +310,8 @@ what you changed, so the next version starts from what you approved." ]
            | _ -> Html.none) ] ]
 
 /// The Navigator tab with the loop beneath it. Takes the already-built navigator
-/// element rather than its inputs — the same composition posture `ProjectionSync.beside`
-/// takes, and for the same reason: this pane is unaffected by whatever the
-/// Navigator's own entry point happens to take, so the two evolve independently.
+/// element rather than its inputs, so this pane is unaffected by whatever the
+/// Navigator's own entry point happens to take and the two evolve independently.
 let below
   (navigatorTab: ReactElement)
   (session: Session.SessionState)

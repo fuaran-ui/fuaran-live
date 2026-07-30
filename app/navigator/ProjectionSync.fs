@@ -1,23 +1,23 @@
 module Fuaran.Live.ProjectionSync
 
 // ============================================================================
-//  Navigator ⇄ source-projection sync (Phase 714).
+//  Navigator ⇄ source-projection sync (Phase 714; recomposed 2026-07-30 as the
+//  unified Source card).
 //
-//  Walk the tree on the left; watch the corresponding construct light up in
-//  three authoring languages at once on the right. That is the whole feature,
-//  and it is one no other UI system can show: the same node, simultaneously, as
-//  TypeScript, Python and F# source — because in Fuaran the tree IS the
-//  artefact, and each language is a projection of it rather than the thing
-//  itself.
+//  Walk the tree in the Editor; watch the corresponding construct light up in
+//  whichever representation the Source card has open — the canonical wire JSON
+//  or any of the nine host languages. That is a feature no other UI system can
+//  show: the same node, as wire bytes or as TypeScript, Python or F# source —
+//  because in Fuaran the tree IS the artefact, and each language is a
+//  projection of it rather than the thing itself.
 //
 //  Two things make it honest rather than decorative:
 //
-//   • **One projector, not two.** The panes call `Projection.projectSpans`, the
-//     same walk `Projection.projectTo` runs for the Output box; the span map
-//     falls out of the walk itself (invisible sentinels the generators emit and
-//     the entry points strip). There is no second, "highlight-aware" projector
-//     that could drift from the real one — the text a pane shows is byte-for-
-//     byte the text the Output box shows.
+//   • **One projector, not two.** The card calls `Projection.projectSpans`, the
+//     same walk `Projection.projectTo` runs; the span map falls out of the walk
+//     itself (invisible sentinels the generators emit and the entry points
+//     strip). There is no second, "highlight-aware" projector that could drift
+//     from the real one.
 //
 //   • **Nearest-enclosing resolution.** A language does not project every node:
 //     the illustrative walkers fold a node in a `state` slot into its parent's
@@ -25,15 +25,21 @@ module Fuaran.Live.ProjectionSync
 //     showing nothing, the pane highlights the closest ANCESTOR the language
 //     does project, and says so. "Nothing is highlighted" and "this construct
 //     contains your node" are different facts and are reported differently.
+//     The wire JSON tab always resolves exactly — every node projects to wire.
 //
 //  The cursor arrives by SUBSCRIPTION (`Navigator.subscribeCursor`), not by
-//  prop: the Navigator owns the walk, this pane only watches it. Everything
+//  prop: the Navigator owns the walk, this card only watches it. Everything
 //  else is derived from the session tree on each render, so an applied op —
 //  from the property panel, a model re-emission, a replayed permalink — re-runs
-//  the projections and lands the highlight on the focused node's NEW span with
-//  no edit path of its own. Scrolling uses `block: 'nearest'`, so a pane whose
-//  highlight is already visible does not move at all; scroll context survives
-//  the edit.
+//  the projection and lands the highlight on the focused node's NEW span with
+//  no edit path of its own. Scrolling uses `block: 'nearest'`, so a highlight
+//  already visible does not move at all; scroll context survives the edit.
+//
+//  History: until the 2026-07-30 workspace recomposition this module rendered
+//  three fixed language panes BESIDE the walk, inside the Navigator disclosure
+//  (`beside` / `SyncPane`). The Source card supersedes that — and the separate
+//  Inspector (wire JSON) and Output (source projection) boxes — with one tabbed
+//  pane in the right column, permanently visible next to the live preview.
 // ============================================================================
 
 open Fable.Core
@@ -42,20 +48,13 @@ open Fuaran.UI.Types
 
 module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 
-// ─── which projections are on screen ─────────────────────────────────────────
-
-/// The three the feature is FOR — "step through the UI, watch the code in three
-/// languages". Every other target the Output box can project is one click away;
-/// none of them is on by default, because four panes of source beside a tree
-/// walk is a wall, not a demo.
-let private defaultShown =
-  [ Projection.Target.TypeScript
-    Projection.Target.Python
-    Projection.Target.FSharp ]
+/// The host's effect seam, bound to the browser implementation exactly as the
+/// Navigator binds it — the Copy button is the only effect this card performs.
+let private effects = Byok.browserEffectPorts
 
 // ─── keeping the highlight in view ───────────────────────────────────────────
 
-/// Scroll every pane's highlight into view within its own scroll box. `nearest`
+/// Scroll the pane's highlight into view within its own scroll box. `nearest`
 /// on both axes is load-bearing: a highlight already on screen does not move,
 /// which is what "re-derive the projections without losing scroll context"
 /// means in practice. No smooth behaviour — an edit should land, not animate.
@@ -70,7 +69,7 @@ let private defaultShown =
 })()""")>]
 let private scrollHitsIntoView () : int = jsNative
 
-// ─── one language pane ───────────────────────────────────────────────────────
+// ─── one representation pane ─────────────────────────────────────────────────
 
 let private paneFor (target: Projection.Target) (label: string) (wire: string) (idPath: string list) : ReactElement =
   let projected = Projection.projectSpans target wire
@@ -84,6 +83,7 @@ let private paneFor (target: Projection.Target) (label: string) (wire: string) (
 
   let status =
     match span with
+    | None when List.isEmpty idPath -> "walk the tree in the Editor to highlight the matching construct here"
     | None -> "not projected in this language"
     | Some s ->
       let first, last = Projection.lineRange projected.Text s
@@ -122,68 +122,72 @@ let private paneFor (target: Projection.Target) (label: string) (wire: string) (
             [ prop.className "fl-ps-pane-head"
               prop.children
                 [ Html.span [ prop.className "fl-ps-lang"; prop.text label ]
-                  Html.span [ prop.className "fl-ps-where"; prop.text status ] ] ]
+                  Html.span [ prop.className "fl-ps-where"; prop.text status ]
+                  Html.button
+                    [ prop.className "fl-ps-copy"
+                      prop.title "Copy this representation to the clipboard"
+                      prop.text "Copy"
+                      prop.onClick (fun _ -> effects.WriteToClipboard projected.Text) ] ] ]
           Html.pre
             [ prop.className "fl-code fl-ps-code"
               prop.custom ("data-fuaran-projection", Projection.languageTag target)
               prop.children code ] ] ]
 
-// ─── the pane ────────────────────────────────────────────────────────────────
+// ─── the unified Source card ─────────────────────────────────────────────────
 
+/// The first tab is the wire itself, not a language projection of it — name it
+/// what it is. The remaining labels are the shared Output-box labels verbatim.
+let private tabLabel (target: Projection.Target) (label: string) : string =
+  match target with
+  | Projection.Target.Json -> "Wire JSON"
+  | _ -> label
+
+/// The right column's "the tree, as text" card: the canonical wire JSON or one
+/// of the nine host-language projections, one tab at a time, cursor-synced to
+/// the Editor's walk. Supersedes the Inspector and Output boxes.
 [<ReactComponent>]
-let SyncPane (tree: Node<obj> option) : ReactElement =
+let SourceCard
+  (tree: Node<obj> option)
+  (active: Projection.Target)
+  (onSelect: Projection.Target -> unit)
+  : ReactElement =
   let idPath, setIdPath = React.useState ([||]: string array)
-  // The UPDATER form, not the value form. React batches state writes, so two
-  // toggles clicked inside one batch both read the same captured `shown` and the
-  // first one's change is silently lost. Observed, not theorised: switching JSON
-  // on and TypeScript off in one go dropped the JSON pane.
-  let shown, updateShown = React.useStateWithUpdater defaultShown
 
   // Subscribe once, and hand React the unsubscribe thunk as the effect's
-  // cleanup. The Navigator replays the current path on subscribe, so a pane
-  // opened part-way through a walk starts in step rather than blank. (The
+  // cleanup. The Navigator replays the current path on subscribe, so a card
+  // mounted part-way through a walk starts in step rather than blank. (The
   // annotation picks the `unit -> (unit -> unit)` overload; `useEffectOnce` has
   // four, and the return type is the only thing that separates them.)
   let subscribe () : unit -> unit = Navigator.subscribeCursor setIdPath
 
   React.useEffectOnce subscribe
 
-  // After every render — the projections have just been re-derived, so this is
+  // After every render — the projection has just been re-derived, so this is
   // also the edit-sync path: a tree change re-renders, the spans move, and the
   // highlight is brought back into view where it now sits.
   React.useEffect (fun () -> scrollHitsIntoView () |> ignore)
 
-  let toggle (target: Projection.Target) =
-    updateShown (fun prev ->
-      if List.contains target prev then
-        prev |> List.filter (fun t -> t <> target)
-      else
-        // Keep the Output box's tab order rather than append-on-click order, so
-        // a pane always appears where the reader expects it.
-        Projection.targets
-        |> List.map fst
-        |> List.filter (fun t -> t = target || List.contains t prev))
-
-  let toggles =
+  let tabs =
     Html.div
-      [ prop.className "fl-ps-toggles"
-        prop.role "group"
-        prop.ariaLabel "Source projections to show"
+      [ prop.className "fl-output-tabs"
+        prop.role "tablist"
+        prop.ariaLabel "Source representation"
         prop.children
-          [ for target, label in Projection.targets do
-              let on = List.contains target shown
+          [ for t, label in Projection.targets do
+              let selected = t = active
 
               Html.button
                 [ prop.key label
+                  prop.role "tab"
+                  prop.ariaSelected selected
                   prop.className (
-                    if on then
-                      "fl-ps-toggle fl-ps-toggle-on"
+                    if selected then
+                      "fl-output-tab fl-output-tab-active"
                     else
-                      "fl-ps-toggle"
+                      "fl-output-tab"
                   )
-                  prop.ariaPressed on
-                  prop.text label
-                  prop.onClick (fun _ -> toggle target) ] ] ]
+                  prop.text (tabLabel t label)
+                  prop.onClick (fun _ -> onSelect t) ] ] ]
 
   let body =
     match tree with
@@ -191,40 +195,14 @@ let SyncPane (tree: Node<obj> option) : ReactElement =
       Html.div
         [ prop.className "fl-empty fl-ps-empty"
           prop.text
-            "No tree yet. Generate a UI (or load an example), then walk it — the construct under the cursor is highlighted in every language you switch on here." ]
+            "Build a UI – its canonical wire JSON plus illustrative builder source in all nine host languages appears here, and walking the tree in the Editor highlights the matching construct." ]
     | Some root ->
       let wire = Canon.encodeNode root
-      let path = List.ofArray idPath
 
-      if List.isEmpty shown then
-        Html.div
-          [ prop.className "fl-empty fl-ps-empty"
-            prop.text "No projections shown. Switch one on above." ]
-      else
-        Html.div
-          [ prop.className "fl-ps-panes"
-            prop.children
-              [ for target, label in Projection.targets do
-                  if List.contains target shown then
-                    paneFor target label wire path ] ]
+      let label =
+        Projection.targets
+        |> List.pick (fun (t, l) -> if t = active then Some(tabLabel t l) else None)
 
-  Html.div
-    [ prop.className "fl-ps"
-      prop.children
-        [ Html.p
-            [ prop.className "fl-ps-intro"
-              prop.text
-                "The same node, in every language at once. Walk the tree beside this and the matching construct is highlighted here; edit it and the source re-derives with the highlight still on it." ]
-          toggles
-          body ] ]
+      paneFor active label wire (List.ofArray idPath)
 
-/// The Navigator tab as the playground mounts it: the walk on one side, the
-/// live source projections on the other. Takes the Navigator's already-built
-/// element rather than its inputs, so this composition is unaffected by what the
-/// Navigator's own entry point happens to take.
-let beside (navigator: ReactElement) (tree: Node<obj> option) : ReactElement =
-  Html.div
-    [ prop.className "fl-nav-tab"
-      prop.children
-        [ Html.div [ prop.className "fl-nav-tab-walk"; prop.children [ navigator ] ]
-          SyncPane tree ] ]
+  Html.div [ prop.className "fl-source"; prop.children [ tabs; body ] ]

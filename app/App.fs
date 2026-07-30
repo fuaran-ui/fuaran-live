@@ -41,6 +41,9 @@ importSideEffects "@fuaran-ui/renderer/css"
 // (`MathEnhance.enhance`) renders into KaTeX markup that needs this CSS (Phase
 // 294 adoption). The npm `katex` package ships it.
 importSideEffects "katex/dist/katex.min.css"
+// The shared brand design-system layer — MUST load after the reference CSS
+// (it re-binds the --fuaran-* contract) and before the shell CSS.
+importSideEffects "./brand/fuaran-brand.css"
 importSideEffects "./app.css"
 // The icon-contract glyph map — icons render as empty data-icon hooks; this
 // maps the common names to currentColor SVG masks (see app/icon-glyphs.css).
@@ -2005,9 +2008,16 @@ let private topbar (model: Model) (dispatch: Msg -> unit) : ReactElement =
             [ prop.className "ds-brand"
               prop.children
                 [ Html.img
-                    [ prop.className "ds-brand-mark"
+                    [ prop.className "ds-brand-mark ds-brand-mark-light"
                       prop.src "brand/fuaran-mark.svg"
                       prop.alt "Fuaran" ]
+                  // The real Mist dark-mode mark; CSS display-toggles the pair
+                  // off the shared dark selectors (retires the filter hack).
+                  Html.img
+                    [ prop.className "ds-brand-mark ds-brand-mark-dark"
+                      prop.src "brand/fuaran-mark-mist.svg"
+                      prop.alt ""
+                      prop.ariaHidden true ]
                   Html.span [ prop.className "ds-brand-word"; prop.text "fuaran" ] ] ]
           Html.button
             [ prop.className "ds-theme-toggle"

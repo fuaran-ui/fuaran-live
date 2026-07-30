@@ -24,6 +24,9 @@ open Fuaran.Showcase
 // Same stylesheet pair as the site shell: the canonical F# reference CSS (the
 // player's class vocabulary) + the site chrome (which carries the rcv-* theme).
 importSideEffects "@fuaran-ui/renderer/css"
+// The shared brand design-system layer — after the reference CSS, before the
+// shell CSS (same contract as the playground + showcase entries).
+importSideEffects "../brand/fuaran-brand.css"
 importSideEffects "./app.css"
 // The icon-contract glyph map, shared with the playground (one file, no copies).
 importSideEffects "../icon-glyphs.css"

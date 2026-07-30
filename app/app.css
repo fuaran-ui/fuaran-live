@@ -3,20 +3,24 @@
    these rules only dress the playground's own chat / inspector furniture and the
    three-pane layout scaffold. */
 
-/* Fuaran brand palette – loch / mist / paper / ink (same tokens as the demo site).
-   Light = Paper ground + Loch-deep accent; dark = deep-loch ground + Mist accent. */
+/* Legacy --fl-* tokens: ALIASES over the shared brand layer
+   (app/brand/fuaran-brand.css) so the .fl-* component rules ride the design
+   system without a rename sweep. Each alias audited individually — note
+   --fl-code-bg maps to the always-dark reference code tokens (deep loch in
+   BOTH themes; inverse-polarity vs the surface tokens), and --fl-error-* map
+   to the critical tone. New rules should consume the brand tokens directly. */
 :root {
-  --fl-bg: #efe9dc; /* Paper – page ground */
-  --fl-surface: #fcfaf4; /* warm off-white – raised panes */
-  --fl-fg: #1a2026; /* Ink */
-  --fl-muted: #55606b;
-  --fl-border: #dad2c0; /* warm paper-deep border */
-  --fl-accent: #1e4754; /* Loch deep */
-  --fl-accent-fg: #fcfaf4; /* paper text on the loch accent */
-  --fl-error-bg: #f4e4de;
-  --fl-error-fg: #b8442f;
-  --fl-code-bg: #16232b; /* deep loch – code panes */
-  --fl-code-fg: #dce3e5;
+  --fl-bg: var(--fuaran-color-surface, #efe9dc);
+  --fl-surface: var(--fuaran-color-elevated, #fcfaf4);
+  --fl-fg: var(--fuaran-color-text, #1a2026);
+  --fl-muted: var(--fuaran-color-text-muted, #55606b);
+  --fl-border: var(--fuaran-color-border, #dad2c0);
+  --fl-accent: var(--fuaran-color-accent, #1e4754);
+  --fl-accent-fg: var(--fuaran-color-accent-ink, #fcfaf4);
+  --fl-error-bg: var(--fuaran-tone-critical-bg, #f4e4de);
+  --fl-error-fg: var(--fuaran-tone-critical-fg, #b8442f);
+  --fl-code-bg: var(--fuaran-code-bg, #16232b);
+  --fl-code-fg: var(--fuaran-code-fg, #dce3e5);
   color-scheme: light;
 }
 
@@ -34,40 +38,8 @@
   color-scheme: dark;
 }
 
-/* Showcase design-system tokens (Brand palette) ported so the playground chrome
-   + cards share the site's vocabulary and theme as one. Light in :root, dark
-   under <html>.ds-dark (toggled by applyDarkClass in App.fs). The legacy --fl-*
-   tokens above still drive the .fl-* component rules (they flip via
-   .fl-shell.fl-dark); these add the body-level + chrome theming the shell scope
-   never reached. */
-:root {
-  --fuaran-color-surface: #efe9dc;
-  --fuaran-color-elevated: #fcfaf4;
-  --fuaran-color-code-surface: #eae3d3;
-  --fuaran-color-text: #1a2026;
-  --fuaran-color-text-muted: #55606b;
-  --fuaran-color-border: #dad2c0;
-  --fuaran-color-brand: #1e4754;
-  --fuaran-color-accent: #1e4754;
-  --fuaran-color-critical: #b8442f;
-  --fuaran-color-success: #2e7d5b;
-  --ds-max-width: 72rem;
-  --ds-gutter: clamp(1rem, 3vw, 2rem);
-  --ds-border: 1px solid var(--fuaran-color-border, #dad2c0);
-  --ds-accent: var(--fuaran-color-accent, #1e4754);
-}
-.ds-dark {
-  --fuaran-color-surface: #0c1216;
-  --fuaran-color-elevated: #10171b;
-  --fuaran-color-code-surface: #080d10;
-  --fuaran-color-text: #dce3e5;
-  --fuaran-color-text-muted: #93a2ab;
-  --fuaran-color-border: #26333b;
-  --fuaran-color-brand: #62a5be;
-  --fuaran-color-accent: #62a5be;
-  --fuaran-color-critical: #e0725a;
-  --fuaran-color-success: #5fbf95;
-}
+/* The brand palette + --ds-* layout tokens now come from the shared
+   app/brand/fuaran-brand.css (imported before this file). */
 
 html,
 body {
@@ -86,22 +58,7 @@ body {
     sans-serif;
 }
 
-/* Markdown-emitted anchors carry no class – marked emits a bare <a> – so they
-   fell through to the user-agent's #0000EE (visited #551A8B), far under WCAG AA
-   against the dark surface. The Link PRIMITIVE (.fuaran-link) is already
-   tokenised on --fuaran-tone-brand-fg, which the shared brand theme flips per
-   mode; prose links ride the same token so the two agree in either theme.
-   Mirrored in app/showcase/app.css – a change here re-applies there. */
-.fuaran-kind-markdown a,
-.fuaran-kind-markdown a:visited {
-  color: var(--fuaran-tone-brand-fg, #1e4754);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.fuaran-kind-markdown a:hover {
-  color: var(--fuaran-tone-brand-border, #62a5be);
-}
+/* (Markdown-anchor styling moved to the shared brand layer.) */
 
 .fl-shell {
   min-height: 100vh;
@@ -305,7 +262,7 @@ body {
   background: var(--fl-code-bg);
   color: var(--fl-code-fg);
   border-radius: 8px;
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   line-height: 1.5;
 }
@@ -739,7 +696,7 @@ body {
 .fl-pair-code {
   flex: 1 1 220px;
   min-width: 200px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.68rem;
   line-height: 1.3;
   word-break: break-all;
@@ -1288,7 +1245,7 @@ body {
 }
 .fl-pb-count {
   font-size: 0.7rem;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   opacity: 0.7;
 }
 .fl-pb-list {
@@ -1351,12 +1308,12 @@ body {
   font-weight: 700;
 }
 .fl-panel-id {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.72rem;
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .fl-panel-chain {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.72rem;
   color: var(--fuaran-color-accent, #4c5bd4);
 }
@@ -1430,79 +1387,8 @@ body {
   background: transparent;
 }
 
-/* ── branded topbar – identical to the showcase (same .ds-* classes + CSS,
-      copied verbatim from app/showcase/app.css) so the two entries read as one
-      product: same logo + wordmark "fuaran", same tagline, same theme toggle. ── */
-.ds-topbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap; /* lets the tagline take its own row beneath the logo */
-  gap: 0.55rem 0.75rem;
-}
-.ds-topbar .ds-brand {
-  flex: 1;
-  min-width: 0;
-}
-.ds-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  text-decoration: none;
-  color: inherit;
-  padding-bottom: 0.25rem;
-}
-.ds-brand-mark {
-  width: 3rem;
-  height: 3rem;
-  display: block;
-}
-.ds-dark .ds-brand-mark {
-  filter: brightness(1.9) saturate(0.9);
-}
-.ds-brand-word {
-  font-family: 'EB Garamond', Garamond, 'Times New Roman', serif;
-  font-style: italic;
-  font-weight: 500;
-  font-size: 2.25rem;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  color: var(--fuaran-color-brand, #1e4754);
-}
-/* The tagline sits on its own line beneath the logo (flex-basis 100% wraps it
-   under the .ds-topbar row) – mirrored from the docs-site masthead lockup. */
-.ds-brand-tagline {
-  flex-basis: 100%;
-  margin: 0;
-  font-family: ui-monospace, 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 0.74rem;
-  font-weight: 500;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--fuaran-color-text-muted, #55606b);
-}
-@media (max-width: 560px) {
-  .ds-brand-tagline {
-    display: none;
-  }
-}
-.ds-theme-toggle {
-  flex: none;
-  width: 2.75rem;
-  height: 2.75rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: var(--ds-border);
-  border-radius: 0.6rem;
-  background: var(--fuaran-color-elevated, #fff);
-  color: var(--fuaran-color-brand, #1e4754);
-  font-size: 1.15rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.ds-theme-toggle:hover {
-  border-color: var(--fuaran-color-brand, #1e4754);
-}
+/* ── branded topbar — the lockup + toggle now come from the shared brand
+      layer (app/brand/fuaran-brand.css); both entries read as one product. ── */
 
 /* ── project intro hero (mirrors the showcase landing) ── */
 .pg-hero {
@@ -1729,7 +1615,7 @@ body {
 }
 
 .fl-nav-id {
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.75rem;
   color: var(--fuaran-color-text-muted);
 }
@@ -2022,7 +1908,7 @@ body {
 }
 
 .fl-rf-change {
-  font-family: var(--ds-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
 }
 

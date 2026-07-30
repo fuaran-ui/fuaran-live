@@ -2,12 +2,9 @@
    .fuaran-* classes) is supplied by the canonical reference stylesheet imported
    alongside this file in App.fs; these styles are only the site frame around it. */
 
-:root {
-  --ds-max-width: 62rem;
-  --ds-gutter: 1.5rem;
-  --ds-border: 1px solid var(--fuaran-color-border, #e2e2e8);
-  --ds-accent: var(--fuaran-color-accent, #4c5bd4);
-}
+/* The brand palette + --ds-* layout tokens come from the shared
+   ../brand/fuaran-brand.css (imported before this file). The receiver keeps
+   its narrow column via a scoped override on .rcv-shell below. */
 
 body {
   margin: 0;
@@ -22,22 +19,7 @@ body {
   line-height: 1.55;
 }
 
-/* Markdown-emitted anchors carry no class – marked emits a bare <a> – so they
-   fell through to the user-agent's #0000EE (visited #551A8B), measuring 1.93:1
-   against the dark card surface where WCAG AA wants 4.5:1. The Link PRIMITIVE
-   (.fuaran-link) is already tokenised on --fuaran-tone-brand-fg, which the brand
-   theme flips per mode; prose links now ride the same token, so the two agree in
-   either theme instead of one being branded and the other being 1996. */
-.fuaran-kind-markdown a,
-.fuaran-kind-markdown a:visited {
-  color: var(--fuaran-tone-brand-fg, #1e4754);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.fuaran-kind-markdown a:hover {
-  color: var(--fuaran-tone-brand-border, #62a5be);
-}
+/* (Markdown-anchor styling moved to the shared brand layer.) */
 
 .ds-shell {
   /* Wider content column to match the playground shell (was var(--ds-max-width),
@@ -100,7 +82,7 @@ body {
   overflow-y: auto;
 }
 .wire-json code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -215,7 +197,7 @@ body {
   position: absolute;
   top: 1.1rem;
   right: 1.1rem;
-  font-family: ui-monospace, 'IBM Plex Mono', 'Courier New', monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -407,7 +389,7 @@ body {
 }
 .rosetta-tabpanel-tag {
   padding: 0 0.35rem;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.75rem;
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
@@ -449,7 +431,7 @@ body {
   overflow-x: auto;
   font-size: 0.78rem;
   line-height: 1.5;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: var(--ds-font-mono);
 }
 
 .rosetta-stage,
@@ -545,7 +527,7 @@ body {
 }
 
 .rosetta-host-hash {
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
@@ -564,7 +546,7 @@ body {
   border-radius: 0.5rem;
   background: var(--fuaran-color-code-surface, #f4f4f8);
   overflow-x: auto;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   white-space: pre-wrap;
   word-break: break-all;
@@ -591,7 +573,7 @@ body {
   gap: 0.5rem;
   align-items: baseline;
   overflow-x: auto;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
 }
 
@@ -890,7 +872,7 @@ body {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .tp-pass-stub {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   color: var(--fuaran-color-text-muted, #5a5a66);
   word-break: break-all;
@@ -990,7 +972,7 @@ body {
   font-weight: 600;
 }
 .tp-tamper-refusal {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   color: var(--fuaran-color-critical, #c8452f);
   word-break: break-word;
@@ -1024,7 +1006,7 @@ body {
 .tp-string-box {
   flex: 1 1 auto;
   min-width: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.74rem;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--fuaran-color-border, #e2e2e8);
@@ -1156,7 +1138,7 @@ body {
   cursor: pointer;
 }
 .sk-brand-hex {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.85rem;
 }
 .sk-brand-reset {
@@ -1181,7 +1163,7 @@ body {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .sk-hash-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   padding: 0.15rem 0.45rem;
   border-radius: 0.35rem;
   background: var(--fuaran-color-code-surface, #f5f5f8);
@@ -1250,7 +1232,7 @@ body {
   gap: 0.5rem;
 }
 .sk-audit-flag {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.82rem;
   color: var(--fuaran-color-critical, #c8452f);
 }
@@ -1425,7 +1407,7 @@ body {
 .k-sense-signal {
   flex-basis: 100%;
   margin-left: 1.5rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   color: var(--fuaran-color-critical, #c8452f);
 }
@@ -1538,7 +1520,7 @@ body {
   padding-top: 0.05rem;
 }
 .k-step-text {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   word-break: break-word;
 }
 .k-step-diagnose .k-step-text {
@@ -1580,6 +1562,9 @@ body.rcv {
 }
 
 .rcv-shell {
+  /* The receiver keeps the narrow reading column (the shared brand layer's
+     --ds-max-width is the 96rem product shell). */
+  --ds-max-width: 62rem;
   max-width: var(--ds-max-width);
   margin: 0 auto;
   padding: 1.5rem var(--ds-gutter) 4rem;
@@ -1588,7 +1573,7 @@ body.rcv {
 .rcv-badge {
   display: inline-block;
   align-self: flex-start;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1600,7 +1585,7 @@ body.rcv {
 
 .rcv-title {
   margin: 0.4rem 0 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-weight: 500;
   color: #e6edf5;
 }
@@ -1613,7 +1598,7 @@ body.rcv {
 
 .rcv-waiting {
   margin: 0.6rem 0 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   color: #7ee0a3;
 }
 
@@ -1733,7 +1718,7 @@ body.rcv {
   font-size: 0.9rem;
 }
 .tm-apply-error-code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   background: var(--fuaran-color-surface, #f5f5f8);
   border-radius: 0.4rem;
@@ -1865,11 +1850,11 @@ body.rcv {
   font-size: 0.72rem;
 }
 .tm-hash {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   color: var(--fuaran-color-text, #1c1c22);
 }
 .tm-hash-link {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .tm-op-json {
@@ -1882,7 +1867,7 @@ body.rcv {
   line-height: 1.45;
 }
 .tm-op-json code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -2018,7 +2003,7 @@ body.rcv {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .bs-rig-width {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-weight: 600;
 }
 .bs-rig-slider {
@@ -2113,7 +2098,7 @@ body.rcv {
   border-top: 1px solid var(--fuaran-color-border, #e2e2e8);
 }
 .bs-node-id {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-weight: 600;
 }
 .bs-declared {
@@ -2125,12 +2110,12 @@ body.rcv {
   gap: 0.2rem;
 }
 .bs-measure {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
 }
 .bs-flag {
   color: var(--fuaran-color-critical, #c8452f);
   font-weight: 700;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
 }
 .bs-flag-ok {
   color: var(--fuaran-color-success, #2f9e5f);
@@ -2161,7 +2146,7 @@ body.rcv {
   line-height: 1.5;
 }
 .bs-inspect code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -2305,7 +2290,7 @@ body.rcv {
   gap: 0.5rem;
 }
 .nd-dossier-node {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-weight: 600;
 }
 .nd-dossier-close {
@@ -2345,7 +2330,7 @@ body.rcv {
   flex: 1 1 8rem;
 }
 .nd-drow-hash {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 
@@ -2391,7 +2376,7 @@ body.rcv {
   gap: 0.3rem;
 }
 .nd-verify-err {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   word-break: break-word;
 }
@@ -2584,7 +2569,7 @@ body.rcv {
 .ut-latency {
   margin-left: auto;
   font-size: 0.78rem;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   padding: 0.1rem 0.45rem;
   border-radius: 0.35rem;
 }
@@ -2627,7 +2612,7 @@ body.rcv {
   color: var(--fuaran-color-critical, #c8452f);
 }
 .ut-assert-name {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
 }
 .ut-assert-detail {
   color: var(--fuaran-color-text-muted, #5a5a66);
@@ -2783,7 +2768,7 @@ body.rcv {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .ut-mock-verdict {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   color: var(--fuaran-color-critical, #c8452f);
   font-weight: 700;
@@ -3073,7 +3058,7 @@ polygon.gi-dag-pending {
   margin: 0.5rem 0;
 }
 .gi-conflict-chip {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.72rem;
   color: #8f2c21;
   background: #fdecea;
@@ -3272,7 +3257,7 @@ polygon.gi-dag-pending {
   gap: 0.5rem;
 }
 .bnc-verdict-code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.82rem;
   font-weight: 700;
   background: var(--fuaran-color-surface, #f5f5f8);
@@ -3332,7 +3317,7 @@ polygon.gi-dag-pending {
   flex: 1 1 12rem;
 }
 .bnc-log-code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 
@@ -3532,7 +3517,7 @@ polygon.gi-dag-pending {
   padding: 0.6rem 0.9rem;
   border-top: var(--ds-border);
   font-size: 0.78rem;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
 }
 .dl-probe-ok {
   color: #226844;
@@ -3742,7 +3727,7 @@ polygon.gi-dag-pending {
   padding: 0.7rem 0.85rem;
   background: #0f1622;
   color: #d6e2f0;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.82rem;
   line-height: 1.55;
   resize: vertical;
@@ -3751,7 +3736,7 @@ polygon.gi-dag-pending {
 .pn-progress {
   font-size: 0.82rem;
   color: var(--fuaran-color-accent, #3358d4);
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
 }
 .pn-err {
   font-size: 0.8rem;
@@ -3802,7 +3787,7 @@ polygon.gi-dag-pending {
   gap: 0.25rem;
 }
 .pn-op code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   color: #226844;
 }
@@ -3985,7 +3970,7 @@ polygon.gi-dag-pending {
   overflow-y: auto;
 }
 .sm-source code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -4057,7 +4042,7 @@ polygon.gi-dag-pending {
   border-radius: 1.4rem;
   background: var(--fuaran-color-elevated, #fff);
   color: var(--fuaran-color-text, #1c1c22);
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.82rem;
   cursor: pointer;
   padding: 0 0.85rem;
@@ -4075,7 +4060,7 @@ polygon.gi-dag-pending {
   flex-wrap: wrap;
 }
 .gy-term-tag {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.82rem;
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
@@ -4113,7 +4098,7 @@ polygon.gi-dag-pending {
   gap: 0.25rem;
 }
 .gy-pred code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   color: #2f6f9e;
 }
@@ -4284,7 +4269,7 @@ polygon.gi-dag-pending {
 .wi-delta {
   font-size: 0.72rem;
   font-weight: 700;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   padding: 0.05rem 0.35rem;
   border-radius: 0.3rem;
 }
@@ -4359,7 +4344,7 @@ polygon.gi-dag-pending {
   gap: 0.2rem;
 }
 .wi-op code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.72rem;
   color: #7fdca0;
 }
@@ -4379,7 +4364,7 @@ polygon.gi-dag-pending {
   line-height: 1.5;
 }
 .wi-formula-body code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   white-space: pre;
 }
 
@@ -4782,7 +4767,7 @@ polygon.gi-dag-pending {
   line-height: 1.5;
 }
 .rl-code code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   white-space: pre;
 }
 
@@ -4914,7 +4899,7 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .rl-seal-hash {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   overflow-x: auto;
 }
@@ -5087,7 +5072,7 @@ polygon.gi-dag-pending {
 .ls-sheet th {
   background: var(--fuaran-color-surface, #f5f5f8);
   font-weight: 600;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.74rem;
 }
 .ls-num {
@@ -5130,7 +5115,7 @@ polygon.gi-dag-pending {
 .ls-step-name {
   font-weight: 700;
   font-size: 0.82rem;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
 }
 .ls-step-formula {
   font-size: 0.8rem;
@@ -5144,7 +5129,7 @@ polygon.gi-dag-pending {
 }
 .ls-threshold-label {
   font-size: 0.8rem;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .ls-slider {
@@ -5391,7 +5376,7 @@ polygon.gi-dag-pending {
 }
 .cf-guest-branch {
   font-size: 0.68rem;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   color: var(--fuaran-color-text-muted, #8a8a96);
 }
 .cf-guest-app {
@@ -5536,7 +5521,7 @@ polygon.gi-dag-pending {
 }
 .pb-latency {
   font-size: 0.78rem;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   color: #1f8a4c;
 }
 .pb-empty {
@@ -5587,7 +5572,7 @@ polygon.gi-dag-pending {
 }
 .pb-result-needs {
   font-size: 0.72rem;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   color: var(--fuaran-color-text-muted, #8a8a96);
 }
 
@@ -5669,67 +5654,11 @@ polygon.gi-dag-pending {
 }
 
 /* ============================================================================
- *  Fuaran brand – the loch / paper / ink palette + wordmark, from the Fuaran-UI
- *  Brand Assets. Defining the --fuaran-color-* tokens re-themes the whole site
- *  frame (nav, cards, every page's chrome); the rendered exhibit trees keep their
- *  own injected theme. Last :root wins by cascade order.
+ *  Fuaran brand – the palette tokens, lockup, and theme toggle now come from
+ *  the shared ../brand/fuaran-brand.css (imported before this file). Only the
+ *  showcase-specific chrome (egress badge, footer credit, landing lede)
+ *  remains here.
  * ========================================================================== */
-:root {
-  --fuaran-color-surface: #efe9dc; /* Paper – default background */
-  --fuaran-color-elevated: #fcfaf4; /* warm off-white – raised cards */
-  --fuaran-color-code-surface: #eae3d3; /* paper-deep – code blocks */
-  --fuaran-color-text: #1a2026; /* Ink */
-  --fuaran-color-text-muted: #55606b;
-  --fuaran-color-border: #dad2c0; /* warm paper-deep border */
-  --fuaran-color-brand: #1e4754; /* Loch deep – primary */
-  --fuaran-color-accent: #1e4754; /* Loch deep – active nav / accents */
-  --fuaran-color-critical: #b8442f;
-  --fuaran-color-success: #2e7d5b;
-}
-/* Light (paper) is the default; dark mode is the `.ds-dark` chrome tokens below +
-   the injected brandDarkTheme in App.fs (which re-colours the rendered exhibits so
-   their bare text stays legible). Toggle persists to localStorage; see App.fs. */
-
-/* ── the brand lockup in the shell header ── */
-.ds-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  text-decoration: none;
-  color: inherit;
-  padding-bottom: 0.25rem;
-}
-.ds-brand-mark {
-  width: 3rem;
-  height: 3rem;
-  display: block;
-}
-.ds-brand-word {
-  font-family: 'EB Garamond', Garamond, 'Times New Roman', serif;
-  font-style: italic;
-  font-weight: 500;
-  font-size: 2.25rem;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  color: var(--fuaran-color-brand, #1e4754);
-}
-/* The tagline sits on its own line beneath the logo (flex-basis 100% wraps it
-   under the .ds-topbar row) – mirrored from the docs-site masthead lockup. */
-.ds-brand-tagline {
-  flex-basis: 100%;
-  margin: 0;
-  font-family: ui-monospace, 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 0.74rem;
-  font-weight: 500;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--fuaran-color-text-muted, #55606b);
-}
-@media (max-width: 560px) {
-  .ds-brand-tagline {
-    display: none;
-  }
-}
 
 /* The landing intro lede above the headline – the shared "intro" treatment
    (muted, +size), matched to the playground's intro so both pages read alike.
@@ -5747,37 +5676,7 @@ polygon.gi-dag-pending {
   font-size: 0.76rem;
   line-height: 1.5;
   color: var(--fuaran-color-text-muted, #55606b);
-  font-family: ui-monospace, 'IBM Plex Mono', 'Courier New', monospace;
-}
-
-/* ── top bar: brand + theme toggle ── */
-.ds-topbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap; /* lets the tagline take its own row beneath the logo */
-  gap: 0.55rem 0.75rem;
-}
-.ds-topbar .ds-brand {
-  flex: 1;
-  min-width: 0;
-}
-.ds-theme-toggle {
-  flex: none;
-  width: 2.75rem;
-  height: 2.75rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: var(--ds-border);
-  border-radius: 0.6rem;
-  background: var(--fuaran-color-elevated, #fff);
-  color: var(--fuaran-color-brand, #1e4754);
-  font-size: 1.15rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.ds-theme-toggle:hover {
-  border-color: var(--fuaran-color-brand, #1e4754);
+  font-family: var(--ds-font-mono);
 }
 
 /* ── the persistent zero-egress badge (D5) ── */
@@ -5791,7 +5690,7 @@ polygon.gi-dag-pending {
   border-radius: 999px;
   background: color-mix(in srgb, var(--fuaran-color-success, #2e7d5b) 10%, transparent);
   color: var(--fuaran-color-success, #2e7d5b);
-  font-family: ui-monospace, 'IBM Plex Mono', 'Courier New', monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -5809,25 +5708,8 @@ polygon.gi-dag-pending {
   }
 }
 
-/* ── dark mode: the chrome tokens ride the .ds-dark class on <html> (App.fs), so
-      the body background outside the max-width shell darkens too. The rendered
-      exhibit trees flip via the injected brandDarkTheme (themeStyleElement). ── */
-.ds-dark {
-  --fuaran-color-surface: #0c1216; /* deepest – page ground */
-  --fuaran-color-elevated: #10171b; /* Dark surface – raised cards */
-  --fuaran-color-code-surface: #080d10;
-  --fuaran-color-text: #dce3e5;
-  --fuaran-color-text-muted: #93a2ab;
-  --fuaran-color-border: #26333b;
-  --fuaran-color-brand: #62a5be; /* Mist – mark/accent on dark */
-  --fuaran-color-accent: #62a5be;
-  --fuaran-color-critical: #e0725a;
-  --fuaran-color-success: #5fbf95;
-}
-/* lighten the loch mark toward mist on the dark surface */
-.ds-dark .ds-brand-mark {
-  filter: brightness(1.9) saturate(0.9);
-}
+/* (Dark chrome tokens + the dark mark now come from the shared brand layer:
+   .ds-dark flips the token set, and the mark swaps to the real Mist asset.) */
 
 /* ── Every Screen (Responsive.fs): one tree, three device widths, zero @media ── */
 .rw-page {
@@ -5865,7 +5747,7 @@ polygon.gi-dag-pending {
   font-weight: 600;
 }
 .rw-frame-w {
-  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono);
   color: var(--fuaran-color-text-muted, #5a6472);
   font-size: 0.85rem;
 }
@@ -5941,7 +5823,7 @@ polygon.gi-dag-pending {
   padding: 0.75rem;
   border-radius: 0.4rem;
   background: var(--fuaran-color-code-surface, #f4f2ea);
-  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   line-height: 1.5;
 }
@@ -6054,7 +5936,7 @@ polygon.gi-dag-pending {
   border-bottom: var(--ds-border);
 }
 .ev-prov {
-  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono);
   font-size: 0.82rem;
   color: var(--fuaran-color-text-muted, #5a6472);
 }
@@ -6225,7 +6107,7 @@ polygon.gi-dag-pending {
   padding: 0.75rem;
   border-radius: 0.4rem;
   background: var(--fuaran-color-code-surface, #f4f2ea);
-  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono);
   font-size: 0.76rem;
   line-height: 1.5;
 }
@@ -6322,7 +6204,7 @@ polygon.gi-dag-pending {
   font-weight: 600;
 }
 .wv-artefact-profile {
-  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   color: var(--fuaran-color-brand, #1e4754);
 }
@@ -6333,7 +6215,7 @@ polygon.gi-dag-pending {
   padding: 0.75rem;
   border-radius: 0.4rem;
   background: var(--fuaran-color-code-surface, #f4f2ea);
-  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono);
   font-size: 0.76rem;
   line-height: 1.5;
 }
@@ -6363,7 +6245,7 @@ polygon.gi-dag-pending {
   background: var(--fuaran-color-elevated, #fcfaf4);
 }
 .wv-host-profile {
-  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-family: var(--ds-font-mono);
   font-weight: 700;
 }
 .wv-badge {
@@ -6500,7 +6382,7 @@ polygon.gi-dag-pending {
 .ch-source .fuaran-grid-cell-editable {
   width: 5rem;
   text-align: right;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.82rem;
 }
 .ch-controls {
@@ -6588,7 +6470,7 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 .ch-hash {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.82rem;
   color: var(--fuaran-color-accent, #3358d4);
 }
@@ -6630,12 +6512,12 @@ polygon.gi-dag-pending {
   min-width: 2.2rem;
 }
 .ch-chain-op {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   color: #226844;
 }
 .ch-chain-hash {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.75rem;
   color: var(--fuaran-color-accent, #3358d4);
   margin-left: auto;
@@ -6703,7 +6585,7 @@ polygon.gi-dag-pending {
   gap: 0.7rem;
 }
 .tq-ask-id {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   background: var(--fuaran-color-surface, #f5f5f8);
   border-radius: 0.35rem;
@@ -6825,7 +6707,7 @@ polygon.gi-dag-pending {
 }
 .tq-refusal-code,
 .tq-refusal-path {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   font-weight: 700;
   background: var(--fuaran-color-surface, #f5f5f8);
@@ -6897,7 +6779,7 @@ polygon.gi-dag-pending {
   margin-bottom: 0.3rem;
 }
 .tq-ledger-kind {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--ds-accent);
@@ -7084,7 +6966,7 @@ polygon.gi-dag-pending {
   margin-bottom: 0.35rem;
 }
 .how-tool {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--ds-accent);
@@ -7115,7 +6997,7 @@ polygon.gi-dag-pending {
   gap: 0.5rem;
 }
 .how-refusal-code {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.8rem;
   font-weight: 700;
   background: var(--fuaran-color-surface, #f5f5f8);
@@ -7485,7 +7367,7 @@ polygon.gi-dag-pending {
   border: none;
   resize: vertical;
   padding: 0.75rem;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--ds-font-mono);
   font-size: 0.78rem;
   line-height: 1.45;
   background: var(--fuaran-color-elevated, #fff);
@@ -7672,7 +7554,7 @@ polygon.gi-dag-pending {
   padding: 0.12rem 0.4rem;
   font: inherit;
   font-size: 0.72rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--ds-font-mono);
   cursor: pointer;
 }
 .nv-crumb-on {

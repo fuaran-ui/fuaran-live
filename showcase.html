@@ -10,6 +10,22 @@
     />
     <title>fuaran-live – Fuaran showcase</title>
     <link rel="icon" type="image/svg+xml" href="brand/fuaran-favicon.svg" />
+    <!-- Pre-paint theme resolution: persisted choice -> OS preference. Sets the
+         .ds-dark chrome class before first paint so a dark-preference load never
+         flashes light. The Elmish toggle keeps ownership after boot. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('fuaran-theme');
+          var dark =
+            t === 'dark' ||
+            (t !== 'light' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('ds-dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <!-- The zero-egress showcase root. A separate entry (and Fable project)

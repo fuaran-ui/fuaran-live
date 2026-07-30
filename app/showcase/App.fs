@@ -40,6 +40,9 @@ importSideEffects "@fuaran-ui/renderer/css"
 // Ladder's script-less iframe rungs are untouched by design – that contrast IS
 // the demo (the no-JS rung now shows real MathML superscripts).
 importSideEffects "katex/dist/katex.min.css"
+// The shared brand design-system layer — MUST load after the reference CSS
+// (it re-binds the --fuaran-* contract) and before the shell CSS.
+importSideEffects "../brand/fuaran-brand.css"
 importSideEffects "./app.css"
 // The icon-contract glyph map, shared with the playground (one file, no copies).
 importSideEffects "../icon-glyphs.css"
@@ -150,9 +153,16 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                       prop.href "#/"
                       prop.children
                         [ Html.img
-                            [ prop.className "ds-brand-mark"
+                            [ prop.className "ds-brand-mark ds-brand-mark-light"
                               prop.src "brand/fuaran-mark.svg"
                               prop.alt "Fuaran" ]
+                          // The real Mist dark-mode mark; CSS display-toggles
+                          // the pair off the shared dark selectors.
+                          Html.img
+                            [ prop.className "ds-brand-mark ds-brand-mark-dark"
+                              prop.src "brand/fuaran-mark-mist.svg"
+                              prop.alt ""
+                              prop.ariaHidden true ]
                           Html.span [ prop.className "ds-brand-word"; prop.text "fuaran" ] ] ]
                   // The persistent zero-egress badge (D5). Present on every
                   // showcase route – the standing promise this whole origin

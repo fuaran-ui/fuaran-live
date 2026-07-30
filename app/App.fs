@@ -2083,16 +2083,30 @@ let private connectRow (model: Model) (dispatch: Msg -> unit) : ReactElement =
               prop.type' "password"
               prop.placeholder (providerLabel + " key · in-tab only")
               prop.onChange (fun (v: string) -> dispatch (SetKey v)) ]
-          // The frontier-only disclaimer: WHY lower tiers aren't offered. A
-          // Fuaran emission is a strict structured-output task, so the model
-          // quality difference is visible as refusals, not subtle degradation.
+          // The recommended-settings explainer: WHY only frontier tiers, and
+          // what each call already carries (measured posture + caching) so the
+          // visitor knows the knobs are set, not unset. The numbers behind
+          // every claim live on the published evaluation – link, don't quote.
           Html.p
             [ prop.className "pg-connect-note"
               prop.children
                 [ Html.strong [ prop.text "Why only frontier models? " ]
                   Html.span
                     [ prop.text
-                        "A Fuaran emission must be exactly-valid typed wire JSON – the decoder refuses anything malformed rather than guessing at it. Frontier models get it right in a turn or two; lower tiers spend your tokens in repair loops, so we don't offer them." ] ] ] ] ]
+                        "A Fuaran emission must be exactly-valid typed wire JSON – the decoder refuses anything malformed rather than guessing at it. Frontier models get it right in a turn or two; lower tiers spend your tokens in repair loops, so we offer one frontier model per provider and the choice is whose key, not which tier." ] ] ]
+          Html.p
+            [ prop.className "pg-connect-note"
+              prop.children
+                [ Html.strong [ prop.text "Settings are pre-tuned. " ]
+                  Html.span
+                    [ prop.text
+                        "Every call already carries the reasoning posture the evaluation measured as each model's best default for this task – low effort for Claude, GPT and Kimi (quality holds within a couple of points at a fraction of the deliberation cost and latency), the provider default for Gemini and Grok (reducing their thinking measurably hurts wire correctness). The ~15k-token system prompt is cached per provider – explicitly on Claude, automatically elsewhere – so steady-state turns bill a fraction of first-turn input. Nothing to configure; the receipts are on the " ]
+                  Html.a
+                    [ prop.href "https://fuaran-ui.io/evaluation"
+                      prop.target "_blank"
+                      prop.rel "noreferrer"
+                      prop.text "evaluation" ]
+                  Html.span [ prop.text " – measured, with provenance, per model." ] ] ] ] ]
 
 // ─── trust + spend panel (Phase 115) ─────────────────────────────────────────
 //

@@ -69,6 +69,33 @@ const cannedResponse: Record<string, string> = {
     ],
     usage: { prompt_tokens: 10, completion_tokens: 5 },
   }),
+  // xAI (Grok) is OpenAI-compatible on the wire shape, but reports reasoning
+  // tokens OUTSIDE completion_tokens (the eval's observed 62-vs-359 split):
+  // the parse must fold completion_tokens_details.reasoning_tokens back into
+  // OutTokens so the cost readout bills the provider's actual total. The
+  // canned usage below expects OutTokens = 2 + 3 = 5.
+  xai: JSON.stringify({
+    choices: [
+      {
+        message: {
+          content: 'hi',
+          tool_calls: [
+            {
+              id: 'tc',
+              type: 'function',
+              function: { name: 'getNodeState', arguments: '{"nodeId":"n1"}' },
+            },
+          ],
+        },
+        finish_reason: 'tool_calls',
+      },
+    ],
+    usage: {
+      prompt_tokens: 10,
+      completion_tokens: 2,
+      completion_tokens_details: { reasoning_tokens: 3 },
+    },
+  }),
   gemini: JSON.stringify({
     candidates: [
       {
@@ -88,7 +115,7 @@ const cannedResponse: Record<string, string> = {
 };
 
 describe('the multi-provider agentic response parse (shared JsonValue model)', () => {
-  for (const provider of ['anthropic', 'openai', 'gemini', 'kimi']) {
+  for (const provider of ['anthropic', 'openai', 'gemini', 'kimi', 'xai']) {
     it(`${provider}: parses text + tool_use blocks, stop reason, and usage`, () => {
       const r = parseAgenticResponseFlat(provider, cannedResponse[provider]);
       expect(r.Blocks).toBe(2);
@@ -148,6 +175,20 @@ describe('the multi-provider agentic request build (block → wire per provider)
     expect(body).toContain('tool_calls');
     expect(body).toContain('"tool_choice":"auto"');
     expect(body).toContain('"reasoning_effort":"low"');
+    expect(body).toContain('"max_tokens":1024');
+    expect(body).not.toContain('max_completion_tokens');
+    expect(body).not.toContain('prompt_cache_key');
+  });
+
+  it('xai is OpenAI-compatible at the measured provider-default posture', () => {
+    // The eval's fifth family: @low induces deep-nesting JSON slips on
+    // data-heavy emissions (tier-a-005 1/3 at low vs 3/3 at default), so —
+    // like Gemini — no effort field is sent. Implicit caching means no
+    // prompt_cache_key either; xAI documents `max_tokens`.
+    const body = agenticRequestBodyFlat('xai');
+    expect(body).toContain('tool_calls');
+    expect(body).toContain('"tool_choice":"auto"');
+    expect(body).not.toContain('reasoning_effort');
     expect(body).toContain('"max_tokens":1024');
     expect(body).not.toContain('max_completion_tokens');
     expect(body).not.toContain('prompt_cache_key');

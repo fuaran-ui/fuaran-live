@@ -16,7 +16,8 @@ module Fuaran.Live.Byok
 //  per call (never captured), held memory-only (never persisted).
 //
 //  All providers implement `SendAgentic` (multi-turn tool-use), so the
-//  self-debug loop is multi-provider – Claude, GPT, Gemini, and Kimi alike. The
+//  self-debug loop is multi-provider – Claude, GPT, Gemini, Kimi, and Grok
+//  alike. The
 //  ordered `AgentContentBlock` model (Ports.fs) is fuaran-live's richer
 //  projection over the shared flat `AIProviderResponse`; the per-provider
 //  block↔wire translation lives here (Anthropic content blocks; OpenAI
@@ -96,6 +97,9 @@ let GEMINI_ORIGIN = "https://generativelanguage.googleapis.com"
 [<Literal>]
 let KIMI_ORIGIN = "https://api.moonshot.ai"
 
+[<Literal>]
+let XAI_ORIGIN = "https://api.x.ai"
+
 // Frontier-only, one model per provider (operator decision 2026-07-15): lower
 // model tiers emit measurably worse wire JSON, so the picker offers exactly one
 // frontier model per provider – the choice is WHOSE key, not which tier.
@@ -115,6 +119,12 @@ let DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"
 // probe (pilot 5 addendum, 2026-07-21): base-40 one-shot 84.2% at low effort.
 [<Literal>]
 let DEFAULT_KIMI_MODEL = "kimi-k3"
+
+// xAI is Grok 4.5 – the eval's fifth family (smoke 2026-07-28; the 729
+// publication cohort ran it at provider-default posture: 12/12 decode-gate
+// parse across three repeats, 100% judged-correct on the fuaran arm).
+[<Literal>]
+let DEFAULT_GROK_MODEL = "grok-4.5"
 
 // ─── measured reasoning postures ─────────────────────────────────────────────
 //
@@ -143,6 +153,13 @@ let private openAiPostureFields: (string * JsonValue) list =
 let private kimiPostureFields: (string * JsonValue) list =
   [ "reasoning_effort", jstr "low" ]
 
+// Grok deliberately sends NO reasoning-effort field: like Gemini, its measured
+// recommended posture is the provider default. The low-effort shakedown
+// (2026-07-28) found @low induces repeatable deep-nesting JSON slips on
+// emissions with large embedded data payloads (tier-a-005: 1/3 parse at low vs
+// 3/3 at default); the 729 cohort ran @default and parsed 12/12.
+let private grokPostureFields: (string * JsonValue) list = []
+
 // ─── prompt caching (cost posture) ───────────────────────────────────────────
 //
 // The system prompt is the full drift-checked prompt pack (~15k tokens), so
@@ -162,6 +179,10 @@ let private kimiPostureFields: (string * JsonValue) list =
 // - Kimi (Moonshot): AUTOMATIC – repeated prefixes bill at the cached-input
 //   rate with no request field to set; `prompt_cache_key` is an OpenAI-specific
 //   routing hint and is not sent to Moonshot.
+// - Grok (xAI): AUTOMATIC/IMPLICIT with no request field – the eval smoke
+//   observed the cache warming ASYNCHRONOUSLY (the first turn bills near-full
+//   input; turns minutes later hit ~15.7k cached tokens on the shared prefix).
+//   `prompt_cache_key` is not sent.
 
 /// The Anthropic `system` field as a content-block array with the ephemeral
 /// cache breakpoint (a bare string cannot carry `cache_control`).
@@ -190,7 +211,12 @@ let private modelPricing: (string * float * float) list =
     DEFAULT_GEMINI_MODEL, 1.50, 9.0
     // Kimi K3 – confirmed 2026-07-16 from the official per-model pricing page
     // (platform.kimi.ai; single tier, 1M context).
-    DEFAULT_KIMI_MODEL, 3.0, 15.0 ]
+    DEFAULT_KIMI_MODEL, 3.0, 15.0
+    // Grok 4.5 – docs.x.ai/docs/models, retrieved 2026-07-30 (matches the
+    // eval's Pricing.fs entry). Output figure is the billed total: xAI counts
+    // reasoning tokens in the bill, and the usage normalisation below folds
+    // them into OutputTokens so this rate applies to the right number.
+    DEFAULT_GROK_MODEL, 2.0, 6.0 ]
 
 /// Approximate USD cost of a token mix against the indicative price table, or
 /// None for a model the table doesn't know (the readout then shows tokens only).
@@ -533,18 +559,39 @@ type private OpenAiCompatibleConfig =
     MaxTokensField: string
     /// The measured posture + cache fields appended to every request body.
     ExtraFields: (string * JsonValue) list
+    /// Whether `usage.completion_tokens` already includes reasoning tokens.
+    /// OpenAI and Moonshot: yes. xAI: NO – reasoning tokens ride
+    /// `completion_tokens_details.reasoning_tokens` OUTSIDE the completion
+    /// count (observed 62 completion vs 359 reasoning on one cell), so the
+    /// usage parse folds them back in or the cost readout under-bills.
+    OutputTokensIncludeReasoning: bool
   }
 
-let private openAiUsage (json: JsonValue) : ProviderUsage option =
+let private openAiUsageWith (includeReasoning: bool) (json: JsonValue) : ProviderUsage option =
   match JsonValue.tryField "usage" json with
   | Some usage ->
     match
       usage |> JsonValue.tryField "prompt_tokens" |> Option.bind JsonValue.asInt,
       usage |> JsonValue.tryField "completion_tokens" |> Option.bind JsonValue.asInt
     with
-    | Some i, Some o -> Some { InputTokens = i; OutputTokens = o }
+    | Some i, Some o ->
+      let reasoningOutside =
+        if includeReasoning then
+          0
+        else
+          usage
+          |> JsonValue.tryField "completion_tokens_details"
+          |> Option.bind (JsonValue.tryField "reasoning_tokens")
+          |> Option.bind JsonValue.asInt
+          |> Option.defaultValue 0
+
+      Some
+        { InputTokens = i
+          OutputTokens = o + reasoningOutside }
     | _ -> None
   | None -> None
+
+let private openAiUsage (json: JsonValue) : ProviderUsage option = openAiUsageWith true json
 
 let private openAiFirstMessage (json: JsonValue) : JsonValue option =
   json
@@ -723,7 +770,8 @@ let private createOpenAiCompatibleProvider
 
             match! postJson (cfg.Origin + "/v1/chat/completions") [ "authorization", "Bearer " + key ] body with
             | Result.Error e -> return ProviderOutcome.Error e
-            | Result.Ok json -> return ProviderOutcome.Ok(openAiText json, openAiUsage json)
+            | Result.Ok json ->
+              return ProviderOutcome.Ok(openAiText json, openAiUsageWith cfg.OutputTokensIncludeReasoning json)
           })
 
       member _.SendAgentic(request) =
@@ -739,7 +787,13 @@ let private createOpenAiCompatibleProvider
                 (openAiCompatibleAgenticBody cfg request)
             with
             | Result.Error e -> return AgentOutcome.Error e
-            | Result.Ok json -> return AgentOutcome.Ok(openAiBlocks json, openAiStop json, openAiUsage json)
+            | Result.Ok json ->
+              return
+                AgentOutcome.Ok(
+                  openAiBlocks json,
+                  openAiStop json,
+                  openAiUsageWith cfg.OutputTokensIncludeReasoning json
+                )
         } }
 
 let private openAiConfig: OpenAiCompatibleConfig =
@@ -748,7 +802,8 @@ let private openAiConfig: OpenAiCompatibleConfig =
     DefaultModel = DEFAULT_OPENAI_MODEL
     Origin = OPENAI_ORIGIN
     MaxTokensField = "max_completion_tokens"
-    ExtraFields = openAiPostureFields @ openAiCacheFields }
+    ExtraFields = openAiPostureFields @ openAiCacheFields
+    OutputTokensIncludeReasoning = true }
 
 /// Moonshot (Kimi) – OpenAI-compatible per its migration guide (endpoint + key
 /// convention confirmed 2026-07-16 from platform.kimi.ai docs, via the eval
@@ -760,10 +815,30 @@ let private kimiConfig: OpenAiCompatibleConfig =
     DefaultModel = DEFAULT_KIMI_MODEL
     Origin = KIMI_ORIGIN
     MaxTokensField = "max_tokens"
-    ExtraFields = kimiPostureFields }
+    ExtraFields = kimiPostureFields
+    OutputTokensIncludeReasoning = true }
+
+/// xAI (Grok) – OpenAI-compatible chat completions. No posture fields (the
+/// measured recommendation is the provider default – see grokPostureFields);
+/// no cache fields (implicit caching, no request knob); and CRUCIALLY
+/// `OutputTokensIncludeReasoning = false`: xAI bills reasoning tokens but
+/// reports them OUTSIDE `completion_tokens`, so the usage parse folds
+/// `completion_tokens_details.reasoning_tokens` back in to keep the cost
+/// readout honest (the eval seam's same normalisation).
+let private xaiConfig: OpenAiCompatibleConfig =
+  { Id = "xai"
+    Label = "Grok (xAI)"
+    DefaultModel = DEFAULT_GROK_MODEL
+    Origin = XAI_ORIGIN
+    MaxTokensField = "max_tokens"
+    ExtraFields = grokPostureFields
+    OutputTokensIncludeReasoning = false }
 
 let createOpenAIProvider: (unit -> string option) -> IAgenticProvider =
   createOpenAiCompatibleProvider openAiConfig
+
+let createGrokProvider: (unit -> string option) -> IAgenticProvider =
+  createOpenAiCompatibleProvider xaiConfig
 
 let createKimiProvider: (unit -> string option) -> IAgenticProvider =
   createOpenAiCompatibleProvider kimiConfig
@@ -1046,7 +1121,17 @@ let providers: ProviderDescriptor list =
             Frontier = true } ]
       Origin = KIMI_ORIGIN
       Create = (fun getKey -> createKimiProvider getKey :> IAIProvider)
-      CreateAgentic = Some createKimiProvider } ]
+      CreateAgentic = Some createKimiProvider }
+    { Id = "xai"
+      Label = "Grok (xAI)"
+      DefaultModel = DEFAULT_GROK_MODEL
+      Models =
+        [ { Id = DEFAULT_GROK_MODEL
+            Label = "Grok 4.5"
+            Frontier = true } ]
+      Origin = XAI_ORIGIN
+      Create = (fun getKey -> createGrokProvider getKey :> IAIProvider)
+      CreateAgentic = Some createGrokProvider } ]
 
 [<Literal>]
 let defaultProviderId = "anthropic"
@@ -1099,6 +1184,7 @@ let agenticRequestBodyFlat (providerId: string) : string =
   match providerId with
   | "openai" -> JsonHost.serialize (openAiCompatibleAgenticBody openAiConfig request)
   | "kimi" -> JsonHost.serialize (openAiCompatibleAgenticBody kimiConfig request)
+  | "xai" -> JsonHost.serialize (openAiCompatibleAgenticBody xaiConfig request)
   | "gemini" -> JsonHost.serialize (geminiAgenticBody request)
   | _ -> JsonHost.serialize (anthropicAgenticBody request)
 
@@ -1121,6 +1207,7 @@ let parseAgenticResponseFlat
     match providerId with
     | "openai"
     | "kimi" -> openAiBlocks json, openAiStop json, openAiUsage json
+    | "xai" -> openAiBlocks json, openAiStop json, openAiUsageWith false json
     | "gemini" -> geminiBlocks json, geminiStop json, geminiUsage json
     | _ -> anthropicBlocks json, anthropicStop json, anthropicUsage json
 

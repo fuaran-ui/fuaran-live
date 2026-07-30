@@ -327,11 +327,11 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
   let tree = session.Tree
   let stored, setStored = React.useState (None: NavCursor option)
 
-  // The accessibility lens (Phase 717). One flag: when it is on, the card's
-  // property panel is replaced by `A11yWalk.panel` and the walk gains
-  // flag-order navigation. The lens is a self-contained module — everything
-  // this pane knows about it is this boolean and the four call sites below.
-  let a11yLens, setA11yLens = React.useState false
+  // The accessibility lens (Phase 717) is RETIRED from this pane (operator
+  // decision 2026-07-30, alongside the keyboard suspension — its flag-order
+  // walk was keyboard-driven). `A11yWalk` still provides the card's passive
+  // finding badge; the toggle, the audit panel, and `f`/`F` flag stepping are
+  // no longer mounted. The module keeps them for the showcase's demo walk.
 
   // The structural editor (Phase 713). Five pieces of local state, and only one
   // of them survives a cursor move: `held` — carrying a node while you walk to
@@ -515,18 +515,6 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
     setPaletteOpen false
     setStructuralError None
 
-  // Flag-order navigation (Phase 717). The lens answers "which node is flagged
-  // next" in the walk's own order; jumping there is the cursor's business, so
-  // the two stay on their own sides of the seam. No further flag is a no-op —
-  // the same stop-do-not-wrap rule the plain walk follows.
-  let moveFlag (pick: Node<obj> -> string -> string option) =
-    match tree, cursor with
-    | Some root, Some c ->
-      match pick root (focusedText c) with
-      | Some id -> setStored (Some(jumpTo root c (NodeId id)))
-      | None -> ()
-    | _ -> ()
-
   // Undo/redo rebuild the session by REPLAY (see `OpLog`) and hand the result
   // back through `onEdit`, the same channel a property commit uses — so every
   // other pane follows a time-step exactly as it follows an edit, and the
@@ -595,19 +583,8 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
          | None -> ())
 
         true
-      // Phase 717 — the lens and its flag-order walk. `a` toggles the audit;
-      // `f` / `F` step the findings rather than the tree, so a long tree audits
-      // in flag order instead of DFS order.
-      | "a"
-      | "A" ->
-        setA11yLens (not a11yLens)
-        true
-      | "f" ->
-        moveFlag A11yWalk.nextFlaggedId
-        true
-      | "F" ->
-        moveFlag A11yWalk.prevFlaggedId
-        true
+      // (The Phase 717 lens bindings — `a` toggle, `f`/`F` flag stepping —
+      // were retired with the lens itself, 2026-07-30.)
       // Phase 713 — the structural gestures. `Delete` arms on the first press
       // and commits on the second: a subtree removal is the one edit here whose
       // undo, though real, costs the user a moment of alarm, and an in-UI
@@ -719,10 +696,7 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
                           // the plain walk still reports what it passes.
                           A11yWalk.badge root node ] ]
                   Html.pre [ prop.className "fl-code fl-nav-props"; prop.text (propSummary node) ]
-                  (if a11yLens then
-                     A11yWalk.panel session root node onEdit
-                   else
-                     PropertyPanel session node onEdit) ] ]
+                  PropertyPanel session node onEdit ] ]
 
       // ── the structural panel (Phase 713) ──────────────────────────────────
       //
@@ -887,14 +861,7 @@ adds a ReorderChildren naming every sibling."
 
       Html.div
         [ prop.className "fl-nav-body"
-          prop.children
-            [ stepRow
-              crumbs
-              card
-              structuralPanel
-              // Phase 717 — the lens toggle + the walk's audit summary.
-              A11yWalk.toggle tree a11yLens (fun () -> setA11yLens (not a11yLens))
-              historyControls ] ]
+          prop.children [ stepRow; crumbs; card; structuralPanel; historyControls ] ]
     | _ -> emptyState
 
   // Keyboard navigation SUSPENDED (operator decision 2026-07-30). The

@@ -1,0 +1,587 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   fuaran-brand.css — the Fuaran brand design-system artefact.
+
+   CANONICAL COPY: fuaran-live/public/brand/fuaran-brand.css
+   Byte-copied (with ./fonts/ and the mark SVGs) into consuming repos:
+     - fuaran-ui-site/content/public/brand/   (fuaran-ui.io)
+   Parity is CI-checked from the consumer side. Edit ONLY the canonical copy.
+
+   Load order contract: this file loads AFTER the reference stylesheet
+   (fuaran-reference.css / @fuaran-ui/renderer/css), which it re-binds and
+   never edits, and BEFORE any site-specific shell CSS.
+
+   Layers:
+     1. @font-face            (self-hosted WOFF2, ./fonts/, OFL — see OFL.txt)
+     2. Brand tokens          (--fuaran-color-*, --ds-*, type/space/radius)
+     3. Light re-bind         (the full --fuaran-* reference contract)
+     4. Dark re-bind          (:root[data-theme="dark"], :root.ds-dark)
+     5. Brand components      (.ds-topbar / .ds-brand / .ds-theme-toggle)
+     6. Code + highlight theme (.hljs-* — inert until a host loads hljs)
+
+   Dark switching: the dual selector serves both estate mechanisms —
+   fuaran-ui.io sets data-theme="dark" on <html>; fuaran-live sets .ds-dark.
+   Both persist under the shared localStorage key `fuaran-theme`.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1. Fonts ─────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/eb-garamond-500-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+}
+
+/* ─── 2. Brand tokens ──────────────────────────────────────────────────────
+   The raw palette (Brand Assets README canon + the working values the estate
+   converged on):
+     Loch deep #1E4754 · Loch #357588 · Mist #62A5BE · Ink #1A2026
+     Paper #EFE9DC · Paper deep #E4DCC9 · Dark surface #10171B · Peat #7A5236
+     Working: elevated #FCFAF4 · panel #EAE3D3 · muted #55606B / #93A2AB
+     line #DAD2C0 / #26333B · dark bg #0C1216 · dark ink #DCE3E5
+     code surface #16232B (deep loch — code panes are dark in BOTH themes)
+   The semantic layer below flips between modes; shells consume it, never raw
+   hex. Names continue the --fuaran-color-* vocabulary the live surfaces
+   already use. */
+
+:root {
+  --fuaran-color-surface: #efe9dc;        /* page ground (Paper)             */
+  --fuaran-color-elevated: #fcfaf4;       /* raised panes                    */
+  --fuaran-color-panel: #eae3d3;          /* inset panes, inline-code pills  */
+  --fuaran-color-text: #1a2026;           /* Ink                             */
+  --fuaran-color-text-muted: #55606b;
+  --fuaran-color-border: #dad2c0;
+  --fuaran-color-brand: #1e4754;          /* Loch deep — wordmark, accents   */
+  --fuaran-color-accent: #1e4754;
+  --fuaran-color-accent-ink: #fcfaf4;     /* text ON the accent              */
+  --fuaran-color-critical: #b8442f;
+  --fuaran-color-success: #2e7d5b;
+  --fuaran-color-code-surface: #16232b;   /* deep loch — both themes         */
+  --fuaran-color-code-text: #dce3e5;
+
+  /* Layout + type scale (shell-level; the reference sheet's component scales
+     are separate and unchanged) */
+  --ds-max-width: 96rem;
+  --ds-measure: 70ch;
+  --ds-gutter: clamp(1rem, 3vw, 2rem);
+  --ds-border: 1px solid var(--fuaran-color-border);
+  --ds-accent: var(--fuaran-color-accent);
+  --ds-radius-sm: 0.35rem;
+  --ds-radius-md: 0.5rem;
+  --ds-radius-lg: 0.75rem;
+  --ds-transition: 0.12s ease;
+
+  --ds-font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ds-font-serif: 'EB Garamond', Garamond, 'Times New Roman', serif;
+  --ds-font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo,
+    Consolas, monospace;
+}
+
+/* ─── 3. Light re-bind of the reference contract ───────────────────────────
+   The reference sheet ships deliberately generic (blue/grey) defaults; the
+   brand re-binds the complete contract (HOST-STYLING-CHECKLIST §1): 7×3 tone
+   palette, the 7×4×3 interaction matrix, focus-ring globals, and the
+   fallback-only tokens (code, shadows, modal/toast, mono font). Static hex
+   throughout — the sheet's no-color-mix policy (cascade-consistent across
+   browsers). Spacing / text-scale / radius keep the reference values:
+   density is deliberately theme-independent. */
+
+:root {
+  /* 3.1 Tone palette (idle) */
+  --fuaran-tone-default-bg: #fcfaf4;
+  --fuaran-tone-default-fg: #1a2026;
+  --fuaran-tone-default-border: #dad2c0;
+  --fuaran-tone-subdued-bg: #eae3d3;
+  --fuaran-tone-subdued-fg: #55606b;
+  --fuaran-tone-subdued-border: #cfc5ae;
+  --fuaran-tone-brand-bg: #e2ecee;
+  --fuaran-tone-brand-fg: #1e4754;
+  --fuaran-tone-brand-border: #9dc0cc;
+  --fuaran-tone-success-bg: #e2f0e8;
+  --fuaran-tone-success-fg: #2e7d5b;
+  --fuaran-tone-success-border: #93c9ae;
+  --fuaran-tone-warning-bg: #f7eed9;
+  --fuaran-tone-warning-fg: #8a5f16;
+  --fuaran-tone-warning-border: #ddbe6f;
+  --fuaran-tone-critical-bg: #f4e4de;
+  --fuaran-tone-critical-fg: #b8442f;
+  --fuaran-tone-critical-border: #de9a87;
+  --fuaran-tone-info-bg: #e4eff2;
+  --fuaran-tone-info-fg: #357588;
+  --fuaran-tone-info-border: #a3c8d2;
+
+  /* 3.2 Interaction matrix — hover (one step deeper into the tone) */
+  --fuaran-tone-default-hover-bg: #f3eee1;
+  --fuaran-tone-default-hover-fg: #10151a;
+  --fuaran-tone-default-hover-border: #cfc5ae;
+  --fuaran-tone-subdued-hover-bg: #e0d7c2;
+  --fuaran-tone-subdued-hover-fg: #444e58;
+  --fuaran-tone-subdued-hover-border: #c4b89c;
+  --fuaran-tone-brand-hover-bg: #d3e2e6;
+  --fuaran-tone-brand-hover-fg: #183a45;
+  --fuaran-tone-brand-hover-border: #7fb3c4;
+  --fuaran-tone-success-hover-bg: #d2e8dc;
+  --fuaran-tone-success-hover-fg: #256a4c;
+  --fuaran-tone-success-hover-border: #6fba93;
+  --fuaran-tone-warning-hover-bg: #f1e4c3;
+  --fuaran-tone-warning-hover-fg: #745010;
+  --fuaran-tone-warning-hover-border: #d3ae4e;
+  --fuaran-tone-critical-hover-bg: #eed6cd;
+  --fuaran-tone-critical-hover-fg: #a03a27;
+  --fuaran-tone-critical-hover-border: #d57f66;
+  --fuaran-tone-info-hover-bg: #d6e6eb;
+  --fuaran-tone-info-hover-fg: #2c6172;
+  --fuaran-tone-info-hover-border: #86b7c6;
+
+  /* focus — surface stays put; the ring is the affordance; borders take the
+     brand focus accent */
+  --fuaran-tone-default-focus-bg: #fcfaf4;
+  --fuaran-tone-default-focus-fg: #1a2026;
+  --fuaran-tone-default-focus-border: #62a5be;
+  --fuaran-tone-subdued-focus-bg: #eae3d3;
+  --fuaran-tone-subdued-focus-fg: #55606b;
+  --fuaran-tone-subdued-focus-border: #62a5be;
+  --fuaran-tone-brand-focus-bg: #e2ecee;
+  --fuaran-tone-brand-focus-fg: #1e4754;
+  --fuaran-tone-brand-focus-border: #62a5be;
+  --fuaran-tone-success-focus-bg: #e2f0e8;
+  --fuaran-tone-success-focus-fg: #2e7d5b;
+  --fuaran-tone-success-focus-border: #62a5be;
+  --fuaran-tone-warning-focus-bg: #f7eed9;
+  --fuaran-tone-warning-focus-fg: #8a5f16;
+  --fuaran-tone-warning-focus-border: #62a5be;
+  --fuaran-tone-critical-focus-bg: #f4e4de;
+  --fuaran-tone-critical-focus-fg: #b8442f;
+  --fuaran-tone-critical-focus-border: #62a5be;
+  --fuaran-tone-info-focus-bg: #e4eff2;
+  --fuaran-tone-info-focus-fg: #357588;
+  --fuaran-tone-info-focus-border: #62a5be;
+
+  /* active — deeper than hover */
+  --fuaran-tone-default-active-bg: #eae3d3;
+  --fuaran-tone-default-active-fg: #10151a;
+  --fuaran-tone-default-active-border: #c4b89c;
+  --fuaran-tone-subdued-active-bg: #d6cbb1;
+  --fuaran-tone-subdued-active-fg: #39424b;
+  --fuaran-tone-subdued-active-border: #b9ab8b;
+  --fuaran-tone-brand-active-bg: #c2d7dd;
+  --fuaran-tone-brand-active-fg: #132e37;
+  --fuaran-tone-brand-active-border: #62a5be;
+  --fuaran-tone-success-active-bg: #c0dece;
+  --fuaran-tone-success-active-fg: #1d573e;
+  --fuaran-tone-success-active-border: #4fab7c;
+  --fuaran-tone-warning-active-bg: #ead8ab;
+  --fuaran-tone-warning-active-fg: #5e410d;
+  --fuaran-tone-warning-active-border: #c69d33;
+  --fuaran-tone-critical-active-bg: #e7c6ba;
+  --fuaran-tone-critical-active-fg: #88301f;
+  --fuaran-tone-critical-active-border: #cb6a4d;
+  --fuaran-tone-info-active-bg: #c6dbe2;
+  --fuaran-tone-info-active-fg: #234e5c;
+  --fuaran-tone-info-active-border: #69a6b9;
+
+  /* disabled — every tone drains to the warm subdued set */
+  --fuaran-tone-default-disabled-bg: #eae3d3;
+  --fuaran-tone-default-disabled-fg: #8a939b;
+  --fuaran-tone-default-disabled-border: #dad2c0;
+  --fuaran-tone-subdued-disabled-bg: #eae3d3;
+  --fuaran-tone-subdued-disabled-fg: #8a939b;
+  --fuaran-tone-subdued-disabled-border: #dad2c0;
+  --fuaran-tone-brand-disabled-bg: #eae3d3;
+  --fuaran-tone-brand-disabled-fg: #8a939b;
+  --fuaran-tone-brand-disabled-border: #dad2c0;
+  --fuaran-tone-success-disabled-bg: #eae3d3;
+  --fuaran-tone-success-disabled-fg: #8a939b;
+  --fuaran-tone-success-disabled-border: #dad2c0;
+  --fuaran-tone-warning-disabled-bg: #eae3d3;
+  --fuaran-tone-warning-disabled-fg: #8a939b;
+  --fuaran-tone-warning-disabled-border: #dad2c0;
+  --fuaran-tone-critical-disabled-bg: #eae3d3;
+  --fuaran-tone-critical-disabled-fg: #8a939b;
+  --fuaran-tone-critical-disabled-border: #dad2c0;
+  --fuaran-tone-info-disabled-bg: #eae3d3;
+  --fuaran-tone-info-disabled-fg: #8a939b;
+  --fuaran-tone-info-disabled-border: #dad2c0;
+
+  /* 3.3 Focus ring — Mist in both themes (visible on paper AND dark) */
+  --fuaran-focus-ring-color: #62a5be;
+  --fuaran-focus-ring-width: 2px;
+  --fuaran-focus-ring-offset: 2px;
+  --fuaran-focus-ring-style: solid;
+
+  /* 3.4 Fallback-only tokens the sheet reads but never declares.
+     Code panes are DEEP LOCH in both themes — a brand decision (was a
+     foreign #1e1e2e). */
+  --fuaran-font-mono: var(--ds-font-mono);
+  --fuaran-code-bg: #16232b;
+  --fuaran-code-fg: #dce3e5;
+  --fuaran-code-copy-bg: #24333c;
+  --fuaran-code-copy-border: #33434e;
+  --fuaran-avatar-size: 40px;
+  --fuaran-disclosure-summary-padding: var(--fuaran-space-md, 12px)
+    var(--fuaran-space-lg, 16px);
+  --fuaran-modal-backdrop: rgba(12, 18, 22, 0.55);
+  --fuaran-modal-max-width: 560px;
+  --fuaran-toast-max-width: 360px;
+  --fuaran-shadow-lg: 0 10px 15px -3px rgba(26, 32, 38, 0.12);
+  --fuaran-shadow-xl: 0 20px 25px -5px rgba(26, 32, 38, 0.14);
+  --fuaran-z-modal: 1000;
+  --fuaran-z-toast: 1100;
+  /* Tab + segmented tokens are DERIVED from tone vars in the reference
+     :root, so the re-binds above propagate to them automatically. */
+}
+
+/* ─── 4. Dark re-bind ────────────────────────────────────────────────────── */
+
+:root[data-theme='dark'],
+:root.ds-dark {
+  color-scheme: dark;
+
+  --fuaran-color-surface: #0c1216;
+  --fuaran-color-elevated: #10171b;
+  --fuaran-color-panel: #18222a;
+  --fuaran-color-text: #dce3e5;
+  --fuaran-color-text-muted: #93a2ab;
+  --fuaran-color-border: #26333b;
+  --fuaran-color-brand: #62a5be;          /* Mist                            */
+  --fuaran-color-accent: #62a5be;
+  --fuaran-color-accent-ink: #0c1216;
+  --fuaran-color-critical: #e0725a;
+  --fuaran-color-success: #5fbf95;
+  --fuaran-color-code-surface: #080d10;
+  --fuaran-color-code-text: #dce3e5;
+
+  /* Tone palette (idle) — the Brand.fs dark Theme canon */
+  --fuaran-tone-default-bg: #10171b;
+  --fuaran-tone-default-fg: #dce3e5;
+  --fuaran-tone-default-border: #26333b;
+  --fuaran-tone-subdued-bg: #18222a;
+  --fuaran-tone-subdued-fg: #93a2ab;
+  --fuaran-tone-subdued-border: #2e3d47;
+  --fuaran-tone-brand-bg: #163039;
+  --fuaran-tone-brand-fg: #9fd6e8;
+  --fuaran-tone-brand-border: #62a5be;
+  --fuaran-tone-success-bg: #123a2c;
+  --fuaran-tone-success-fg: #6fcea7;
+  --fuaran-tone-success-border: #2e9d75;
+  --fuaran-tone-warning-bg: #3d2f12;
+  --fuaran-tone-warning-fg: #e6c25a;
+  --fuaran-tone-warning-border: #b8922e;
+  --fuaran-tone-critical-bg: #3a1712;
+  --fuaran-tone-critical-fg: #f0a99c;
+  --fuaran-tone-critical-border: #cf6350;
+  --fuaran-tone-info-bg: #163039;
+  --fuaran-tone-info-fg: #9fd6e8;
+  --fuaran-tone-info-border: #62a5be;
+
+  /* Interaction matrix — dark states lift TOWARD visibility (lighter), the
+     inverse of light mode's deepening. This block is the fix for the
+     dark-hover bug: pre-brand-file, dark surfaces held the sheet's light
+     hover values and flashed light grey. */
+  --fuaran-tone-default-hover-bg: #18222a;
+  --fuaran-tone-default-hover-fg: #ecf1f3;
+  --fuaran-tone-default-hover-border: #33434e;
+  --fuaran-tone-subdued-hover-bg: #1e2b34;
+  --fuaran-tone-subdued-hover-fg: #a6b3bb;
+  --fuaran-tone-subdued-hover-border: #3a4c58;
+  --fuaran-tone-brand-hover-bg: #1b3a45;
+  --fuaran-tone-brand-hover-fg: #b5e1ef;
+  --fuaran-tone-brand-hover-border: #7bb5cb;
+  --fuaran-tone-success-hover-bg: #164635;
+  --fuaran-tone-success-hover-fg: #84d7b4;
+  --fuaran-tone-success-hover-border: #38b085;
+  --fuaran-tone-warning-hover-bg: #493917;
+  --fuaran-tone-warning-hover-fg: #ebcd74;
+  --fuaran-tone-warning-hover-border: #c7a13c;
+  --fuaran-tone-critical-hover-bg: #461d16;
+  --fuaran-tone-critical-hover-fg: #f3b9ae;
+  --fuaran-tone-critical-hover-border: #d97964;
+  --fuaran-tone-info-hover-bg: #1b3a45;
+  --fuaran-tone-info-hover-fg: #b5e1ef;
+  --fuaran-tone-info-hover-border: #7bb5cb;
+
+  --fuaran-tone-default-focus-bg: #10171b;
+  --fuaran-tone-default-focus-fg: #dce3e5;
+  --fuaran-tone-default-focus-border: #62a5be;
+  --fuaran-tone-subdued-focus-bg: #18222a;
+  --fuaran-tone-subdued-focus-fg: #93a2ab;
+  --fuaran-tone-subdued-focus-border: #62a5be;
+  --fuaran-tone-brand-focus-bg: #163039;
+  --fuaran-tone-brand-focus-fg: #9fd6e8;
+  --fuaran-tone-brand-focus-border: #62a5be;
+  --fuaran-tone-success-focus-bg: #123a2c;
+  --fuaran-tone-success-focus-fg: #6fcea7;
+  --fuaran-tone-success-focus-border: #62a5be;
+  --fuaran-tone-warning-focus-bg: #3d2f12;
+  --fuaran-tone-warning-focus-fg: #e6c25a;
+  --fuaran-tone-warning-focus-border: #62a5be;
+  --fuaran-tone-critical-focus-bg: #3a1712;
+  --fuaran-tone-critical-focus-fg: #f0a99c;
+  --fuaran-tone-critical-focus-border: #62a5be;
+  --fuaran-tone-info-focus-bg: #163039;
+  --fuaran-tone-info-focus-fg: #9fd6e8;
+  --fuaran-tone-info-focus-border: #62a5be;
+
+  --fuaran-tone-default-active-bg: #1e2b34;
+  --fuaran-tone-default-active-fg: #f4f7f8;
+  --fuaran-tone-default-active-border: #3e5260;
+  --fuaran-tone-subdued-active-bg: #24343f;
+  --fuaran-tone-subdued-active-fg: #b9c4ca;
+  --fuaran-tone-subdued-active-border: #465b69;
+  --fuaran-tone-brand-active-bg: #214551;
+  --fuaran-tone-brand-active-fg: #cbeaf4;
+  --fuaran-tone-brand-active-border: #93c4d7;
+  --fuaran-tone-success-active-bg: #1a533e;
+  --fuaran-tone-success-active-fg: #99dfc1;
+  --fuaran-tone-success-active-border: #43c295;
+  --fuaran-tone-warning-active-bg: #55431c;
+  --fuaran-tone-warning-active-fg: #f0d78e;
+  --fuaran-tone-warning-active-border: #d5b04b;
+  --fuaran-tone-critical-active-bg: #52231a;
+  --fuaran-tone-critical-active-fg: #f6c9c0;
+  --fuaran-tone-critical-active-border: #e28f78;
+  --fuaran-tone-info-active-bg: #214551;
+  --fuaran-tone-info-active-fg: #cbeaf4;
+  --fuaran-tone-info-active-border: #93c4d7;
+
+  --fuaran-tone-default-disabled-bg: #18222a;
+  --fuaran-tone-default-disabled-fg: #6e7b84;
+  --fuaran-tone-default-disabled-border: #26333b;
+  --fuaran-tone-subdued-disabled-bg: #18222a;
+  --fuaran-tone-subdued-disabled-fg: #6e7b84;
+  --fuaran-tone-subdued-disabled-border: #26333b;
+  --fuaran-tone-brand-disabled-bg: #18222a;
+  --fuaran-tone-brand-disabled-fg: #6e7b84;
+  --fuaran-tone-brand-disabled-border: #26333b;
+  --fuaran-tone-success-disabled-bg: #18222a;
+  --fuaran-tone-success-disabled-fg: #6e7b84;
+  --fuaran-tone-success-disabled-border: #26333b;
+  --fuaran-tone-warning-disabled-bg: #18222a;
+  --fuaran-tone-warning-disabled-fg: #6e7b84;
+  --fuaran-tone-warning-disabled-border: #26333b;
+  --fuaran-tone-critical-disabled-bg: #18222a;
+  --fuaran-tone-critical-disabled-fg: #6e7b84;
+  --fuaran-tone-critical-disabled-border: #26333b;
+  --fuaran-tone-info-disabled-bg: #18222a;
+  --fuaran-tone-info-disabled-fg: #6e7b84;
+  --fuaran-tone-info-disabled-border: #26333b;
+
+  --fuaran-code-bg: #080d10;
+  --fuaran-code-fg: #dce3e5;
+  --fuaran-code-copy-bg: #10171b;
+  --fuaran-code-copy-border: #26333b;
+  --fuaran-modal-backdrop: rgba(0, 0, 0, 0.6);
+  --fuaran-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.45);
+  --fuaran-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── 5. Brand components ──────────────────────────────────────────────────
+   The lockup + theme toggle, defined once. Class names continue the .ds-*
+   vocabulary the live surfaces already use; fuaran-ui.io's masthead adopts
+   them. Markup shape:
+
+     <div class="ds-topbar">
+       <a class="ds-brand" href="…">
+         <img class="ds-brand-mark ds-brand-mark-light" src=".../fuaran-mark.svg" alt="Fuaran">
+         <img class="ds-brand-mark ds-brand-mark-dark" src=".../fuaran-mark-mist.svg" alt="" aria-hidden="true">
+         <span class="ds-brand-word">fuaran</span>
+       </a>
+       …nav…
+       <button class="ds-theme-toggle" …>☾</button>
+     </div>
+     <p class="ds-brand-tagline">The source for generative UI</p>
+   */
+
+.ds-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+}
+
+.ds-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+}
+
+.ds-brand:hover {
+  text-decoration: none;
+}
+
+.ds-brand-mark {
+  width: 3rem;
+  height: 3rem;
+  display: block;
+}
+
+/* Dark mark = the real Mist asset, not a filter approximation. The two <img>
+   swap keeps the toggle-driven theme in charge (a <picture> media query
+   would track the OS, not the toggle). */
+.ds-brand-mark-dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .ds-brand-mark-light,
+:root.ds-dark .ds-brand-mark-light {
+  display: none;
+}
+
+:root[data-theme='dark'] .ds-brand-mark-dark,
+:root.ds-dark .ds-brand-mark-dark {
+  display: block;
+}
+
+.ds-brand-word {
+  font-family: var(--ds-font-serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 2.25rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--fuaran-color-brand);
+}
+
+.ds-brand-tagline {
+  margin: 0.55rem 0 0;
+  font-family: var(--ds-font-mono);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--fuaran-color-text-muted);
+}
+
+@media (max-width: 560px) {
+  .ds-brand-tagline {
+    display: none;
+  }
+}
+
+.ds-theme-toggle {
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--ds-border);
+  border-radius: 0.6rem;
+  background: var(--fuaran-color-elevated);
+  color: var(--fuaran-color-brand);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color var(--ds-transition);
+}
+
+.ds-theme-toggle:hover {
+  border-color: var(--fuaran-color-accent);
+}
+
+/* Markdown-emitted anchors inside rendered trees follow the accent (the fix
+   both shells previously carried as mirrored copies). */
+.fuaran-kind-markdown a {
+  color: var(--fuaran-color-accent);
+  text-decoration: none;
+}
+
+.fuaran-kind-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* ─── 6. Code + highlight theme ────────────────────────────────────────────
+   Code panes are deep loch in both themes; one highlight palette serves
+   both. Inert until a host loads highlight.js (fuaran-ui.io does; the live
+   surfaces may later). Tuned for WCAG AA against #16232B / #080D10. */
+
+.hljs {
+  color: var(--fuaran-color-code-text);
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #7f95a3;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-meta {
+  color: #9fd6e8; /* mist-bright */
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #a8d5b8; /* loch-green */
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: #e6c25a; /* warm gold */
+}
+
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name {
+  color: #cbeaf4;
+  font-weight: 500;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-type {
+  color: #b8c9d4;
+}
+
+.hljs-built_in,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: #86b7c6;
+}
+
+.hljs-deletion {
+  color: #f0a99c;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}

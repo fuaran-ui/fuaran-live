@@ -133,6 +133,42 @@ let signalRoundTrips (token: string) : bool =
   | Some(k, sdp) -> encodeSignal k sdp = token
   | None -> false
 
+// ─── the join link (2026-07-30) ──────────────────────────────────────────────
+//
+// The presenter's QR used to encode the RAW offer token, so scanning it with a
+// phone camera showed a wall of base64 and opened nothing. It now encodes a
+// JOIN LINK — this page's own URL with `?live=pair` (lands in the joiner panel)
+// and the offer in the `#offer=` FRAGMENT, which the browser never sends to any
+// server: scanning opens the playground on the phone and the answer code is
+// generated automatically. The same link works pasted into a chat. The token
+// is standard base64 (`+ / =`), all legal fragment bytes, so no re-encoding.
+
+[<Emit("(window.location.origin + window.location.pathname)")>]
+let private pageBase () : string = jsNative
+
+/// The URL the presenter's QR (and copy box) carries.
+let joinLinkFor (offerToken: string) : string =
+  pageBase () + "?live=pair#offer=" + offerToken
+
+/// The `#offer=<token>` a join link delivered to THIS window, or "" when the
+/// page was opened without one.
+[<Emit("(function(){ try { var m = /[#&]offer=([^&]+)/.exec(window.location.hash || ''); return m ? m[1] : ''; } catch (e) { return ''; } })()")>]
+let private offerFragmentProbe () : string = jsNative
+
+let pairOfferFromLink () : string = offerFragmentProbe ()
+
+/// The offer token in whatever the joiner pasted — a bare token, or a full join
+/// link (the presenter's share surface now hands out links, and either shape
+/// should work in the paste box).
+let offerTokenOf (input: string) : string =
+  let trimmed = input.Trim()
+  let i = trimmed.LastIndexOf "#offer="
+
+  if i >= 0 then
+    trimmed.Substring(i + "#offer=".Length)
+  else
+    trimmed
+
 // ─── raw RTCPeerConnection interop (the only browser-touching surface) ────────
 
 [<Emit("new RTCPeerConnection({ iceServers: [{ urls: $0 }] })")>]

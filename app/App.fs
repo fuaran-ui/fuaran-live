@@ -683,6 +683,15 @@ let private init () : Model * Cmd<Msg> =
 
   let isAudience = Live.isAudience ()
 
+  // A join link carries the presenter's offer in the `#offer=` fragment
+  // (2026-07-30): scanning the presenter's QR opens this page on the phone and
+  // the answer code is generated automatically — no paste step on the joiner.
+  let joinOffer =
+    if WebRtc.isPairJoinRequested () then
+      WebRtc.pairOfferFromLink ()
+    else
+      ""
+
   { Session = session
     Prompt = ""
     VoiceSupported = Voice.isSupported ()
@@ -712,11 +721,18 @@ let private init () : Model * Cmd<Msg> =
     ParityTs = None
     ParityFs = None
     ParityFixture = None
-    // A device that followed a `?live=pair` link lands straight in the joiner panel.
+    // A device that followed a `?live=pair` link lands straight in the joiner
+    // panel — and one that followed a full join link starts answering at once.
     Pair =
       (if WebRtc.isPairJoinRequested () then
          { pairEmpty with
-             Role = Some PairRole.Joiner }
+             Role = Some PairRole.Joiner
+             OfferInput = joinOffer
+             Status =
+               (if joinOffer <> "" then
+                  WebRtc.PeerState.Connecting
+                else
+                  WebRtc.PeerState.New) }
        else
          pairEmpty)
     Asks = Map.empty
@@ -737,7 +753,13 @@ let private init () : Model * Cmd<Msg> =
       copyEnhanceCmd
       mathEnhanceCmd
       Cmd.ofEffect (fun _ -> applyDarkClass (Brand.initialDark ()))
-      (if isAudience then audienceSubscribeCmd else Cmd.none) ]
+      (if isAudience then audienceSubscribeCmd else Cmd.none)
+      // The join-link auto-answer: the scanned offer starts the handshake
+      // immediately, so the phone lands directly on its answer code.
+      (if joinOffer <> "" then
+         startAnswererCmd joinOffer
+       else
+         Cmd.none) ]
 
 // ─── update – the unified loop ───────────────────────────────────────────────
 
@@ -823,7 +845,9 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         Pair = { model.Pair with OfferInput = s } },
     Cmd.none
   | SubmitPairOffer ->
-    let token = model.Pair.OfferInput.Trim()
+    // The paste box takes a bare pairing code OR a full join link — the
+    // presenter's share surface hands out links now.
+    let token = WebRtc.offerTokenOf model.Pair.OfferInput
 
     if token = "" then
       model, Cmd.none
@@ -1783,10 +1807,11 @@ let private pairPanel (model: Model) (dispatch: Msg -> unit) : ReactElement =
               [ prop.className "fl-pair-title"
                 prop.text "Pair a device – you are presenting" ]
             pairTokenShare
-              "1. On the other device, open this site, tap “Join a paired session”, and scan or paste this code:"
-              p.Offer
+              "1. Scan this QR with the other device's camera – it opens this site and starts joining automatically. \
+(Or send that device the link below – pasting it into “Join a paired session” works too.)"
+              (if p.Offer = "" then "" else WebRtc.joinLinkFor p.Offer)
             pairTokenPaste
-              "2. Paste the code the other device shows back, then connect:"
+              "2. Paste the answer code the other device shows back, then connect:"
               p.AnswerInput
               "Paste the answer code from the other device…"
               "Connect"
@@ -1801,14 +1826,16 @@ let private pairPanel (model: Model) (dispatch: Msg -> unit) : ReactElement =
         prop.children
           [ Html.h3 [ prop.className "fl-pair-title"; prop.text "Join a paired session" ]
             pairTokenPaste
-              "1. Paste the pairing code from the presenting device:"
+              "1. Paste the join link (or pairing code) from the presenting device:"
               p.OfferInput
-              "Paste the pairing code…"
+              "Paste the join link or pairing code…"
               "Generate answer"
               (SetPairOfferInput >> dispatch)
               (fun () -> dispatch SubmitPairOffer)
             (if p.Answer <> "" then
-               pairTokenShare "2. Scan or paste this answer code back on the presenting device:" p.Answer
+               pairTokenShare
+                 "2. Send this answer code back to the presenting device (copy it into a chat) and paste it there:"
+                 p.Answer
              else
                Html.none)
             statusLine

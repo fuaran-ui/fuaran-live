@@ -13,7 +13,10 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 
+// Fable-generated JS — no .d.ts; vitest runs it via esbuild (no typecheck).
+// @ts-expect-error untyped Fable output
 import { lightTheme, darkTheme } from '../app/output/shared/Brand.js';
+// @ts-expect-error untyped Fable output
 import { toCssVariables } from '../app/output/fuaran-dotnet/src/Fuaran.UI.Renderer.Core/Theme.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,7 +26,11 @@ const css = readFileSync(join(here, '../app/brand/fuaran-brand.css'), 'utf8');
 const declsOf = (slice: string): Map<string, string> => {
   const out = new Map<string, string>();
   for (const m of slice.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) {
-    out.set(m[1], m[2].trim().replace(/\s+/g, ' '));
+    const name = m[1];
+    const value = m[2];
+    if (name !== undefined && value !== undefined) {
+      out.set(name, value.trim().replace(/\s+/g, ' '));
+    }
   }
   return out;
 };

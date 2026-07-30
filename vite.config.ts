@@ -146,7 +146,10 @@ if (dualHost) {
 // edit to the script re-derives the hash rather than silently breaking it.
 function inlineScriptHashes(html: string): string {
   const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(
-    (m) => `'sha256-${createHash('sha256').update(m[1], 'utf8').digest('base64')}'`,
+    (m) =>
+      `'sha256-${createHash('sha256')
+        .update(m[1] ?? '', 'utf8')
+        .digest('base64')}'`,
   );
   return hashes.length > 0 ? ` ${hashes.join(' ')}` : '';
 }

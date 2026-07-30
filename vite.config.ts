@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -21,14 +22,14 @@ import { PROVIDER_ORIGINS } from './src/byok/origins';
 // are allowed.
 const PROVIDER_ORIGINS_CSP = PROVIDER_ORIGINS.join(' ');
 
-// Live-drive Stage 2 (Phase 295) — cross-device WebRTC pairing needs a STUN
-// server for NAT traversal during the handshake. This is the ONE non-provider
-// origin the playground may connect to, and it is handshake-only: no UI data and
-// never the BYOK key crosses it (the data itself flows peer-to-peer over the
-// WebRTC data channel, which needs no CSP origin). Kept in sync with
-// `WebRtc.stunServer` (app/WebRtc.fs). Present in `connect-src` because browsers
-// gate `RTCPeerConnection` ICE-server URLs on that directive.
-const STUN_ORIGIN = 'stun:stun.l.google.com:19302';
+// Live-drive Stage 2 (Phase 295) — cross-device WebRTC pairing uses a public
+// STUN server (`WebRtc.stunServer`, app/WebRtc.fs) for NAT traversal during the
+// handshake. That egress is deliberately NOT in `connect-src`: CSP has no valid
+// source expression for the `stun:` scheme, and browsers do not gate
+// `RTCPeerConnection` ICE on `connect-src` at all (CSP3 reserves a separate
+// `webrtc` directive for it, defaulting to allow). The `stun:` entry this
+// policy carried until 2026-07-30 was reported invalid and ignored by Chrome —
+// pairing worked because the directive never applied, not because of the entry.
 
 // BYOS (bring your own server) — the Go sessions page connects to a session server
 // the visitor runs on their OWN machine as one binary (default http://localhost:14050,
@@ -43,19 +44,32 @@ const BYOS_LOCAL_ORIGINS = 'http://localhost:* http://127.0.0.1:*';
 // (ts-host.html + fable-host.html), so `frame-src 'self'` is required. It is a
 // same-origin-only relaxation — no third-party frames — and is harmless when the
 // flag is off (no iframes are created), so it stays in the baseline policy.
-const prodCsp = [
-  `default-src 'self'`,
-  `connect-src 'self' ${PROVIDER_ORIGINS_CSP} ${STUN_ORIGIN}`,
-  `img-src 'self' data:`,
-  `style-src 'self' 'unsafe-inline'`,
-  `script-src 'self'`,
-  `font-src 'self'`,
-  `frame-src 'self'`,
-  `base-uri 'none'`,
-  `object-src 'none'`,
-  `form-action 'none'`,
-  `frame-ancestors 'none'`,
-].join('; ');
+//
+// Three 2026-07-30 corrections, each from a real console violation in the
+// deployed artifact:
+//  • `script-src` carries the sha256 of each entry's inline pre-paint theme
+//    script (computed from the HTML at build time, so an edit can never drift
+//    the hash) — under a bare `'self'` the browser blocked it and every
+//    dark-preference load flashed light.
+//  • `font-src` allows `data:` — Vite inlines assets under 4 KB as data: URIs,
+//    which turned the smallest font subset into a blocked data: font.
+//  • `frame-ancestors` is HEADER-ONLY by spec — in a <meta> policy it is
+//    ignored (with a console warning), so it lives in
+//    public/staticwebapp.config.json's globalHeaders instead, where it is
+//    actually enforced.
+const prodCsp = (scriptHashes: string) =>
+  [
+    `default-src 'self'`,
+    `connect-src 'self' ${PROVIDER_ORIGINS_CSP}`,
+    `img-src 'self' data:`,
+    `style-src 'self' 'unsafe-inline'`,
+    `script-src 'self'${scriptHashes}`,
+    `font-src 'self' data:`,
+    `frame-src 'self'`,
+    `base-uri 'none'`,
+    `object-src 'none'`,
+    `form-action 'none'`,
+  ].join('; ');
 
 // The showcase entries (showcase.html + receiver.html) are the zero-key-egress
 // half of the site: no key is ever pasted (every page delivers its wow from
@@ -73,31 +87,31 @@ const prodCsp = [
 // and no other origin; the "no key, no provider egress" posture is otherwise
 // intact (Pyodide is a static runtime download, not a data/LLM egress).
 const pyodideCdn = 'https://cdn.jsdelivr.net';
-const showcaseCsp = [
-  `default-src 'self'`,
-  `connect-src 'self' ${pyodideCdn} ${BYOS_LOCAL_ORIGINS}`,
-  `img-src 'self' data:`,
-  `style-src 'self' 'unsafe-inline'`,
-  `script-src 'self' 'wasm-unsafe-eval' ${pyodideCdn}`,
-  `worker-src 'self' blob:`,
-  `font-src 'self'`,
-  `base-uri 'none'`,
-  `object-src 'none'`,
-  `form-action 'none'`,
-  `frame-ancestors 'none'`,
-].join('; ');
+const showcaseCsp = (scriptHashes: string) =>
+  [
+    `default-src 'self'`,
+    `connect-src 'self' ${pyodideCdn} ${BYOS_LOCAL_ORIGINS}`,
+    `img-src 'self' data:`,
+    `style-src 'self' 'unsafe-inline'`,
+    `script-src 'self' 'wasm-unsafe-eval' ${pyodideCdn}${scriptHashes}`,
+    `worker-src 'self' blob:`,
+    `font-src 'self' data:`,
+    `base-uri 'none'`,
+    `object-src 'none'`,
+    `form-action 'none'`,
+  ].join('; ');
 
 // Vite's dev server relies on inline scripts + eval (HMR) and a websocket, so
 // the strict policy is applied only to the production build; dev gets a relaxed
 // variant. The shipped `dist/index.html` always carries `prodCsp`.
 const devCsp = [
   `default-src 'self'`,
-  `connect-src 'self' ${PROVIDER_ORIGINS_CSP} ${pyodideCdn} ${STUN_ORIGIN} ${BYOS_LOCAL_ORIGINS} ws: wss:`,
+  `connect-src 'self' ${PROVIDER_ORIGINS_CSP} ${pyodideCdn} ${BYOS_LOCAL_ORIGINS} ws: wss:`,
   `img-src 'self' data:`,
   `style-src 'self' 'unsafe-inline'`,
   `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' ${pyodideCdn}`,
   `worker-src 'self' blob:`,
-  `font-src 'self'`,
+  `font-src 'self' data:`,
   `frame-src 'self'`,
 ].join('; ');
 
@@ -126,15 +140,33 @@ if (dualHost) {
   buildInputs.fableHost = 'fable-host.html';
 }
 
+// The sha256 source expressions for every inline <script> in a page, computed
+// from the page bytes the browser will hash — so the pre-paint theme script
+// runs under a strict `script-src 'self'` without `'unsafe-inline'`, and an
+// edit to the script re-derives the hash rather than silently breaking it.
+function inlineScriptHashes(html: string): string {
+  const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(
+    (m) => `'sha256-${createHash('sha256').update(m[1], 'utf8').digest('base64')}'`,
+  );
+  return hashes.length > 0 ? ` ${hashes.join(' ')}` : '';
+}
+
 function cspPlugin(): Plugin {
   return {
     name: 'fuaran-live-csp',
-    transformIndexHtml(html, ctx) {
-      const isShowcase =
-        ctx.filename.endsWith('showcase.html') || ctx.filename.endsWith('receiver.html');
-      const policy = ctx.server ? devCsp : isShowcase ? showcaseCsp : prodCsp;
-      const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}" />`;
-      return html.replace('<!--CSP-INJECTION-POINT-->', meta);
+    transformIndexHtml: {
+      // 'post' so the hash pass sees the final document — any script another
+      // transform injected would otherwise be blocked by the shipped policy.
+      order: 'post',
+      handler(html, ctx) {
+        const isShowcase =
+          ctx.filename.endsWith('showcase.html') || ctx.filename.endsWith('receiver.html');
+        const policy = ctx.server
+          ? devCsp
+          : (isShowcase ? showcaseCsp : prodCsp)(inlineScriptHashes(html));
+        const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}" />`;
+        return html.replace('<!--CSP-INJECTION-POINT-->', meta);
+      },
     },
   };
 }

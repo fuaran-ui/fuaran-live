@@ -1467,6 +1467,32 @@ let private transcriptView (model: Model) (dispatch: Msg -> unit) : ReactElement
       [ prop.className "fl-timeline"
         prop.children [ for entry in model.AgentTimeline -> timelineEntryView model.Panels model.Asks resolveAsk entry ] ]
 
+// The transcript follows the conversation: whenever the timeline changes, the
+// scroll container snaps to the newest row – unless the user has scrolled up
+// to read, in which case it stays put until they return near the bottom.
+[<ReactComponent>]
+let private TranscriptPane (model: Model) (dispatch: Msg -> unit) : ReactElement =
+  let container = React.useElementRef ()
+  // True while the user is at (or near) the bottom – only then follow new rows.
+  let pinned = React.useRef true
+
+  React.useEffect (
+    (fun () ->
+      match container.current with
+      | Some el when pinned.current -> el.scrollTop <- el.scrollHeight
+      | _ -> ()),
+    [| box model.AgentTimeline |]
+  )
+
+  Html.div
+    [ prop.className "fl-transcript"
+      prop.ref container
+      prop.onScroll (fun _ ->
+        match container.current with
+        | Some el -> pinned.current <- el.scrollHeight - el.scrollTop - el.clientHeight < 48.0
+        | None -> ())
+      prop.children [ transcriptView model dispatch ] ]
+
 let private conversationPane (model: Model) (dispatch: Msg -> unit) : ReactElement =
   let conversationEmpty =
     Option.isNone model.Session.Tree && List.isEmpty model.AgentTimeline
@@ -1475,9 +1501,7 @@ let private conversationPane (model: Model) (dispatch: Msg -> unit) : ReactEleme
     [ prop.className "fl-chat"
       prop.children
         [ statusBar model dispatch
-          Html.div
-            [ prop.className "fl-transcript"
-              prop.children [ transcriptView model dispatch ] ]
+          TranscriptPane model dispatch
           Html.textarea
             [ prop.className "fl-prompt"
               prop.value model.Prompt

@@ -93,7 +93,13 @@
   /* Layout + type scale (shell-level; the reference sheet's component scales
      are separate and unchanged) */
   --ds-max-width: 96rem;
-  --ds-measure: 70ch;
+  /* The prose reading measure. rem, not ch, so headings and body cap at the
+     same width; 52rem (~832px) reads comfortably without the cramped look a
+     70ch cap gave body text on wide screens (operator feedback 2026-07-30). */
+  --ds-measure: 52rem;
+  /* Code panes: wrap instead of scrolling horizontally, and cap the box with
+     vertical scrolling past this height (the shared code-pane default). */
+  --ds-code-max-height: 30rem;
   --ds-gutter: clamp(1rem, 3vw, 2rem);
   --ds-border: 1px solid var(--fuaran-color-border);
   --ds-accent: var(--fuaran-color-accent);
@@ -545,6 +551,19 @@
    Code panes are deep loch in both themes; one highlight palette serves
    both. Inert until a host loads highlight.js (fuaran-ui.io does; the live
    surfaces may later). Tuned for WCAG AA against #16232B / #080D10. */
+
+/* The code-pane default, every surface: long lines WRAP (horizontal
+   scrolling is the worse reading experience — a one-line wire document
+   becomes a deep block instead of a 3,000px strip), long tokens may break,
+   and a tall pane caps at --ds-code-max-height with vertical scrolling.
+   A surface with a deliberate exception (e.g. a formatted source panel that
+   wants white-space:pre) re-declares it in its own later-loading sheet. */
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: var(--ds-code-max-height, 30rem);
+  overflow: auto;
+}
 
 .hljs {
   color: var(--fuaran-code-fg, #dce3e5);

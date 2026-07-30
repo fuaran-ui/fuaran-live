@@ -1210,7 +1210,7 @@ let private heroIntro: Node<unit> =
             Fuaran.markdown
               "pg-hero-showcase"
               (sprintf
-                "New here? Browse the **[showcase of what UI-as-data can do →](%s)** – a gallery of live demos, no key needed."
+                "New here? Browse the **[showcase of what UI-as-data can do →](%s)** – a gallery of live demos, no key needed. Building something? **[Read the docs →](https://fuaran-ui.io)** – the language guide, wire-format specification, and per-host get-started tracks."
                 showcaseHref) ] }
 
 // ─── panes (Feliz, dispatching Msg; preview uses the F# renderer) ─────────────

@@ -25,12 +25,18 @@ open Fuaran.UI.Renderer
 // ─── the published feed shape (see public/eval/README.md) ────────────────────
 
 type Provider =
-  { Name: string
+  {
+    Name: string
     Model: string
+    /// Two-tier framing (feeds since 2026-07-30): "headline" = the provider's
+    /// best-performing arm, "budget" = its cost-optimal posture. "" on a
+    /// pre-tier feed — the card then renders untagged, never wrongly tagged.
+    Tier: string
     Passed: int
     Total: int
     PassRate: float
-    MeanScore: float }
+    MeanScore: float
+  }
 
 type Category =
   { Name: string
@@ -103,6 +109,7 @@ let private gInt (o: obj) (k: string) : int = int (gFloat o k)
 let private parseProvider (o: obj) : Provider =
   { Name = gStr o "name"
     Model = gStr o "model"
+    Tier = gStr o "tier"
     Passed = gInt o "passed"
     Total = gInt o "total"
     PassRate = gFloat o "passRate"
@@ -198,11 +205,17 @@ let private providerCard (i: int) (p: Provider) : Node<unit> =
       (toneFor p.PassRate)
       (sprintf "%d / %d prompts · mean %.1f / 5" p.Passed p.Total p.MeanScore)
 
+  let modelLine =
+    match p.Tier with
+    | "headline" -> sprintf "_%s_ · **best**" p.Model
+    | "budget" -> sprintf "_%s_ · budget posture" p.Model
+    | _ -> sprintf "_%s_" p.Model
+
   let children =
     if p.Model = "" then
       [ metric ]
     else
-      [ metric; Fuaran.markdown (sprintf "ev-pmodel-%d" i) (sprintf "_%s_" p.Model) ]
+      [ metric; Fuaran.markdown (sprintf "ev-pmodel-%d" i) modelLine ]
 
   Fuaran.card
     (sprintf "ev-p-%d" i)
@@ -251,7 +264,12 @@ let private dashboardTree (r: Results) : Node<unit> =
       "ev-prov"
       { Defaults.gridLayout<unit> with
           Cols = 3
-          Children = [ for i, p in List.indexed r.Providers -> providerCard i p ] }
+          Children =
+            [ for i, p in
+                List.indexed (
+                  r.Providers
+                  |> List.sortBy (fun p -> (if p.Tier = "headline" then 0 else 1), -p.PassRate)
+                ) -> providerCard i p ] }
 
   let categoryGrid =
     Fuaran.gridLayout

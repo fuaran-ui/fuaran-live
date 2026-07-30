@@ -35,12 +35,12 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@fuaran-ui/ai-tools": "^0.3.0",
-    "@fuaran-ui/charts": "^0.3.0",
-    "@fuaran-ui/ops": "^0.3.0",
-    "@fuaran-ui/renderer": "^0.3.0",
-    "@fuaran-ui/schema": "^0.3.0",
-    "@fuaran-ui/ui": "^0.3.0",
+    "@fuaran-ui/ai-tools": "^0.4.0",
+    "@fuaran-ui/charts": "^0.4.0",
+    "@fuaran-ui/ops": "^0.4.0",
+    "@fuaran-ui/renderer": "^0.4.0",
+    "@fuaran-ui/schema": "^0.4.0",
+    "@fuaran-ui/ui": "^0.4.0",
     "katex": "^0.16.11",
     "marked": "^15.0.7",
     "qrcode-generator": "^1.4.4",

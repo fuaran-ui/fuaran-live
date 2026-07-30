@@ -1207,11 +1207,16 @@ let private heroIntro: Node<unit> =
               { Level = 1
                 Text = TextSource.Literal "See what UI-as-data can do."
                 Variant = HeadingVariant.Standard }
+            // The cross-link triangle: each site's front page links the other
+            // two, one sentence per destination (operator convention).
             Fuaran.markdown
               "pg-hero-showcase"
               (sprintf
-                "New here? Browse the **[showcase of what UI-as-data can do →](%s)** – a gallery of live demos, no key needed. Building something? **[Read the docs →](https://fuaran-ui.io)** – the language guide, wire-format specification, and per-host get-started tracks."
-                showcaseHref) ] }
+                "New here? Browse the **[showcase of what UI-as-data can do →](%s)** – a gallery of live demos, no key needed."
+                showcaseHref)
+            Fuaran.markdown
+              "pg-hero-docs"
+              "Building something? **[Read the docs →](https://fuaran-ui.io)** – the language guide, wire-format specification, and per-host get-started tracks." ] }
 
 // ─── panes (Feliz, dispatching Msg; preview uses the F# renderer) ─────────────
 

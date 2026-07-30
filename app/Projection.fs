@@ -1583,11 +1583,39 @@ let private valueOrSource (k: JsonValue) : JsonValue =
 /// A `DataGrid`'s erased column: `field` (declarative) and `value` (closure) are
 /// sibling optional slots; `format`/`width` project their (default-omitted) form.
 let private tsGridColumnErased (v: JsonValue) : string =
+  let kindObj = fieldD "kind" v
+
   let cellKind =
-    match dollarType (fieldD "kind" v) |> Option.defaultValue "Text" with
+    match dollarType kindObj |> Option.defaultValue "Text" with
     | "Numeric" -> "{ kind: 'Numeric' }"
     | "Date" -> "{ kind: 'Date' }"
     | "Editable" -> "{ kind: 'Editable', onEdit: () => action.chain([]) }"
+    | "TonedPill" ->
+      // Phase 750's declarative pill: wholly wire-expressible, so it projects
+      // faithfully. In-memory `defaultTone` is required; the wire omits
+      // `default` when it is 'Default' (the omit-on-default discipline), so
+      // absence reconstructs as 'Default'.
+      let mapLit =
+        membersOf "map" kindObj
+        |> List.map (fun (value, tone) ->
+          qs value
+          + ": "
+          + qs (
+            match tone with
+            | JString t -> t
+            | _ -> ""
+          ))
+        |> String.concat ", "
+
+      let defaultTone = optStr "default" kindObj |> Option.defaultValue "Default"
+
+      "{ kind: 'TonedPill', field: "
+      + qs (strOf "field" kindObj)
+      + ", map: { "
+      + mapLit
+      + " }, defaultTone: "
+      + qs defaultTone
+      + " }"
     | _ -> "{ kind: 'Text' }"
 
   tsInline (

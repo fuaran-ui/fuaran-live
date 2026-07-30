@@ -1646,6 +1646,15 @@ body {
   padding: 0.3rem 0.6rem;
 }
 
+/* The step row pinned above the breadcrumb (2026-07-30): two wide, obvious
+   click targets so the walk needs no keyboard and no scrolling to the full
+   control row below the card. */
+.fl-nav-step-row .fl-btn {
+  flex: 1;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+}
+
 .fl-nav-empty {
   font-size: 0.85rem;
 }

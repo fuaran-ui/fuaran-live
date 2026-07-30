@@ -54,15 +54,26 @@ let private effects = Byok.browserEffectPorts
 
 // ─── keeping the highlight in view ───────────────────────────────────────────
 
-/// Scroll the pane's highlight into view within its own scroll box. `nearest`
-/// on both axes is load-bearing: a highlight already on screen does not move,
-/// which is what "re-derive the projections without losing scroll context"
-/// means in practice. No smooth behaviour — an edit should land, not animate.
+/// Bring the pane's highlight into view WITHIN its own `.fl-ps-code` scroll box
+/// only. Deliberately NOT `scrollIntoView`: that scrolls every scrollable
+/// ancestor including the viewport, so each cursor step in the Editor yanked
+/// the whole page toward the Source card (reported 2026-07-30). A highlight
+/// already on screen does not move — "re-derive the projections without losing
+/// scroll context" — and the page never moves at all. No smooth behaviour: an
+/// edit should land, not animate.
 [<Emit("""(function(){
   try {
     var hits = document.querySelectorAll('.fl-ps-hit');
     for (var i = 0; i < hits.length; i++) {
-      if (hits[i].scrollIntoView) { hits[i].scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+      var el = hits[i];
+      var sc = el.closest('.fl-ps-code');
+      if (!sc) { continue; }
+      var cr = sc.getBoundingClientRect();
+      var er = el.getBoundingClientRect();
+      if (er.top < cr.top) { sc.scrollTop += er.top - cr.top; }
+      else if (er.bottom > cr.bottom) { sc.scrollTop += Math.min(er.bottom - cr.bottom, er.top - cr.top); }
+      if (er.left < cr.left) { sc.scrollLeft += er.left - cr.left; }
+      else if (er.left > cr.right) { sc.scrollLeft += er.left - cr.right; }
     }
     return hits.length;
   } catch (e) { return 0; }

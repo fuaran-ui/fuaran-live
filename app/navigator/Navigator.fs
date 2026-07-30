@@ -209,12 +209,17 @@ let private PropertyPanel
 
 // ─── rendered-node highlight (the only DOM touch in this module) ─────────────
 
-/// Outline the rendered element carrying `nodeId` and scroll it into view,
-/// clearing the outline from every other rendered node first. Scoped to the
-/// live-preview container so a tree rendered elsewhere on the page (a transcript
-/// panel) is never mistaken for the session tree. Returns whether an element was
-/// found — an id with no rendered element is normal (a node inside a collapsed
-/// disclosure, say), not an error.
+/// Outline the rendered element carrying `nodeId` and bring it into view
+/// WITHIN the preview's own scroll box, clearing the outline from every other
+/// rendered node first. Scoped to the live-preview container so a tree rendered
+/// elsewhere on the page (a transcript panel) is never mistaken for the session
+/// tree. Returns whether an element was found — an id with no rendered element
+/// is normal (a node inside a collapsed disclosure, say), not an error.
+///
+/// Deliberately NOT `scrollIntoView`: that scrolls every scrollable ancestor
+/// including the viewport, so each cursor step yanked the whole page toward the
+/// preview (reported 2026-07-30). Only the nearest scrollable ancestor below
+/// the document is adjusted; the page never moves.
 // The id escaping is `split`/`join` rather than a regex `replace` deliberately:
 // the replacement pattern would be `$&`, and `$` is the Emit macro's own
 // placeholder sigil — an escape that reads fine and expands wrongly is not worth
@@ -229,7 +234,18 @@ let private PropertyPanel
     var el = scope.querySelector('[data-fuaran-node-id="' + esc + '"]');
     if (!el) { return false; }
     el.classList.add('fl-nav-focus');
-    if (el.scrollIntoView) { el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }); }
+    var sc = el.parentElement;
+    while (sc && sc !== document.body && sc !== document.documentElement) {
+      var cs = getComputedStyle(sc);
+      if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && sc.scrollHeight > sc.clientHeight) { break; }
+      sc = sc.parentElement;
+    }
+    if (sc && sc !== document.body && sc !== document.documentElement) {
+      var cr = sc.getBoundingClientRect();
+      var er = el.getBoundingClientRect();
+      if (er.top < cr.top) { sc.scrollTop += er.top - cr.top; }
+      else if (er.bottom > cr.bottom) { sc.scrollTop += Math.min(er.bottom - cr.bottom, er.top - cr.top); }
+    }
     return true;
   } catch (e) { return false; }
 })($0, $1)""")>]
@@ -823,10 +839,29 @@ adds a ReorderChildren naming every sibling."
                 carrying
                 refusal ] ]
 
+      // The step row (2026-07-30): the walk's two primary motions pinned above
+      // the breadcrumb, so the tree is clickable-through without the keyboard
+      // or scrolling down to the full control row below the card.
+      let stepRow =
+        Html.div
+          [ prop.className "fl-nav-controls fl-nav-step-row"
+            prop.children
+              [ Html.button
+                  [ prop.className "fl-btn ghost"
+                    prop.title "The previous node in the walk (↑ on the keyboard)"
+                    prop.text "▴ Previous"
+                    prop.onClick (fun _ -> move prev) ]
+                Html.button
+                  [ prop.className "fl-btn ghost"
+                    prop.title "The next node in the walk (↓ on the keyboard)"
+                    prop.text "▾ Next"
+                    prop.onClick (fun _ -> move next) ] ] ]
+
       Html.div
         [ prop.className "fl-nav-body"
           prop.children
-            [ crumbs
+            [ stepRow
+              crumbs
               card
               structuralPanel
               Html.div
@@ -863,9 +898,9 @@ adds a ReorderChildren naming every sibling."
         [ Html.p
             [ prop.className "fl-nav-intro"
               prop.text
-                "Walk the tree the model emitted, and edit it. Click here, then use the keyboard — the node under the \
-cursor is outlined in the live preview above, and its properties are editable in the card below. Every edit becomes a \
-tree op, checked before it is applied." ]
+                "Walk the tree the model emitted, and edit it. Use the arrow buttons (or click here and drive it from \
+the keyboard) — the node under the cursor is outlined in the live preview, highlighted in the Source card, and its \
+properties are editable in the card below. Every edit becomes a tree op, checked before it is applied." ]
           Html.p [ prop.className "fl-nav-help"; prop.text helpHint ]
           body ] ]
 

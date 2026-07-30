@@ -100,9 +100,11 @@ let KIMI_ORIGIN = "https://api.moonshot.ai"
 [<Literal>]
 let XAI_ORIGIN = "https://api.x.ai"
 
-// Frontier-only, one model per provider (operator decision 2026-07-15): lower
-// model tiers emit measurably worse wire JSON, so the picker offers exactly one
-// frontier model per provider – the choice is WHOSE key, not which tier.
+// One curated model per provider (operator decision 2026-07-15; reframed
+// 2026-07-30): the picker offers exactly the model the evaluation measures as
+// the best default for wire emission – increasingly a high-capability mid-tier
+// model at a low reasoning setting rather than the frontier flagship – so the
+// choice is WHOSE key, not which model.
 // Anthropic rides Opus 4.8 until Fable 5 is permanently available (swap this
 // literal when it is); OpenAI is GPT-5.6 Sol (GA 2026-07-09); Google is Gemini
 // 3.1 Pro (`gemini-3.1-pro-preview`, Google's frontier coding/agentic model).
@@ -1053,21 +1055,18 @@ let createGeminiProvider (getKey: unit -> string option) : IAgenticProvider =
 /// and the agentic factory. As of Phase 327 ALL providers are agentic
 /// (tool-use via the shared `FuaranLive.AiWire` mappers), so each carries
 /// `CreateAgentic = Some _` and can drive the self-debug loop.
-/// A selectable model for a provider. `Frontier` flags the most-capable tier –
-/// surfaced in the picker so users are steered to where emission quality is best.
-type ModelOption =
-  { Id: string
-    Label: string
-    Frontier: bool }
+/// A selectable model for a provider – the single evaluation-chosen default
+/// today; a list so a future picker could offer measured alternates.
+type ModelOption = { Id: string; Label: string }
 
 type ProviderDescriptor =
   {
     Id: string
     Label: string
     DefaultModel: string
-    /// The models offered in the picker for this provider, in display order
-    /// (frontier first). The selected model rides each agentic request; an
-    /// unknown id still works – the cost readout just falls back to tokens only.
+    /// The models offered in the picker for this provider, in display order.
+    /// The selected model rides each agentic request; an unknown id still
+    /// works – the cost readout just falls back to tokens only.
     Models: ModelOption list
     /// The single origin this provider's key is ever sent to (the trust panel
     /// shows it; the CSP `connect-src` allow-list enforces it).
@@ -1077,7 +1076,7 @@ type ProviderDescriptor =
   }
 
 /// The providers offered in the picker, in display order. Claude is the default;
-/// all are agentic. ONE frontier model per provider (the operator decision
+/// all are agentic. ONE curated model per provider (the operator decision
 /// recorded at the DEFAULT_* literals) – the picker is a single combined
 /// model-forward choice, so `Models` is a single entry each and the UI never
 /// shows a separate tier dropdown.
@@ -1087,8 +1086,7 @@ let providers: ProviderDescriptor list =
       DefaultModel = DEFAULT_CLAUDE_MODEL
       Models =
         [ { Id = DEFAULT_CLAUDE_MODEL
-            Label = "Claude Opus 4.8"
-            Frontier = true } ]
+            Label = "Claude Opus 4.8" } ]
       Origin = ANTHROPIC_ORIGIN
       Create = (fun getKey -> createAnthropicProvider getKey :> IAIProvider)
       CreateAgentic = Some createAnthropicProvider }
@@ -1097,8 +1095,7 @@ let providers: ProviderDescriptor list =
       DefaultModel = DEFAULT_OPENAI_MODEL
       Models =
         [ { Id = DEFAULT_OPENAI_MODEL
-            Label = "GPT-5.6 Sol"
-            Frontier = true } ]
+            Label = "GPT-5.6 Sol" } ]
       Origin = OPENAI_ORIGIN
       Create = (fun getKey -> createOpenAIProvider getKey :> IAIProvider)
       CreateAgentic = Some createOpenAIProvider }
@@ -1107,8 +1104,7 @@ let providers: ProviderDescriptor list =
       DefaultModel = DEFAULT_GEMINI_MODEL
       Models =
         [ { Id = DEFAULT_GEMINI_MODEL
-            Label = "Gemini 3.1 Pro"
-            Frontier = true } ]
+            Label = "Gemini 3.1 Pro" } ]
       Origin = GEMINI_ORIGIN
       Create = (fun getKey -> createGeminiProvider getKey :> IAIProvider)
       CreateAgentic = Some createGeminiProvider }
@@ -1117,8 +1113,7 @@ let providers: ProviderDescriptor list =
       DefaultModel = DEFAULT_KIMI_MODEL
       Models =
         [ { Id = DEFAULT_KIMI_MODEL
-            Label = "Kimi K3"
-            Frontier = true } ]
+            Label = "Kimi K3" } ]
       Origin = KIMI_ORIGIN
       Create = (fun getKey -> createKimiProvider getKey :> IAIProvider)
       CreateAgentic = Some createKimiProvider }
@@ -1127,8 +1122,7 @@ let providers: ProviderDescriptor list =
       DefaultModel = DEFAULT_GROK_MODEL
       Models =
         [ { Id = DEFAULT_GROK_MODEL
-            Label = "Grok 4.5"
-            Frontier = true } ]
+            Label = "Grok 4.5" } ]
       Origin = XAI_ORIGIN
       Create = (fun getKey -> createGrokProvider getKey :> IAIProvider)
       CreateAgentic = Some createGrokProvider } ]

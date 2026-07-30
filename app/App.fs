@@ -2086,15 +2086,17 @@ let private connectRow (model: Model) (dispatch: Msg -> unit) : ReactElement =
                 [ Html.span [ prop.text "🔒" ]
                   Html.span [ prop.className "pg-byok-text"; prop.text "BYOK – key in-tab only" ] ] ]
           // ONE combined model picker (operator decision 2026-07-15): a single
-          // frontier model per provider – lower tiers emit measurably worse
-          // wire JSON, so the only choice offered is WHOSE key you bring.
+          // curated model per provider – the one the evaluation measures as
+          // the best default for wire emission (increasingly a high-capability
+          // mid-tier model at a low reasoning setting, not the frontier
+          // flagship) – so the only choice offered is WHOSE key you bring.
           // Selecting an entry selects its provider; the model follows
           // (SelectProvider sets Model = the provider's DefaultModel).
           Html.select
             [ prop.className "fl-provider"
               prop.value model.ProviderId
               prop.title
-                "The frontier model your key runs – one per provider; lower tiers aren't offered because emission quality drops."
+                "The model your key runs – one per provider, the one the evaluation measured best for emitting valid wire JSON."
               prop.onChange (fun (v: string) -> dispatch (SelectProvider v))
               prop.children
                 [ for p in Byok.providers ->
@@ -2107,17 +2109,17 @@ let private connectRow (model: Model) (dispatch: Msg -> unit) : ReactElement =
               prop.type' "password"
               prop.placeholder (providerLabel + " key · in-tab only")
               prop.onChange (fun (v: string) -> dispatch (SetKey v)) ]
-          // The recommended-settings explainer: WHY only frontier tiers, and
+          // The recommended-settings explainer: WHY one model per provider, and
           // what each call already carries (measured posture + caching) so the
           // visitor knows the knobs are set, not unset. The numbers behind
           // every claim live on the published evaluation – link, don't quote.
           Html.p
             [ prop.className "pg-connect-note"
               prop.children
-                [ Html.strong [ prop.text "Why only frontier models? " ]
+                [ Html.strong [ prop.text "Why one model per provider? " ]
                   Html.span
                     [ prop.text
-                        "A Fuaran emission must be exactly-valid typed wire JSON – the decoder refuses anything malformed rather than guessing at it. Frontier models get it right in a turn or two; lower tiers spend your tokens in repair loops, so we offer one frontier model per provider and the choice is whose key, not which tier." ] ] ]
+                        "A Fuaran emission must be exactly-valid typed wire JSON – the decoder refuses anything malformed rather than guessing at it. For each provider we offer the single model the evaluation measures as the best default for that job – not necessarily the frontier flagship: high-capability mid-tier models at modest reasoning settings keep winning on correct wire per token. The choice is whose key you bring, not which tier." ] ] ]
           Html.p
             [ prop.className "pg-connect-note"
               prop.children

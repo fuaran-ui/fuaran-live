@@ -186,6 +186,28 @@ let private playgroundDoor: ReactElement =
                         "Leave the zero-egress showcase for the hands-on half: **bring your own key** and prompt a model to emit live Fuaran UI. Your key is held in memory only and sent solely to your chosen provider – the one place on the site that talks to the outside world." ] }
           ) ] ]
 
+/// The door to the documentation (the reciprocal of the docs site's "Demos"
+/// footer link): the reference half of the triangle, for the visitor who has
+/// seen the demos and wants to build.
+let private docsDoor: ReactElement =
+  Html.a
+    [ prop.className "ds-playground-door"
+      prop.href "https://fuaran-ui.io"
+      prop.target "_blank"
+      prop.rel "noreferrer"
+      prop.children
+        [ Html.span [ prop.className "ds-door-kicker"; prop.text "The reference door →" ]
+          renderNode (
+            Fuaran.card
+              "ds-docs-door-card"
+              { Defaults.card with
+                  Heading = Some(TextSource.Literal "Read the docs – fuaran-ui.io")
+                  Children =
+                    [ Fuaran.markdown
+                        "ds-docs-door-blurb"
+                        "The language guide, the wire-format specification and conformance corpus, the live component reference, and get-started tracks for all nine host languages." ] }
+          ) ] ]
+
 let landing: ReactElement =
   Html.div
     [ prop.className "ds-landing"
@@ -195,7 +217,8 @@ let landing: ReactElement =
             [ prop.className "ds-pillar-grid"
               prop.children [ for p in Pillars.allPillars -> pillarCard p ] ]
           evaluationTile
-          playgroundDoor ] ]
+          playgroundDoor
+          docsDoor ] ]
 
 // ─── pillar page (its demos) ────────────────────────────────────────────────
 

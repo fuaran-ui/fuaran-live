@@ -1,7 +1,10 @@
 module Fuaran.Live.Navigator
 
 // ============================================================================
-//  The Navigator — a keyboard-driven cursor over the session's live tree.
+//  The Navigator — a button-driven cursor over the session's live tree.
+//  (Keyboard-driven until 2026-07-30 — see the suspension note at the root
+//  element: the single-key bindings collided with typing in the property
+//  fields, so the walk is mouse-first and `onKeyDown` is kept but unwired.)
 //
 //  The playground already shows you the tree three ways: rendered (the live
 //  preview), as canonical wire JSON (the inspector), and as builder source (the
@@ -36,7 +39,7 @@ module Fuaran.Live.Navigator
 //  session-free module with no key store, no effect ports and no React, so the
 //  zero-egress showcase can link the SAME walk this tab drives rather than
 //  mirroring it. This module is the tab: the session, the panels, the DOM
-//  highlight and the keyboard.
+//  highlight and the controls.
 // ============================================================================
 
 open Fable.Core
@@ -293,12 +296,10 @@ let private publishCursor (path: string array) : unit =
 
 // ─── the tab view ────────────────────────────────────────────────────────────
 
+// The single-key binding catalogue this hint used to enumerate is SUSPENDED —
+// see the suspension note at the root element below.
 let private helpHint =
-  "↓/j next · ↑/k previous · ←/h parent · →/l first child · Home root · \
-a accessibility lens · f/F next/previous finding · \
-n insert · m pick up/drop · Alt+↑/↓ reorder · Delete remove (twice to confirm) · Esc cancel · \
-Ctrl+Z undo · Ctrl+Shift+Z redo. \
-The walk is depth-first and stops at both ends — it does not wrap."
+  "The walk is depth-first and stops at both ends — it does not wrap."
 
 /// A placement in words, for the placement select and the destination readout.
 let private describePlacement (placement: StructuralEdit.Placement) : string =
@@ -536,7 +537,22 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
   let stepHistory (f: Session.SessionState -> Session.SessionState option) = f session |> Option.iter onEdit
 
   let onKeyDown (ev: Browser.Types.KeyboardEvent) =
-    let handled =
+    // Keys typed INTO a field belong to the field, not to the walk (reported
+    // 2026-07-30: Backspace in a property input armed a node removal, and the
+    // letter bindings fired while typing). Key events bubble here from the
+    // property / structural editors' inputs, so any key whose target is an
+    // editable element is left entirely alone — including Escape, which the
+    // editors claim for their own draft-reset.
+    let inEditableTarget =
+      let el = ev.target :?> Browser.Types.HTMLElement
+
+      not (isNull (box el))
+      && (el.tagName = "INPUT"
+          || el.tagName = "TEXTAREA"
+          || el.tagName = "SELECT"
+          || el.isContentEditable)
+
+    let handle () =
       // Modified keys first: the plain-letter moves below are single-key
       // bindings, so Ctrl+Z must be claimed before `ev.key` is matched bare.
       // Browsers report the letter case-shifted while Shift is held, hence both.
@@ -616,6 +632,8 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
         true
       | _ -> false
 
+    let handled = if inEditableTarget then false else handle ()
+
     if handled then
       ev.preventDefault ()
 
@@ -643,13 +661,13 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
               [ prop.className "fl-btn ghost"
                 prop.text "↶ Undo"
                 prop.disabled (not (OpLog.canUndo session))
-                prop.title "Ctrl+Z — replay the session to the previous op"
+                prop.title "Replay the session to the previous op"
                 prop.onClick (fun _ -> stepHistory OpLog.undo) ]
             Html.button
               [ prop.className "fl-btn ghost"
                 prop.text "↷ Redo"
                 prop.disabled (not (OpLog.canRedo session))
-                prop.title "Ctrl+Shift+Z — replay one op forward"
+                prop.title "Replay one op forward"
                 prop.onClick (fun _ -> stepHistory OpLog.redo) ]
             Html.button
               [ prop.className "fl-btn ghost"
@@ -782,7 +800,7 @@ let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState 
                 prop.text (
                   "Carrying #"
                   + id
-                  + " — walk to where it should go and press Drop (m). The move appends; a placement that is not last \
+                  + " — walk to where it should go and press Drop. The move appends; a placement that is not last \
 adds a ReorderChildren naming every sibling."
                 ) ]
 
@@ -800,7 +818,7 @@ adds a ReorderChildren naming every sibling."
                       [ Html.button
                           [ prop.className (if paletteOpen then "fl-btn" else "fl-btn ghost")
                             prop.text "＋ Insert…"
-                            prop.title "n — choose a kind and a placement"
+                            prop.title "Choose a kind and a placement"
                             prop.onClick (fun _ ->
                               setPaletteOpen (not paletteOpen)
                               setStructuralError None) ]
@@ -811,22 +829,22 @@ adds a ReorderChildren naming every sibling."
                               | Some _ -> "▼ Drop here"
                               | None -> "✥ Pick up"
                             )
-                            prop.title "m — pick the focused node up, then walk to its new parent and drop it"
+                            prop.title "Pick the focused node up, then walk to its new parent and drop it"
                             prop.onClick (fun _ -> doPickUpOrDrop ()) ]
                         Html.button
                           [ prop.className "fl-btn ghost"
                             prop.text "⤒ Move up"
-                            prop.title "Alt+↑ — ReorderChildren naming the full sibling order"
+                            prop.title "ReorderChildren naming the full sibling order"
                             prop.onClick (fun _ -> doNudge -1) ]
                         Html.button
                           [ prop.className "fl-btn ghost"
                             prop.text "⤓ Move down"
-                            prop.title "Alt+↓ — ReorderChildren naming the full sibling order"
+                            prop.title "ReorderChildren naming the full sibling order"
                             prop.onClick (fun _ -> doNudge 1) ]
                         Html.button
                           [ prop.className (if removeArmed then "fl-btn" else "fl-btn ghost")
                             prop.text (if removeArmed then "Confirm remove" else "🗑 Remove")
-                            prop.title "Delete — press twice; the whole subtree goes, and Ctrl+Z brings it back"
+                            prop.title "Press twice; the whole subtree goes, and Undo brings it back"
                             prop.onClick (fun _ -> if removeArmed then doRemove () else setRemoveArmed true) ]
                         (if removeArmed then
                            Html.button
@@ -839,23 +857,33 @@ adds a ReorderChildren naming every sibling."
                 carrying
                 refusal ] ]
 
-      // The step row (2026-07-30): the walk's two primary motions pinned above
-      // the breadcrumb, so the tree is clickable-through without the keyboard
-      // or scrolling down to the full control row below the card.
+      // The step row (2026-07-30): ALL the walk's motions, pinned above the
+      // breadcrumb. With the keyboard bindings suspended these buttons are the
+      // walk, so they live where the eye starts, in one row.
       let stepRow =
         Html.div
           [ prop.className "fl-nav-controls fl-nav-step-row"
             prop.children
               [ Html.button
                   [ prop.className "fl-btn ghost"
-                    prop.title "The previous node in the walk (↑ on the keyboard)"
+                    prop.title "Up to the enclosing node"
+                    prop.text "◂ Parent"
+                    prop.onClick (fun _ -> move parent) ]
+                Html.button
+                  [ prop.className "fl-btn ghost"
+                    prop.title "The previous node in the walk (depth-first)"
                     prop.text "▴ Previous"
                     prop.onClick (fun _ -> move prev) ]
                 Html.button
                   [ prop.className "fl-btn ghost"
-                    prop.title "The next node in the walk (↓ on the keyboard)"
+                    prop.title "The next node in the walk (depth-first)"
                     prop.text "▾ Next"
-                    prop.onClick (fun _ -> move next) ] ] ]
+                    prop.onClick (fun _ -> move next) ]
+                Html.button
+                  [ prop.className "fl-btn ghost"
+                    prop.title "Down into the node's first child"
+                    prop.text "First child ▸"
+                    prop.onClick (fun _ -> move firstChild) ] ] ]
 
       Html.div
         [ prop.className "fl-nav-body"
@@ -864,43 +892,31 @@ adds a ReorderChildren naming every sibling."
               crumbs
               card
               structuralPanel
-              Html.div
-                [ prop.className "fl-nav-controls"
-                  prop.children
-                    [ Html.button
-                        [ prop.className "fl-btn ghost"
-                          prop.text "◂ Parent"
-                          prop.onClick (fun _ -> move parent) ]
-                      Html.button
-                        [ prop.className "fl-btn ghost"
-                          prop.text "▴ Previous"
-                          prop.onClick (fun _ -> move prev) ]
-                      Html.button
-                        [ prop.className "fl-btn ghost"
-                          prop.text "▾ Next"
-                          prop.onClick (fun _ -> move next) ]
-                      Html.button
-                        [ prop.className "fl-btn ghost"
-                          prop.text "First child ▸"
-                          prop.onClick (fun _ -> move firstChild) ] ] ]
               // Phase 717 — the lens toggle + the walk's audit summary.
               A11yWalk.toggle tree a11yLens (fun () -> setA11yLens (not a11yLens))
               historyControls ] ]
     | _ -> emptyState
 
+  // Keyboard navigation SUSPENDED (operator decision 2026-07-30). The
+  // single-key bindings (`j`/`k`, bare arrows, `n`, `m`, Delete…) collided
+  // with ordinary typing — a Backspace in a property field armed a node
+  // removal — and with ordinary page expectations, and every gesture has a
+  // button equivalent, so the walk is mouse-first now: `onKeyDown` above is
+  // deliberately NOT wired (and the `tabIndex`/`role "application"` focus
+  // surface went with it). It is kept, with its editable-target guard, for a
+  // deliberate opt-in revival rather than deleted; UI text no longer
+  // references any key.
   Html.div
     [ prop.className "fl-nav"
-      prop.tabIndex 0
-      prop.role "application"
+      prop.role "group"
       prop.ariaLabel "Tree navigator"
-      prop.onKeyDown onKeyDown
       prop.children
         [ Html.p
             [ prop.className "fl-nav-intro"
               prop.text
-                "Walk the tree the model emitted, and edit it. Use the arrow buttons (or click here and drive it from \
-the keyboard) — the node under the cursor is outlined in the live preview, highlighted in the Source card, and its \
-properties are editable in the card below. Every edit becomes a tree op, checked before it is applied." ]
+                "Walk the tree the model emitted, and edit it. Use the arrow buttons — the node under the cursor is \
+outlined in the live preview, highlighted in the Source card, and its properties are editable in the card below. \
+Every edit becomes a tree op, checked before it is applied." ]
           Html.p [ prop.className "fl-nav-help"; prop.text helpHint ]
           body ] ]
 

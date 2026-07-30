@@ -549,7 +549,7 @@ let toggle (root: Node<obj> option) (isOn: bool) (onToggle: unit -> unit) : Reac
                 else
                   "Accessibility lens: off"
               )
-              prop.title "A — audit the tree as you walk it: what a screen reader gets from each node"
+              prop.title "Audit the tree as you walk it: what a screen reader gets from each node"
               prop.ariaPressed isOn
               prop.onClick (fun _ -> onToggle ()) ]
           Html.span [ prop.className "fl-nav-count"; prop.text readout ] ] ]

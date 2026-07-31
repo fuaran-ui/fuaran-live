@@ -53,7 +53,7 @@ jobs:
           # Rationale + bump procedure in ci.yml. The corpus checkout stays unpinned
           # deliberately — it is the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: 6fa6b7d2b485cbf7ee1d207eb08972e775402c7b
+          ref: 0735ffca92be988cc83009dad27b2e23aa8f4bbb
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4

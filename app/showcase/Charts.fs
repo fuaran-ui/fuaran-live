@@ -128,19 +128,31 @@ let private cellNum (v: CellValue) : float =
   | CellValue.Numeric n -> n
   | _ -> 0.0
 
+// fuaran#665 — column accessors and handlers read the projected wire `Row`
+// (Map<string, obj>) by field name; the typed record survives only at the
+// Source seam, projected through the REQUIRED `toRow` below.
+let private rowText (field: string) (r: Fuaran.Core.Row) : string =
+  defaultArg (Map.tryFind field r |> Option.map string) ""
+
+let private rowFloat (field: string) (r: Fuaran.Core.Row) : float =
+  match Map.tryFind field r with
+  | Some v -> unbox<float> v
+  | None -> 0.0
+
 let private sourceGrid (rows: Row list) : Node<Msg> =
   Fuaran.grid
     "sales-source"
+    (fun (r: Row) -> Map.ofList [ "quarter", box r.Quarter; "revenue", box r.Revenue; "target", box r.Target ])
     { Defaults.grid<Row, Msg> with
         Source = Binding.Static(Some(Seq.ofList rows))
-        RowKey = (fun r -> r.Quarter)
+        RowKey = rowText "quarter"
         Editable = true
         Columns =
-          [ Column.text "quarter" (fun r -> r.Quarter)
-            Column.numeric "revenue" (fun r -> r.Revenue)
-            |> Column.editable (fun r v -> Action.Dispatch(SetCell(r.Quarter, "revenue", cellNum v)))
-            Column.numeric "target" (fun r -> r.Target)
-            |> Column.editable (fun r v -> Action.Dispatch(SetCell(r.Quarter, "target", cellNum v))) ] }
+          [ Column.text "quarter" (rowText "quarter")
+            Column.numeric "revenue" (rowFloat "revenue")
+            |> Column.editable (fun r v -> Action.Dispatch(SetCell(rowText "quarter" r, "revenue", cellNum v)))
+            Column.numeric "target" (rowFloat "target")
+            |> Column.editable (fun r v -> Action.Dispatch(SetCell(rowText "quarter" r, "target", cellNum v))) ] }
 
 // ─── op-stream rendering (the hash-chained provenance of the edits) ──────────
 

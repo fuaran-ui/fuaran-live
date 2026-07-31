@@ -28,6 +28,14 @@ function runFable(args) {
   const r = spawnSync('dotnet', ['fable', ...args], { encoding: 'utf8' });
   const out = (r.stdout ?? '') + (r.stderr ?? '');
   process.stdout.write(out);
+  // A Fable CRASH (e.g. the project cracker dying on a NuGet restore failure)
+  // prints an exception, not `error FSHARP` lines — and the artefact-existence
+  // check below cannot catch it either, because the PREVIOUS build's JS is
+  // still on disk. Discovered 2026-07-31: an NU1605 package downgrade crashed
+  // the cracker and this script reported success over stale output.
+  if (/Unhandled exception/i.test(out)) {
+    return ['Fable crashed (unhandled exception) — see the output above for the cause'];
+  }
   return out
     .split(/\r?\n/)
     .filter((l) => /\berror\b/i.test(l) && /error (FSHARP|FABLE|FS\d+)/i.test(l))

@@ -44,6 +44,21 @@ So: the door is shut deliberately and stated plainly, rather than left ajar and 
 - **Telling us it's confusing.** If the thirty-second first run doesn't land, that's a real
   bug in a demo. Say so.
 
+## One rule, if you are working in a fork
+
+Worth stating even though PRs are closed, because it is the rule this project
+learned the hard way and a fork inherits the same documents:
+
+> **A claim that names a test cites a test that runs in CI. A claim that names a
+> mitigation cites code that exists.** Otherwise the claim goes.
+
+[`SECURITY.md`](SECURITY.md) once described an egress test that did not exist and
+a scrub that had never been written. Prose has no build step, so nothing failed
+when those stopped being true — and a security document is the one place where an
+unbacked sentence actively does harm, because it is what a reviewer checks
+_instead of_ checking the code. The full statement of the rule is in
+[`SECURITY.md`](SECURITY.md#the-rule-this-document-is-held-to).
+
 ## Forking
 
 Fork it. Apache-2.0 means you may use, modify, and redistribute the source, including

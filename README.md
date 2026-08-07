@@ -16,8 +16,8 @@ The model emits canonical wire JSON; the app decodes it via `@fuaran-ui/schema`,
 
 ## Bring your own key (BYOK)
 
-- Paste an Anthropic API key into the Conversation pane. It is held **in memory only** — remembered for this session, **never written to disk or any browser storage** (`localStorage` / `sessionStorage` / IndexedDB), and **never sent anywhere but the provider** (`api.anthropic.com`). Reloading or closing the tab forgets it.
-- A strict Content-Security-Policy locks the production build's `connect-src` to the provider origin, so even a compromised dependency cannot exfiltrate the key. A guard test (`test/networkEgress.test.ts`) asserts the key reaches no storage, logging, or non-provider boundary.
+- Paste a provider API key into the Conversation pane — Claude, GPT, Gemini, Kimi or Grok. It is held **in memory only** — remembered for this session, **never written to disk or any browser storage** (`localStorage` / `sessionStorage` / IndexedDB), and **never sent anywhere but the provider you chose**. Reloading or closing the tab forgets it.
+- A strict Content-Security-Policy locks the production build's `connect-src` to the provider origins, so even a compromised dependency cannot exfiltrate the key. A guard test ([`test/networkEgress.test.ts`](test/networkEgress.test.ts), run in CI) asserts the key reaches no storage, logging, telemetry, URL, or non-provider boundary — including on the error paths, and including the check that the test itself can still detect a leak.
 - The full threat model — trust boundaries, residual risks (malicious extension, XSS, supply chain), and mitigations — is in [`SECURITY.md`](SECURITY.md).
 
 ## Run it

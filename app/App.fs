@@ -2143,9 +2143,15 @@ let private connectRow (model: Model) (dispatch: Msg -> unit) : ReactElement =
                       p.Models |> List.tryHead |> Option.map _.Label |> Option.defaultValue p.Label
 
                     Html.option [ prop.value p.Id; prop.text (modelLabel + " · " + p.Label) ] ] ]
+          // Masked, and opted out of form autofill / spellcheck: the value is a
+          // credential, so it should not enter the browser's saved-form history
+          // or be shipped to a spellcheck service. (A password manager may still
+          // offer to store it — that is the user's own vault, and their call.)
           Html.input
             [ prop.className "fl-key"
               prop.type' "password"
+              prop.autoComplete "off"
+              prop.spellCheck false
               prop.placeholder (providerLabel + " key · in-tab only")
               prop.onChange (fun (v: string) -> dispatch (SetKey v)) ]
           // The recommended-settings explainer: WHY one model per provider, and
@@ -2396,6 +2402,13 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
              | None -> Html.none) ] ]
 
 // ─── boot ──────────────────────────────────────────────────────────────────
+
+// The proactive unload scrub promised by SECURITY.md's key-handling guarantees:
+// every provider's key store drops its reference on `pagehide`, so a page put
+// into the back/forward cache (where the heap survives and `unload` never fires)
+// is restored holding no key. The heap-death guarantee stands on its own; this
+// narrows the window.
+Byok.scrubOnUnload (fun () -> keyStores |> Map.iter (fun _ store -> store.Clear()))
 
 Program.mkProgram init update view
 |> Program.withReactSynchronous "fuaran-live-fs-root"

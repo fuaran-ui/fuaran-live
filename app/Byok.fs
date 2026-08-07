@@ -52,6 +52,21 @@ let createKeyStore () : KeyStore =
       member _.Clear() = inMemory <- None
       member _.Has() = inMemory.IsSome }
 
+/// The proactive unload scrub. The key already dies with the JS heap when the
+/// tab closes, so this is defence in depth rather than the guarantee itself:
+/// it drops the reference at the last moment the page is certain to get a
+/// callback. `pagehide` and not `unload` on purpose — `pagehide` also fires when
+/// the page enters the back/forward cache, where the heap SURVIVES and `unload`
+/// never runs, so a page restored from bfcache comes back holding no key.
+/// Host-agnostic: a non-browser host (a test, a server) simply has no `window`
+/// and the call is a no-op.
+let scrubOnUnload (clear: unit -> unit) : unit =
+  emitJsStatement
+    clear
+    "if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+             window.addEventListener('pagehide', function () { $0(); });
+         }"
+
 // ─── browser effect ports (port of browserEffects.ts) ────────────────────────
 
 /// The browser implementation of the `EffectPorts` seam. `Download` builds an
@@ -250,7 +265,16 @@ let browserHttpTransport: IHttpTransport =
               :: [ for k, v in request.Headers -> k, box v ]
             )
 
-          let init = createObj [ "method" ==> request.Method; "headers" ==> headerObj ]
+          // `redirect: 'error'` — never the `follow` default. Browsers strip
+          // `Authorization` when a redirect crosses origins, but they do NOT
+          // strip custom headers: a 30x from one allowlisted provider origin to
+          // another would forward `x-api-key` / `x-goog-api-key` intact, and the
+          // CSP cannot see the difference because both origins are on the
+          // allow-list. No provider endpoint here legitimately redirects, so
+          // failing the request is the correct outcome and the header can never
+          // be replayed to an origin the caller did not choose.
+          let init =
+            createObj [ "method" ==> request.Method; "headers" ==> headerObj; "redirect" ==> "error" ]
 
           match request.Body with
           | Some body -> init?body <- body
@@ -296,6 +320,40 @@ let private statusToKind (status: int) : ProviderErrorKind =
   elif status = 429 then RateLimit
   else ProviderFault
 
+// ─── secret redaction on the error path ──────────────────────────────────────
+//
+// The key rides an auth header and nothing else, but an error MESSAGE is a
+// different surface from a request. Two of the strings below originate OUTSIDE
+// this app: the vendor's own `error.message` (a provider that echoes back the
+// credential it rejected puts the key in it) and a transport exception's text.
+// Either would flow into `ProviderError.Message`, and from there to the UI, the
+// `Warn` port, and any log the host keeps. So the single egress helper redacts
+// its own auth-header values out of everything it surfaces. Nothing observed
+// today puts a key there — the point is that nothing can.
+
+/// Header names whose value is, or contains, the BYOK key.
+let private authHeaderNames = [ "x-api-key"; "authorization"; "x-goog-api-key" ]
+
+/// The secret substrings carried by `headers`: each auth header's value, plus
+/// the bare key behind an `Authorization: Bearer ` scheme prefix. Values shorter
+/// than a plausible credential are dropped so a placeholder or an empty key can
+/// never blank out an entire message.
+let private secretsOf (headers: (string * string) list) : string list =
+  headers
+  |> List.filter (fun (name, _) -> List.contains (name.ToLower()) authHeaderNames)
+  |> List.collect (fun (_, value) ->
+    if value.StartsWith "Bearer " then
+      [ value; value.Substring 7 ]
+    else
+      [ value ])
+  |> List.filter (fun secret -> secret.Length >= 8)
+  |> List.distinct
+
+/// Replace every secret substring in `text` with a fixed marker.
+let private redactSecrets (secrets: string list) (text: string) : string =
+  secrets
+  |> List.fold (fun (acc: string) secret -> acc.Replace(secret, "[redacted]")) text
+
 /// The vendor error message (`.error.message`) from a non-2xx body – Anthropic,
 /// OpenAI, and Gemini all nest it there. Falls back to the bare status text.
 let private vendorErrorMessage (body: string) : string option =
@@ -315,6 +373,7 @@ let private postJson
   : Async<Result<JsonValue, ProviderError>> =
   async {
     let request = HttpRequest.post url headers (JsonHost.serialize body)
+    let secrets = secretsOf headers
 
     try
       let! response = browserHttpTransport.Send request
@@ -336,13 +395,13 @@ let private postJson
         return
           Result.Error
             { Kind = statusToKind response.StatusCode
-              Message = detail
+              Message = redactSecrets secrets detail
               Status = Some response.StatusCode }
     with ex ->
       return
         Result.Error
           { Kind = Network
-            Message = ex.Message
+            Message = redactSecrets secrets ex.Message
             Status = None }
   }
 
@@ -1224,6 +1283,101 @@ let parseAgenticResponseFlat
      StopReason = stopStr
      InTokens = (usage |> Option.map (fun u -> u.InputTokens) |> Option.defaultValue 0)
      OutTokens = (usage |> Option.map (fun u -> u.OutputTokens) |> Option.defaultValue 0) |}
+
+/// Every provider origin the registry can egress to, flattened for the test
+/// boundary. This is the mirror side of `src/byok/origins.ts` (the constants
+/// vite.config.ts builds the CSP `connect-src` from): the egress test asserts
+/// the two sets are equal, so "the policy and the egress code cannot drift
+/// apart" is enforced rather than merely asserted in a comment.
+let providerOriginsFlat () : string array =
+  providers |> List.map _.Origin |> List.toArray
+
+let private errorKindName (kind: ProviderErrorKind) : string =
+  match kind with
+  | Config -> "config"
+  | Auth -> "auth"
+  | RateLimit -> "rate-limit"
+  | Network -> "network"
+  | ProviderFault -> "provider-fault"
+
+/// Drive ONE complete provider round trip for `providerId` — a fresh memory-only
+/// key store holding `key`, the real adapter, the real egress helper, the real
+/// `fetch` call — against whatever `fetch` the host has installed, and flatten
+/// the outcome for the vitest boundary. `agentic` selects the tool-use path.
+///
+/// This is the surface `test/networkEgress.test.ts` drives: the test installs an
+/// instrumented `fetch` plus fake storage/console/telemetry globals, runs the
+/// probe over every provider and every failure branch, and asserts the key
+/// reached the auth header and nowhere else. The failure branches matter most —
+/// a credential escapes through a message far more plausibly than through a
+/// request — so the returned `Message` is asserted as carefully as the request.
+let egressProbeFlat
+  (providerId: string)
+  (key: string)
+  (agentic: bool)
+  : JS.Promise<
+      {| Kind: string
+         Message: string
+         Text: string |}
+     >
+  =
+  let store = createKeyStore ()
+  store.Set key
+  let descriptor = descriptorFor providerId
+  let getKey () = store.Get()
+
+  let flat
+    kind
+    message
+    text
+    : {| Kind: string
+         Message: string
+         Text: string |}
+    =
+    {| Kind = kind
+       Message = message
+       Text = text |}
+
+  async {
+    if agentic then
+      match descriptor.CreateAgentic with
+      | None -> return flat "unsupported" "" ""
+      | Some mk ->
+        let request: AgentRequest =
+          { System = "sys"
+            Model = descriptor.DefaultModel
+            MaxTokens = 256
+            Tools =
+              [ { Name = "getNodeState"
+                  Description = "read a node"
+                  InputSchema = createObj [ "type" ==> "object" ] } ]
+            Messages =
+              [ { Role = User
+                  Content = [ AgentContentBlock.Text "build it" ] } ] }
+
+        match! (mk getKey).SendAgentic request with
+        | AgentOutcome.Error e -> return flat (errorKindName e.Kind) e.Message ""
+        | AgentOutcome.Ok(blocks, _, _) ->
+          let text =
+            blocks
+            |> List.choose (function
+              | AgentContentBlock.Text t -> Some t
+              | _ -> None)
+            |> String.concat ""
+
+          return flat "ok" "" text
+    else
+      let request: ProviderRequest =
+        { System = "sys"
+          Model = descriptor.DefaultModel
+          MaxTokens = 256
+          Messages = [ { Role = User; Content = "build it" } ] }
+
+      match! (descriptor.Create getKey).Send request with
+      | ProviderOutcome.Error e -> return flat (errorKindName e.Kind) e.Message ""
+      | ProviderOutcome.Ok(text, _) -> return flat "ok" "" text
+  }
+  |> Async.StartAsPromise
 
 /// `estimateCostUsd` flattened for the vitest boundary: -1.0 ⇒ unknown model
 /// (the readout shows tokens only).

@@ -129,7 +129,13 @@
          IHttpTransport egress seam, retry, and the SSE streaming state
          machine. Byok.fs expresses the three providers over this substrate
          and drives them through a browser fetch IHttpTransport. Compile
-         order = dependency order (mirrors the original project). -->
+         order = dependency order (mirrors the original project).
+
+         Vendored 2026-07-15 as a MODIFIED copy of the author's own
+         Apache-2.0 wire layer (Apache-2.0 §4(b)): the sources were renamed
+         into this single namespace and reformatted to this repo's F# style.
+         Treat them as a maintained fork, not upstream code — a fix made
+         here is a fix made to this copy alone. -->
     <Compile Include="vendor\aiwire\JsonValue.fs" />
     <Compile Include="vendor\aiwire\JsonHost.fs" />
     <Compile Include="vendor\aiwire\Contract.fs" />

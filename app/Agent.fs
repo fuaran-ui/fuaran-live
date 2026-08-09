@@ -337,14 +337,38 @@ let getBindingValue (treeJson: string option) (id: string) : obj =
   var addBranch = function(branch){
     if (branch == null || typeof branch !== 'object') return;
     if (Array.isArray(branch.allOf)) {
-      var disc = null, specName = null;
+      // Two allOf shapes ride the schema: the legacy `$ref` + `$type`-const
+      // pair, and (since fuaran#768) an INLINE object part carrying its own
+      // properties/required plus an `anyOf` of alternative required-sets (the
+      // Switch selector: `stateKey` OR `on`). Merge inline parts, and satisfy
+      // an anyOf-of-required by adopting its FIRST alternative — the schema
+      // lists the canonical spelling first, and a synthesiser must pick one.
+      var disc = null, specName = null, mergedReq = [], mergedProps = {};
       branch.allOf.forEach(function(part){
         if (part && typeof part.$ref === 'string') specName = part.$ref.replace('#/$defs/','');
-        else { var c = constOf(part); if (c) disc = c; }
+        else if (part) {
+          var c = constOf(part); if (c) disc = c;
+          if (part.properties) {
+            for (var pk in part.properties)
+              if (pk !== '$type' && Object.prototype.hasOwnProperty.call(part.properties, pk))
+                mergedProps[pk] = part.properties[pk];
+          }
+          if (Array.isArray(part.required))
+            part.required.forEach(function(r){ if (r !== '$type' && mergedReq.indexOf(r) < 0) mergedReq.push(r); });
+          if (Array.isArray(part.anyOf)) {
+            var first = part.anyOf[0];
+            if (first && Array.isArray(first.required))
+              first.required.forEach(function(r){ if (mergedReq.indexOf(r) < 0) mergedReq.push(r); });
+          }
+        }
       });
       if (disc) {
         var spec = specName ? defs[specName] : null;
-        kindBranch[disc] = { specName: specName, required: (spec && spec.required) || [], properties: (spec && spec.properties) || {} };
+        kindBranch[disc] = {
+          specName: specName,
+          required: (spec && spec.required) || mergedReq,
+          properties: (spec && spec.properties) || mergedProps
+        };
       }
     } else {
       var c = constOf(branch);

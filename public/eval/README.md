@@ -74,9 +74,12 @@ single-shot claims (their multi-turn cells are routed out by the publisher).
         "condition": "fuaran",
         "modelPin": "claude-opus-4-8@low",
         "cells": 27,
-        "usdAtTurn3": 0.1566, "cellsAtTurn3": 27,
-        "usdAtTurn5": 0.3339, "cellsAtTurn5": 6,
-        "identityMean": 0.986, "identityCells": 24,
+        "usdAtTurn3": 0.1566,
+        "cellsAtTurn3": 27,
+        "usdAtTurn5": 0.3339,
+        "cellsAtTurn5": 6,
+        "identityMean": 0.986,
+        "identityCells": 24,
         "pricingRetrieved": "2026-07-30"
       }
     ],

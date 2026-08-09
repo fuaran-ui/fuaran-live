@@ -13,9 +13,13 @@ module Fuaran.Showcase.Notarised
 //  exact link and the doctored replay is refused, with the library's real
 //  `VerificationError` shown verbatim.
 //
-//  Honest scope: hash-chaining proves the integrity of the record, not the
-//  cryptographic identity of the author – signed attestation is a separate,
-//  future concern, and the footer says so rather than overclaiming.
+//  Honest scope: the chain is an unkeyed SHA-256 digest, so it catches
+//  corruption and a casual rewrite like the button's – NOT an attacker with
+//  write access to the store, who recomputes every hash after the entry they
+//  changed. So this is corruption detection, not tamper evidence, and it
+//  carries no cryptographic identity of the author either. Signing is a
+//  separate seam and is not shipped; the honesty panel says so rather than
+//  letting the demo imply otherwise.
 // ============================================================================
 
 open System
@@ -358,10 +362,10 @@ let private NotarisedView () : ReactElement =
                           "Every turn is a real hash-chained op-record: the hash is computed over the operation, its sequence, timestamp, and author, linked to the previous hash. The dossier and audit strip read that chain directly." ]
                     Html.li
                       [ prop.text
-                          "The tamper genuinely rewrites a historical op's payload and re-runs the shipped Verify.chain – the red link and the error text are the library's actual output, not a staged failure. The doctored replay is refused." ]
+                          "The tamper genuinely rewrites a historical op's payload and re-runs the shipped Verify.chain – the red link and the error text are the library's actual output, not a staged failure. The doctored replay is refused. Note what the button does: it rewrites one op and leaves the following hashes in place, which is what corruption or a careless edit looks like. Someone with write access to the store would recompute those hashes, so the chain is corruption detection rather than tamper evidence." ]
                     Html.li
                       [ prop.text
-                          "Authorship is mixed and accountable: two of the nine turns are human edits, colour-coded throughout. Hash-chaining proves the integrity of the record, not the cryptographic identity of the author – attested identity is a separate concern; this page does not overclaim it." ]
+                          "Authorship is mixed and accountable: two of the nine turns are human edits, colour-coded throughout. The chain links the record together, but it proves nothing about the cryptographic identity of the author – signing is a separate seam and is not shipped, so this page claims a checkable record rather than an attested one." ]
                     Html.li
                       [ prop.children
                           [ Html.text

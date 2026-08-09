@@ -45,8 +45,10 @@ type ConversationTurn = { Role: ProviderRole; Content: string }
 // abstractions) is the same DU the panel chain records and the same one the
 // other hosts encode byte-identically. Folding it through
 // `HashChain.computeHash` puts it INSIDE the hash, so re-attributing an op after
-// the fact breaks the chain — attribution is tamper-evident, not merely written
-// down. That is the difference between a log and provenance.
+// the fact breaks the chain — attribution is part of the record, not merely
+// written down beside it. That is the difference between a log and provenance.
+// The chain is unkeyed, so breaking it catches corruption and a careless edit,
+// not a writer who recomputes the following hashes; signing is a separate seam.
 
 /// A fixed timestamp, so the session chain is CONTENT-ADDRESSED — a pure
 /// function of prev-hash + sequence + actor + op, exactly as the panel chain is
@@ -443,9 +445,9 @@ let allMessageContents (session: SessionState) (prompt: string) : string array =
 //     truncation safe: dropping a line loses emphasis, never data.
 //
 // The correction trail comes from the Phase 712 record, which is why the
-// attribution had to be tamper-evident before this could be built: "the human's
-// ops since the last emission" is a claim about provenance, and a log anyone
-// could rewrite afterwards would make it a guess.
+// attribution had to be inside the hash before this could be built: "the human's
+// ops since the last emission" is a claim about provenance, and a log whose
+// attribution could be edited afterwards without trace would make it a guess.
 
 /// The human's ops since the last model emission — the trailing run of `Human`
 /// entries in the APPLIED prefix of the record (the redo tail is excluded for

@@ -79,7 +79,7 @@
     </Compile>
     <!-- The op-record + hash-chain slice (Phase 466): each agent panel turn is
          its own hash-chained op-stream scope, so a panel's provenance is
-         tamper-evident and replayable in the browser. Fable-safe (the showcase
+         chain-checkable and replayable in the browser. Fable-safe (the showcase
          project Fable-compiles the whole parent project already). These three
          lean on the Fuaran.Core spine packages added below. -->
     <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\OpRecord.fs">

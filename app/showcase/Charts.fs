@@ -17,9 +17,11 @@ module Fuaran.Showcase.Charts
 //      no charting library. Toggle the "variance" derived column and the pipeline
 //      grows a step; the chart re-plots it live.
 //    • Every edit is folded into a real hash-chained op-stream (the shipped
-//      `HashChain.computeHash`): a tamper-evident, append-only provenance log of
-//      the typed operations between chart versions – the figure is notarised AND
-//      diffable, and the log proves it.
+//      `HashChain.computeHash`): an append-only provenance log of the typed
+//      operations between chart versions – the figure is notarised AND diffable,
+//      and the log proves it. The chain is an unkeyed digest, so it detects
+//      corruption and casual alteration; it is not tamper evidence, and the
+//      honesty panel says so.
 //
 //  Nothing here needs a server. The wire drawer shows the genuine canonical JSON
 //  – the chart node now carries its source table AND its transform pipeline, so
@@ -237,7 +239,7 @@ let private ChartsView () : ReactElement =
 
   // On any change, derive the real structural tree-diff between the previously
   // rendered chart and the new one, and FOLD the whole batch into ONE
-  // hash-chained op-stream entry – a tamper-evident provenance record of the
+  // hash-chained op-stream entry – a chain-linked provenance record of the
   // edit (the shipped `HashChain.computeHash`, running under Fable in the
   // browser). One edit ⇒ one chained entry, hashing the batched typed ops; the
   // summary names the op kinds honestly rather than surfacing each facet delta.
@@ -371,7 +373,7 @@ let private ChartsView () : ReactElement =
                 [ prop.className "ch-chain-head"
                   prop.text (
                     sprintf
-                      "Op-stream – %d hash-chained edit(s). Each entry links to the previous by hash, so the history is tamper-evident, not just recorded:"
+                      "Op-stream – %d hash-chained edit(s). Each entry links to the previous by hash, so a corrupted or altered entry breaks the chain instead of replaying quietly:"
                       (List.length chain)
                   ) ]
               Html.ul
@@ -413,7 +415,7 @@ let private ChartsView () : ReactElement =
                           "The chart binds its data with a declarative transform pipeline that rides the wire. The renderer runs the real Fuaran dataframe evaluator in your browser (compiled to JavaScript), computes the rows – including the derived variance column when toggled – and renders them as inline SVG. No server, no charting library, no pre-baked numbers." ]
                     Html.li
                       [ prop.text
-                          "Every edit is folded into a hash-chained op-stream: each entry links to the previous by hash, so the edit history is tamper-evident. The figure is notarised (the content hash) and diffable (the typed ops) – and portable, because the same wire renders byte-for-byte on the TypeScript and Python hosts, server-side and headless." ]
+                          "Every edit is folded into a hash-chained op-stream: each entry links to the previous by hash, so a corrupted or altered entry breaks the chain. The chain is an unkeyed digest, which makes it corruption detection rather than tamper evidence – anyone who can write the store can recompute the hashes that follow their edit, and catching that needs signing, a separate seam that is not shipped. The figure is notarised (the content hash) and diffable (the typed ops) – and portable, because the same wire renders byte-for-byte on the TypeScript and Python hosts, server-side and headless." ]
                     Html.li
                       [ prop.children
                           [ Html.text "Author it from a notebook: the same shape a "

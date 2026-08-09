@@ -606,7 +606,7 @@ let private TeleportView (bare: bool) : ReactElement =
           prop.children
             [ Html.p
                 [ prop.className "tp-tamper-what"
-                  prop.text ("In transit, we " + what + " – the signature was left untouched.") ]
+                  prop.text ("In transit, we " + what + " – the digest was left untouched.") ]
               Html.code [ prop.className "tp-tamper-refusal"; prop.text refusal ]
               Html.p
                 [ prop.className "tp-tamper-note"

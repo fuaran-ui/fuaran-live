@@ -58,6 +58,40 @@ site – mirroring the receiver-origin override pattern used elsewhere on the si
 }
 ```
 
+### `sessionEconomics` (optional — Tier-B multi-turn companion)
+
+Present only when the publish carried a multi-turn session window. Multi-turn cells
+publish **here and only here** — `parsePassRate` and every other primary metric remain
+single-shot claims (their multi-turn cells are routed out by the publisher).
+
+```json
+{
+  "sessionEconomics": {
+    "cohort": "618-stage2-20260807",
+    "excludedTasks": [{ "id": "…", "reason": "…" }],
+    "arms": [
+      {
+        "condition": "fuaran",
+        "modelPin": "claude-opus-4-8@low",
+        "cells": 27,
+        "usdAtTurn3": 0.1566, "cellsAtTurn3": 27,
+        "usdAtTurn5": 0.3339, "cellsAtTurn5": 6,
+        "identityMean": 0.986, "identityCells": 24,
+        "pricingRetrieved": "2026-07-30"
+      }
+    ],
+    "note": "…self-describing measurement note…"
+  }
+}
+```
+
+- `usdAtTurnK` is the mean cumulative **billed** USD through turn K over the sessions
+  that reached turn K — `cellsAtTurnK` is that denominator, and it rides beside every
+  figure deliberately. A missing `usdAtTurnK` means the model is unpriced, never zero.
+- `identityMean` is the fraction of prompt-named element ids present in both the first
+  and final emission, mean over measured cells only (`identityCells`).
+- `excludedTasks` disclose section-level exclusions with reasons.
+
 ### Field notes
 
 - **`passRate`** / **`adversarialPassRate`** are fractions in `0..1` (the page

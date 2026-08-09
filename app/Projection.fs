@@ -1042,6 +1042,11 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
         |> String.concat ", "
 
       "binding.i18n(" + qs (strOf "key" v) + ", { " + rendered + " })"
+  | Some "Now" ->
+    // Phase 765 — the host-furnished instant. `project` is erased on encode
+    // (the wire form is the bare `{"$type":"Now"}`), so the identity keeps
+    // the round-trip byte-exact; no smart-ctor exists in the TS tier yet.
+    "{ kind: 'Now', project: (iso) => iso }"
   | Some "Local" ->
     "binding.local("
     + tsBinding Opq.Scalar (fieldD "initialFrom" v)
@@ -1254,7 +1259,9 @@ let private ctrlDefault (kind: string) : string =
   match kind with
   | "Number"
   | "RangedNumber" -> "0"
-  | "Checkbox" -> "false"
+  // Phase 766 — Toggle shares Checkbox's boolean value slot.
+  | "Checkbox"
+  | "Toggle" -> "false"
   | "Choice"
   | "SegmentedChoice" -> "undefined"
   | "Range" -> "[0, 0]"
@@ -1337,6 +1344,9 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
   match kind with
   | "Number" -> tsInline ([ "kind", qs "Number" ] @ handler "onChange" @ [ "value", value ])
   | "Checkbox" -> tsInline ([ "kind", qs "Checkbox" ] @ handler "onToggle" @ [ "value", value ])
+  // Phase 766 — Toggle shares Checkbox's shape exactly (same onToggle handler,
+  // same boolean value slot); only the kind discriminator differs.
+  | "Toggle" -> tsInline ([ "kind", qs "Toggle" ] @ handler "onToggle" @ [ "value", value ])
   | "Choice" ->
     tsInline (
       [ "kind", qs "Choice" ]
@@ -2469,12 +2479,37 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
         + " }")
       |> String.concat ", "
 
-    call
-      "switch"
-      [ idF
-        "stateKey", qs (strOf "stateKey" k)
-        "cases", "[" + cases + "]"
-        "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
+    // Phase 768 — the selector is any Binding. The State form keeps its compact
+    // `stateKey` wire spelling and the smart-ctor expresses it directly; a
+    // non-State `on` (Selection etc.) has NO ctor surface in the TS tier yet,
+    // so the projection post-edits the built node's spec — exact, executable,
+    // and honest about the ctor gap (a future SwitchOptions.on simplifies it).
+    match JsonValue.tryField "on" k with
+    | Some onV ->
+      let built =
+        "fuaran.switch("
+        + tsObjLit
+            [ idF
+              "stateKey", "''"
+              "cases", "[" + cases + "]"
+              "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
+            depth
+        + ")"
+
+      Some(
+        "(() => { const n = "
+        + built
+        + "; return { ...n, kind: { ...n.kind, spec: { ...n.kind.spec, on: "
+        + tsBinding Opq.Scalar onV
+        + " } } }; })()"
+      )
+    | None ->
+      call
+        "switch"
+        [ idF
+          "stateKey", qs (strOf "stateKey" k)
+          "cases", "[" + cases + "]"
+          "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
   | _ -> None
 
 // ─── the modern-host Box vocabulary (Go / Kotlin / Rust / Swift) ──────────────

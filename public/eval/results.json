@@ -1,10 +1,10 @@
 {
   "status": "published",
-  "generatedAt": "2026-08-09T07:03:49Z",
-  "commit": "3e065a78",
+  "generatedAt": "2026-08-10T17:19:24Z",
+  "commit": "73bc0d32",
   "suiteVersion": "1.0",
   "sourceUrl": "https://fuaran-ui.io/eval/README.md",
-  "cohort": "since-20260730T003649Z",
+  "cohort": "since-20260730T003649Z-until-20260801T183513Z",
   "summary": {
     "totalPrompts": 1235,
     "tasks": 57,
@@ -903,5 +903,68 @@
       }
     ],
     "note": "Tier-B multi-turn session economics: cumulative billed USD through turn k, mean over sessions that reached turn k (denominator beside each figure); identity = fraction of prompt-named element ids present in both the first and final emission, mean over measured cells. Multi-turn cells publish here only \u2014 parsePassRate remains a single-shot claim."
+  },
+  "repairRecovery": {
+    "cohort": "tierc-cohort1-20260810",
+    "rubricVersion": "v2.1",
+    "conditions": [
+      {
+        "label": "fuaran",
+        "fired": 83,
+        "recovered": 60
+      },
+      {
+        "label": "jsx_shadcn",
+        "fired": 88,
+        "recovered": 71
+      },
+      {
+        "label": "feliz_bare",
+        "fired": 77,
+        "recovered": 65
+      }
+    ],
+    "families": [
+      {
+        "label": "Google Gemini",
+        "fired": 55,
+        "recovered": 46
+      },
+      {
+        "label": "OpenAI GPT",
+        "fired": 62,
+        "recovered": 39
+      },
+      {
+        "label": "Claude (Opus)",
+        "fired": 51,
+        "recovered": 38
+      },
+      {
+        "label": "xAI Grok",
+        "fired": 40,
+        "recovered": 34
+      },
+      {
+        "label": "Moonshot Kimi",
+        "fired": 40,
+        "recovered": 39
+      }
+    ],
+    "fuaranChannels": [
+      {
+        "channel": "structured",
+        "fired": 26,
+        "recovered": 16,
+        "meanRecoveryTokens": 5701
+      },
+      {
+        "channel": "judge",
+        "fired": 57,
+        "recovered": 44,
+        "meanRecoveryTokens": 6783
+      }
+    ],
+    "note": "Repair-under-error: each task\u0027s prompt DELIBERATELY instructs an invalid form; recovery is measured given the induced first failure, with each condition fed its own natural error signal (the typed decoder\u0027s structured envelope for the Fuaran condition, the compile/render gate for JSX, otherwise the judge\u0027s prose). These rates are NOT a cross-condition ranking: the instructed form stays LEGAL in the markup conditions (obeying it can pass first-shot), while only the typed-tree condition\u0027s recovery requires overriding the instruction \u2014 the numbers measure how models resolve a conflict between an insistent instruction and authoritative error feedback. Judged under the deliberate-bait rubric framing; verdicts from the post-correction rejudge."
   }
 }

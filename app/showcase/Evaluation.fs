@@ -51,6 +51,20 @@ type Summary =
     ProvidersEvaluated: int
     AdversarialPassRate: float }
 
+type RecoveryArm =
+  { Label: string
+    Fired: int
+    Recovered: int }
+
+/// Tier-C repair-under-error companion (README `repairRecovery`). The note is
+/// carried on the wire and rendered WITH the numbers — they are unciteable
+/// without it (the rates are not a cross-condition ranking).
+type RepairRecovery =
+  { Cohort: string
+    Conditions: RecoveryArm list
+    Families: RecoveryArm list
+    Note: string }
+
 type Results =
   { Generated: string
     Commit: string
@@ -58,7 +72,8 @@ type Results =
     SuiteVersion: string
     Summary: Summary
     Providers: Provider list
-    Categories: Category list }
+    Categories: Category list
+    RepairRecovery: RepairRecovery option }
 
 /// The feed state. `Awaiting` is the honest leg – no run has published to the
 /// feed yet; `Failed` is the other honest leg – the feed is absent/unparseable.
@@ -155,7 +170,23 @@ let private parseFeed (raw: string) : FeedState =
           SuiteVersion = gStr o "suiteVersion"
           Summary = summary
           Providers = [ for p in fieldArr o "providers" -> parseProvider p ]
-          Categories = [ for c in fieldArr o "categories" -> parseCategory c ] }
+          Categories = [ for c in fieldArr o "categories" -> parseCategory c ]
+          RepairRecovery =
+            let rr = field o "repairRecovery"
+
+            if isNull (box rr) then
+              None
+            else
+              let arm (a: obj) : RecoveryArm =
+                { Label = gStr a "label"
+                  Fired = gInt a "fired"
+                  Recovered = gInt a "recovered" }
+
+              Some
+                { Cohort = gStr rr "cohort"
+                  Conditions = [ for a in fieldArr rr "conditions" -> arm a ]
+                  Families = [ for a in fieldArr rr "families" -> arm a ]
+                  Note = gStr rr "note" } }
 
 // ─── the dashboard body (a Fuaran tree – exhibit zero) ───────────────────────
 
@@ -293,6 +324,51 @@ let private dashboardTree (r: Results) : Node<unit> =
 
   if not r.Categories.IsEmpty then
     children <- children @ [ headingNode "ev-h-cat" 2 "By category"; categoryGrid ]
+
+  match r.RepairRecovery with
+  | None -> ()
+  | Some rr ->
+    let recoveryMetric (prefix: string) (i: int) (a: RecoveryArm) : Node<unit> =
+      let rate =
+        if a.Fired > 0 then
+          float a.Recovered / float a.Fired
+        else
+          0.0
+
+      metricNode
+        (sprintf "ev-rr-%s-%d" prefix i)
+        a.Label
+        rate
+        (CellFormat.Percent(Some 0))
+        (toneFor rate)
+        (sprintf "%d / %d recovered given an induced failure" a.Recovered a.Fired)
+
+    let condGrid =
+      Fuaran.gridLayout
+        "ev-rr-conds"
+        { Defaults.gridLayout<unit> with
+            Cols = 3
+            Children = [ for i, a in List.indexed rr.Conditions -> recoveryMetric "c" i a ] }
+
+    let famGrid =
+      Fuaran.gridLayout
+        "ev-rr-fams"
+        { Defaults.gridLayout<unit> with
+            Cols = 3
+            Children = [ for i, a in List.indexed rr.Families -> recoveryMetric "f" i a ] }
+
+    children <-
+      children
+      @ [ headingNode "ev-h-rr" 2 "Repair under error (Tier C)"
+          Fuaran.callout
+            "ev-rr-note"
+            { Defaults.callout with
+                Tone = ToneVariant.Info
+                Heading = Some(TextSource.Literal "Read this before the numbers")
+                Body = TextSource.Literal rr.Note }
+          condGrid
+          headingNode "ev-h-rr-fam" 3 "By model family"
+          famGrid ]
 
   Fuaran.dashboard
     "ev-dash"

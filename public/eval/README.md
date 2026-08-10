@@ -95,6 +95,47 @@ single-shot claims (their multi-turn cells are routed out by the publisher).
   and final emission, mean over measured cells only (`identityCells`).
 - `excludedTasks` disclose section-level exclusions with reasons.
 
+### `repairRecovery` (optional — Tier-C repair-under-error companion)
+
+Present only when the publish carried a repair-under-error window. Tier-C cells never
+enter the primary metrics.
+
+```json
+{
+  "repairRecovery": {
+    "cohort": "tierc-cohort1-20260810",
+    "rubricVersion": "v2.1",
+    "conditions": [{ "label": "fuaran", "fired": 83, "recovered": 60 }],
+    "families": [{ "label": "Moonshot Kimi", "fired": 40, "recovered": 39 }],
+    "fuaranChannels": [
+      { "channel": "structured", "fired": 26, "recovered": 16, "meanRecoveryTokens": 5701 }
+    ],
+    "note": "…the design-framing note, carried on the wire…"
+  }
+}
+```
+
+**Methodology.** Each Tier-C task's prompt DELIBERATELY instructs an invalid form (a
+text string in a numeric-only slot, an arithmetic expression as a fraction, an
+invented enum value), inducing a first-emission failure. The harness then measures
+recovery: each condition is fed its own natural error signal — the typed decoder's
+structured rejection for Fuaran, the compile/render gate for JSX, otherwise the
+judge's prose — for up to three attempts. `fired` counts cells where the induced
+failure actually occurred (models may decline the wrong instruction and emit correctly
+first-shot — a measured behaviour); `recovered` counts cells that reached a passing
+state within the cap. `fuaranChannels` splits the Fuaran condition by which signal
+drove the last recovery feedback.
+
+**Read the note before the numbers.** These rates are NOT a cross-condition ranking:
+the instructed invalid form stays LEGAL in the markup conditions — a wrong value in
+JSX renders plausibly and can pass first-shot — while only the typed-tree condition
+catches it, so only there does recovery require overriding the instruction. What the
+section measures is how models resolve a conflict between an insistent instruction
+and authoritative error feedback, plus per-family induced-failure and recovery rates.
+Judging uses the deliberate-bait rubric framing (`rubricVersion` v2.1): the recovered
+state is graded against the criteria only, never penalised for replacing the
+instructed invalid form with a valid equivalent.
+
 ### Field notes
 
 - **`passRate`** / **`adversarialPassRate`** are fractions in `0..1` (the page

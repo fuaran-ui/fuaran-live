@@ -51,6 +51,25 @@ type Summary =
     ProvidersEvaluated: int
     AdversarialPassRate: float }
 
+type SessionArm =
+  { Condition: string
+    ModelPin: string
+    Cells: int
+    UsdAtTurn3: float
+    CellsAtTurn3: int
+    UsdAtTurn5: float
+    CellsAtTurn5: int
+    IdentityMean: float
+    IdentityCells: int }
+
+/// Tier-B session-economics companion (README `sessionEconomics`) — Phase 806:
+/// published since 2026-08-09, rendered at last. Denominators ride beside
+/// every figure; a missing USD reads 0.0 and renders as unpriced.
+type SessionEconomics =
+  { Cohort: string
+    Arms: SessionArm list
+    Note: string }
+
 type RecoveryArm =
   { Label: string
     Fired: int
@@ -73,6 +92,7 @@ type Results =
     Summary: Summary
     Providers: Provider list
     Categories: Category list
+    SessionEconomics: SessionEconomics option
     RepairRecovery: RepairRecovery option }
 
 /// The feed state. `Awaiting` is the honest leg – no run has published to the
@@ -171,6 +191,27 @@ let private parseFeed (raw: string) : FeedState =
           Summary = summary
           Providers = [ for p in fieldArr o "providers" -> parseProvider p ]
           Categories = [ for c in fieldArr o "categories" -> parseCategory c ]
+          SessionEconomics =
+            let se = field o "sessionEconomics"
+
+            if isNull (box se) then
+              None
+            else
+              let arm (a: obj) : SessionArm =
+                { Condition = gStr a "condition"
+                  ModelPin = gStr a "modelPin"
+                  Cells = gInt a "cells"
+                  UsdAtTurn3 = gFloat a "usdAtTurn3"
+                  CellsAtTurn3 = gInt a "cellsAtTurn3"
+                  UsdAtTurn5 = gFloat a "usdAtTurn5"
+                  CellsAtTurn5 = gInt a "cellsAtTurn5"
+                  IdentityMean = gFloat a "identityMean"
+                  IdentityCells = gInt a "identityCells" }
+
+              Some
+                { Cohort = gStr se "cohort"
+                  Arms = [ for a in fieldArr se "arms" -> arm a ]
+                  Note = gStr se "note" }
           RepairRecovery =
             let rr = field o "repairRecovery"
 
@@ -324,6 +365,45 @@ let private dashboardTree (r: Results) : Node<unit> =
 
   if not r.Categories.IsEmpty then
     children <- children @ [ headingNode "ev-h-cat" 2 "By category"; categoryGrid ]
+
+  match r.SessionEconomics with
+  | None -> ()
+  | Some se ->
+    let armCard (i: int) (a: SessionArm) : Node<unit> =
+      let turn5 = a.UsdAtTurn5 > 0.0
+
+      metricNode
+        (sprintf "ev-se-%d" i)
+        (sprintf "%s · %s" a.Condition a.ModelPin)
+        (if turn5 then a.UsdAtTurn5 else a.UsdAtTurn3)
+        (CellFormat.Currency "USD")
+        ToneVariant.Default
+        (sprintf
+          "turn 3: $%.3f (n=%d)%s · identity μ %.2f (n=%d)"
+          a.UsdAtTurn3
+          a.CellsAtTurn3
+          (if turn5 then
+             sprintf " · turn 5: $%.3f (n=%d)" a.UsdAtTurn5 a.CellsAtTurn5
+           else
+             "")
+          a.IdentityMean
+          a.IdentityCells)
+
+    children <-
+      children
+      @ [ headingNode "ev-h-se" 2 "Session economics (Tier B, multi-turn)"
+          Fuaran.callout
+            "ev-se-note"
+            { Defaults.callout with
+                Tone = ToneVariant.Info
+                Heading = Some(TextSource.Literal "How these are measured")
+                Body = TextSource.Literal se.Note }
+          Fuaran.gridLayout
+            "ev-se-arms"
+            { Defaults.gridLayout<unit> with
+                Cols = 3
+                Children =
+                  [ for i, a in List.indexed (se.Arms |> List.sortBy (fun a -> a.Condition, a.ModelPin)) -> armCard i a ] } ]
 
   match r.RepairRecovery with
   | None -> ()

@@ -324,7 +324,12 @@ let private emptyState: ReactElement =
 /// session back to the host, which is what keeps the rendered view, the
 /// inspector and every other tab on the same tree (one source of truth).
 [<ReactComponent>]
-let NavigatorPane (session: Session.SessionState) (onEdit: Session.SessionState -> unit) : ReactElement =
+let NavigatorPane
+  (site: SiteView.Site option)
+  (session: Session.SessionState)
+  (onEdit: Session.SessionState -> unit)
+  (onSite: SiteView.Action -> unit)
+  : ReactElement =
   let tree = session.Tree
   let stored, setStored = React.useState (None: NavCursor option)
 
@@ -860,9 +865,15 @@ adds a ReorderChildren naming every sibling."
                     prop.text "First child ▸"
                     prop.onClick (fun _ -> move firstChild) ] ] ]
 
+      // The site view's "Move to page…" row (beside the structural panel it
+      // belongs with): pick a destination page for the focused subtree. Renders
+      // nothing unless a page set with somewhere to move to is loaded.
+      let movePicker =
+        SiteView.MovePicker site session (cursor |> Option.bind focusedId) onSite
+
       Html.div
         [ prop.className "fl-nav-body"
-          prop.children [ stepRow; crumbs; card; structuralPanel; historyControls ] ]
+          prop.children [ stepRow; crumbs; card; structuralPanel; movePicker; historyControls ] ]
     | _ -> emptyState
 
   // Keyboard navigation SUSPENDED (operator decision 2026-07-30). The
@@ -886,8 +897,17 @@ adds a ReorderChildren naming every sibling."
 outlined in the live preview, highlighted in the Source card, and its properties are editable in the card below. \
 Every edit becomes a tree op, checked before it is applied." ]
           Html.p [ prop.className "fl-nav-help"; prop.text helpHint ]
+          // The site bar (page tabs + paired undo + the bundle paste box).
+          // Above the walk, and rendered in the empty state too — loading a
+          // page set is one of the ways a tree ARRIVES here.
+          SiteView.SiteBar site session onSite
           body ] ]
 
 /// The tab's entry point — what the playground shell mounts.
-let view (session: Session.SessionState) (onEdit: Session.SessionState -> unit) : ReactElement =
-  NavigatorPane session onEdit
+let view
+  (site: SiteView.Site option)
+  (session: Session.SessionState)
+  (onEdit: Session.SessionState -> unit)
+  (onSite: SiteView.Action -> unit)
+  : ReactElement =
+  NavigatorPane site session onEdit onSite

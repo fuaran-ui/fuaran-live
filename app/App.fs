@@ -235,6 +235,11 @@ type Model =
     /// True when transcript activity arrived while the Editor tab was showing —
     /// rendered as a dot on the Conversation tab; cleared on selecting it.
     ConvUnseen: bool
+    /// The Navigator's loaded page set (the site view): the OTHER pages'
+    /// sessions, shelved with their histories intact, while the active page's
+    /// session stays `Session` above — the single source of truth every pane
+    /// renders. `None` until a page-set bundle is loaded.
+    Site: SiteView.Site option
   }
 
 type Msg =
@@ -255,6 +260,10 @@ type Msg =
   // engine — so it must live-drive to a paired device exactly like a model
   // emission does. Distinct case only so the provenance is readable.
   | NavigatorEdit of Session.SessionState
+  // A site-view action (load / switch / cross-page move / paired undo): the
+  // semantics live in `SiteView.step`; this only folds its result and, when the
+  // live session changed, propagates it exactly like a navigator edit.
+  | SiteAction of SiteView.Action
   // "Refine from here" (Phase 715): re-prompt with the human-EDITED tree as the
   // emission context instead of the model's last emission. Distinct from `Send`
   // because it deliberately does not resume the accumulated conversation — the
@@ -744,7 +753,8 @@ let private init () : Model * Cmd<Msg> =
          WorkspaceTab.Editor
        else
          WorkspaceTab.Conversation)
-    ConvUnseen = false },
+    ConvUnseen = false
+    Site = None },
   // Register the client-only enhancers once; run an initial KaTeX pass in case a
   // permalink restored a tree carrying an equation. In audience mode also
   // subscribe to the live-drive channel.
@@ -1019,6 +1029,28 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         []
 
     { model with Session = s }, Cmd.batch [ mathEnhanceCmd; presentDeltaCmd delta ]
+  | SiteAction action ->
+    // Fold the site action (pure — `SiteView.step` owns the semantics). When
+    // the live session changed (a page-set load, a page switch, a cross-page
+    // move's source leg, a paired undo), propagate it exactly as a navigator
+    // edit is propagated: live-drive the delta to any paired audience and
+    // re-run the math enhancer. A refused action changes only the site's
+    // notice, so nothing is pushed anywhere.
+    let stepped = SiteView.step action model.Site model.Session
+
+    if stepped.SessionChanged then
+      let delta =
+        if model.Presenting || model.Pair.Status = WebRtc.PeerState.Connected then
+          Live.liveDriveDelta model.Session stepped.Session
+        else
+          []
+
+      { model with
+          Site = stepped.Site
+          Session = stepped.Session },
+      Cmd.batch [ mathEnhanceCmd; presentDeltaCmd delta ]
+    else
+      { model with Site = stepped.Site }, Cmd.none
   | AgentPanels store ->
     // A panel-turn emission advanced the panel store – the transcript's live
     // panel rows re-render from it. A panel may carry Math; re-enhance.
@@ -2319,7 +2351,7 @@ let private editorPane (model: Model) (dispatch: Msg -> unit) : ReactElement =
     [ prop.id "navigator"
       prop.children
         [ Refine.below
-            (Navigator.view model.Session (NavigatorEdit >> dispatch))
+            (Navigator.view model.Site model.Session (NavigatorEdit >> dispatch) (SiteAction >> dispatch))
             model.Session
             model.RefineBaseline
             model.AgentRunning

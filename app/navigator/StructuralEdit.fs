@@ -127,7 +127,7 @@ let defaultTarget (root: Node<obj>) (focused: NodeId) : Target option =
 // refusal the emitted op would have met, so the sentence describes the same
 // fact the engine would have reported after the fact.
 
-let private placeErrorText (error: PlaceError) : string =
+let placeErrorText (error: PlaceError) : string =
   match error with
   | PlaceError.ParentNotFound(NodeId parentId) -> "no node '" + parentId + "' to place under"
   | PlaceError.ChildlessKind(NodeId parentId) -> "'" + parentId + "' is a kind that takes no children"
@@ -149,16 +149,25 @@ let private placeErrorText (error: PlaceError) : string =
 /// rejection would leave it); a derived op goes through the very gate a
 /// property edit uses — apply to a CANDIDATE tree, refuse on a newly-introduced
 /// error-severity defect, and only then fold, recording the op against the
-/// navigator's `Human` actor. That shared channel is what makes undo cover
-/// structure for free: the replay knows nothing about which op it is replaying,
-/// so a structural op undoes because it applies.
-let private commitPlaced
+/// caller's actor. That shared channel is what makes undo cover structure for
+/// free: the replay knows nothing about which op it is replaying, so a
+/// structural op undoes because it applies.
+let private commitPlacedAs
+  (actor: Fuaran.UI.OpStream.Abstractions.Actor)
   (session: Session.SessionState)
   (planned: Result<TreeOp<obj>, PlaceError>)
   : PropertyEditor.CommitOutcome =
   match planned with
   | Error error -> PropertyEditor.Rejected(placeErrorText error)
-  | Ok op -> PropertyEditor.commitOp session op
+  | Ok op -> PropertyEditor.commitOpAs actor session op
+
+/// `commitPlacedAs` under the navigator's own origin marker — the shape every
+/// single-tree structural edit below uses.
+let private commitPlaced
+  (session: Session.SessionState)
+  (planned: Result<TreeOp<obj>, PlaceError>)
+  : PropertyEditor.CommitOutcome =
+  commitPlacedAs Session.navigatorActor session planned
 
 /// Where the cursor should land once `nodeId` is removed: the previous sibling,
 /// else the next, else the parent. Computed BEFORE the removal (the node is
@@ -421,6 +430,36 @@ let move (session: Session.SessionState) (target: Target) (moved: NodeId) : Prop
 /// Nudge `nodeId` one place among its siblings (`-1` up, `+1` down).
 let nudge (session: Session.SessionState) (nodeId: NodeId) (delta: int) : PropertyEditor.CommitOutcome =
   withRoot session (fun root -> commitPlaced session (Placement.nudgeOp root nodeId delta))
+
+// ─── cross-tree legs (the site view's "Move to page…" verb) ──────────────────
+//
+// A cross-page move is not a new op kind: it is the packaged paste (subtree
+// lift + collision-remap + placed insert) applied to the DESTINATION page's
+// tree, and an ordinary `RemoveNode` applied to the source page's — each an
+// ordinary single-tree op through the very gate above, recorded against its own
+// tree's stream. What pairs them is the actor: the caller passes the same
+// correlation-bearing actor to both legs, so each stream carries the pairing in
+// its own attributed (hash-chained) record rather than in view state beside it.
+
+/// Paste `incoming` — a subtree lifted from ANOTHER tree — at `target` in this
+/// session's tree, recorded against `actor`. Ids that collide with ones already
+/// present are remapped by the packaged paste; ids with no collision are kept.
+let pasteFromAs
+  (actor: Fuaran.UI.OpStream.Abstractions.Actor)
+  (session: Session.SessionState)
+  (target: Target)
+  (incoming: Node<obj>)
+  : PropertyEditor.CommitOutcome =
+  withRoot session (fun root -> commitPlacedAs actor session (Placement.pasteOp root incoming target))
+
+/// Remove `nodeId`, recorded against a caller-chosen actor — the source-page
+/// leg of a cross-page move.
+let removeAs
+  (actor: Fuaran.UI.OpStream.Abstractions.Actor)
+  (session: Session.SessionState)
+  (nodeId: NodeId)
+  : PropertyEditor.CommitOutcome =
+  PropertyEditor.commitOpAs actor session (TreeOp.RemoveNode nodeId)
 
 // ─── flat diagnostic surface (cross-boundary friendly) ───────────────────────
 //

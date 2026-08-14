@@ -526,7 +526,16 @@ type CommitOutcome =
 /// through this same function rather than restating the gate, so "what the
 /// navigator will accept" has exactly one definition and cannot drift into two.
 /// Pure; never throws.
-let commitOp (session: Session.SessionState) (op: TreeOp<obj>) : CommitOutcome =
+///
+/// The `actor` is the attribution the fold records — `navigatorActor` for every
+/// ordinary panel/structural edit (see `commitOp` below), a correlation-bearing
+/// actor for the site view's cross-page move, where the SAME actor recorded
+/// against two trees' streams is what pairs the two legs for undo.
+let commitOpAs
+  (actor: Fuaran.UI.OpStream.Abstractions.Actor)
+  (session: Session.SessionState)
+  (op: TreeOp<obj>)
+  : CommitOutcome =
   match session.Tree with
   | None -> Rejected "there is no tree to edit"
   | Some tree ->
@@ -538,18 +547,23 @@ let commitOp (session: Session.SessionState) (op: TreeOp<obj>) : CommitOutcome =
         let canonOp = Canon.encodeOp op
 
         // Phase 712 — the same fold, now attributed. The op is recorded
-        // against `navigatorActor` (a `Human`), which is what makes "what did
-        // the person change, as opposed to the model" answerable from the
-        // stream afterwards rather than only from memory. `recordOp` also
-        // truncates any redo tail: committing after undoing abandons the
-        // undone branch.
+        // against the caller's actor (a `Human` for every navigator surface),
+        // which is what makes "what did the person change, as opposed to the
+        // model" answerable from the stream afterwards rather than only from
+        // memory. `recordOp` also truncates any redo tail: committing after
+        // undoing abandons the undone branch.
         Committed
           { session with
               Tree = Some candidate
               Ops = session.Ops @ [ canonOp ]
               Snapshots = session.Snapshots @ [ candidate ]
-              Log = Session.recordOp session Session.navigatorActor op canonOp }
+              Log = Session.recordOp session actor op canonOp }
       | defects -> Rejected(String.concat "; " defects)
+
+/// The gate under the navigator's own origin marker — the shape every
+/// pre-existing call site uses.
+let commitOp (session: Session.SessionState) (op: TreeOp<obj>) : CommitOutcome =
+  commitOpAs Session.navigatorActor session op
 
 /// Build the op a field change becomes, then run it through the gate above.
 let commit (session: Session.SessionState) (node: Node<obj>) (field: Field) (raw: string) : CommitOutcome =

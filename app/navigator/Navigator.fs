@@ -305,6 +305,7 @@ let private helpHint =
 let private describePlacement (placement: StructuralEdit.Placement) : string =
   match placement with
   | StructuralEdit.Placement.Last -> "at the end"
+  | StructuralEdit.Placement.First -> "at the start"
   | StructuralEdit.Placement.Before anchor -> "before #" + idText anchor
   | StructuralEdit.Placement.After anchor -> "after #" + idText anchor
 

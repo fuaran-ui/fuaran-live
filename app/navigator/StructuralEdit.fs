@@ -13,24 +13,27 @@ module Fuaran.Live.StructuralEdit
 //
 //  ── Placement is stated by naming ids, never by an index (0.4.0) ────────────
 //
-//  `InsertChild` and `MoveNode` **append**. They changed membership only; order
+//  `InsertChild` and `MoveNode` **append**. They change membership only; order
 //  is stated separately by `ReorderChildren`, which names the full sibling id
 //  list. So placing a node anywhere but last is
 //
 //      Batch [ InsertChild(parent, child); ReorderChildren(parent, ids…) ]
 //
-//  and there is no integer anywhere in it. That is not a quirk to work around —
-//  it is the identity rule the wire format canonicalised, and this module is its
-//  most direct interactive exercise. A UI that held a position would be holding
-//  a projection over a list, correct only against the one snapshot it was read
-//  from and silently wrong after any preceding or concurrent edit; a UI that
-//  holds ids either addresses a node that is there or fails loudly. Every value
-//  this module puts in an op is an id.
+//  and there is no integer anywhere in it. That derivation — the post-op
+//  sibling permutation, the dropped reorder leg when appending already yields
+//  the wanted order, and the pre-checks that mirror the apply engine's own
+//  refusals — ships in the apply-engine tier as `Fuaran.UI.Ops.Placement`
+//  (`Placement` / `Target` / `PlaceError` / `placeOp` / `moveOp` / `nudgeOp` /
+//  `canPlace`), and this module CONSUMES it rather than carrying its own copy.
+//  The types are re-exported below so callers keep addressing them as
+//  `StructuralEdit.Placement` / `StructuralEdit.Target`.
 //
-//  The `Batch` is emitted only when it says something: appending IS the wanted
-//  order for `Last` (and for "after the last sibling"), so the reorder leg is
-//  dropped when the computed order already equals the appended one. An op that
-//  restates the status quo is noise in a provenance log that other tools read.
+//  One consequence worth naming: the packaged pre-checks refuse an op the apply
+//  engine would refuse — an unknown anchor, a childless destination, a move
+//  into a descendant — BEFORE emission, with a sentence, where this module once
+//  emitted the op and let the gate reject it after the fact. Same outcome
+//  either way (the commit funnel below turns both into a rejection that leaves
+//  the session untouched); the refusal just arrives earlier and reads better.
 //
 //  ── The palette is derived, not written ────────────────────────────────────
 //
@@ -70,28 +73,22 @@ module Fuaran.Live.StructuralEdit
 
 open Fable.Core
 open Fuaran.UI.Types
+open Fuaran.UI.Ops
 open Fuaran.UI.Ops.Types
 
 module Introspect = Fuaran.UI.Ops.Introspect
 module Decode = Fuaran.UI.Ops.JsonDecode
 
-// ─── placement (pure — no DOM, no React) ─────────────────────────────────────
+// ─── placement (the packaged vocabulary, re-exported) ────────────────────────
 
-/// Where a node should sit among its new siblings, stated the only way the wire
-/// format allows: by naming an existing sibling, or by asking for the end.
-[<RequireQualifiedAccess>]
-type Placement =
-  /// Append — what `InsertChild` / `MoveNode` do on their own.
-  | Last
-  /// Immediately before the named sibling.
-  | Before of anchor: NodeId
-  /// Immediately after the named sibling.
-  | After of anchor: NodeId
+/// Where a node should sit among its new siblings — the packaged placement
+/// vocabulary (`Fuaran.UI.Ops`), re-exported so callers keep addressing it as
+/// `StructuralEdit.Placement`.
+type Placement = Fuaran.UI.Ops.Placement
 
-/// A structural destination: which parent, and where among its children.
-type Target =
-  { ParentId: NodeId
-    Placement: Placement }
+/// A structural destination: which parent, and where among its children — the
+/// packaged `Fuaran.UI.Ops.Target`, re-exported.
+type Target = Fuaran.UI.Ops.Target
 
 /// The raw string of a `NodeId` (the wire spelling).
 let idText (NodeId s) : string = s
@@ -103,24 +100,6 @@ let childIdsOf (root: Node<obj>) (parentId: NodeId) : NodeId list =
   |> Option.bind (fun parent -> Introspect.getChildren parent.Kind)
   |> Option.map (List.map (fun c -> (NodeId c.Id)))
   |> Option.defaultValue []
-
-/// Place `moved` within `order` (which already contains it) per `placement`.
-/// An anchor that is not in the list appends — the honest fallback, since the
-/// only thing that can be said about a sibling that is not there is nothing.
-let private reposition (order: NodeId list) (moved: NodeId) (placement: Placement) : NodeId list =
-  let rest = order |> List.filter (fun id -> id <> moved)
-
-  let anchored (anchor: NodeId) (offset: int) =
-    match rest |> List.tryFindIndex (fun id -> id = anchor) with
-    | None -> rest @ [ moved ]
-    | Some i ->
-      let at = i + offset
-      (rest |> List.truncate at) @ [ moved ] @ (rest |> List.skip at)
-
-  match placement with
-  | Placement.Last -> rest @ [ moved ]
-  | Placement.Before anchor -> anchored anchor 0
-  | Placement.After anchor -> anchored anchor 1
 
 /// The structural destination a cursor on `focused` implies: under the focused
 /// node when it accepts children, otherwise beside it under its parent. `None`
@@ -140,65 +119,46 @@ let defaultTarget (root: Node<obj>) (focused: NodeId) : Target option =
         { ParentId = (NodeId parent.Id)
           Placement = Placement.After focused })
 
-// ─── op construction ─────────────────────────────────────────────────────────
+// ─── op construction (delegated) + the shared commit funnel ──────────────────
+//
+// The ops themselves come from the packaged placement algebra. What is local is
+// the translation of its typed refusal into the sentence the navigator's status
+// line shows — each `PlaceError` case is a pre-statement of the apply-time
+// refusal the emitted op would have met, so the sentence describes the same
+// fact the engine would have reported after the fact.
 
-/// The op an insertion becomes. `InsertChild` appends, so the wanted order is
-/// computed over the POST-INSERT membership and stated by `ReorderChildren`
-/// naming every sibling id; the reorder leg is dropped when appending already
-/// produces that order.
-let insertOp (root: Node<obj>) (target: Target) (child: Node<obj>) : TreeOp<obj> =
-  let appended = childIdsOf root target.ParentId @ [ (NodeId child.Id) ]
-  let wanted = reposition appended (NodeId child.Id) target.Placement
-  let insert = TreeOp.InsertChild(target.ParentId, child)
-
-  if wanted = appended then
-    insert
-  else
-    TreeOp.Batch [ insert; TreeOp.ReorderChildren(target.ParentId, wanted) ]
-
-/// The op a move becomes. `MoveNode` appends under the new parent, and the node
-/// may already be one of that parent's children (a re-placement within one
-/// parent), so the post-move membership is the siblings WITHOUT it plus it.
-let moveOp (root: Node<obj>) (target: Target) (moved: NodeId) : TreeOp<obj> =
-  let appended =
-    (childIdsOf root target.ParentId |> List.filter (fun id -> id <> moved))
-    @ [ moved ]
-
-  let wanted = reposition appended moved target.Placement
-  let move = TreeOp.MoveNode(moved, target.ParentId)
-
-  if wanted = appended then
-    move
-  else
-    TreeOp.Batch [ move; TreeOp.ReorderChildren(target.ParentId, wanted) ]
-
-/// The op a keyboard move-up (`-1`) / move-down (`+1`) becomes: the focused
-/// node swapped with the sibling in that direction, stated as the FULL sibling
-/// id order (which is what `ReorderChildren` requires — a partial list is
-/// refused by the apply engine, and rightly, since a partial order is not one).
-let nudgeOp (root: Node<obj>) (nodeId: NodeId) (delta: int) : Result<TreeOp<obj>, string> =
-  match Introspect.findParent nodeId root with
-  | None -> Error "the root node has no siblings to reorder"
-  | Some(parent, index) ->
-    let ids = childIdsOf root (NodeId parent.Id)
-    let swapWith = index + delta
-
-    if swapWith < 0 || swapWith >= List.length ids then
-      Error(
-        if delta < 0 then
-          "already the first of its siblings"
-        else
-          "already the last of its siblings"
-      )
+let private placeErrorText (error: PlaceError) : string =
+  match error with
+  | PlaceError.ParentNotFound(NodeId parentId) -> "no node '" + parentId + "' to place under"
+  | PlaceError.ChildlessKind(NodeId parentId) -> "'" + parentId + "' is a kind that takes no children"
+  | PlaceError.NodeNotFound(NodeId nodeId) -> "no node '" + nodeId + "' in the tree"
+  | PlaceError.UnknownAnchor(NodeId anchor) -> "no sibling '" + anchor + "' to place beside"
+  | PlaceError.DuplicateId(NodeId nodeId) -> "the id '" + nodeId + "' is already taken"
+  | PlaceError.MoveIntoSelf(NodeId nodeId) -> "cannot move '" + nodeId + "' into itself"
+  | PlaceError.MoveIntoDescendant(NodeId nodeId, NodeId parentId) ->
+    "cannot move '" + nodeId + "' into '" + parentId + "', which is inside it"
+  | PlaceError.CannotNudgeRoot _ -> "the root node has no siblings to reorder"
+  | PlaceError.NudgeOutOfRange(_, delta) ->
+    if delta < 0 then
+      "already the first of its siblings"
     else
-      let reordered =
-        ids
-        |> List.mapi (fun i id ->
-          if i = index then ids[swapWith]
-          elif i = swapWith then ids[index]
-          else id)
+      "already the last of its siblings"
 
-      Ok(TreeOp.ReorderChildren(NodeId parent.Id, reordered))
+/// The one seam every placed op passes through: a refusal from the packaged
+/// pre-checks becomes a rejection (session untouched, exactly as an apply-time
+/// rejection would leave it); a derived op goes through the very gate a
+/// property edit uses — apply to a CANDIDATE tree, refuse on a newly-introduced
+/// error-severity defect, and only then fold, recording the op against the
+/// navigator's `Human` actor. That shared channel is what makes undo cover
+/// structure for free: the replay knows nothing about which op it is replaying,
+/// so a structural op undoes because it applies.
+let private commitPlaced
+  (session: Session.SessionState)
+  (planned: Result<TreeOp<obj>, PlaceError>)
+  : PropertyEditor.CommitOutcome =
+  match planned with
+  | Error error -> PropertyEditor.Rejected(placeErrorText error)
+  | Ok op -> PropertyEditor.commitOp session op
 
 /// Where the cursor should land once `nodeId` is removed: the previous sibling,
 /// else the next, else the parent. Computed BEFORE the removal (the node is
@@ -221,16 +181,20 @@ let fallbackAfterRemove (root: Node<obj>) (nodeId: NodeId) : NodeId option =
     else
       Some(NodeId parent.Id)
 
-/// Whether `moved` may legally be dropped under `parentId`: a parent that takes
-/// children, that is not the node itself, and that is not inside it (a move
-/// into your own descendant is a cycle, refused by the apply engine — saying so
-/// before the click is friendlier than a rejection after it).
+/// Whether `moved` may legally be dropped under `parentId` — the pick-up/drop
+/// interaction's own guard, delegated to the packaged pre-check (`canPlace`
+/// with an end placement, since drop legality is about the destination, not
+/// the position): a parent that takes children, that is not the node itself,
+/// and that is not inside it (a move into your own descendant is a cycle,
+/// refused by the apply engine — saying so before the click is friendlier than
+/// a rejection after it).
 let canDrop (root: Node<obj>) (moved: NodeId) (parentId: NodeId) : bool =
-  parentId <> moved
-  && not (Introspect.isAncestorOf moved parentId root)
-  && (Introspect.findNode parentId root
-      |> Option.bind (fun parent -> Introspect.getChildren parent.Kind)
-      |> Option.isSome)
+  Placement.canPlace
+    root
+    moved
+    { ParentId = parentId
+      Placement = Placement.Last }
+  |> Result.isOk
 
 // ─── the palette: synthesising a minimal-valid node per kind ─────────────────
 
@@ -427,17 +391,15 @@ let palette (session: Session.SessionState) (target: Target) : PaletteEntry list
     |> List.choose (fun disc ->
       defaultNodeFor root disc
       |> Option.bind (fun node ->
-        match PropertyEditor.commitOp session (insertOp root target node) with
+        match commitPlaced session (Placement.placeOp root node target) with
         | PropertyEditor.Committed _ -> Some { Kind = disc; Node = node }
         | PropertyEditor.Rejected _ -> None))
 
 // ─── commit (one gate, shared with the property editor) ──────────────────────
 //
-// Every entry point below funnels into `PropertyEditor.commitOp`: apply to a
-// CANDIDATE tree, refuse on a newly-introduced error-severity defect, and only
-// then fold — recording the op against the navigator's `Human` actor, which is
-// what makes undo cover structure for free (Phase 712's replay knows nothing
-// about which op it is replaying, so a structural op undoes because it applies).
+// Every entry point below funnels into `commitPlaced` (and so into
+// `PropertyEditor.commitOp`), with the op itself derived by the packaged
+// placement algebra.
 
 let private withRoot (session: Session.SessionState) (f: Node<obj> -> PropertyEditor.CommitOutcome) =
   match session.Tree with
@@ -446,7 +408,7 @@ let private withRoot (session: Session.SessionState) (f: Node<obj> -> PropertyEd
 
 /// Insert `child` at `target`.
 let insert (session: Session.SessionState) (target: Target) (child: Node<obj>) : PropertyEditor.CommitOutcome =
-  withRoot session (fun root -> PropertyEditor.commitOp session (insertOp root target child))
+  withRoot session (fun root -> commitPlaced session (Placement.placeOp root child target))
 
 /// Remove `nodeId` (the caller confirms; this does not ask).
 let remove (session: Session.SessionState) (nodeId: NodeId) : PropertyEditor.CommitOutcome =
@@ -454,28 +416,27 @@ let remove (session: Session.SessionState) (nodeId: NodeId) : PropertyEditor.Com
 
 /// Move `moved` to `target`.
 let move (session: Session.SessionState) (target: Target) (moved: NodeId) : PropertyEditor.CommitOutcome =
-  withRoot session (fun root -> PropertyEditor.commitOp session (moveOp root target moved))
+  withRoot session (fun root -> commitPlaced session (Placement.moveOp root moved target))
 
 /// Nudge `nodeId` one place among its siblings (`-1` up, `+1` down).
 let nudge (session: Session.SessionState) (nodeId: NodeId) (delta: int) : PropertyEditor.CommitOutcome =
-  withRoot session (fun root ->
-    match nudgeOp root nodeId delta with
-    | Error message -> PropertyEditor.Rejected message
-    | Ok op -> PropertyEditor.commitOp session op)
+  withRoot session (fun root -> commitPlaced session (Placement.nudgeOp root nodeId delta))
 
 // ─── flat diagnostic surface (cross-boundary friendly) ───────────────────────
 //
 // F# lists, records and DUs are awkward to assert on from the JS side of the
-// Fable boundary, so — exactly as the Phase 710/711/712 helpers do — the same
-// logic is projected to plain strings and flat records. These are the headless
-// test surface AND a host-language-agnostic description of the structural
-// vocabulary.
+// Fable boundary, so — exactly as the cursor / op-log / property-editor helpers
+// do — the same logic is projected to plain strings and flat records. These are
+// the headless test surface AND a host-language-agnostic description of the
+// structural vocabulary.
 
-/// A placement spelled as a plain string: `"last"`, `"before:<id>"`,
+/// A placement spelled as a plain string: `"last"`, `"first"`, `"before:<id>"`,
 /// `"after:<id>"`. Anything unrecognised is `Last` — the append the ops do on
 /// their own, which is the safe reading of an unknown request.
 let parsePlacement (spec: string) : Placement =
-  if spec.StartsWith "before:" then
+  if spec = "first" then
+    Placement.First
+  elif spec.StartsWith "before:" then
     Placement.Before(NodeId(spec.Substring 7))
   elif spec.StartsWith "after:" then
     Placement.After(NodeId(spec.Substring 6))
@@ -486,6 +447,7 @@ let parsePlacement (spec: string) : Placement =
 let placementSpec (placement: Placement) : string =
   match placement with
   | Placement.Last -> "last"
+  | Placement.First -> "first"
   | Placement.Before anchor -> "before:" + idText anchor
   | Placement.After anchor -> "after:" + idText anchor
 

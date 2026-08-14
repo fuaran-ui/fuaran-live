@@ -74,6 +74,13 @@
     <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Apply.fs">
       <Link>linked\Apply.fs</Link>
     </Compile>
+    <!-- The placement algebra (placed insert / move / nudge + the clone verbs) –
+         the packaged derivation of "membership and order are separate ops" that
+         the navigator's structural editing consumes instead of carrying its own.
+         Depends on Introspect above + the Fuaran.Core.Tree package below. -->
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Placement.fs">
+      <Link>linked\Placement.fs</Link>
+    </Compile>
     <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
       <Link>linked\CanonicalJson.fs</Link>
     </Compile>

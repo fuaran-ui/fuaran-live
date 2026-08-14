@@ -135,7 +135,7 @@ let private corpus: App list =
           "Settings"
           [ card "a6-prof" "Profile" "Edit your details"
             card "a6-bill" "Billing" "Manage your plan"
-            button "a6-save" "Save changes" (Action.SetState("saved", JBool true)) ] }
+            button "a6-save" "Save changes" (Action.SetState("saved", Some(JBool true), None)) ] }
     { Id = "marketing"
       Name = "Product page"
       Tree =

@@ -116,7 +116,7 @@ module internal PatternBankEngine =
               Of = "revenue" } ]
         ) ]
 
-    Fuaran.UI.Types.Binding.Transform(DataSource.Embedded table, pipeline, None)
+    Fuaran.UI.Types.Binding.Transform(Fuaran.UI.Types.TransformSource.Data(DataSource.Embedded table), pipeline, None)
 
 
 module PatternBank =

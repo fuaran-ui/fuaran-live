@@ -117,7 +117,8 @@ let private chartNode (kind: ChartKind) (yFields: string list) (variance: bool) 
     "sales-chart"
     { Defaults.chart<Msg> with
         Kind = kind
-        Source = Binding.Transform(DataSource.Embedded(sourceTable rows), buildPipeline variance, None)
+        Source =
+          Binding.Transform(TransformSource.Data(DataSource.Embedded(sourceTable rows)), buildPipeline variance, None)
         XField = "quarter"
         YFields = yFields
         Title = Some(TextSource.Literal(titleFor yFields)) }

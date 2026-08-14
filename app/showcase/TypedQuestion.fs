@@ -120,7 +120,7 @@ let private askTree (round: int) : Node<obj> =
                         Kind = FormFieldKind.Text(Some(Binding.State(noteKey, Some "")), None)
                         Required = false
                         Help = Some(TextSource.Literal "Optional – up to 120 characters.") } ]
-                  OnSubmit = Action.SetState(commitKey, JStr(envelopeId round))
+                  OnSubmit = Action.SetState(commitKey, Some(JStr(envelopeId round)), None)
                   SubmitLabel = TextSource.Literal "Send the typed answer"
                   Disabled = Some(Binding.State(frozenKey round, Some false)) } ] }
 

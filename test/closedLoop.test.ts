@@ -93,9 +93,18 @@ describe('the system prompt teaches the canonical flat wire format', () => {
     // block), and the op test tolerates `"$type": "…"` spacing. The op list is
     // the full TreeOp vocabulary – a pack example using any op must not be
     // misread as a tree.
+    // The pack also teaches by COUNTER-EXAMPLE: a fence introduced by prose
+    // saying the emission "fails to decode" is a deliberate negative example
+    // (the text-in-`Metric.value` trap). Its polarity is asserted, not skipped:
+    // a counter-example that starts decoding means the teaching went stale.
     const blocks = [
       ...systemPrompt.matchAll(/(?:^|\n)[ \t]*```json[^\S\n]*\n([\s\S]*?)\n[ \t]*```/g),
-    ].map((m: RegExpMatchArray) => (m[1] ?? '').trim());
+    ].map((m: RegExpMatchArray) => ({
+      body: (m[1] ?? '').trim(),
+      isCounterExample: /fails? to decode/i.test(
+        systemPrompt.slice(Math.max(0, (m.index ?? 0) - 200), m.index ?? 0),
+      ),
+    }));
     expect(blocks.length).toBeGreaterThanOrEqual(4);
 
     // Three example classes, three contracts. A full NODE (top-level "id" +
@@ -108,7 +117,7 @@ describe('the system prompt teaches the canonical flat wire format', () => {
     // prose) and must at least be valid JSON.
     const seenTrees: unknown[] = [];
     let fullTrees = 0;
-    for (const block of blocks) {
+    for (const { body: block, isCounterExample } of blocks) {
       const isOp =
         /"\$type":\s*"(EditNode|UpdateProp|ReplaceBinding|UpdateStyle|UpdateState|InsertChild|RemoveNode|MoveNode|ReorderChildren|Batch)"/.test(
           block.slice(0, 200),
@@ -131,7 +140,13 @@ describe('the system prompt teaches the canonical flat wire format', () => {
         parsed !== null &&
         'id' in parsed &&
         'kind' in parsed;
-      if (isNode) {
+      if (isNode && isCounterExample) {
+        const r = ingestResult(empty, block);
+        expect(
+          r.Ok,
+          `counter-example unexpectedly decodes (the prompt claims it fails):\n${block}`,
+        ).toBe(false);
+      } else if (isNode) {
         const r = ingestResult(empty, block);
         expect(r.Ok, `example failed to decode: ${r.Error}\n${block}`).toBe(true);
         seenTrees.push(r.Next);

@@ -440,6 +440,18 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
   expect(canonical, path).toBe(emitted);
 }
 
+// ── Package-vocabulary ceiling ───────────────────────────────────────────────
+// The app's own decoder is the LINKED F# tier, which can know node kinds the
+// published `@fuaran-ui/*` packages do not yet — the palette offers them and the
+// playground round-trips them, but this suite's cross-check against the
+// installed npm decoder cannot. Such kinds are pinned here BY NAME and asserted
+// in both directions: a pinned kind must still fail the installed decoder (a
+// package update that closes the gap fails loudly, prompting removal), and any
+// unpinned kind must decode.
+const PACKAGE_GAP_KINDS: ReadonlySet<string> = new Set([
+  'Icon', // not in the installed node vocabulary
+]);
+
 describe('the synthesised defaults are strictly decodable and normalisation-stable', () => {
   it('decodes, reaches a fixed point, and loses nothing it emitted', () => {
     const s = seeded();
@@ -457,6 +469,14 @@ describe('the synthesised defaults are strictly decodable and normalisation-stab
       // `expect` does not tell the compiler anything, so `.value` below is only
       // reachable behind a real guard. The failure carries the same detail.
       const first = decodeNode(wire);
+      if (PACKAGE_GAP_KINDS.has(kind)) {
+        expect(
+          first.ok,
+          `${kind} is pinned as a package-vocabulary gap but now decodes through the ` +
+            'installed packages — remove it from PACKAGE_GAP_KINDS',
+        ).toBe(false);
+        continue;
+      }
       if (!first.ok) {
         throw new Error(`${kind} does not decode: ${first.error.code}`);
       }

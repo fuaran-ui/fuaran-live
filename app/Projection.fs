@@ -1831,6 +1831,13 @@ and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue
   // `heading` (the `dashboard` ctor takes none) and no ctor ARIA default leaks.
   let layoutV = fieldD "layout" k
 
+  // `gap` is optional on both Flex and Grid (encoder omits it when absent), so
+  // it is emitted only when the wire carries it.
+  let gapPart =
+    match optNum "gap" layoutV with
+    | Some g -> ", gap: " + numLit g
+    | None -> ""
+
   let layout =
     match dollarType layoutV with
     | Some "Flex" ->
@@ -1838,10 +1845,12 @@ and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue
       + qs (strOf "direction" layoutV)
       + ", wrap: "
       + boolLit (boolOf "wrap" layoutV)
+      + gapPart
       + " }"
     | Some "Grid" ->
       "{ kind: 'Grid', cols: "
       + numLit (numOf "cols" layoutV)
+      + gapPart
       + (match optStr "templateColumns" layoutV with
          | Some t -> ", templateColumns: " + qs t
          | None -> "")

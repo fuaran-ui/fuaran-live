@@ -42,6 +42,16 @@ packages, re-encodes via the canonical encoder, and asserts the result is
 `pnpm run fable:app`); any drift between the projector and the `@fuaran-ui/ui`
 contract fails the gate.
 
+One bound on that claim: the corpus is versioned with the language repos and can
+run **ahead of the published `@fuaran-ui/*` packages**, and a fixture carrying
+wire vocabulary the installed decoder/encoder does not know yet is unprojectable
+by construction — the projection's fidelity ceiling is the installed packages'
+vocabulary. The harness detects those fixtures mechanically (decode→encode
+through the installed package is not the identity), skips them with the missing
+wire feature named, and pins the skip set by name so it cannot drift silently:
+a package update that closes a gap fails the pin test until the entry is removed
+and the fixture rejoins the byte-round-trip gate.
+
 Two consequences shape the emitter (as for the pre-326 projectors):
 
 - Closure-valued fields (handlers, query/selection accessors, parse/format) are

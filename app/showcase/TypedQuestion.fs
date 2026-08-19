@@ -197,7 +197,16 @@ let private renderLive (node: Node<obj>) : ReactElement =
       Fragments = Render.collectFragments Map.empty node
       ExpandingFragments = Set.empty
       Scope = None
-      SessionContext = Map.empty }
+      SessionContext = Map.empty
+      // No user-action record sink: this is a client-only page with no
+      // durable destination, and the action log is privacy-classed, so an
+      // unconfigured host must record nothing and pay nothing. `None`
+      // reproduces the renderer's own default at every convenience entry
+      // point. `CurrentNodeId` is renderer-owned - `render` sets it per
+      // node, and only when a sink is wired - so `None` is the only
+      // correct value at construction.
+      ActionSink = None
+      CurrentNodeId = None }
     node
 
 let private renderStatic (n: Node<'msg>) : ReactElement =

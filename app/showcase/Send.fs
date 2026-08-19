@@ -251,7 +251,16 @@ let private renderTree (n: Node<unit>) : ReactElement =
       Fragments = Render.collectFragments Map.empty n
       ExpandingFragments = Set.empty
       Scope = None
-      SessionContext = Map.empty }
+      SessionContext = Map.empty
+      // No user-action record sink: this is a client-only page with no
+      // durable destination, and the action log is privacy-classed, so an
+      // unconfigured host must record nothing and pay nothing. `None`
+      // reproduces the renderer's own default at every convenience entry
+      // point. `CurrentNodeId` is renderer-owned - `render` sets it per
+      // node, and only when a sink is wired - so `None` is the only
+      // correct value at construction.
+      ActionSink = None
+      CurrentNodeId = None }
     n
 
 [<ReactComponent>]

@@ -32,10 +32,27 @@ type Provider =
     /// best-performing arm, "budget" = its cost-optimal posture. "" on a
     /// pre-tier feed — the card then renders untagged, never wrongly tagged.
     Tier: string
+    /// The arm the publisher names as this provider's cost recommendation.
+    /// `false` on a pre-tier feed, which is also the honest reading — an
+    /// unnamed arm is not a pick.
+    BudgetPick: bool
     Passed: int
     Total: int
     PassRate: float
-    MeanScore: float
+    /// Absent on a feed whose scoring carries no 0–5 rubric mean — the pass-rate
+    /// subtext then simply omits the clause, rather than reporting a mean of 0.
+    MeanScore: float option
+    /// Expected spend per correct artifact, on each published posture: a cold
+    /// first call, and a turn inside a warm cached session. `None` when the
+    /// feed does not carry the key — every pre-economics feed — and the tile
+    /// then renders "—" rather than a fabricated zero.
+    CostPerCorrectUsd: float option
+    CostPerCorrectCachedUsd: float option
+    /// Reasoning tokens over billed output. `ReasoningSplitSource` names how
+    /// the split was obtained and rides WITH the number, never separately: a
+    /// derived split is an estimate and has to say so where it is read.
+    ReasoningShare: float option
+    ReasoningSplitSource: string
   }
 
 type Category =
@@ -44,12 +61,18 @@ type Category =
     Total: int
     PassRate: float }
 
+/// Every optional field here is optional on the wire too. A feed that measured
+/// no adversarial track, no economics, or no reasoning split omits the key, and
+/// the tile reads "—" — a missing measurement is never rendered as a zero.
 type Summary =
   { TotalPrompts: int
     Passed: int
     PassRate: float
     ProvidersEvaluated: int
-    AdversarialPassRate: float }
+    AdversarialPassRate: float option
+    CostPerCorrectUsd: float option
+    CostPerCorrectCachedUsd: float option
+    ReasoningShare: float option }
 
 type SessionArm =
   { Condition: string
@@ -85,15 +108,30 @@ type RepairRecovery =
     Note: string }
 
 type Results =
-  { Generated: string
+  {
+    Generated: string
     Commit: string
     SourceUrl: string
     SuiteVersion: string
     Summary: Summary
     Providers: Provider list
     Categories: Category list
+    /// The two cost-per-correct prose strings, carried on the wire and rendered
+    /// VERBATIM. The page never writes its own gloss on the number: how it was
+    /// computed, and what it undercounts, are the publisher's claims to make.
+    CostPerCorrectNote: string
+    CostPerCorrectCaveat: string
     SessionEconomics: SessionEconomics option
-    RepairRecovery: RepairRecovery option }
+    RepairRecovery: RepairRecovery option
+  }
+
+/// Which spend posture the cost-per-correct figures are read on. The feed
+/// publishes both because they are different purchases — a cold first call
+/// against a warm cached session — and neither one is "the" number.
+[<RequireQualifiedAccess>]
+type CostBasis =
+  | Cold
+  | Cached
 
 /// The feed state. `Awaiting` is the honest leg – no run has published to the
 /// feed yet; `Failed` is the other honest leg – the feed is absent/unparseable.
@@ -141,14 +179,30 @@ let private gFloat (o: obj) (k: string) : float =
 
 let private gInt (o: obj) (k: string) : int = int (gFloat o k)
 
+/// The optional read. An absent key is `None`, NOT `0.0`: the publisher omits a
+/// metric it did not measure, so collapsing the two would turn "unmeasured"
+/// into a claim of zero — the one thing this page exists not to do.
+let private gFloatOpt (o: obj) (k: string) : float option =
+  let v = field o k
+
+  if isNull (box v) then None else Some(unbox<float> v)
+
+[<Emit("(($0 == null ? null : $0[$1]) === true)")>]
+let private gBool (o: obj) (k: string) : bool = jsNative
+
 let private parseProvider (o: obj) : Provider =
   { Name = gStr o "name"
     Model = gStr o "model"
     Tier = gStr o "tier"
+    BudgetPick = gBool o "budgetPick"
     Passed = gInt o "passed"
     Total = gInt o "total"
     PassRate = gFloat o "passRate"
-    MeanScore = gFloat o "meanScore" }
+    MeanScore = gFloatOpt o "meanScore"
+    CostPerCorrectUsd = gFloatOpt o "costPerCorrectUsd"
+    CostPerCorrectCachedUsd = gFloatOpt o "costPerCorrectCachedUsd"
+    ReasoningShare = gFloatOpt o "reasoningShare"
+    ReasoningSplitSource = gStr o "reasoningSplitSource" }
 
 let private parseCategory (o: obj) : Category =
   { Name = gStr o "name"
@@ -181,7 +235,10 @@ let private parseFeed (raw: string) : FeedState =
           Passed = gInt s "passed"
           PassRate = gFloat s "passRate"
           ProvidersEvaluated = gInt s "providersEvaluated"
-          AdversarialPassRate = gFloat s "adversarialPassRate" }
+          AdversarialPassRate = gFloatOpt s "adversarialPassRate"
+          CostPerCorrectUsd = gFloatOpt s "costPerCorrectUsd"
+          CostPerCorrectCachedUsd = gFloatOpt s "costPerCorrectCachedUsd"
+          ReasoningShare = gFloatOpt s "reasoningShare" }
 
       FeedState.Published
         { Generated = gStr o "generatedAt"
@@ -191,6 +248,8 @@ let private parseFeed (raw: string) : FeedState =
           Summary = summary
           Providers = [ for p in fieldArr o "providers" -> parseProvider p ]
           Categories = [ for c in fieldArr o "categories" -> parseCategory c ]
+          CostPerCorrectNote = gStr o "costPerCorrectNote"
+          CostPerCorrectCaveat = gStr o "costPerCorrectCaveat"
           SessionEconomics =
             let se = field o "sessionEconomics"
 
@@ -241,10 +300,13 @@ let private headingNode (id: string) (level: int) (text: string) : Node<unit> =
       Text = TextSource.Literal text
       Variant = HeadingVariant.Standard }
 
-let private metricNode
+/// The graceful-degradation tile. `None` leaves the value slot UNBOUND, which
+/// the renderer draws as "—" — so a feed published before a metric existed
+/// still renders its whole card, with the unmeasured tiles honestly blank.
+let private metricOptNode
   (id: string)
   (label: string)
-  (value: float)
+  (value: float option)
   (fmt: CellFormat)
   (tone: ToneVariant)
   (subtext: string)
@@ -253,7 +315,10 @@ let private metricNode
     id
     { Defaults.metric with
         Label = TextSource.Literal label
-        Value = Binding.Static(Some value)
+        Value =
+          (match value with
+           | Some v -> Binding.Static(Some v)
+           | None -> Defaults.metric.Value)
         Format = fmt
         Tone = tone
         Subtext =
@@ -262,12 +327,67 @@ let private metricNode
            else
              Some(TextSource.Literal subtext)) }
 
+let private metricNode
+  (id: string)
+  (label: string)
+  (value: float)
+  (fmt: CellFormat)
+  (tone: ToneVariant)
+  (subtext: string)
+  : Node<unit> =
+  metricOptNode id label (Some value) fmt tone subtext
+
 let private toneFor (rate: float) : ToneVariant =
   if rate >= 0.9 then ToneVariant.Success
   elif rate >= 0.75 then ToneVariant.Default
   else ToneVariant.Warning
 
-let private providerCard (i: int) (p: Provider) : Node<unit> =
+let private toneForOpt (rate: float option) : ToneVariant =
+  match rate with
+  | Some r -> toneFor r
+  | None -> ToneVariant.Default
+
+// ─── cost-per-correct: the basis, and the prose that must ride with it ───────
+
+let private basisLabel (basis: CostBasis) : string =
+  match basis with
+  | CostBasis.Cold -> "cold-call"
+  | CostBasis.Cached -> "cached-session"
+
+let private costOn (basis: CostBasis) (cold: float option) (cached: float option) : float option =
+  match basis with
+  | CostBasis.Cold -> cold
+  | CostBasis.Cached -> cached
+
+/// The figure the reader did NOT select, named so both postures stay visible
+/// without touching the toggle. An unpublished counterpart says so.
+let private otherBasisText (basis: CostBasis) (cold: float option) (cached: float option) : string =
+  let describe (label: string) (v: float option) =
+    match v with
+    | Some x -> sprintf "%s $%.4f" label x
+    | None -> sprintf "%s unpublished" label
+
+  match basis with
+  | CostBasis.Cold -> describe "cached-session" cached
+  | CostBasis.Cached -> describe "cold-call" cold
+
+/// How the reasoning split was obtained. It is a fidelity caveat, not a label:
+/// a derived split is an estimate, and the tile that shows the share says so.
+let private splitSourceText (source: string) : string =
+  match source with
+  | "native" -> "split: provider-native"
+  | "sdk" -> "split: SDK-reported"
+  | "derived" -> "split: derived (estimated)"
+  | "" -> "split source unreported"
+  | other -> sprintf "split: %s" other
+
+let private hasCostPerCorrect (r: Results) : bool =
+  r.Summary.CostPerCorrectUsd.IsSome
+  || r.Summary.CostPerCorrectCachedUsd.IsSome
+  || r.Providers
+     |> List.exists (fun p -> p.CostPerCorrectUsd.IsSome || p.CostPerCorrectCachedUsd.IsSome)
+
+let private providerCard (basis: CostBasis) (i: int) (p: Provider) : Node<unit> =
   let metric =
     metricNode
       (sprintf "ev-pm-%d" i)
@@ -275,19 +395,52 @@ let private providerCard (i: int) (p: Provider) : Node<unit> =
       p.PassRate
       (CellFormat.Percent(Some 0))
       (toneFor p.PassRate)
-      (sprintf "%d / %d prompts · mean %.1f / 5" p.Passed p.Total p.MeanScore)
+      (sprintf
+        "%d / %d prompts%s"
+        p.Passed
+        p.Total
+        (match p.MeanScore with
+         | Some m -> sprintf " · mean %.1f / 5" m
+         | None -> ""))
 
   let modelLine =
-    match p.Tier with
-    | "headline" -> sprintf "_%s_ · **best**" p.Model
-    | "budget" -> sprintf "_%s_ · budget posture" p.Model
-    | _ -> sprintf "_%s_" p.Model
+    let tierNote =
+      match p.Tier with
+      | "headline" -> " · **best**"
+      | "budget" -> " · budget posture"
+      | _ -> ""
+
+    sprintf "_%s_%s%s" p.Model tierNote (if p.BudgetPick then " · cost pick" else "")
+
+  // The two economics tiles ride in every provider card, whether or not the
+  // feed measured them: an absent figure is a visible "—", not a missing row.
+  let costMetric =
+    metricOptNode
+      (sprintf "ev-pcpc-%d" i)
+      "Cost per correct (USD)"
+      (costOn basis p.CostPerCorrectUsd p.CostPerCorrectCachedUsd)
+      (CellFormat.Number(Some 4))
+      ToneVariant.Default
+      (sprintf "%s basis · %s" (basisLabel basis) (otherBasisText basis p.CostPerCorrectUsd p.CostPerCorrectCachedUsd))
+
+  let reasoningMetric =
+    metricOptNode
+      (sprintf "ev-prs-%d" i)
+      "Reasoning share"
+      p.ReasoningShare
+      (CellFormat.Percent(Some 0))
+      ToneVariant.Default
+      (if p.ReasoningShare.IsSome then
+         sprintf "of billed output · %s" (splitSourceText p.ReasoningSplitSource)
+       else
+         "no reasoning split published")
 
   let children =
-    if p.Model = "" then
-      [ metric ]
-    else
-      [ metric; Fuaran.markdown (sprintf "ev-pmodel-%d" i) modelLine ]
+    [ metric
+      if p.Model <> "" then
+        Fuaran.markdown (sprintf "ev-pmodel-%d" i) modelLine
+      costMetric
+      reasoningMetric ]
 
   Fuaran.card
     (sprintf "ev-p-%d" i)
@@ -295,7 +448,7 @@ let private providerCard (i: int) (p: Provider) : Node<unit> =
         Heading = Some(TextSource.Literal p.Name)
         Children = children }
 
-let private dashboardTree (r: Results) : Node<unit> =
+let private dashboardTree (basis: CostBasis) (r: Results) : Node<unit> =
   let summaryGrid =
     Fuaran.gridLayout
       "ev-summary"
@@ -316,6 +469,27 @@ let private dashboardTree (r: Results) : Node<unit> =
                 (CellFormat.Percent(Some 0))
                 ToneVariant.Brand
                 (sprintf "%d / %d passed" r.Summary.Passed r.Summary.TotalPrompts)
+              // The headline economic figure. Rendered at four decimals rather
+              // than as a currency: a cost per correct artifact lives in tenths
+              // of a cent, and the currency format's two digits would round the
+              // cold/cached difference away entirely.
+              metricOptNode
+                "ev-s-cpc"
+                "Cost per correct (USD)"
+                (costOn basis r.Summary.CostPerCorrectUsd r.Summary.CostPerCorrectCachedUsd)
+                (CellFormat.Number(Some 4))
+                ToneVariant.Brand
+                (sprintf
+                  "%s basis · %s"
+                  (basisLabel basis)
+                  (otherBasisText basis r.Summary.CostPerCorrectUsd r.Summary.CostPerCorrectCachedUsd))
+              metricOptNode
+                "ev-s-reason"
+                "Reasoning share"
+                r.Summary.ReasoningShare
+                (CellFormat.Percent(Some 0))
+                ToneVariant.Default
+                "reasoning tokens over billed output, pooled"
               metricNode
                 "ev-s-prov"
                 "Providers"
@@ -323,13 +497,30 @@ let private dashboardTree (r: Results) : Node<unit> =
                 (CellFormat.Number(Some 0))
                 ToneVariant.Default
                 "evaluated head-to-head"
-              metricNode
+              metricOptNode
                 "ev-s-adv"
                 "Adversarial pass rate"
                 r.Summary.AdversarialPassRate
                 (CellFormat.Percent(Some 0))
-                (toneFor r.Summary.AdversarialPassRate)
+                (toneForOpt r.Summary.AdversarialPassRate)
                 "held-out adversarial track" ] }
+
+  // The measurement note and the undercount caveat are the feed's own strings,
+  // rendered verbatim beside the number they qualify — a cost figure read
+  // without them is not the claim the publisher made.
+  let costProse =
+    if not (hasCostPerCorrect r) then
+      []
+    else
+      [ if r.CostPerCorrectNote <> "" then
+          Fuaran.callout
+            "ev-cpc-note"
+            { Defaults.callout with
+                Tone = ToneVariant.Info
+                Heading = Some(TextSource.Literal "How cost per correct is measured")
+                Body = TextSource.Literal r.CostPerCorrectNote }
+        if r.CostPerCorrectCaveat <> "" then
+          Fuaran.markdown "ev-cpc-caveat" (sprintf "_Caveat: %s._" r.CostPerCorrectCaveat) ]
 
   let providerGrid =
     Fuaran.gridLayout
@@ -341,7 +532,7 @@ let private dashboardTree (r: Results) : Node<unit> =
                 List.indexed (
                   r.Providers
                   |> List.sortBy (fun p -> (if p.Tier = "headline" then 0 else 1), -p.PassRate)
-                ) -> providerCard i p ] }
+                ) -> providerCard basis i p ] }
 
   let categoryGrid =
     Fuaran.gridLayout
@@ -358,7 +549,8 @@ let private dashboardTree (r: Results) : Node<unit> =
                   (toneFor c.PassRate)
                   (sprintf "%d / %d" c.Passed c.Total) ] }
 
-  let mutable children = [ headingNode "ev-h-sum" 2 "Headline"; summaryGrid ]
+  let mutable children =
+    [ headingNode "ev-h-sum" 2 "Headline"; summaryGrid ] @ costProse
 
   if not r.Providers.IsEmpty then
     children <- children @ [ headingNode "ev-h-prov" 2 "By provider"; providerGrid ]
@@ -497,6 +689,7 @@ let private sourceLink (url: string) : ReactElement =
 let private EvaluationView () : ReactElement =
   let state, setState = React.useState FeedState.Loading
   let lastChecked, setChecked = React.useState ""
+  let basis, setBasis = React.useState CostBasis.Cold
 
   let load () =
     fetchInto
@@ -516,6 +709,30 @@ let private EvaluationView () : ReactElement =
     { new System.IDisposable with
         member _.Dispose() = clearInterval timer })
 
+  // The cost basis is the reader's choice, so it is chrome rather than tree:
+  // the dashboard body renders through the no-dispatch resolver, and a control
+  // that pretended to be part of the tree could not act. It appears only when
+  // the published feed actually carries a cost-per-correct figure.
+  let basisToggle =
+    let basisOption (b: CostBasis) (label: string) =
+      let isCurrent = basis = b
+
+      Html.button
+        [ prop.className "ev-refresh"
+          prop.ariaPressed isCurrent
+          prop.text (sprintf "%s %s" (if isCurrent then "●" else "○") label)
+          prop.onClick (fun _ -> setBasis b) ]
+
+    match state with
+    | FeedState.Published r when hasCostPerCorrect r ->
+      Html.span
+        [ prop.className "ev-live"
+          prop.children
+            [ Html.text "Cost basis"
+              basisOption CostBasis.Cold "Cold-call"
+              basisOption CostBasis.Cached "Cached-session" ] ]
+    | _ -> Html.none
+
   let liveStrip =
     Html.div
       [ prop.className "ev-strip"
@@ -530,6 +747,7 @@ let private EvaluationView () : ReactElement =
                       else
                         sprintf "Live feed · auto-refreshing · checked %s" lastChecked
                     ) ] ]
+            basisToggle
             Html.button
               [ prop.className "ev-refresh"
                 prop.text "Check now"
@@ -553,7 +771,7 @@ let private EvaluationView () : ReactElement =
     | FeedState.Loading -> renderNode (Fuaran.markdown "ev-loading" "_Reading the live results feed…_")
     | FeedState.Awaiting m -> renderNode (awaitingNode m)
     | FeedState.Failed reason -> renderNode (failedNode reason)
-    | FeedState.Published r -> renderNode (dashboardTree r)
+    | FeedState.Published r -> renderNode (dashboardTree basis r)
 
   Html.div
     [ prop.className "ev-page"
@@ -578,6 +796,9 @@ let private EvaluationView () : ReactElement =
                           Html.li
                             [ prop.text
                                 "Until a run publishes, the page shows no figures at all – not placeholders. If the feed can't be read it says so, in grey. It never dresses up a missing or failing result as a pass." ]
+                          Html.li
+                            [ prop.text
+                                "Cost per correct is shown with the publisher's own measurement note and undercount caveat, rendered word for word from the feed. A metric the run did not measure shows an em dash, not a zero." ]
                           Html.li
                             [ prop.text
                                 "The link above goes to the public source and methodology, so the numbers are reproducible rather than asserted." ]

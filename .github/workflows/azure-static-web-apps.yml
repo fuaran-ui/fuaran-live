@@ -48,12 +48,13 @@ jobs:
         with:
           # Pinned to an exact ref: the F# tier is a PROJECT REFERENCE, so a
           # floating default branch let any upstream push redden this repo with no
-          # commit here. A COMMIT SHA rather than a release tag — no tag yet carries
-          # the Phases 692-694 flattened NodeKind this repo authors against.
+          # commit here. A RELEASE TAG: v0.12.0 post-dates the Phases 692-694
+          # flattened NodeKind this repo authors against, so the pin is back on a
+          # tag (see ci.yml for why it was a bare SHA in between).
           # Rationale + bump procedure in ci.yml. The corpus checkout stays unpinned
           # deliberately — it is the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: 0735ffca92be988cc83009dad27b2e23aa8f4bbb
+          ref: v0.12.0
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4

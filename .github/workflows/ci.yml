@@ -44,22 +44,31 @@ jobs:
       #     one home is that all hosts see the same current spec. Pinning it
       #     would reintroduce exactly the drift that split bought out.
       #
-      # The ref is a COMMIT SHA, not a release tag, and that is the pin failing
-      # open rather than a downgrade in rigour. Phases 692-694 flattened
-      # NodeKind and reshaped the authoring surface (TextSource, NodeId,
-      # SemanticStyle, SelectOption); this repo adopted that contract, but no
-      # release tag carries it yet — v0.6.0 is the newest, and it PREDATES the
-      # change. So the pin named a contract the source no longer targeted and
-      # every workflow compiled the migrated app against the old types. A SHA
-      # is at least as deliberate as a tag (a tag can be moved; a SHA cannot),
-      # so it is the right pin until the tier cuts its next release. Prefer a
-      # tag again at that point.
+      # The ref is a RELEASE TAG again, which is where this pin was always
+      # meant to end up. The history is worth keeping, because it explains why
+      # a tag is not automatically the more rigorous choice:
+      #
+      #   Phases 692-694 flattened NodeKind and reshaped the authoring surface
+      #   (TextSource, NodeId, SemanticStyle, SelectOption). This repo adopted
+      #   that contract while no release tag carried it — v0.6.0 was the newest
+      #   and PREDATED the change — so a tag pin named a contract the source no
+      #   longer targeted, and every workflow compiled the migrated app against
+      #   the old types. The pin moved to a commit SHA, which is at least as
+      #   deliberate as a tag (a tag can be moved; a SHA cannot), on the stated
+      #   intent of returning to a tag once the tier cut a release carrying the
+      #   flattened NodeKind.
+      #
+      # That release exists, so this is that return. v0.12.0 post-dates the
+      # flattening and its tree is one test-only commit ahead of the SHA the
+      # pin previously named (which was the 0.12.0 version-bump commit, not the
+      # tagged one) — so the contract this repo compiles against is unchanged
+      # by the switch.
       #
       # To bump: raise the ref in all six workflows together (grep the ref).
       - uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-dotnet
-          ref: 0735ffca92be988cc83009dad27b2e23aa8f4bbb
+          ref: v0.12.0
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4

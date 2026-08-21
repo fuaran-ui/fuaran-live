@@ -182,10 +182,66 @@ let private roundsResult: Result<Round list, Decode.DecodeError> =
 
 // ─── Rendering the decoded tree with the real state substrate ────────────────
 //  `BrowserRuntime` routes the decoded submit button's `Action.SetState` into
-//  the observable StateStore (the diagnostic default would only warn), and the
-//  handler-free fields land their edits there via the write-back default.
+//  the observable StateStore, and the handler-free fields land their edits
+//  there via the write-back default.
+//
+//  The browser host denies dispatch by default – the right posture for a host
+//  that cannot vet what it is asked to run – so this page states a policy
+//  rather than inheriting one, and states the narrowest one that works. That is
+//  this page's own subject applied to itself: an elicitation is a
+//  contract-checked exchange, so the presenting host grants exactly the one
+//  capability the contract needs and refuses the rest.
+//
+//  The grant is a single key. `commitKey` is the wire-survivable commit signal
+//  the submit button carries, and it is the ONLY gated action anywhere in the
+//  decoded tree: the three answer fields reach the store through the renderer's
+//  declarative write-back, which is a tree-originated State write rather than a
+//  dispatched action, so it never meets this gate. Granting `SetState` on the
+//  answer keys as well would therefore widen the policy without enabling
+//  anything.
 
-let private browserRuntime: Runtime.IFuaranRuntime = BrowserRuntime.create ()
+let private browserRuntime: Runtime.IFuaranRuntime =
+  // Effects delegate to the stock browser runtime; only the policy is ours.
+  // Its own deny-by-default `CanDispatch` is never consulted – the renderer
+  // asks THIS wrapper – so the page deliberately does not reach for
+  // `createPermissive`, and stays absent from a `grep permissive` sweep for
+  // hosts running the pre-0.14.0 allow-everything posture.
+  let effects = BrowserRuntime.create ()
+
+  { new Runtime.IFuaranRuntime with
+      member _.CanDispatch(action) =
+        match action with
+        | Runtime.ActionDescriptor.SetState key -> key = commitKey
+        | _ -> false
+
+      member _.Call(endpoint, onResult) = effects.Call(endpoint, onResult)
+      member _.Notify(channel, payload) = effects.Notify(channel, payload)
+      member _.Navigate(route) = effects.Navigate(route)
+      member _.SetState(key, value) = effects.SetState(key, value)
+
+      member _.InvokeAiTool(toolName, args) = effects.InvokeAiTool(toolName, args)
+
+      member _.WriteToClipboard(text) = effects.WriteToClipboard(text)
+
+      member _.ReadFileBody(file, encoding, onRead) =
+        effects.ReadFileBody(file, encoding, onRead)
+
+      member _.Warn(message) = effects.Warn(message)
+      member _.LayoutObserver = effects.LayoutObserver
+
+      member _.TryRenderCustom(moduleId, componentId, props) =
+        effects.TryRenderCustom(moduleId, componentId, props)
+
+      member _.TryGetCustomRenderer(moduleId, componentId) =
+        effects.TryGetCustomRenderer(moduleId, componentId)
+
+      member _.TryRenderCustomInScope(scope, moduleId, componentId, props) =
+        effects.TryRenderCustomInScope(scope, moduleId, componentId, props)
+
+      member _.TryGetCustomRendererInScope(scope, moduleId, componentId) =
+        effects.TryGetCustomRendererInScope(scope, moduleId, componentId)
+
+      member _.TryLoadGuest(scopeId) = effects.TryLoadGuest(scopeId) }
 
 let private renderLive (node: Node<obj>) : ReactElement =
   Render.render

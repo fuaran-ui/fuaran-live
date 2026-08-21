@@ -236,6 +236,17 @@ type private Tab =
 // lands the clicked index in the observable StateStore via the browser
 // runtime (the TypedQuestion pattern). The empty-sources/no-runtime shape
 // would render the tabs dead.
+//
+// Deny-by-default is deliberate here, and the page needs no policy of its own.
+// The write-back is a tree-originated State write rather than a dispatched
+// action, so it never meets the gate — the tabs work under a runtime that
+// refuses everything. The exemplar's one gated action is the "Refresh data"
+// button's `Action.Navigate "dashboard/refresh"`, and refusing it is the
+// CORRECT outcome rather than a capability this page has lost: the exemplar is
+// an artefact on display, not a live dashboard, and the browser runtime routes
+// Navigate to `window.location.hash` — which this showcase also routes on, so
+// an allowed navigation would steer the whole site to a route that does not
+// exist. Do not "repair" this to `createPermissive`.
 let private browserRuntime: Runtime.IFuaranRuntime = BrowserRuntime.create ()
 
 let private renderTree (n: Node<unit>) : ReactElement =

@@ -714,23 +714,38 @@ let private EvaluationView () : ReactElement =
   // that pretended to be part of the tree could not act. It appears only when
   // the published feed actually carries a cost-per-correct figure.
   let basisToggle =
+    // A segmented control rather than two buttons carrying their state in a
+    // ●/○ glyph: the two options are one exclusive choice, so the control
+    // should show the choice space and mark the current option structurally.
+    // aria-pressed stays the accessible state; the modifier class is the
+    // visual one, matching the tablist convention elsewhere in the showcase.
     let basisOption (b: CostBasis) (label: string) =
       let isCurrent = basis = b
 
       Html.button
-        [ prop.className "ev-refresh"
+        [ prop.className (
+            if isCurrent then
+              "ev-basis-option ev-basis-option-active"
+            else
+              "ev-basis-option"
+          )
           prop.ariaPressed isCurrent
-          prop.text (sprintf "%s %s" (if isCurrent then "●" else "○") label)
+          prop.text label
           prop.onClick (fun _ -> setBasis b) ]
 
     match state with
     | FeedState.Published r when hasCostPerCorrect r ->
       Html.span
-        [ prop.className "ev-live"
+        [ prop.className "ev-basis"
           prop.children
-            [ Html.text "Cost basis"
-              basisOption CostBasis.Cold "Cold-call"
-              basisOption CostBasis.Cached "Cached-session" ] ]
+            [ Html.span [ prop.className "ev-basis-label"; prop.text "Cost basis" ]
+              Html.span
+                [ prop.className "ev-basis-group"
+                  prop.role "group"
+                  prop.ariaLabel "Cost basis"
+                  prop.children
+                    [ basisOption CostBasis.Cold "Cold-call"
+                      basisOption CostBasis.Cached "Cached-session" ] ] ] ]
     | _ -> Html.none
 
   let liveStrip =

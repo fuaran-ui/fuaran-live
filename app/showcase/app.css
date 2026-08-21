@@ -5926,6 +5926,54 @@ polygon.gi-dag-pending {
 .ev-refresh:hover {
   border-color: var(--fuaran-color-brand, #1e4754);
 }
+/* Cost-basis segmented control. Cold-call and cached-session are one
+   exclusive choice, so it reads as a single joined control with the current
+   option filled, rather than as two independent buttons. */
+.ev-basis {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ev-basis-label {
+  font-size: 0.85rem;
+  color: var(--fuaran-color-text-muted, #5a6472);
+}
+.ev-basis-group {
+  display: inline-flex;
+  border: var(--ds-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--fuaran-color-surface, #fff);
+}
+.ev-basis-option {
+  flex: none;
+  min-height: 2.75rem;
+  padding: 0 0.85rem;
+  border: none;
+  background: transparent;
+  color: var(--fuaran-color-text-muted, #5a6472);
+  font: inherit;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ev-basis-option + .ev-basis-option {
+  border-left: var(--ds-border);
+}
+.ev-basis-option:hover {
+  color: var(--fuaran-color-text, #1a2026);
+}
+.ev-basis-option-active {
+  background: var(--fuaran-color-brand, #1e4754);
+  color: var(--fuaran-color-surface, #fff);
+}
+.ev-basis-option-active:hover {
+  color: var(--fuaran-color-surface, #fff);
+}
+.ev-basis-option:focus-visible {
+  outline: 2px solid var(--fuaran-color-brand, #1e4754);
+  outline-offset: -2px;
+}
 .ev-meta {
   display: flex;
   flex-wrap: wrap;

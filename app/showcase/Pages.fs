@@ -344,6 +344,7 @@ let renderRoute (route: Route) (replay: Replay.ReplayState) : ReactElement =
   | DemoPage d when d.Id = "chart-as-data" -> Charts.page
   | DemoPage d when d.Id = "typed-question" -> TypedQuestion.page
   | DemoPage d when d.Id = "hand-on-the-wheel" -> HandOnTheWheel.page
+  | DemoPage d when d.Id = "agent-readable" -> AgentReadable.page
   | DemoPage d when d.Id = "locale-lens" -> LocaleLens.page
   | DemoPage d when d.Id = "go-sessions" -> GoSessions.page
   | DemoPage d when d.Id = "navigator" -> Navigator.page

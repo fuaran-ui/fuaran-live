@@ -104,6 +104,13 @@
 //      teleport-qr}.ts - DOM read-back / geometry / QR helpers; author no wire.
 //    - app/showcase/pandas-host.ts - the Pyodide loader glue that EXECUTES
 //      dash-host.py; it authors no wire itself (the Python surface does, locked above).
+//    - app/showcase/AgentReadable.fs - authors NO wire: its page tree is built through
+//      the real `Fuaran.*` constructors, and the JSON it does emit is a different
+//      vocabulary entirely (the declared-affordance `data-fuaran-*` attributes), minted
+//      by `Fuaran.Core`'s canonical encoder over the shipped affordance types' own
+//      `toWire` projections. That payload is nonetheless a contract a reader parses, so
+//      it carries its own lock in agentReadable.test.ts (closed-set tokens, payload
+//      shapes, and the omitted-open-bound property), with a go-red self-test.
 //    - Every .fs showcase page built through the real `Fuaran.*` constructors +
 //      `Fuaran.UI.Renderer` - canon-by-construction, the phase's explicit out-of-scope
 //      class (the reference encoder is its own oracle).

@@ -7778,3 +7778,252 @@ polygon.gi-dag-pending {
   margin-bottom: 0.35rem;
   line-height: 1.5;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   The Agent-Readable Page (ar-) – a page that advertises its own natural-
+   language affordances, beside a live read of what a machine gets back. */
+
+.ar-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+.ar-title {
+  margin: 0;
+}
+.ar-lede {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+  max-width: 52rem;
+}
+.ar-muted {
+  margin: 0.15rem 0 0.8rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+  max-width: 60ch;
+}
+.ar-panel {
+  border: var(--ds-border);
+  border-radius: 0.85rem;
+  padding: 1rem 1.15rem;
+  background: var(--fuaran-color-elevated, #fff);
+}
+.ar-panel h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+}
+
+/* ── buttons ── */
+.ar-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  border: var(--ds-border);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  background: var(--fuaran-color-surface, #fff);
+  color: inherit;
+  cursor: pointer;
+}
+.ar-btn:hover {
+  border-color: var(--fuaran-color-accent, #3358d4);
+}
+.ar-btn-primary {
+  background: var(--fuaran-color-accent, #3358d4);
+  border-color: var(--fuaran-color-accent, #3358d4);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── the read bar ── */
+.ar-readbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+}
+.ar-readcount {
+  font-size: 0.8rem;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+
+/* ── one control, as read back from the DOM ── */
+.ar-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 0.8rem;
+}
+.ar-control {
+  border: var(--ds-border);
+  border-radius: 0.7rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--fuaran-color-surface, #fcfcfd);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.ar-control-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ar-control-id {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.ar-shape,
+.ar-flag,
+.ar-tag,
+.ar-effect {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 0.3rem;
+  padding: 0.08rem 0.36rem;
+  border: 1px solid var(--fuaran-color-border, #ececf2);
+  color: var(--fuaran-color-text-muted, #5a5a66);
+  white-space: nowrap;
+}
+.ar-flag-write {
+  border-color: rgba(51, 88, 212, 0.4);
+  color: var(--fuaran-color-accent, #3358d4);
+}
+.ar-flag-read {
+  border-style: dashed;
+}
+.ar-tag {
+  border: none;
+  font-family: var(--ds-mono, ui-monospace, monospace);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ar-control-desc {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.ar-now {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+.ar-now-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.ar-now-value {
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+.ar-block-label {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+  margin-bottom: 0.25rem;
+}
+.ar-phrases {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+.ar-phrases li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.ar-phrase {
+  font-size: 0.82rem;
+}
+.ar-effect-write {
+  border-color: rgba(51, 88, 212, 0.4);
+  color: var(--fuaran-color-accent, #3358d4);
+}
+.ar-effect-read {
+  border-style: dashed;
+}
+.ar-aliases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.ar-alias {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  border: 1px dashed var(--fuaran-color-border, #ececf2);
+  border-radius: 0.35rem;
+  padding: 0.1rem 0.4rem;
+}
+.ar-alias-arrow {
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.ar-values {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--fuaran-color-canvas, #f6f6f9);
+}
+.ar-none {
+  margin: 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.ar-verbatim {
+  font-size: 0.8rem;
+}
+.ar-verbatim summary {
+  cursor: pointer;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.ar-verbatim-pre {
+  margin: 0.4rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.55rem;
+  background: var(--fuaran-color-canvas, #f6f6f9);
+}
+
+/* ── the registry facts + honesty footer ── */
+.ar-facts {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.ar-facts li {
+  margin-bottom: 0.35rem;
+}
+.ar-honesty {
+  font-size: 0.85rem;
+  color: var(--fuaran-color-text-muted, #55555f);
+}
+.ar-honesty h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  color: var(--fuaran-color-text, #21212a);
+}
+.ar-honesty li {
+  margin-bottom: 0.4rem;
+  line-height: 1.55;
+  max-width: 72ch;
+}

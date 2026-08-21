@@ -294,6 +294,14 @@ let demos: Demo list =
       Route = "navigator"
       ReplayId = None
       Live = true }
+    { Id = "agent-readable"
+      Title = "The Agent-Readable Page"
+      Pillar = Pillar.Machine
+      Wow =
+        "A page that advertises its own natural-language affordances – the phrases it understands, the synonyms it resolves, the values it accepts – and a live pane showing exactly what a machine reading it gets back."
+      Route = "agent-readable"
+      ReplayId = None
+      Live = true }
     { Id = "locale-lens"
       Title = "The Locale Lens"
       Pillar = Pillar.Intent

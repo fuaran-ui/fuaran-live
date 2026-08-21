@@ -211,17 +211,17 @@
          FSharp.Core-only + Fable-clean (source-packed under fable/), so Fable
          retranspiles the Core skeleton source in-browser. Versions matched to
          fuaran-dotnet/Directory.Packages.props. -->
-    <PackageReference Include="Fuaran.Core.Tree" Version="0.3.0" />
-    <PackageReference Include="Fuaran.Core.Ops" Version="0.3.0" />
+    <PackageReference Include="Fuaran.Core.Tree" Version="0.11.0" />
+    <PackageReference Include="Fuaran.Core.Ops" Version="0.11.0" />
     <!-- The Pattern Bank fast path runs the real Fuaran.Core signature-search
          engine (FunctionRegistry.findBySignature – the same engine powering the
          public Fuaran.UI.FastPath package). Fable-source-packed. -->
-    <PackageReference Include="Fuaran.Core.Function" Version="0.3.0" />
+    <PackageReference Include="Fuaran.Core.Function" Version="0.11.0" />
     <!-- The linked OpRecord/StreamEntry/HashChain slice (Phase 466 panel
          provenance) delegates to the Fuaran.Core op-stream skeleton, exactly as
          the real Fuaran.UI.OpStream.Abstractions.fsproj does; same linked-not-
          referenced rationale as the Core.Tree/Ops pair above. -->
-    <PackageReference Include="Fuaran.Core.OpStream" Version="0.3.0" />
+    <PackageReference Include="Fuaran.Core.OpStream" Version="0.11.0" />
   </ItemGroup>
 
 </Project>

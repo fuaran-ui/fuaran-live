@@ -99,7 +99,8 @@ let private askTree (round: int) : Node<obj> =
                         Kind = FormFieldKind.Number(Some(Binding.State(canaryKey, Some 10.0)), None)
                         Required = true
                         Help =
-                          Some(TextSource.Literal "A whole percentage. Try 12.5 – the contract says integers only.") }
+                          Some(TextSource.Literal "A whole percentage. Try 12.5 – the contract says integers only.")
+                        Rule = None }
                       { Id = "tq-env-field"
                         Label = TextSource.Literal "Environment"
                         Kind =
@@ -114,12 +115,14 @@ let private askTree (round: int) : Node<obj> =
                             None
                           )
                         Required = true
-                        Help = None }
+                        Help = None
+                        Rule = None }
                       { Id = "tq-note-field"
                         Label = TextSource.Literal "Note for the log"
                         Kind = FormFieldKind.Text(Some(Binding.State(noteKey, Some "")), None)
                         Required = false
-                        Help = Some(TextSource.Literal "Optional – up to 120 characters.") } ]
+                        Help = Some(TextSource.Literal "Optional – up to 120 characters.")
+                        Rule = None } ]
                   OnSubmit = Action.SetState(commitKey, Some(JStr(envelopeId round)), None)
                   SubmitLabel = TextSource.Literal "Send the typed answer"
                   Disabled = Some(Binding.State(frozenKey round, Some false)) } ] }

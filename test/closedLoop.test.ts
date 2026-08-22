@@ -93,9 +93,19 @@ describe('the system prompt teaches the canonical flat wire format', () => {
     // block), and the op test tolerates `"$type": "…"` spacing. The op list is
     // the full TreeOp vocabulary – a pack example using any op must not be
     // misread as a tree.
+    // The pack also teaches TRAPS: a fenced block whose introducing prose ends
+    // "…fails to decode:" is a deliberate counter-example (e.g. the
+    // text-in-Metric trap). Those must be asserted to FAIL decode — a
+    // counter-example that starts decoding means the trap teaching is stale.
     const blocks = [
       ...systemPrompt.matchAll(/(?:^|\n)[ \t]*```json[^\S\n]*\n([\s\S]*?)\n[ \t]*```/g),
-    ].map((m: RegExpMatchArray) => (m[1] ?? '').trim());
+    ].map((m: RegExpMatchArray) => {
+      const before = systemPrompt.slice(Math.max(0, (m.index ?? 0) - 240), m.index ?? 0);
+      return {
+        text: (m[1] ?? '').trim(),
+        negative: /fails to decode:\s*$/i.test(before.trimEnd()),
+      };
+    });
     expect(blocks.length).toBeGreaterThanOrEqual(4);
 
     // Three example classes, three contracts. A full NODE (top-level "id" +
@@ -108,7 +118,7 @@ describe('the system prompt teaches the canonical flat wire format', () => {
     // prose) and must at least be valid JSON.
     const seenTrees: unknown[] = [];
     let fullTrees = 0;
-    for (const block of blocks) {
+    for (const { text: block, negative } of blocks) {
       const isOp =
         /"\$type":\s*"(EditNode|UpdateProp|ReplaceBinding|UpdateStyle|UpdateState|InsertChild|RemoveNode|MoveNode|ReorderChildren|Batch)"/.test(
           block.slice(0, 200),
@@ -131,7 +141,11 @@ describe('the system prompt teaches the canonical flat wire format', () => {
         parsed !== null &&
         'id' in parsed &&
         'kind' in parsed;
-      if (isNode) {
+      if (isNode && negative) {
+        // A taught trap: the pack promises this exact emission is rejected.
+        const r = ingestResult(empty, block);
+        expect(r.Ok, `counter-example DECODED — the taught trap is stale:\n${block}`).toBe(false);
+      } else if (isNode) {
         const r = ingestResult(empty, block);
         expect(r.Ok, `example failed to decode: ${r.Error}\n${block}`).toBe(true);
         seenTrees.push(r.Next);

@@ -1359,9 +1359,92 @@ let private tlRow (key: int) (cls: string) (tag: string) (body: string) : ReactE
 // its scope so post-turn interaction (tabs, filters – the write-back default)
 // re-renders it with no host glue: the panel stays ALIVE after the run ends.
 
-/// The panels' `Action.SetState` / write-back substrate: the browser runtime
-/// routes scoped writes into the per-panel store the row subscribes to.
-let private panelRuntime: Runtime.IFuaranRuntime = BrowserRuntime.create ()
+/// The panels' write-back substrate, and their dispatch policy.
+///
+/// A panel tree is MODEL-EMITTED and therefore untrusted, so the browser host's
+/// deny-by-default posture is the right starting point and this runtime states
+/// its own policy rather than reaching for the permissive opt-in. What it grants
+/// is exactly one thing: `Action.SetState`.
+///
+/// Why that one is safe HERE. A panel renders through `renderWithSourcesInScope`,
+/// and under a scope the renderer routes a `SetState` into
+/// `StateStore.forScope <panel>` — a separate store instance — without ever
+/// reaching this runtime's own `SetState`. So the containment is structural and
+/// upstream of the gate: the write cannot touch the default store, cannot touch
+/// another panel, and cannot address the host-reserved `host.` namespace (which
+/// is refused as a namespace, whatever a policy says). The blast radius is the
+/// panel's own state, which is the panel's own business. Note the coupling: this
+/// runtime is used at exactly one site and that site is always scoped. Rendering
+/// it UNSCOPED would put model-emitted writes in the default store.
+///
+/// Why it is needed. The prompt pack teaches `SetState` as the way a tree drives
+/// its own state — a form's `onSubmit` writing a key a `Switch` reads to show a
+/// confirmation, a button opening a modal — so models emit it, and while it was
+/// denied every such panel was silently inert. The write-back default (a control
+/// bound to `Binding.State`) is NOT gated and always worked, which is why tabs
+/// and filters stayed live and the breakage was invisible: the panel looked
+/// interactive right up to the point a model-authored button did nothing.
+///
+/// Why nothing else is granted. The remaining descriptors all reach PAST the
+/// panel into the host or the network, and a serverless BYOK page holding the
+/// visitor's key is the host that can least afford them: `Call` fetches a
+/// model-chosen endpoint (outbound egress — and the prompt pack teaches it as
+/// the ordinary form submit, so it will be emitted and must be refused here,
+/// where there is no backend for it to mean anything); `Notify` injects into the
+/// host's own window-event plane; `Navigate` steers the page; `WriteToClipboard`
+/// plants content the visitor may later paste somewhere with authority;
+/// `AiTool`, `ReadFileBody` and `ApplyTreeOp` are host capabilities no rendered
+/// panel is entitled to. A gap between what the prompt teaches and what this
+/// host grants is expected rather than a defect — the pack teaches the language
+/// to hosts that have a backend and a trust boundary; this page has neither.
+///
+/// `CommitLocal` is the one deny that is a judgement call rather than a clear
+/// case, recorded so it can be revisited on evidence: it is renderer-internal
+/// choreography for the taught `Local`-buffer "Apply" flow, but it dispatches a
+/// window event keyed on a MODEL-CHOSEN node id, so it is the one grant whose
+/// effect would not be confined to the emitting panel. It stays denied until a
+/// panel that needs it can be exercised end to end.
+let private panelRuntime: Runtime.IFuaranRuntime =
+  // Effects delegate to the stock browser runtime; only the policy is ours. Its
+  // own deny-by-default `CanDispatch` is never consulted — the renderer asks
+  // THIS wrapper — so the page stays absent from a `grep permissive` sweep for
+  // hosts running the pre-0.14.0 allow-everything posture.
+  let effects = BrowserRuntime.create ()
+
+  { new Runtime.IFuaranRuntime with
+      member _.CanDispatch(action) =
+        match action with
+        | Runtime.ActionDescriptor.SetState _ -> true
+        | _ -> false
+
+      member _.Call(endpoint, onResult) = effects.Call(endpoint, onResult)
+      member _.Notify(channel, payload) = effects.Notify(channel, payload)
+      member _.Navigate(route) = effects.Navigate(route)
+      member _.SetState(key, value) = effects.SetState(key, value)
+
+      member _.InvokeAiTool(toolName, args) = effects.InvokeAiTool(toolName, args)
+
+      member _.WriteToClipboard(text) = effects.WriteToClipboard(text)
+
+      member _.ReadFileBody(file, encoding, onRead) =
+        effects.ReadFileBody(file, encoding, onRead)
+
+      member _.Warn(message) = effects.Warn(message)
+      member _.LayoutObserver = effects.LayoutObserver
+
+      member _.TryRenderCustom(moduleId, componentId, props) =
+        effects.TryRenderCustom(moduleId, componentId, props)
+
+      member _.TryGetCustomRenderer(moduleId, componentId) =
+        effects.TryGetCustomRenderer(moduleId, componentId)
+
+      member _.TryRenderCustomInScope(scope, moduleId, componentId, props) =
+        effects.TryRenderCustomInScope(scope, moduleId, componentId, props)
+
+      member _.TryGetCustomRendererInScope(scope, moduleId, componentId) =
+        effects.TryGetCustomRendererInScope(scope, moduleId, componentId)
+
+      member _.TryLoadGuest(scopeId) = effects.TryLoadGuest(scopeId) }
 
 [<ReactComponent>]
 let private PanelRow (panel: Panels.Panel) : ReactElement =

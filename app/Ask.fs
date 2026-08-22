@@ -129,10 +129,27 @@ let outcomeKindName (o: ElicitationOutcome) : string =
 
 // ─── the ask row ─────────────────────────────────────────────────────────────
 
-/// The write-back substrate for ask trees: routes the decoded controls'
-/// scoped `Action.SetState` / value write-backs into the observable store.
-/// Lazy so importing this module headlessly (the flat test surface) never
-/// touches the browser.
+/// The write-back substrate for ask trees: routes the decoded controls' value
+/// write-backs into this ask's scoped store, which `submit` reads to build the
+/// answer. Lazy so importing this module headlessly (the flat test surface)
+/// never touches the browser.
+///
+/// Deny-by-default is deliberate here, and this host wants no policy of its own.
+/// The write-back is a tree-originated State write rather than a dispatched
+/// action, so it never meets the gate — the question's controls stay fully live
+/// under a runtime that refuses everything. Nothing in the ask flow needs a
+/// dispatched action at all: `Send typed answer` and `Decline` are host chrome
+/// below, and the answer is built by reading the scoped store directly.
+///
+/// So a model-emitted `Action.SetState` inside an ask tree IS refused, and that
+/// is the point rather than a capability lost. An ask is a contract-bound
+/// question whose answer must come from the person answering it; a tree that
+/// could write its own answer keys would let the asker pre-fill the reply it
+/// wanted. (Model-emitted panels take the opposite posture, for the opposite
+/// reason — see `panelRuntime`: a panel is an app whose interactivity is the
+/// whole product.) A refusal surfaces on the Warn channel as
+/// `dispatch denied by policy gate: SetState(<key>)`; do not "repair" it to
+/// `createPermissive`.
 let private askRuntime = lazy (BrowserRuntime.create (): Runtime.IFuaranRuntime)
 
 [<ReactComponent>]

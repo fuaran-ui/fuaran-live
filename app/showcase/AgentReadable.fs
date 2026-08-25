@@ -481,6 +481,17 @@ let private renderLive (node: Node<obj>) : ReactElement =
       ExpandingFragments = Set.empty
       Scope = None
       SessionContext = Map.empty
+      // Deny non-local egress. Note this page names a permissive DISPATCH
+      // runtime a few lines up and still denies egress here: the two seams are
+      // declared separately and one does not imply the other. Dispatch was
+      // opted out of because the tree's single action is a state write this
+      // page authored and can read; egress is a different question, and the
+      // honest answer is that the hold form names no destination at all - no
+      // link, no image, no markdown anchor - so there is nothing to declare
+      // and a denial forbids nothing the exhibit does. The page advertises
+      // what it affords; declaring an egress it does not use would be the one
+      // affordance claim on it that was not true.
+      EgressPolicy = Sanitize.denyNonLocalEgress
       // Client-only page with no durable destination: an unconfigured host
       // records nothing and pays nothing, and `CurrentNodeId` is renderer-owned.
       ActionSink = None

@@ -263,6 +263,16 @@ let private renderTree (n: Node<unit>) : ReactElement =
       ExpandingFragments = Set.empty
       Scope = None
       SessionContext = Map.empty
+      // Deny non-local egress, stated rather than inherited. The exemplar is
+      // hand-authored above and names no destination outside this page: no
+      // link, no image `src`, no markdown anchor, and its one route is the
+      // relative `dashboard/refresh`, which is same-origin and so allowed by
+      // this policy anyway (the dispatch gate above is what refuses it, and
+      // for its own reason). So the denying default costs this page nothing
+      // and says something true - a zero-egress exhibit declares no egress.
+      // Reaching `permissiveEgress` here would be the opposite claim, made
+      // only to fill the field.
+      EgressPolicy = Sanitize.denyNonLocalEgress
       // No user-action record sink: this is a client-only page with no
       // durable destination, and the action log is privacy-classed, so an
       // unconfigured host must record nothing and pay nothing. `None`

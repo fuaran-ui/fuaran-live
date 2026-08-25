@@ -257,6 +257,21 @@ let private renderLive (node: Node<obj>) : ReactElement =
       ExpandingFragments = Set.empty
       Scope = None
       SessionContext = Map.empty
+      // Deny non-local egress, and here that is the load-bearing choice rather
+      // than the cheap one: this is the page that renders a DECODED tree. The
+      // question arrives as canonical bytes and is decoded before it is drawn,
+      // so the tree is exactly the artefact a presenting host must not trust -
+      // an asking agent could put a destination in it, and a rendered `src`
+      // is contacted by rendering alone. A decoded tree cannot declare its own
+      // egress, so absent a declaration from this host it gets none. There is
+      // nothing to declare: the elicitation carries a form, a prompt and a
+      // commit action, and no destination at all.
+      //
+      // This is the same posture as the dispatch policy above, one seam over.
+      // The page grants exactly the one capability its contract needs and
+      // refuses the rest, so it stays out of a `grep permissiveEgress` sweep
+      // for hosts that opted back out of the default.
+      EgressPolicy = Sanitize.denyNonLocalEgress
       // No user-action record sink: this is a client-only page with no
       // durable destination, and the action log is privacy-classed, so an
       // unconfigured host must record nothing and pay nothing. `None`

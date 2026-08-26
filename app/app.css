@@ -2129,3 +2129,147 @@ body {
   margin: 0.8rem 0 0;
   font-size: 0.8rem;
 }
+
+/* ── Run mode (Phase 761) ────────────────────────────────────────────────────
+   The preview's Inspect ⇄ Run switch and the three surfaces Run adds: the
+   running app, the live `$state` map, and the step journal. The journal styles
+   a DENIAL as a first-class outcome rather than an error, because that is what
+   it is — the default-deny effect registry working as designed, on a page whose
+   whole subject is what a generated app may and may not do. */
+
+.fl-run-toggle {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0 0 0.7rem;
+}
+
+.fl-run-tab {
+  border: 1px solid var(--fl-border);
+  background: transparent;
+  color: var(--fl-muted);
+  border-radius: 999px;
+  padding: 0.2rem 0.8rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.fl-run-tab.is-active {
+  background: var(--fl-accent);
+  border-color: var(--fl-accent);
+  color: var(--fl-accent-fg);
+  cursor: default;
+}
+
+.fl-run {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.fl-run-posture {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+}
+
+.fl-run-posture-yes,
+.fl-run-posture-no {
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  border: 1px solid var(--fl-border);
+}
+
+.fl-run-posture-yes {
+  color: var(--fuaran-tone-positive-fg, #2f6b4f);
+  background: var(--fuaran-tone-positive-bg, #e2ece4);
+}
+
+.fl-run-posture-no {
+  color: var(--fl-error-fg);
+  background: var(--fl-error-bg);
+}
+
+.fl-run-surface {
+  border: 1px solid var(--fl-border);
+  border-radius: 0.4rem;
+  padding: 0.7rem;
+  background: var(--fl-surface);
+}
+
+.fl-run-state,
+.fl-run-journal {
+  border: 1px solid var(--fl-border);
+  border-radius: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.fl-run-state-title,
+.fl-run-journal-title {
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fl-muted);
+  margin-bottom: 0.35rem;
+}
+
+.fl-run-state-empty,
+.fl-run-journal-empty {
+  color: var(--fl-muted);
+  font-style: italic;
+}
+
+.fl-run-state-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.7rem;
+  margin: 0;
+}
+
+.fl-run-state-key,
+.fl-run-state-value {
+  margin: 0;
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+}
+
+.fl-run-state-key {
+  color: var(--fl-accent);
+}
+
+.fl-run-journal-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.fl-run-step {
+  border-left: 2px solid var(--fl-border);
+  padding-left: 0.55rem;
+}
+
+.fl-run-step-head {
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  color: var(--fl-muted);
+}
+
+.fl-run-step-effect,
+.fl-run-step-ops {
+  color: var(--fl-fg);
+}
+
+.fl-run-step-denial,
+.fl-run-step-reject {
+  color: var(--fl-error-fg);
+}
+
+.fl-run-step-diagnostic {
+  color: var(--fl-muted);
+}

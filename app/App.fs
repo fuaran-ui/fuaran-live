@@ -240,6 +240,13 @@ type Model =
     /// session stays `Session` above — the single source of truth every pane
     /// renders. `None` until a page-set bundle is loaded.
     Site: SiteView.Site option
+    /// Run mode: the emission RUNNING under the bounded program loop, rather
+    /// than merely rendered. `None` is Inspect — the static render, and the
+    /// default. Started fresh from the session tree each time Run is entered, so
+    /// leaving and re-entering resets the app's state exactly as reloading a
+    /// page would; the session tree itself is untouched by anything that
+    /// happens in here.
+    Run: RunMode.State option
   }
 
 type Msg =
@@ -260,6 +267,13 @@ type Msg =
   // engine — so it must live-drive to a paired device exactly like a model
   // emission does. Distinct case only so the provenance is readable.
   | NavigatorEdit of Session.SessionState
+  // Run mode (Phase 761). `ToggleRun` swaps the preview between the static
+  // render and the emission running under the bounded program loop;
+  // `RunInteract` carries one interaction — the node id a delegated click landed
+  // on — into that loop. No `'Msg` travels: the emission has no message type,
+  // which is the whole point of the bounded path.
+  | ToggleRun
+  | RunInteract of nodeId: string
   // A site-view action (load / switch / cross-page move / paired undo): the
   // semantics live in `SiteView.step`; this only folds its result and, when the
   // live session changed, propagates it exactly like a navigator edit.
@@ -754,7 +768,8 @@ let private init () : Model * Cmd<Msg> =
        else
          WorkspaceTab.Conversation)
     ConvUnseen = false
-    Site = None },
+    Site = None
+    Run = None },
   // Register the client-only enhancers once; run an initial KaTeX pass in case a
   // permalink restored a tree carrying an equation. In audience mode also
   // subscribe to the live-drive channel.
@@ -776,6 +791,27 @@ let private init () : Model * Cmd<Msg> =
 let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
   match msg with
   | SetPrompt p -> { model with Prompt = p }, Cmd.none
+  // ── run mode ──────────────────────────────────────────────────────────────
+  //
+  // Entering Run starts a fresh program from the session's current tree;
+  // leaving drops it. The denial sink is wired to the console as WELL as the
+  // journal that renders it: the journal is what the visitor reads, the console
+  // line is what someone debugging their own emission greps for.
+  | ToggleRun ->
+    match model.Run, model.Session.Tree with
+    | Some _, _ -> { model with Run = None }, Cmd.none
+    | None, None -> model, Cmd.none
+    | None, Some tree ->
+      { model with
+          Run = Some(RunMode.start RunMode.consoleDenialSink tree) },
+      Cmd.none
+  | RunInteract nodeId ->
+    match model.Run with
+    | None -> model, Cmd.none
+    | Some run ->
+      { model with
+          Run = Some(RunMode.step run nodeId "click") },
+      Cmd.none
   | ToggleTheme ->
     let dark = not model.Dark
 
@@ -1769,7 +1805,39 @@ let private conversationPane (model: Model) (dispatch: Msg -> unit) : ReactEleme
                       prop.text "▶ Watch a scripted agent stream live panels & ask you a typed question – no key needed"
                       prop.onClick (fun _ -> dispatch DemoSend) ] ] ] ] ]
 
-let private previewPane (model: Model) : ReactElement =
+/// The Inspect ⇄ Run switch (Phase 761). Inspect shows what the model emitted;
+/// Run makes it work. The same decoded tree either way — the difference is
+/// entirely in who is holding it, which is the claim the toggle exists to make
+/// checkable rather than assertable.
+let private runToggle (model: Model) (dispatch: Msg -> unit) : ReactElement =
+  let running = model.Run.IsSome
+
+  Html.div
+    [ prop.className "fl-run-toggle"
+      prop.children
+        [ Html.button
+            [ prop.className (if running then "fl-run-tab" else "fl-run-tab is-active")
+              prop.disabled (not running)
+              prop.title "The static render — what the model emitted."
+              prop.text "Inspect"
+              prop.onClick (fun _ ->
+                if running then
+                  dispatch ToggleRun) ]
+          Html.button
+            [ prop.className (if running then "fl-run-tab is-active" else "fl-run-tab")
+              prop.disabled running
+              prop.title
+                "Run the emission under the bounded program loop — state, bounded actions and closure-free effects, in this tab, with no server round-trip."
+              prop.text "Run"
+              prop.onClick (fun _ ->
+                if not running then
+                  dispatch ToggleRun) ] ] ]
+
+/// `runControls` is `None` for a surface that must not offer Run at all — the
+/// audience window, whose whole contract is that it mirrors the presenter and
+/// authors nothing. Explicit rather than a dead toggle wired to `ignore`: a
+/// control that is present and does nothing is worse than one that is absent.
+let private previewPane (runControls: (Msg -> unit) option) (model: Model) : ReactElement =
   // The `.fl-preview-root` wrapper is the Navigator's highlight scope (Phase
   // 710): it is how "the rendered element carrying this node id" is resolved to
   // the SESSION tree rather than to a same-id node in some other tree rendered
@@ -1778,9 +1846,27 @@ let private previewPane (model: Model) : ReactElement =
   match model.Session.Tree with
   | None -> Html.div [ prop.className "fl-empty"; prop.text "Your generated UI renders here." ]
   | Some tree ->
-    Html.div
-      [ prop.className "fl-preview-root"
-        prop.children [ Render.renderWithSources BindingResolver.empty ignore tree ] ]
+    let staticRender = Render.renderWithSources BindingResolver.empty ignore tree
+
+    let children =
+      match runControls with
+      | None -> [ staticRender ]
+      | Some dispatch ->
+        let body =
+          match model.Run with
+          | None -> staticRender
+          | Some run ->
+            Html.div
+              [ prop.className "fl-run"
+                prop.children
+                  [ RunMode.posture
+                    RunMode.runningApp run (fun nodeId -> dispatch (RunInteract nodeId))
+                    RunMode.statePanel run
+                    RunMode.journal run ] ]
+
+        [ runToggle model dispatch; body ]
+
+    Html.div [ prop.className "fl-preview-root"; prop.children children ]
 
 // The former Inspector pane (the wire JSON in a `<pre>`) is superseded by the
 // Source card's "Wire JSON" tab (2026-07-30 recomposition).
@@ -2379,7 +2465,7 @@ let private audienceView (model: Model) : ReactElement =
             [ prop.className "fl-audience-banner"
               prop.text
                 "🔴 Live audience – this screen is being driven from another window. No server: the UI arrives as data and re-renders live." ]
-          paneCard "Live preview" (previewPane model) ] ]
+          paneCard "Live preview" (previewPane None model) ] ]
 
 /// A collapsible "tool" panel – progressive disclosure for the secondary
 /// features so the core prompt→preview workspace stays front-and-centre.
@@ -2499,7 +2585,7 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                     Html.div
                       [ prop.className "pg-col"
                         prop.children
-                          [ paneCard "Live preview" (previewPane model)
+                          [ paneCard "Live preview" (previewPane (Some dispatch) model)
                             paneCard "Source – the tree as text" (sourcePane model dispatch) ] ] ] ]
             // Secondary tools – collapsed by default; Examples opens on first run.
             Html.section

@@ -30,6 +30,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+// @ts-expect-error untyped Fable output (no .d.ts is generated for it)
 import { annotationsJson } from '../app/showcase/output/AgentReadable.js';
 
 const SHAPES = ['text', 'number', 'boolean', 'choice', 'unknown'];
@@ -86,17 +87,17 @@ function certify(document: string): Entry[] {
       throw new Error(`${entry.field}: data-fuaran-field disagrees with the field id`);
     }
 
-    if (!SHAPES.includes(attrs['data-fuaran-shape'])) {
+    if (!SHAPES.includes(attrs['data-fuaran-shape'] ?? '')) {
       throw new Error(
-        `${entry.field}: shape "${attrs['data-fuaran-shape']}" is outside the closed set`,
+        `${entry.field}: shape "${attrs['data-fuaran-shape'] ?? ''}" is outside the closed set`,
       );
     }
 
-    if (!['true', 'false'].includes(attrs['data-fuaran-controllable'])) {
+    if (!['true', 'false'].includes(attrs['data-fuaran-controllable'] ?? '')) {
       throw new Error(`${entry.field}: controllable is not a bare boolean token`);
     }
 
-    const commands = JSON.parse(attrs['data-fuaran-commands']) as {
+    const commands = JSON.parse(attrs['data-fuaran-commands'] ?? '') as {
       phrase: string;
       effect: string;
     }[];
@@ -127,8 +128,9 @@ function certify(document: string): Entry[] {
       }
     }
 
-    if (attrs['data-fuaran-values'] !== undefined) {
-      const hint = JSON.parse(attrs['data-fuaran-values']) as Record<string, unknown>;
+    const valuesAttr = attrs['data-fuaran-values'];
+    if (valuesAttr !== undefined) {
+      const hint = JSON.parse(valuesAttr) as Record<string, unknown>;
       if (!HINT_KINDS.includes(hint.kind as string)) {
         throw new Error(`${entry.field}: value hint kind "${hint.kind}" is outside the closed set`);
       }
@@ -147,7 +149,7 @@ function certify(document: string): Entry[] {
       });
     }
 
-    const aria = attrs['aria-description'];
+    const aria = attrs['aria-description'] ?? '';
     if (aria !== undefined) {
       if (aria.includes('{value}')) {
         throw new Error(`${entry.field}: aria-description leaks an unsubstituted {value} slot`);
@@ -179,7 +181,7 @@ describe('the agent-readable page publishes a well-formed affordance declaration
 
     // A readable-only control declares only reads: an agent that trusts the
     // declaration must not find a write phrase on something it may not set.
-    const queueCommands = JSON.parse(byField.get('catalogue-queue')!['data-fuaran-commands']) as {
+    const queueCommands = JSON.parse(byField.get('catalogue-queue')!['data-fuaran-commands']!) as {
       effect: string;
     }[];
     expect(queueCommands.every((c) => c.effect === 'read')).toBe(true);
@@ -187,7 +189,7 @@ describe('the agent-readable page publishes a well-formed affordance declaration
 
   it('omits an open bound rather than nulling it', () => {
     const title = entries.find((e) => e.field === 'catalogue-title')!;
-    const hint = JSON.parse(title.attributes['data-fuaran-values']) as Record<string, unknown>;
+    const hint = JSON.parse(title.attributes['data-fuaran-values']!) as Record<string, unknown>;
     expect(hint.kind).toBe('textLength');
     expect(hint.minLength).toBe(2);
     // The declaration has no upper bound, so the key is ABSENT — not null, and
@@ -215,6 +217,14 @@ describe('the agent-readable page publishes a well-formed affordance declaration
 
 describe('the lock bites (go-red self-test)', () => {
   /** Apply a mutation to the real document and expect certification to fail. */
+  /** The first entry, asserted present — the corpus is never empty, and a
+   *  perturbation test that silently mutated nothing would pass vacuously. */
+  const first = (es: Entry[]): Entry => {
+    const e = es[0];
+    if (e === undefined) throw new Error('the annotation corpus is empty');
+    return e;
+  };
+
   const perturbed = (mutate: (entries: Entry[]) => void): (() => void) => {
     const entries = JSON.parse(annotationsJson) as Entry[];
     mutate(entries);
@@ -222,7 +232,7 @@ describe('the lock bites (go-red self-test)', () => {
   };
 
   it('rejects a shape outside the closed set', () => {
-    expect(perturbed((es) => (es[0].attributes['data-fuaran-shape'] = 'freetext'))).toThrow(
+    expect(perturbed((es) => (first(es).attributes['data-fuaran-shape'] = 'freetext'))).toThrow(
       /outside the closed set/,
     );
   });
@@ -231,7 +241,7 @@ describe('the lock bites (go-red self-test)', () => {
     expect(
       perturbed(
         (es) =>
-          (es[0].attributes['data-fuaran-commands'] = JSON.stringify([
+          (first(es).attributes['data-fuaran-commands'] = JSON.stringify([
             { phrase: 'do the thing', effect: 'mutate' },
           ])),
       ),
@@ -242,7 +252,7 @@ describe('the lock bites (go-red self-test)', () => {
     expect(
       perturbed(
         (es) =>
-          (es[0].attributes['data-fuaran-values'] = JSON.stringify({
+          (first(es).attributes['data-fuaran-values'] = JSON.stringify({
             kind: 'textLength',
             minLength: 2,
             maxLength: null,
@@ -252,15 +262,15 @@ describe('the lock bites (go-red self-test)', () => {
   });
 
   it('rejects a marker that disagrees with the field id', () => {
-    expect(perturbed((es) => (es[0].attributes['data-fuaran-field'] = 'somewhere-else'))).toThrow(
-      /disagrees with the field id/,
-    );
+    expect(
+      perturbed((es) => (first(es).attributes['data-fuaran-field'] = 'somewhere-else')),
+    ).toThrow(/disagrees with the field id/);
   });
 
   it('rejects an aria-description with an unsubstituted slot', () => {
     expect(
       perturbed(
-        (es) => (es[0].attributes['aria-description'] = 'You can say: “set it to {value}”.'),
+        (es) => (first(es).attributes['aria-description'] = 'You can say: “set it to {value}”.'),
       ),
     ).toThrow(/unsubstituted \{value\} slot/);
   });

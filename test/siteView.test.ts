@@ -255,9 +255,10 @@ describe('move to page…', () => {
     const destSession = shelfSessionOf(mv.Site, 'About');
     const destIds = Array.from(originIds(destSession)) as string[];
 
-    const sourceActor = sourceIds[sourceIds.length - 1];
-    const destActor = destIds[destIds.length - 1];
-    expect(sourceActor.startsWith('navigator:move:')).toBe(true);
+    const sourceActor = sourceIds.at(-1);
+    const destActor = destIds.at(-1);
+    expect(sourceActor, 'the move must have written a source-side op').toBeDefined();
+    expect(sourceActor!.startsWith('navigator:move:')).toBe(true);
     expect(destActor).toBe(sourceActor); // the shared correlation annotation
 
     // Each leg is an ordinary single-tree op — no new op kind anywhere.

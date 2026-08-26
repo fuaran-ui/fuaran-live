@@ -54,7 +54,27 @@ jobs:
           # Rationale + bump procedure in ci.yml. The corpus checkout stays unpinned
           # deliberately — it is the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: v0.12.0
+          # Bumped off the v0.12.0 tag (Phase 761). Two things changed at once
+          # and only together do they explain the pin:
+          #
+          #   - The PLAYGROUND project no longer project-references this repo at
+          #     all: it consumes the language tier as published nuget.org
+          #     packages at one pinned version. So this checkout now serves the
+          #     SHOWCASE project alone.
+          #   - The showcase source has adopted tier contracts that POSTDATE
+          #     every released tag — `FormField.Rule` and `RenderContext`'s
+          #     egress policy among them — so v0.12.0 could not compile it, and
+          #     no tag can: the newest release predates the contracts the source
+          #     targets. Measured, not assumed: compiling the showcase against
+          #     the 0.35.0 packages fails on exactly those members.
+          #
+          # This is the situation the history above already recorded once, and
+          # the remedy is the same one — a commit SHA, which is at least as
+          # deliberate as a tag and cannot be moved. Return to a tag when the
+          # tier cuts a release carrying those contracts.
+          #
+          # To bump: raise the ref in all six workflows together (grep the ref).
+          ref: 9f9b3f220bdc46e50693528285ff5aa1cda519df
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4

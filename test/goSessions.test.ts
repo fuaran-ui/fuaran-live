@@ -17,8 +17,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // @ts-expect-error untyped Fable output
 import * as GS from '../app/showcase/output/GoSessions.js';
-// @ts-expect-error untyped Fable output – the real Fuaran decoder (playground output).
-import { decodeNode } from '../app/output/fuaran-dotnet/src/Fuaran.UI.Ops/JsonDecode.js';
+// The real Fuaran decoder, from the packaged language tier – see test/tierOutput.ts.
+import { decodeNode } from './tierOutput.js';
 
 const artefactJson = readFileSync('public/replays/go-sessions.json', 'utf8');
 

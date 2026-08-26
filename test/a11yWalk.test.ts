@@ -56,10 +56,9 @@ import {
   canonicalTree,
   // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/OpLog.js';
-// @ts-expect-error untyped Fable output
-import { findNode } from '../app/output/fuaran-dotnet/src/Fuaran.UI.Ops/Introspect.js';
-// @ts-expect-error untyped Fable output
-import { NodeId } from '../app/output/fuaran-dotnet/src/Fuaran.UI/Types.js';
+// The packaged language tier — see test/tierOutput.ts for why the path is
+// centralised there rather than spelled out here.
+import { findNode, NodeId } from './tierOutput.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 //

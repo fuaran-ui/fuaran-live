@@ -64,10 +64,8 @@ function rowOf(s: any, nodeId: string, path: string): string | undefined {
 // The flat surfaces are addressed by node id, so tests never need to hold a
 // decoded `Node` — except `fieldSummary` / `editablePaths`, which take one.
 // Reach it the same way the navigator does: through the introspection surface.
-// @ts-expect-error untyped Fable output
-import { findNode } from '../app/output/fuaran-dotnet/src/Fuaran.UI.Ops/Introspect.js';
-// @ts-expect-error untyped Fable output
-import { NodeId } from '../app/output/fuaran-dotnet/src/Fuaran.UI/Types.js';
+// The packaged language tier — see test/tierOutput.ts.
+import { findNode, NodeId } from './tierOutput.js';
 
 function findNodeJson(s: any, nodeId: string) {
   const found = findNode(new NodeId(nodeId), s.Tree);

@@ -16,8 +16,8 @@ import { describe, it, expect } from 'vitest';
 // Fable-generated JS — no .d.ts; vitest runs it via esbuild (no typecheck).
 // @ts-expect-error untyped Fable output
 import { lightTheme, darkTheme } from '../app/output/shared/Brand.js';
-// @ts-expect-error untyped Fable output
-import { toCssVariables } from '../app/output/fuaran-dotnet/src/Fuaran.UI.Renderer.Core/Theme.js';
+// The packaged language tier — see test/tierOutput.ts.
+import { toCssVariables } from './tierOutput.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(here, '../app/brand/fuaran-brand.css'), 'utf8');

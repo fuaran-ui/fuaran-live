@@ -47,89 +47,23 @@
   </Target>
 
   <ItemGroup>
-    <!-- The Fable-safe slice of the Ops apply engine + the canonical-JSON codec,
-         LINKED (not ProjectReferenced). Fuaran.UI.Ops is Fable-compilable in full –
-         ErrorRender.fs carries a complete `#else` Fable arm (a hand-rolled JSON
-         builder mirroring JsonDecode.fs's no-System.Text.Json stance), and the
-         fuaran-dotnet samples take a plain ProjectReference to it and compile
-         green. The reason to LINK is not portability but compile topology: this
-         repo drives two independent Fable graphs (the playground and the
-         showcase), and a ProjectReference would compile the shared Ops modules
-         once per graph. Linking the exact files each graph needs keeps one copy
-         per graph and the emitted surface minimal.
+    <!-- The Fable-safe slice of the Ops apply engine, the canonical-JSON codec,
+         the op-record/hash-chain slice and the structural tree diff now arrive as
+         PACKAGES (see the PackageReference group below), not as linked sources
+         from a sibling checkout.
 
-         These give the closed loop its decode → apply → encode core in the
-         browser. Compile order = dependency order.
+         Why the change: this project consumes the bounded program loop
+         (Fuaran.Program.Runtime), which is distributed as a package and declares
+         its own Fuaran.UI.* dependencies. A ProjectReference to Fuaran.UI in this
+         project SUBSTITUTES that project for the package's Fuaran.UI dependency,
+         while Fable still extracts every OTHER Fuaran.UI.* package's sources into
+         fable_modules/ — where Fuaran.UI is then out of scope, and the compile
+         dies in the thousands of errors. Linked copies of Ops/OpStream sources
+         compound it, because the package extraction brings a second definition of
+         the same modules into the same compile.
 
-         NB: the `Fuaran.UI.Ops.Types` module (TreeOp / Spec / the WireTree marker)
-         is NOT linked here – it moved to Fuaran.UI.Ops.Abstractions and now reaches
-         this compile transitively via the Fuaran.UI.Renderer ProjectReference
-         (Renderer → Telemetry.Abstractions → Ops.Abstractions). -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Introspect.fs">
-      <Link>linked\Introspect.fs</Link>
-    </Compile>
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\JsonDecode.fs">
-      <Link>linked\JsonDecode.fs</Link>
-    </Compile>
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Apply.fs">
-      <Link>linked\Apply.fs</Link>
-    </Compile>
-    <!-- The placement algebra (placed insert / move / nudge + the clone verbs) –
-         the packaged derivation of "membership and order are separate ops" that
-         the navigator's structural editing consumes instead of carrying its own.
-         Depends on Introspect above + the Fuaran.Core.Tree package below. -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Placement.fs">
-      <Link>linked\Placement.fs</Link>
-    </Compile>
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
-      <Link>linked\CanonicalJson.fs</Link>
-    </Compile>
-    <!-- The op-record + hash-chain slice (Phase 466): each agent panel turn is
-         its own hash-chained op-stream scope, so a panel's provenance is
-         chain-checkable and replayable in the browser. Fable-safe (the showcase
-         project Fable-compiles the whole parent project already). These three
-         lean on the Fuaran.Core spine packages added below. -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\OpRecord.fs">
-      <Link>linked\OpRecord.fs</Link>
-    </Compile>
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\StreamEntry.fs">
-      <Link>linked\StreamEntry.fs</Link>
-    </Compile>
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\HashChain.fs">
-      <Link>linked\HashChain.fs</Link>
-    </Compile>
-    <!-- The §18 elicitation envelope codec (Phase 465) – the typed-question
-         protocol the agent loop's askUser tool speaks. Fable-safe (the showcase
-         project already Fable-compiles it via its OpStream.Abstractions
-         ProjectReference); linked here for the same reason as the files above
-         (a full ProjectReference would double-compile the linked modules). -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\Elicitation.fs">
-      <Link>linked\Elicitation.fs</Link>
-    </Compile>
-    <!-- The structural tree diff (Phase 715): "what did the model change against
-         the version I approved?" is the question the refine loop has to answer,
-         and it is answered with the SHIPPED diff rather than a local one, so the
-         playground's notion of a change is the estate's. `TreeDiff.fs` names
-         `ReplayError` in `StepDiffsError`, so `Replay.fs` (small, Fable-clean,
-         no extra deps) is linked ahead of it; `stepDiffs` itself is behind
-         `#if !FABLE_COMPILER` and simply is not part of this compile. Linked
-         rather than ProjectReferenced for the same reason as everything above –
-         a ref to Fuaran.UI.OpStream.Replay would drag in Fuaran.UI.Ops and
-         double-compile the linked modules. -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Replay\Replay.fs">
-      <Link>linked\Replay.fs</Link>
-    </Compile>
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Replay\TreeDiff.fs">
-      <Link>linked\TreeDiff.fs</Link>
-    </Compile>
-    <!-- The canonical wire-format JSON Schema generator – Fable-safe by design (no
-         reflection, no System.Text.Json; a self-contained structural hand-walk).
-         LINKED so the agent self-debug loop can expose per-kind required-field
-         schemas to the model via the getKindSchema tool, instead of forcing it to
-         guess field names one decode error at a time. -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\SchemaGen.fs">
-      <Link>linked\SchemaGen.fs</Link>
-    </Compile>
+         So the whole Fuaran.UI.* consumption is packaged, at ONE version, and the
+         sibling checkout is no longer part of this project's compile graph. -->
     <!-- The vendored AI-connector wire layer (Phase 576) – a self-contained
          Apache-2.0 copy under the FuaranLive.AiWire namespace: the JsonValue /
          JsonHost canonical-JSON model, the provider contract types, the
@@ -186,14 +120,39 @@
     <Compile Include="navigator\Navigator.fs" />
     <Compile Include="navigator\ProjectionSync.fs" />
     <Compile Include="navigator\Refine.fs" />
+    <!-- Run mode: the emission stops being a picture and becomes an app. Owns
+         the wiring of the packaged bounded program loop — the dispatch gate, the
+         closed default-deny effect registry, the live $state projection and the
+         step journal — so App.fs holds only the toggle and the panes. -->
+    <Compile Include="RunMode.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Typed tree + the renderer (transitively pulls Fuaran.UI). The renderer
-         carries the parity-locked class vocabulary + reference-CSS contract. -->
-    <ProjectReference Include="..\..\fuaran-dotnet\src\Fuaran.UI\Fuaran.UI.fsproj" />
-    <ProjectReference Include="..\..\fuaran-dotnet\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
+    <!-- The Fuaran UI language tier, consumed WHOLLY as published packages at ONE
+         version. Every id here is served by the public restore path (nuget.org)
+         at exactly this version — checked against the registry's own index, not
+         against a local feed, because this repo's CI restores anonymously and a
+         pin only a maintainer's machine can resolve is a pin nobody else can use.
+         A pin naming an unpublished version is not a build error either: it is
+         NU1603, a warning, after which the nearest higher version is substituted
+         silently — and ONE NU1603 line on msbuild's stdout kills the Fable project
+         cracker outright, presenting as an unhandled exception naming nothing.
+
+         Typed tree + the renderer (the parity-locked class vocabulary +
+         reference-CSS contract), the Ops apply engine + canonical JSON codec, the
+         op-record/hash-chain slice, and the structural tree diff. -->
+    <PackageReference Include="Fuaran.UI" Version="0.35.0" />
+    <PackageReference Include="Fuaran.UI.Renderer" Version="0.35.0" />
+    <PackageReference Include="Fuaran.UI.Ops" Version="0.35.0" />
+    <PackageReference Include="Fuaran.UI.OpStream.Abstractions" Version="0.35.0" />
+    <PackageReference Include="Fuaran.UI.OpStream.Replay" Version="0.35.0" />
+    <!-- The bounded program loop: the client placement that runs a wire-decoded
+         program tree interactively in the browser — no hand-authored update
+         function, no message type, no server. Its Fuaran.UI.* dependency pins name
+         the same 0.35.0 family above, which is why this consumption is
+         NU1603-clean. Apache-2.0, published on the public tier. -->
+    <PackageReference Include="Fuaran.Program.Runtime" Version="0.1.0" />
   </ItemGroup>
 
   <ItemGroup>

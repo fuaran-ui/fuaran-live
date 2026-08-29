@@ -1082,8 +1082,25 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
            |> String.concat ", ")
         + "]"
 
+    // The `source` slot is a `TransformSource` DU, not a bare `DataSource`:
+    // `Data` carries the columnar / `ref` table, `Live` preserves a
+    // binding-shaped source (State / Selection / Query) so a runtime
+    // re-evaluates when its channel changes. The wire discriminates
+    // structurally — a `Live` source rides as a Binding case object (it has a
+    // `$type`), a `Data` source as the bare table — and `initial` is the
+    // decode-time snapshot, never encoded, so the empty table round-trips.
+    let srcV = fieldD "source" v
+
+    let sourcePart =
+      match dollarType srcV with
+      | Some _ ->
+        "{ kind: 'Live', binding: "
+        + tsBinding Opq.Collection srcV
+        + ", initial: { kind: 'Embedded', table: { schema: [], columns: [] } } }"
+      | None -> "{ kind: 'Data', source: " + tsDataSource srcV + " }"
+
     "{ kind: 'Transform', source: "
-    + tsDataSource (fieldD "source" v)
+    + sourcePart
     + ", pipeline: ["
     + (arrOf "pipeline" v |> List.map tsTransformStep |> String.concat ", ")
     + "]"
@@ -1201,7 +1218,17 @@ let rec private tsAction (v: JsonValue) : string =
     + tsJson (fieldD "payload" v)
     + ")"
   | Some "Navigate" -> "action.navigate(" + qs (strOf "route" v) + ")"
-  | Some "SetState" -> "action.setState(" + qs (strOf "key" v) + ", " + tsJson (fieldD "value" v) + ")"
+  | Some "SetState" ->
+    // `value` (a literal) and `valueFrom` (a Binding read at dispatch time) are
+    // sibling slots with distinct ctors; `valueFrom` wins when present.
+    (match JsonValue.tryField "valueFrom" v with
+     | Some src ->
+       "action.setStateFrom("
+       + qs (strOf "key" v)
+       + ", "
+       + tsBinding Opq.Scalar src
+       + ")"
+     | None -> "action.setState(" + qs (strOf "key" v) + ", " + tsJson (fieldD "value" v) + ")")
   | Some "AiTool" ->
     "action.aiTool("
     + qs (strOf "toolName" v)
@@ -1236,6 +1263,14 @@ let private tsCellFormat (v: JsonValue) : string =
      | None -> "format.percent()")
   | Some "SignificantDigits" -> "format.significantDigits(" + numLit (numOf "digits" v) + ")"
   | Some "Date" -> "format.date(" + qs (strOf "format" v) + ")"
+  // `Duration` / `RelativeTime` have no `format.*` helper in the TS tier, so
+  // they project as the typed literal (the `Custom` precedent below).
+  | Some "Duration" ->
+    tsInline
+      [ "kind", qs "Duration"
+        "unit", qs (strOf "unit" v)
+        "style", qs (strOf "style" v) ]
+  | Some "RelativeTime" -> tsInline [ "kind", qs "RelativeTime"; "unit", qs (strOf "unit" v) ]
   | Some "Custom" -> "{ kind: 'Custom', fn: () => '' }"
   | _ -> "format.none()"
 
@@ -1397,6 +1432,38 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
     )
   | _ -> tsInline ([ "kind", qs "Text" ] @ handler "onChange" @ [ "value", value ])
 
+/// A `FormField`'s declared constraint (Phase 864) — the ACCEPTED SET, where
+/// `FormFieldKind` names the CONTROL. Every slot is optional and the whole
+/// record is optional on the field, so a form authored before the addition
+/// projects byte-identically. `compare.against` is an ordinary `Binding` (that
+/// IS the cross-field mechanism — the auto-bind rule puts each field's value in
+/// State under its own id), and `message` is a `TextSource`, not a bare string.
+let private tsFieldRule (v: JsonValue) : string =
+  tsInline (
+    (match optStr "format" v with
+     | Some f -> [ "format", qs f ]
+     | None -> [])
+    @ (match optStr "pattern" v with
+       | Some p -> [ "pattern", qs p ]
+       | None -> [])
+    @ (match optNum "minLength" v with
+       | Some n -> [ "minLength", numLit n ]
+       | None -> [])
+    @ (match optNum "maxLength" v with
+       | Some n -> [ "maxLength", numLit n ]
+       | None -> [])
+    @ (match JsonValue.tryField "compare" v with
+       | Some c ->
+         [ "compare",
+           tsInline
+             [ "op", qs (strOf "op" c)
+               "against", tsBinding Opq.Scalar (fieldD "against" c) ] ]
+       | None -> [])
+    @ (match JsonValue.tryField "message" v with
+       | Some m -> [ "message", tsTextSourceLit m ]
+       | None -> [])
+  )
+
 let private tsFormField (depth: int) (v: JsonValue) : string =
   let id = strOf "id" v
 
@@ -1407,6 +1474,9 @@ let private tsFormField (depth: int) (v: JsonValue) : string =
       "required", boolLit (boolOf "required" v) ]
     @ (match JsonValue.tryField "help" v with
        | Some h -> [ "help", tsTextSourceLit h ]
+       | None -> [])
+    @ (match JsonValue.tryField "rule" v with
+       | Some r -> [ "rule", tsFieldRule r ]
        | None -> [])
 
   tsObjLit fields depth
@@ -1419,6 +1489,11 @@ let private tsFilterSpec (depth: int) (v: JsonValue) : string =
       "label", tsTextSourceLit (fieldD "label" v)
       "field", tsFieldKindLit (AutoBind.Filter name) (fieldD "kind" v) ]
     depth
+
+/// A grid's declared initial sort — the zero-based column index plus a
+/// lower-case direction, both required whenever the slot is present.
+let private tsDefaultSort (v: JsonValue) : string =
+  tsInline [ "column", numLit (numOf "column" v); "direction", qs (strOf "direction" v) ]
 
 let private tsColumnWidth (v: JsonValue) : string =
   match dollarType v with
@@ -1639,15 +1714,26 @@ let private tsGridColumnErased (v: JsonValue) : string =
     @ (match optStr "field" v with
        | Some f -> [ "field", qs f ]
        | None -> [])
+    // Per-column opt-OUT slots: both are optional and ride the wire only when
+    // explicitly set, so an absent slot must project as absent, not as a default.
+    @ (match JsonValue.tryField "sortable" v with
+       | Some(JBool b) -> [ "sortable", boolLit b ]
+       | _ -> [])
+    @ (match JsonValue.tryField "editable" v with
+       | Some(JBool b) -> [ "editable", boolLit b ]
+       | _ -> [])
   )
 
 /// `Drawing` (Phase 524) has no smart ctor, so it projects as the typed in-memory
 /// spec literal: the wire tree is walked structurally (`$type` → `kind`; `Static`
 /// bindings ride `{ kind: 'Static', value }`); the `text` / `description` /
-/// `title` slots are `TextSource`, wrapped as `Literal` from their bare string.
+/// `title` slots — and a `DrawStyle.tip` — are `TextSource`, wrapped as
+/// `Literal` from their bare string. A `tip` already in envelope form
+/// (`Bound` / `I18n`) walks structurally and needs no wrapping.
 let rec private tsDrawingConv (key: string) (v: JsonValue) : string =
   match v with
-  | JString s when key = "text" || key = "description" || key = "title" -> "{ kind: 'Literal', value: " + qs s + " }"
+  | JString s when key = "text" || key = "description" || key = "title" || key = "tip" ->
+    "{ kind: 'Literal', value: " + qs s + " }"
   | JNull -> "undefined"
   | JBool b -> boolLit b
   | JNumber n -> numLit n
@@ -1831,6 +1917,13 @@ and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue
   // `heading` (the `dashboard` ctor takes none) and no ctor ARIA default leaks.
   let layoutV = fieldD "layout" k
 
+  // `gap` is an optional slot on every laid-out `BoxLayout` case (Flex / Grid /
+  // Masonry), omitted-when-absent so a gapless layout stays byte-identical.
+  let gapPart =
+    match optNum "gap" layoutV with
+    | Some g -> ", gap: " + numLit g
+    | None -> ""
+
   let layout =
     match dollarType layoutV with
     | Some "Flex" ->
@@ -1838,14 +1931,18 @@ and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue
       + qs (strOf "direction" layoutV)
       + ", wrap: "
       + boolLit (boolOf "wrap" layoutV)
+      + gapPart
       + " }"
     | Some "Grid" ->
       "{ kind: 'Grid', cols: "
       + numLit (numOf "cols" layoutV)
+      + gapPart
       + (match optStr "templateColumns" layoutV with
          | Some t -> ", templateColumns: " + qs t
          | None -> "")
       + " }"
+    // Phase 1082's masonry hang — `cols` is required, `gap` optional.
+    | Some "Masonry" -> "{ kind: 'Masonry', cols: " + numLit (numOf "cols" layoutV) + gapPart + " }"
     | Some other -> "{ kind: '" + other + "' }"
     | None -> "{ kind: 'Auto' }"
 
@@ -1929,7 +2026,17 @@ and private tsDataGridNode (depth: int) (id: string) (k: JsonValue) (nodeV: Json
            |> String.concat ", ")
         + "]"
 
-      [ "staticRows", "{ headers: " + headers + ", rows: " + rows + " }" ]
+      // `sortable` / `defaultSort` are the static-rows sort affordance; both
+      // optional, both omitted-when-absent.
+      let extras =
+        (match JsonValue.tryField "sortable" sr with
+         | Some(JBool b) -> ", sortable: " + boolLit b
+         | _ -> "")
+        + (match JsonValue.tryField "defaultSort" sr with
+           | Some d -> ", defaultSort: " + tsDefaultSort d
+           | None -> "")
+
+      [ "staticRows", "{ headers: " + headers + ", rows: " + rows + extras + " }" ]
     | None -> []
 
   let spec =
@@ -1937,6 +2044,10 @@ and private tsDataGridNode (depth: int) (id: string) (k: JsonValue) (nodeV: Json
       [ "columns", "[" + (cols |> List.map tsGridColumnErased |> String.concat ", ") + "]"
         "source", tsBinding Opq.Collection (fieldD "source" k) ]
       @ (if boolOf "editable" k then [ "editable", "true" ] else [])
+      @ (if boolOf "reorderable" k then
+           [ "reorderable", "true" ]
+         else
+           [])
       @ (match JsonValue.tryField "onRowClick" k with
          | Some _ -> [ "onRowClick", "() => action.chain([])" ]
          | None -> [])
@@ -1945,6 +2056,23 @@ and private tsDataGridNode (depth: int) (id: string) (k: JsonValue) (nodeV: Json
          | None -> [])
       @ (match optStr "rowKeyField" k with
          | Some f -> [ "rowKeyField", qs f ]
+         | None -> [])
+      // The declarative sort / page / edit state slots: each names the State key
+      // the grid reads its own affordance from, so each rides the wire verbatim.
+      @ (match optStr "sortStateKey" k with
+         | Some s -> [ "sortStateKey", qs s ]
+         | None -> [])
+      @ (match JsonValue.tryField "defaultSort" k with
+         | Some d -> [ "defaultSort", tsDefaultSort d ]
+         | None -> [])
+      @ (match optNum "pageSize" k with
+         | Some n -> [ "pageSize", numLit n ]
+         | None -> [])
+      @ (match optStr "pageStateKey" k with
+         | Some s -> [ "pageStateKey", qs s ]
+         | None -> [])
+      @ (match optStr "editStateKey" k with
+         | Some s -> [ "editStateKey", qs s ]
          | None -> [])
       @ staticRows
     )
@@ -2161,6 +2289,9 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match JsonValue.tryField "trendFormat" k with
           | Some t -> [ "trendFormat", tsCellFormat t ]
           | None -> [])
+       @ (match optStr "trendPolarity" k with
+          | Some p -> [ "trendPolarity", qs p ]
+          | None -> [])
        @ (match optStr "icon" k with
           | Some i -> [ "icon", qs i ]
           | None -> [])
@@ -2225,14 +2356,96 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | None -> [])
        @ (match optStr "target" k with
           | Some t -> [ "target", qs t ]
+          | None -> [])
+       @ (match optStr "protection" k with
+          | Some p -> [ "protection", qs p ]
           | None -> []))
   | "Image" ->
     call
       "image"
+      ([ idF
+         "src", tsBinding Opq.Scalar (fieldD "src" k)
+         "alt", tsTextInput (fieldD "alt" k)
+         "variant", qs (strOf "variant" k) ]
+       // The presentation slots (fit / aspectRatio / loading) and the figure
+       // slots (caption / expandable) are each optional and omitted-when-absent.
+       @ (match optStr "fit" k with
+          | Some f -> [ "fit", qs f ]
+          | None -> [])
+       @ (match optStr "aspectRatio" k with
+          | Some a -> [ "aspectRatio", qs a ]
+          | None -> [])
+       @ (match optStr "loading" k with
+          | Some l -> [ "loading", qs l ]
+          | None -> [])
+       @ (match JsonValue.tryField "caption" k with
+          | Some c -> [ "caption", tsTextInput c ]
+          | None -> [])
+       @ (match JsonValue.tryField "expandable" k with
+          | Some(JBool b) -> [ "expandable", boolLit b ]
+          | _ -> [])
+       // Phase 1080 — the candidate renditions. `width` is the descriptor the
+       // browser selects on; the entry's `src` is an ordinary string binding.
+       @ (match JsonValue.tryField "srcSet" k with
+          | Some(JArray entries) ->
+            [ "srcSet",
+              "["
+              + (entries
+                 |> List.map (fun e ->
+                   tsInline
+                     [ "src", tsBinding Opq.Scalar (fieldD "src" e)
+                       "width", numLit (numOf "width" e) ])
+                 |> String.concat ", ")
+              + "]" ]
+          | _ -> []))
+  // Phase 821 — the standalone icon display kind. `fuaran.icon` is the
+  // decorative shorthand (id + name only); the full record needs `iconSpec`,
+  // whose `tone` is required in memory and omitted-on-default on the wire.
+  | "Icon" ->
+    Some(
+      "fuaran.iconSpec("
+      + qs id
+      + ", "
+      + tsInline (
+        [ "icon", qs (strOf "icon" k)
+          "size", qs (optStr "size" k |> Option.defaultValue "Medium")
+          "tone", qs (optStr "tone" k |> Option.defaultValue "Default") ]
+        @ (match optStr "label" k with
+           | Some l -> [ "label", qs l ]
+           | None -> [])
+      )
+      + ")"
+    )
+  // `Media` splits by its inner `kind` into two ctors with different surfaces:
+  // only `Video` carries `autoplay` / `poster`. `controls` and `loop` default
+  // to true / false respectively and are omitted on the wire at their default.
+  | "Media" ->
+    let inner = fieldD "kind" k
+    let isVideo = (dollarType inner |> Option.defaultValue "Video") = "Video"
+
+    let common =
       [ idF
         "src", tsBinding Opq.Scalar (fieldD "src" k)
-        "alt", tsTextInput (fieldD "alt" k)
-        "variant", qs (strOf "variant" k) ]
+        "label", tsTextInput (fieldD "label" k) ]
+      @ (match JsonValue.tryField "controls" k with
+         | Some(JBool b) -> [ "controls", boolLit b ]
+         | _ -> [])
+      @ (match JsonValue.tryField "loop" k with
+         | Some(JBool b) -> [ "loop", boolLit b ]
+         | _ -> [])
+
+    if isVideo then
+      call
+        "video"
+        (common
+         @ (match JsonValue.tryField "autoplay" inner with
+            | Some(JBool b) -> [ "autoplay", boolLit b ]
+            | _ -> [])
+         @ (match JsonValue.tryField "poster" inner with
+            | Some p -> [ "poster", tsBinding Opq.Scalar p ]
+            | None -> []))
+    else
+      call "audio" common
   | "List" ->
     call
       "list"
@@ -2359,17 +2572,63 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | None -> []))
   // ── Visualisation ─────────────────────────────────────────────────────────
   | "Chart" ->
-    call
-      "chart"
-      ([ idF
-         "source", tsBinding Opq.Collection (fieldD "source" k)
-         "xField", qs (strOf "xField" k)
-         "yFields", "[" + (arrOf "yFields" k |> List.map strItem |> String.concat ", ") + "]"
-         "kind", qs (strOf "kind" k)
-         "stacked", boolLit (boolOf "stacked" k) ]
-       @ (match JsonValue.tryField "title" k with
-          | Some t -> [ "title", tsTextInput t ]
-          | None -> []))
+    let ctorExpr =
+      "fuaran.chart("
+      + tsObjLit
+          ([ idF
+             "source", tsBinding Opq.Collection (fieldD "source" k)
+             "xField", qs (strOf "xField" k)
+             "yFields", "[" + (arrOf "yFields" k |> List.map strItem |> String.concat ", ") + "]"
+             "kind", qs (strOf "kind" k)
+             "stacked", boolLit (boolOf "stacked" k) ]
+           @ (match JsonValue.tryField "title" k with
+              | Some t -> [ "title", tsTextInput t ]
+              | None -> []))
+          depth
+      + ")"
+
+    // `ChartOptions` reaches only the five core slots plus `title`; the axis
+    // titles, subtitle, value format, legend placement, data labels and x-scale
+    // are all `ChartSpec` slots with NO ctor surface in the TS tier yet. So the
+    // projection post-edits the built node's spec — the Switch-arm precedent:
+    // exact, executable, and honest about the ctor gap rather than silently
+    // dropping the slot. The three text slots are raw `TextSource` here (no
+    // ctor `text()` coercion runs), so they take the explicit object form.
+    let extras =
+      (match JsonValue.tryField "subtitle" k with
+       | Some s -> [ "subtitle", tsTextSourceLit s ]
+       | None -> [])
+      @ (match JsonValue.tryField "xTitle" k with
+         | Some t -> [ "xTitle", tsTextSourceLit t ]
+         | None -> [])
+      @ (match JsonValue.tryField "yTitle" k with
+         | Some t -> [ "yTitle", tsTextSourceLit t ]
+         | None -> [])
+      @ (match JsonValue.tryField "valueFormat" k with
+         | Some f -> [ "valueFormat", tsFormatIntent f ]
+         | None -> [])
+      @ (match optStr "legendPosition" k with
+         | Some p -> [ "legendPosition", qs p ]
+         | None -> [])
+      @ (match optStr "dataLabels" k with
+         | Some d -> [ "dataLabels", qs d ]
+         | None -> [])
+      @ (match optStr "xScale" k with
+         | Some s -> [ "xScale", qs s ]
+         | None -> [])
+
+    if List.isEmpty extras then
+      Some ctorExpr
+    else
+      Some(
+        "(() => { const n = "
+        + ctorExpr
+        + "; const v = n.kind.visualisation; return { ...n, kind: { ...n.kind, visualisation: { ...v, spec: { ...v.spec, "
+        + (extras
+           |> List.map (fun (key, value) -> key + ": " + value)
+           |> String.concat ", ")
+        + " } } } }; })()"
+      )
   | "Table" ->
     let rows =
       arrOf "rows" k

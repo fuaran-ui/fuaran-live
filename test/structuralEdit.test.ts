@@ -440,10 +440,52 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
   expect(canonical, path).toBe(emitted);
 }
 
+// The set the SYNTHESISER can shape but no decoder accepts, so `defaultNodeFor`
+// drops it and the palette never offers it. Pinned by name rather than skipped
+// silently, because the drop is the guard working and a NEW member is the guard
+// hiding something — see the second lock below for why the two are separated.
+//
+// Every member fails the same way: the schema's `Binding` `$def` is UNPARAMETERISED
+// (`"value": true` — any JSON), so a schema-driven walk cannot know that this
+// slot's `Static` needs a string, a number or an integer, and emits the valueless
+// `{"$type":"Static"}`. That form is legal — the corpus carries it in `controls-*`
+// / `form-segmented` / `multiselect-1` — but only in an auto-bound CONTROL slot,
+// where absence IS the binding. In a typed scalar slot it is WRONG_TYPE.
+//
+// It is an expressiveness gap in the AI-tools JSON schema, not a bug in this
+// walker: no amount of care here recovers a type the schema does not carry, and
+// guessing one from the property name is exactly the guess the synthesiser's
+// docstring refuses to make. Closing it means parameterising `Binding` in the
+// schema, which is a language-tier change.
+const UNDECODABLE_SYNTHESIS = new Set([
+  'Disclosure',
+  'Image',
+  'LabelValueRow',
+  'Link',
+  'Metric',
+  'Modal',
+  'Progress',
+  'Stepper',
+  'Toast',
+]);
+
 describe('the synthesised defaults are strictly decodable and normalisation-stable', () => {
+  // The subject is what the palette OFFERS, not everything the walker can shape.
+  // Those differ, and the difference is load-bearing: `defaultNodeFor` reads its
+  // synthesis back through the real strict decoder and returns None on refusal,
+  // so an undecodable shape never reaches a user's tree.
+  //
+  // This lock swept `schemaKinds()` until 2026-08-30 and passed — on a premise
+  // that was already false. The F# reference decoder rejected nine of those
+  // kinds the whole time; `@fuaran-ui/ops` 0.9.0 happened to accept them, so the
+  // lock was measuring the laxer of the two hosts and reporting agreement that
+  // did not exist. Raising the pins to 0.19.0 — which moved TOWARD the F#
+  // reference — is what surfaced it. Widening a lock's subject past what the
+  // module guarantees does not make it stronger; it makes it wrong in a
+  // direction nobody reads.
   it('decodes, reaches a fixed point, and loses nothing it emitted', () => {
     const s = seeded();
-    const kinds = schemaKinds() as string[];
+    const kinds = paletteKinds(s, 'root', 'last') as string[];
     expect(kinds.length).toBeGreaterThan(20);
 
     let locked = 0;
@@ -473,7 +515,27 @@ describe('the synthesised defaults are strictly decodable and normalisation-stab
     }
 
     // Guard the guard: an empty sweep would pass while locking nothing.
-    expect(locked).toBeGreaterThan(30);
+    expect(locked).toBeGreaterThan(20);
+  });
+
+  // Narrowing the sweep above to the offered kinds would, on its own, let a kind
+  // fall out of the palette silently — the exact failure mode that let the old
+  // premise stand for as long as it did. So the dropped set is itself pinned:
+  // it may only change deliberately, in both directions.
+  it('the kinds the walker shapes but no decoder accepts are exactly the pinned set', () => {
+    const s = seeded();
+    const offered = new Set(paletteKinds(s, 'root', 'last') as string[]);
+    const dropped = (schemaKinds() as string[])
+      .filter((k) => (defaultWireFor(s, k) as string) !== '')
+      .filter((k) => !offered.has(k))
+      .sort();
+
+    expect(
+      dropped,
+      'a kind entered or left the undecodable set — if it LEFT, delete it from ' +
+        'UNDECODABLE_SYNTHESIS (the schema or the walker improved); if it ENTERED, ' +
+        'the palette just lost a kind and the cause is upstream, not here',
+    ).toEqual([...UNDECODABLE_SYNTHESIS].sort());
   });
 });
 

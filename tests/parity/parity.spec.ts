@@ -40,6 +40,14 @@ const lenientCorpus = resolve(here, '../../../wire-format-fixtures/lenient');
 // placeholder (Render.fs `resolveOptions`) so both emit the same `<select>`
 // with only the structural `—` placeholder option. `form-1` is therefore in
 // the green matrix. `form-ranged` remains the numeric-range form primitive.
+//
+// `grid-editable-state` joins the matrix for Phase 666: it is the only fixture
+// carrying `editable: true` over a `$state` row source, and until it landed the
+// two hosts could and did disagree about that shape with nothing to catch it —
+// the F# host drew `<input>` cells where the TypeScript host drew static text.
+// Structural parity is necessary but NOT sufficient for it, which is why the
+// dedicated affordance test below exists: two hosts that BOTH regressed to
+// static cells would still be structurally identical.
 const MATRIX = [
   'composite-root',
   'form-1',
@@ -48,6 +56,7 @@ const MATRIX = [
   'card-1',
   'stack-1',
   'heading-1',
+  'grid-editable-state',
 ] as const;
 
 interface HostPage {
@@ -196,6 +205,67 @@ for (const id of MATRIX) {
     expect(fableDom, `DOM-structure divergence for ${id}`).toBe(tsDom);
   });
 }
+
+// Phase 666 — the editable-grid affordance, asserted rather than implied.
+//
+// The matrix entry above proves the two hosts agree; this proves what they
+// agree ON. A grid declaring `editable: true` over a directly-`$state` row
+// source has a destination for its write-back, so every field-projected
+// Text/Numeric cell must render as an `<input class="fuaran-grid-cell-editable">`
+// — the Phase 663 contract, ported to the TypeScript host by this phase. Both
+// hosts silently falling back to static `<span>` cells is the exact regression
+// the structural comparison cannot see, and it is the state this host pair was
+// actually in before 666.
+//
+// The expected count is DERIVED from the fixture rather than written down: rows
+// × field-projected Text/Numeric columns. A fixture that gains a row or a column
+// moves the expectation with it, and a fixture that stops declaring `editable`
+// fails the derivation's own preconditions rather than quietly lowering the bar
+// to zero.
+const EDITABLE_GRID = 'grid-editable-state';
+
+/** Editable grid cells in a normalized render — the class is the affordance. */
+function editableCellCount(normalized: string): number {
+  return normalized
+    .split(/\r?\n/)
+    .filter((line) => /^<input[^\s>]*\.fuaran-grid-cell-editable(?![\w-])/.test(line.trim()))
+    .length;
+}
+
+test(`cross-host editable-grid write-back affordance — ${EDITABLE_GRID}`, async ({ page }) => {
+  const wire = readFileSync(resolve(corpus, `${EDITABLE_GRID}.json`), 'utf8').trim();
+
+  interface GridColumn {
+    readonly field?: string;
+    readonly kind: { readonly $type: string };
+  }
+  const spec = (JSON.parse(wire) as { kind: Record<string, unknown> }).kind;
+  expect(spec['$type'], `${EDITABLE_GRID} is no longer a DataGrid`).toBe('DataGrid');
+  expect(spec['editable'], `${EDITABLE_GRID} no longer declares editable: true`).toBe(true);
+
+  const source = spec['source'] as { $type: string; defaultValue: readonly unknown[] };
+  expect(source.$type, `${EDITABLE_GRID}'s source is no longer a direct $state binding`).toBe(
+    'State',
+  );
+
+  const editableColumns = (spec['columns'] as readonly GridColumn[]).filter(
+    (c) => c.field !== undefined && (c.kind.$type === 'Text' || c.kind.$type === 'Numeric'),
+  );
+  const expected = source.defaultValue.length * editableColumns.length;
+  expect(expected, `${EDITABLE_GRID} projects no editable cells at all`).toBeGreaterThan(0);
+
+  const tsDom = await renderAndNormalize(page, TS_HOST, wire);
+  const fableDom = await renderAndNormalize(page, FABLE_HOST, wire);
+
+  expect(
+    editableCellCount(tsDom),
+    `TS host rendered ${editableCellCount(tsDom)} editable cells for ${EDITABLE_GRID}, expected ${expected} — an editable grid over a $state source must draw inputs, not static text`,
+  ).toBe(expected);
+  expect(
+    editableCellCount(fableDom),
+    `Fable host rendered ${editableCellCount(fableDom)} editable cells for ${EDITABLE_GRID}, expected ${expected}`,
+  ).toBe(expected);
+});
 
 // §16 lenient-accept normalisation parity: both hosts must ACCEPT the shorthand
 // input and re-encode it to byte-identical canonical form — the expected file's

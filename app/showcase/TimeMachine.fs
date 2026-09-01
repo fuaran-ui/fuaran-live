@@ -362,16 +362,24 @@ let private tagBadge (tag: Tag) : ReactElement =
 
 // ─── The page ────────────────────────────────────────────────────────────────
 
+/// What the merge panel shows for the active fork – a clean auto-compose, the
+/// real conflicts, or the tree the lenient resolution settled. Kept distinct so
+/// the panel never labels a resolved merge as an auto-composed one.
+[<RequireQualifiedAccess>]
+type private MergeView =
+  | Composed of Node<unit>
+  | Conflicts of MergeConflict list
+  | Resolved of Node<unit>
+
 [<ReactComponent>]
 let private TimeMachineView () : ReactElement =
   // `turn` is the trunk scrubber position, 0..N. `branch` names the active
   // fork (branch id + the turn it forked from); None is the trunk view.
   let turn, setTurn = React.useState 0
   let branch, setBranch = React.useState (None: (string * int) option)
-  // The merge result for the active fork, once asked for: a clean tree, or the
-  // real conflicts. Cleared whenever the fork changes.
-  let merge, setMerge =
-    React.useState (None: Result<Node<unit>, MergeConflict list> option)
+  // The merge outcome for the active fork, once asked for. Cleared whenever the
+  // fork changes.
+  let merge, setMerge = React.useState (None: MergeView option)
 
   let scrubTo (n: int) : unit =
     setMerge None
@@ -415,13 +423,15 @@ let private TimeMachineView () : ReactElement =
   let mergePanel: ReactElement list =
     match merge with
     | None -> []
-    | Some(Ok merged) -> [ panel "merged · 3-way, auto-composed" (renderTree merged) ]
-    | Some(Error cs) ->
+    | Some(MergeView.Composed merged) -> [ panel "merged · 3-way, auto-composed" (renderTree merged) ]
+    | Some(MergeView.Resolved merged) ->
+      [ panel "merged · conflicts settled to the ancestor's value" (renderTree merged) ]
+    | Some(MergeView.Conflicts cs) ->
       let resolve () =
         match activeBranch with
         | Some(b, k) ->
           match mergeBranchLenient b k with
-          | Ok t -> setMerge (Some(Ok t))
+          | Ok t -> setMerge (Some(MergeView.Resolved t))
           | Error _ -> ()
         | None -> ()
 
@@ -564,7 +574,8 @@ let private TimeMachineView () : ReactElement =
                   prop.disabled (not canMerge)
                   prop.onClick (fun _ ->
                     match mergeBranch b k with
-                    | Ok r -> setMerge (Some r)
+                    | Ok(Ok merged) -> setMerge (Some(MergeView.Composed merged))
+                    | Ok(Error cs) -> setMerge (Some(MergeView.Conflicts cs))
                     | Error _ -> ()) ]
               Html.button
                 [ prop.className "tm-trunk-btn"

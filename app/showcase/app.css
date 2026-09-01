@@ -1706,6 +1706,48 @@ body.rcv {
   box-sizing: border-box;
 }
 
+/* A fork on stage: the trunk head beside the branch (and the merge result once
+   asked for), each a live tree. */
+.tm-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.tm-split-panel {
+  min-width: 0;
+  border: var(--ds-border);
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  background: var(--fuaran-color-surface, #f5f5f8);
+}
+.tm-split-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.tm-conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+.tm-conflicts p {
+  margin: 0;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.tm-conflicts ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.tm-conflicts code {
+  font-family: var(--ds-font-mono);
+  font-size: 0.8rem;
+}
+
 .tm-apply-error {
   display: flex;
   flex-direction: column;

@@ -12,7 +12,14 @@ module Fuaran.Showcase.TimeMachine
 //  the op prefix (`Fuaran.UI.Ops.Apply.apply`), not by playing pre-rendered
 //  frames. "Fork from here" branches the DAG: the trunk prefix up to the chosen
 //  frame, then a canned alternative op-set applied on top – a genuinely
-//  divergent tree that shares the trunk's hash at the fork point.
+//  divergent tree that shares the trunk's hash at the fork point. A fork is
+//  shown BESIDE the trunk's head, and "Merge into the trunk" folds it back with
+//  the SHIPPED 3-way merge engine (`TreeMerge.merge3Way` – the same function
+//  the server host runs, Fable-portable in the browser): ancestor = the frame
+//  the branch forked from, ours = everything the trunk did after it, theirs =
+//  the branch. A clean auto-compose lands as one tree; a real `MergeConflict`
+//  names the contended cell, and the lenient resolution falls back to the
+//  ancestor's value.
 //
 //  The inspector shows, per turn, the REAL canonical op encoding
 //  (`CanonicalJson.encodeOp`) and a REAL content-addressed hash chain
@@ -28,6 +35,7 @@ open Fuaran.UI.Types
 open Fuaran.UI.Renderer
 open Fuaran.UI.Ops.Types
 open Fuaran.UI.OpStream.Abstractions
+open Fuaran.UI.OpStream.Dag.Merge
 
 module Apply = Fuaran.UI.Ops.Apply
 module CJson = Fuaran.UI.OpStream.Abstractions.CanonicalJson
@@ -249,6 +257,88 @@ let private branches: Branch list =
                   Body = TextSource.Literal "Revenue £128,400 – up 18% QoQ." }
           ) ] } ]
 
+// ─── Branch reconstruction + the 3-way merge (the real engine) ───────────────
+
+let private tryBranch (bid: string) : Branch option =
+  branches |> List.tryFind (fun b -> b.Id = bid)
+
+/// The tree a branch reaches when forked at trunk frame `k`: the trunk prefix,
+/// then the branch's op-set, through the apply engine. `Error` is a real typed
+/// `ApplyError` (the branch edits a node that frame does not hold yet).
+let private branchTree (b: Branch) (k: int) : Result<Node<unit>, string> = foldApply trunkFrames[k] b.Ops
+
+/// Fold a fork back into the trunk HEAD with the shipped 3-way merge. The common
+/// ancestor is the frame the branch forked from; "ours" is what the trunk did
+/// after that frame; "theirs" is the branch. Outer `Error` = the fork itself
+/// failed to apply; inner `Ok` = a clean auto-compose; inner `Error` = real
+/// `MergeConflict`s naming the contended cells.
+let private mergeBranch (b: Branch) (k: int) : Result<Result<Node<unit>, MergeConflict list>, string> =
+  branchTree b k
+  |> Result.map (fun theirs -> TreeMerge.merge3Way trunkFrames[k] trunkFrames[turnCount] theirs)
+
+/// The lenient resolution of the same merge: every conflict falls back to the
+/// ancestor's value, so a tree always comes back.
+let private mergeBranchLenient (b: Branch) (k: int) : Result<Node<unit>, string> =
+  branchTree b k
+  |> Result.map (fun theirs -> TreeMerge.merge3WayLenient trunkFrames[k] trunkFrames[turnCount] theirs)
+
+let private conflictIds (cs: MergeConflict list) : string list =
+  cs |> List.map (fun c -> c.NodeId) |> List.distinct
+
+// ─── Headless surface – the verification gate drives these from vitest ──────
+//
+// Flat string projections across the Fable boundary (the Phase 710-713 pattern):
+// every tree crosses as its canonical wire JSON, so the test compares bytes the
+// real encoder produced and never a hand-waved shape.
+
+/// The number of recorded turns (frames run 0..turnTotal).
+let turnTotal: int = turnCount
+
+/// Canonical JSON of trunk frame `n` – the tree the scrubber shows at turn n.
+let frameJson (n: int) : string = CJson.encodeNode trunkFrames[n]
+
+/// Frame `n` re-derived ONE step from frame n-1 through the apply engine – the
+/// replay claim, checkable against `frameJson n` byte-for-byte.
+let stepJson (n: int) : string =
+  match Apply.apply (List.item (n - 1) turns).Op trunkFrames[n - 1] with
+  | Ok t -> CJson.encodeNode t
+  | Error e -> "error:" + describeError e
+
+/// The fork branches on offer, by id.
+let branchIds: string array = branches |> List.map (fun b -> b.Id) |> Array.ofList
+
+/// `ok:<json>` for the branch's tree when forked at frame `k`, or `error:<msg>`
+/// carrying the real apply error.
+let forkJson (bid: string) (k: int) : string =
+  match tryBranch bid with
+  | None -> "error:unknown branch " + bid
+  | Some b ->
+    match branchTree b k with
+    | Ok t -> "ok:" + CJson.encodeNode t
+    | Error e -> "error:" + e
+
+/// `merged:<json>` for a clean 3-way merge of the branch (forked at `k`) into
+/// the trunk head, `conflict:<id,id,…>` naming the contended nodes, or
+/// `error:<msg>` when the fork itself cannot apply.
+let mergeJson (bid: string) (k: int) : string =
+  match tryBranch bid with
+  | None -> "error:unknown branch " + bid
+  | Some b ->
+    match mergeBranch b k with
+    | Error e -> "error:" + e
+    | Ok(Ok merged) -> "merged:" + CJson.encodeNode merged
+    | Ok(Error cs) -> "conflict:" + String.concat "," (conflictIds cs)
+
+/// `merged:<json>` for the lenient resolution (conflicts fall back to the
+/// ancestor's value), or `error:<msg>`.
+let mergeLenientJson (bid: string) (k: int) : string =
+  match tryBranch bid with
+  | None -> "error:unknown branch " + bid
+  | Some b ->
+    match mergeBranchLenient b k with
+    | Ok merged -> "merged:" + CJson.encodeNode merged
+    | Error e -> "error:" + e
+
 // ─── View helpers ────────────────────────────────────────────────────────────
 
 let private renderTree (n: Node<unit>) : ReactElement =
@@ -278,35 +368,101 @@ let private TimeMachineView () : ReactElement =
   // fork (branch id + the turn it forked from); None is the trunk view.
   let turn, setTurn = React.useState 0
   let branch, setBranch = React.useState (None: (string * int) option)
+  // The merge result for the active fork, once asked for: a clean tree, or the
+  // real conflicts. Cleared whenever the fork changes.
+  let merge, setMerge =
+    React.useState (None: Result<Node<unit>, MergeConflict list> option)
 
   let scrubTo (n: int) : unit =
+    setMerge None
     setBranch None
     setTurn n
 
+  let forkAt (bid: string) (k: int) : unit =
+    setMerge None
+    setBranch (Some(bid, k))
+
+  let returnToTrunk () : unit =
+    setMerge None
+    setBranch None
+
+  let activeBranch: (Branch * int) option =
+    branch
+    |> Option.bind (fun (bid, k) -> tryBranch bid |> Option.map (fun b -> b, k))
+
   // The tree currently on stage: a fork's reconstruction, or the trunk frame.
   let stageResult: Result<Node<unit>, string> =
-    match branch with
+    match activeBranch with
     | None -> Ok trunkFrames[turn]
-    | Some(bid, k) ->
-      match branches |> List.tryFind (fun b -> b.Id = bid) with
-      | Some b -> foldApply trunkFrames[k] b.Ops
-      | None -> Ok trunkFrames[turn]
+    | Some(b, k) -> branchTree b k
+
+  let applyError (err: string) : ReactElement =
+    Html.div
+      [ prop.className "tm-apply-error"
+        prop.children
+          [ Html.strong [ prop.text "The apply engine refused this branch here." ]
+            Html.p
+              [ prop.text
+                  "Forking this early hits a real typed ApplyError – the branch edits a node that this frame doesn't have yet. Scrub further along the trunk, then fork." ]
+            Html.code [ prop.className "tm-apply-error-code"; prop.text err ] ] ]
+
+  let panel (title: string) (body: ReactElement) : ReactElement =
+    Html.div
+      [ prop.className "tm-split-panel"
+        prop.children [ Html.h4 [ prop.className "tm-split-title"; prop.text title ]; body ] ]
+
+  // The merge outcome panel (only once "Merge into the trunk" has been pressed).
+  let mergePanel: ReactElement list =
+    match merge with
+    | None -> []
+    | Some(Ok merged) -> [ panel "merged · 3-way, auto-composed" (renderTree merged) ]
+    | Some(Error cs) ->
+      let resolve () =
+        match activeBranch with
+        | Some(b, k) ->
+          match mergeBranchLenient b k with
+          | Ok t -> setMerge (Some(Ok t))
+          | Error _ -> ()
+        | None -> ()
+
+      [ panel
+          "merge · conflicts"
+          (Html.div
+            [ prop.className "tm-conflicts"
+              prop.children
+                [ Html.p
+                    [ prop.text
+                        "Both sides changed the same cell after the fork. The engine returns each one as a real MergeConflict rather than picking silently." ]
+                  Html.ul
+                    [ prop.children
+                        [ for c in cs ->
+                            Html.li
+                              [ Html.code [ prop.text c.NodeId ]
+                                Html.text (sprintf " · %s · %A" c.Facet c.Class) ] ] ]
+                  Html.button
+                    [ prop.className "tm-trunk-btn"
+                      prop.text "Resolve – fall back to the ancestor's value"
+                      prop.onClick (fun _ -> resolve ()) ] ] ]) ]
 
   let stage =
-    Html.div
-      [ prop.className "tm-stage"
-        prop.children
-          [ match stageResult with
-            | Ok tree -> renderTree tree
-            | Error err ->
-              Html.div
-                [ prop.className "tm-apply-error"
-                  prop.children
-                    [ Html.strong [ prop.text "The apply engine refused this branch here." ]
-                      Html.p
-                        [ prop.text
-                            "Forking this early hits a real typed ApplyError – the branch edits a node that this frame doesn't have yet. Scrub further along the trunk, then fork." ]
-                      Html.code [ prop.className "tm-apply-error-code"; prop.text err ] ] ] ] ]
+    match activeBranch, stageResult with
+    | None, Ok tree -> Html.div [ prop.className "tm-stage"; prop.children [ renderTree tree ] ]
+    | None, Error err -> Html.div [ prop.className "tm-stage"; prop.children [ applyError err ] ]
+    | Some(b, _), forkResult ->
+      // A fork is staged BESIDE the trunk's head – two live trees, side by side –
+      // and the merge result joins them as a third once asked for.
+      let forkBody =
+        match forkResult with
+        | Ok tree -> renderTree tree
+        | Error err -> applyError err
+
+      Html.div
+        [ prop.className "tm-stage tm-split"
+          prop.children (
+            [ panel (sprintf "trunk · head (turn %d)" turnCount) (renderTree trunkFrames[turnCount])
+              panel ("branch · " + b.Name) forkBody ]
+            @ mergePanel
+          ) ]
 
   // Scrubber + per-turn markers (each marker doubles as a jump target).
   let scrubber =
@@ -391,24 +547,29 @@ let private TimeMachineView () : ReactElement =
 
   // Fork controls – offered at the current frame; branch view when active.
   let forkControls =
-    match branch with
-    | Some(bid, k) ->
-      let bName =
-        branches
-        |> List.tryFind (fun b -> b.Id = bid)
-        |> Option.map (fun b -> b.Name)
-        |> Option.defaultValue bid
+    match activeBranch with
+    | Some(b, k) ->
+      let canMerge = merge.IsNone && (stageResult |> Result.isOk)
 
       Html.div
         [ prop.className "tm-fork tm-fork-active"
           prop.children
             [ Html.span
                 [ prop.className "tm-branch-ribbon"
-                  prop.text (sprintf "branch · %s · forked from turn %d" bName k) ]
+                  prop.text (sprintf "branch · %s · forked from turn %d" b.Name k) ]
+              Html.button
+                [ prop.className "tm-fork-btn"
+                  prop.title "3-way merge: ancestor = the fork frame, ours = the trunk head, theirs = this branch"
+                  prop.text "Merge into the trunk (3-way)"
+                  prop.disabled (not canMerge)
+                  prop.onClick (fun _ ->
+                    match mergeBranch b k with
+                    | Ok r -> setMerge (Some r)
+                    | Error _ -> ()) ]
               Html.button
                 [ prop.className "tm-trunk-btn"
                   prop.text "← Return to the trunk"
-                  prop.onClick (fun _ -> setBranch None) ] ] ]
+                  prop.onClick (fun _ -> returnToTrunk ()) ] ] ]
     | None ->
       Html.div
         [ prop.className "tm-fork"
@@ -422,7 +583,7 @@ let private TimeMachineView () : ReactElement =
                           [ prop.className "tm-fork-btn"
                             prop.title b.Blurb
                             prop.text b.Name
-                            prop.onClick (fun _ -> setBranch (Some(b.Id, turn))) ] ] ] ] ]
+                            prop.onClick (fun _ -> forkAt b.Id turn) ] ] ] ] ]
 
   let honesty =
     Html.div
@@ -440,6 +601,9 @@ let private TimeMachineView () : ReactElement =
                     Html.li
                       [ prop.text
                           "Forking replays the trunk up to the chosen frame, then applies an alternative op-set on top – a genuinely divergent app that shares the trunk's history and hash at the branch point. Fork too early and the apply engine returns a real typed error, shown as-is." ]
+                    Html.li
+                      [ prop.text
+                          "Merging runs the shipped structural 3-way merge in the browser – the same engine a server host uses – with the fork frame as the common ancestor. Disjoint changes compose into one tree automatically; a cell both sides rewrote comes back as a real, named conflict, never a silent pick. Fork from the head and the merge is clean by construction; fork earlier and the trunk's later edits meet the branch's." ]
                     Html.li
                       [ prop.children
                           [ Html.text

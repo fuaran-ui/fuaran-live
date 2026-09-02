@@ -19,7 +19,26 @@
 //     entirely still fails even if its error text slipped past check 1).
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// `nuget.config` declares a folder package source beside the released feed so a
+// local pack can shadow a published package during development. NuGet hard-errors
+// (NU1301, "the local source doesn't exist") on a folder source that is absent —
+// which is every fresh clone outside a workspace that has packed something. CI
+// mints the folder empty for the same reason; do it here too, so `pnpm build`
+// works from a bare `git clone`. Empty, the folder changes nothing: every
+// package restores from nuget.org exactly as before.
+function ensureLocalFeedFolder() {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const config = readFileSync(resolve(repoRoot, 'nuget.config'), 'utf8');
+  const m = /<add\s+key="local"\s+value="([^"]+)"/.exec(config);
+  if (!m) return;
+  const feed = resolve(repoRoot, m[1]);
+  if (!existsSync(feed)) mkdirSync(feed, { recursive: true });
+}
+ensureLocalFeedFolder();
 
 // The one tolerated diagnostic: the F# 222 app-shape artefact of source linking.
 const TOLERATED = /\(code 222\)|error FS0?222|only the last source file/i;

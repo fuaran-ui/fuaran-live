@@ -30,7 +30,7 @@
     "build:dual": "pnpm run fable && tsc --noEmit && cross-env VITE_DUAL_HOST=1 vite build",
     "fable:app": "node scripts/fable-app.mjs",
     "fable:app:watch": "dotnet fable watch app --outDir app/output",
-    "parity": "playwright test -c tests/parity/playwright.config.ts",
+    "parity": "pnpm run fable:app && pnpm run build:dual && playwright test -c tests/parity/playwright.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

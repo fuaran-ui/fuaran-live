@@ -10,8 +10,8 @@ tab is the exact canonical wire form; the `TypeScript`, `Python`, `F#`, `C#`, an
 `VB` tabs are **generated source projections** — the canonical wire tree walked
 and emitted as `@fuaran-ui/ui`, `fuaran_py.ui`, `Fuaran.UI` smart-constructor,
 `Fuaran.UI.CSharp` static-factory, and `Fuaran.UI.VisualBasic` XML-literal source.
-Fidelity is **per-leg**: the `TypeScript` column is a **verified byte-round-trip**
-(below); the `Python` / `F#` / `C#` / `VB` columns remain demo-grade /
+Fidelity is **per-leg**: the `TypeScript` and `Python` columns are **verified
+byte-round-trips** (below); the `F#` / `C#` / `VB` columns remain demo-grade /
 illustrative, with the verified round-trip for those legs the deferred follow-on.
 
 ## History
@@ -56,30 +56,87 @@ A kind outside the corpus-covered set falls back to the illustrative generic
 sketch (never a crash); the verified claim covers exactly what the harness
 executes.
 
-## Python / F# / C# / VB legs — demo-grade / illustrative
+## Python leg — VERIFIED byte-round-trip over the modelled set (`fuaran#1142`)
+
+The `Python` column is emitted **per-kind against the real `fuaran_py` authoring
+surface** — `fuaran.*` smart constructors, the `binding.*` / `action.*` /
+`format.*` namespaces, and the typed model `fuaran_py.schema.types` (`t`) with
+its compute layer (`cp`) for the records those namespaces do not reach — and a
+second arm beside the TypeScript one keeps it honest: for every Node fixture in
+the shared corpus it projects the wire JSON to Python source, **executes** the
+generated source against the real host (every fixture in ONE CPython process),
+re-encodes via `fuaran_py.ui.encode`, and asserts byte-identity with the fixture.
+Run it with `pnpm conformance`; the arm needs a CPython carrying `fuaran-py`
+(`python -m venv .venv` then `pip install fuaran-py==0.0.1`, or point
+`FUARAN_PY_PYTHON` at an interpreter that already has it). It **fails** rather
+than skips when the host is absent: an arm that goes green without its oracle is
+worse than no arm.
+
+The claim is deliberately scoped, and the scope is the interesting part. Where
+the TypeScript leg can always fall back to a typed in-memory object literal,
+Python has **no such escape hatch**: `encode` calls `.to_wire()` on the root, and
+the structural `fuaran_py.model.Obj` has no such method, so a construct the typed
+authoring model does not carry has no spelling at all. Measured against
+`fuaran-py` 0.0.1 (the newest published release, and checked against its
+development tree too), that is **55 of the 161 node fixtures**, in four families:
+
+- **No typed node kind** — `Mount`, `Fact`, `Drawing`.
+- **No typed binding / action case** — the `Query`, `I18n` and `Invoke` bindings;
+  the `Call`, `AiTool` and `Invoke` actions.
+- **A hardcoded closure sentinel** — several records emit `onChange` /
+  `onToggle` / `onSelect` / `value` unconditionally, so the canonical minimal
+  control (`{"$type":"Text"}`) and the declarative field-named grid column are
+  unreachable: the slot is not optional in the record, and the encoder has
+  nothing to omit.
+- **A record narrower than the wire** — `Chart` reaches six slots fewer;
+  `TransformBinding` carries neither `params` nor a `Live` source; `DataGrid`
+  carries none of the declarative sort / page / edit-state slots; `Link` has no
+  `protection`, `Table` no `sortable` / `defaultSort`, `Media` no `tracks` /
+  `transcript`.
+
+None of that is projector lag and none of it is fixable in this repo. Each of
+the 55 is listed **with the construct it needs** in the arm's `PY_UNMODELLED`
+map, and the arm fails if one starts round-tripping while still listed — so the
+set cannot quietly outlive its cause, and closing it is a matter of teaching
+`fuaran-py`, one named construct at a time. For those fixtures the projection
+still emits the shape the typed model _would_ take, so pasting it raises an
+`AttributeError` naming the absent class rather than silently producing something
+that looks authored and is not.
+
+The same two consequences shape this emitter as the TypeScript one: closure-valued
+fields are erased to `"<closure>"` by the canonical encoder and so project as
+structural placeholders, and the constructors' per-kind ARIA defaults are pinned
+back to the wire's exact values (through `UiNode.replace`, Python's spelling of
+the TS leg's object spread). Note the ARIA table is the **Python constructors'**,
+not the TypeScript one's — `scroll_area` carries `role=region` where its TS
+counterpart carries none, and the static-rows `table` constructor carries none
+where `grid` carries `region`.
+
+## F# / C# / VB legs — demo-grade / illustrative
 
 Per operator direction these columns are **illustrative** — "how it would look
-written in Python / F# / C# / VB" — **not** a verified byte-round-trip:
+written in F# / C# / VB" — **not** a verified byte-round-trip:
 
 - The tabs are an illustrative structural sketch: the projector walks the
   canonical wire tree (over the vendored `FuaranLive.AiWire` `JsonValue` model) and
   emits idiomatic builder source, covering the kinds the playground produces
   with a **generic fallback** for any uncovered kind (so it **never crashes**
   on a decodable tree). Closure-valued fields (handlers, query/selection
-  accessors) are sketched, not reproduced. Python / F# / C# ride one generic
-  per-language `LangSpec` walker; **VB** has its own walker because its
-  XML-literal shape (`<Kind attr="…">child</Kind>`) does not fit the
-  builder-token model (Phase 363).
+  accessors) are sketched, not reproduced. F# / C# ride one generic per-language
+  `LangSpec` walker; **VB** has its own walker because its XML-literal shape
+  (`<Kind attr="…">child</Kind>`) does not fit the builder-token model
+  (Phase 363).
 
 Headless coverage lives in [`test/projection.test.ts`](../test/projection.test.ts).
 
 ## Deferred follow-on — verify the remaining legs
 
-Restoring the **verified byte-round-trip** for the `Python` and `F#` columns —
-re-authoring their conformance arms (execute the generated source against
-`fuaran_py.ui` via CPython / against `Fuaran.UI` via the dotnet toolchain,
-`encode_node` / canonical-encode, assert byte-identity), and upgrading those
-legs of `app/Projection.fs` from the generic walk to per-kind exact emission —
-remains recorded as the roadmap TIDY-UP residue. `C#` / `VB` follow once their
-authoring surfaces (`Fuaran.UI.CSharp` / `Fuaran.UI.VisualBasic`) are
-executable in a harness.
+Restoring the **verified byte-round-trip** for the `F#` column — re-authoring its
+conformance arm (execute the generated source against `Fuaran.UI` via the dotnet
+toolchain, canonical-encode, assert byte-identity) and upgrading that leg of
+`app/Projection.fs` from the generic walk to per-kind exact emission — remains
+recorded as the roadmap TIDY-UP residue. `C#` / `VB` follow once their authoring
+surfaces (`Fuaran.UI.CSharp` / `Fuaran.UI.VisualBasic`) are executable in a
+harness. The `Python` leg is done, with the scope its section above states: the
+remaining work there is not in this repo but in `fuaran-py`, one named construct
+at a time, and the arm's `PY_UNMODELLED` map is the list.

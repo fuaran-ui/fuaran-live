@@ -71,3 +71,9 @@ vite.config.ts.timestamp-*
 # Editor / OS
 .DS_Store
 .vscode-test
+
+# The Python conformance arm's local interpreter (see
+# tests/projection-conformance/python.test.ts). Created with
+# `python -m venv .venv` then `pip install fuaran-py==0.0.1`.
+.venv/
+__pycache__/

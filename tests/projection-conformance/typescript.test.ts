@@ -12,8 +12,9 @@
 // This is the validation engine that keeps the TS projection honest: any drift
 // between the projector and the @fuaran-ui/ui contract fails the gate. It
 // restores the verified byte-round-trip guarantee for the TypeScript leg that
-// the pre-rebuild TS-shell harness carried (the Python / F# legs remain
-// demo-grade — see docs/PROJECTION_FIDELITY.md).
+// the pre-rebuild TS-shell harness carried. The Python leg has its own arm
+// beside this one (python.test.ts); the F# / C# / VB legs remain demo-grade —
+// see docs/PROJECTION_FIDELITY.md.
 //
 // Requires `pnpm run fable:app` (the app build) to have produced app/output/.
 

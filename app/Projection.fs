@@ -378,47 +378,6 @@ let private tsSpec: LangSpec =
     StaticBinding = fun inner -> "binding.static(" + inner + ")"
     TextLiteral = fun t -> "'" + escape '\'' t + "'" }
 
-// ─── Python (fuaran_py.ui) ────────────────────────────────────────────────────
-
-let private pySpec: LangSpec =
-  { Node =
-      fun kind id fields depth ->
-        let ctor = "fuaran." + toSnake kind
-        let idLit = "'" + escape '\'' id + "'"
-
-        if List.isEmpty fields then
-          ctor + "(" + idLit + ")"
-        else
-          let body =
-            fields
-            |> List.map (fun (k, v) -> pad (depth + 1) + toSnake k + "=" + v)
-            |> String.concat ",\n"
-
-          ctor + "(\n" + pad (depth + 1) + idLit + ",\n" + body + ",\n" + pad depth + ")"
-    Obj =
-      fun members depth ->
-        if List.isEmpty members then
-          "{}"
-        else
-          let body =
-            members
-            |> List.map (fun (k, v) -> pad (depth + 1) + "'" + escape '\'' k + "': " + v)
-            |> String.concat ",\n"
-
-          "{\n" + body + ",\n" + pad depth + "}"
-    Arr =
-      fun items depth ->
-        if List.isEmpty items then
-          "[]"
-        else
-          let body = items |> List.map (fun it -> pad (depth + 1) + it) |> String.concat ",\n"
-          "[\n" + body + ",\n" + pad depth + "]"
-    Str = fun s -> "'" + escape '\'' s + "'"
-    Bool = fun b -> if b then "True" else "False"
-    Null = "None"
-    StaticBinding = fun inner -> "binding.static(" + inner + ")"
-    TextLiteral = fun t -> "'" + escape '\'' t + "'" }
-
 // ─── F# (Fuaran.UI smart constructors) ────────────────────────────────────────
 
 let private fsSpec: LangSpec =
@@ -2771,6 +2730,1421 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
   | _ -> None
 
+// ─── Python (fuaran_py.ui) — per-kind exact emission (Phase 1142) ─────────────
+//
+// The 27.F/281 shape, transposed. Every corpus-reachable construct is emitted
+// against the real `fuaran_py` authoring surface — `fuaran.*` smart constructors
+// for nodes, `binding.*` / `action.*` / `format.*` for the cross-cutting
+// vocabulary, and the typed model `fuaran_py.schema.types` (imported as `t`,
+// with the compute layer as `cp`) for the records those namespaces do not reach.
+// Executing the emitted expression and passing the result to `fuaran_py.ui.encode`
+// re-encodes byte-identically to the wire fixture; the Python arm under
+// `tests/projection-conformance/` is the gate.
+//
+// Two differences from the TypeScript leg shape every function below.
+//
+//  • The Python surface takes KEYWORD ARGUMENTS rather than an options object,
+//    so a constructor call is `fuaran.stack('id', children=[…])`, and a nested
+//    record is a typed dataclass call rather than a re-spelling of the wire.
+//  • There is NO structural escape hatch that composes with the typed layer:
+//    `encode` calls `.to_wire()` on the root and `fuaran_py.model.Obj` has no
+//    such method, so a construct the typed model does not carry cannot be
+//    projected exactly at all. Those are named — with the missing construct — in
+//    the arm's quarantine and in docs/PROJECTION_FIDELITY.md rather than being
+//    sketched into a shape that would read as faithful.
+
+let private pq (s: string) : string = "'" + escape '\'' s + "'"
+
+let private pyBool (b: bool) : string = if b then "True" else "False"
+
+/// A number as a Python literal. Python distinguishes `int` from `float` where
+/// JavaScript does not, and the canonical encoder honours that distinction — so
+/// a whole number large enough that the wire carries it in exponent form has to
+/// reach Python as a float. `123456789012345680` and `123456789012345680.0`
+/// encode differently and only the second matches the wire; a rendering that
+/// already carries a point or an exponent is a float in Python as it stands.
+let private pyNum (n: float) : string =
+  let rendered = numLit n
+
+  if rendered.Contains "." || rendered.Contains "e" || rendered.Contains "E" then
+    rendered
+  elif n = floor n && abs n >= 1e15 then
+    rendered + ".0"
+  else
+    rendered
+
+/// A call with positional then keyword arguments; keyword names are snake_case.
+let private pyCall (ctor: string) (positional: string list) (kw: (string * string) list) : string =
+  let args = positional @ (kw |> List.map (fun (k, v) -> toSnake k + "=" + v))
+  ctor + "(" + String.concat ", " args + ")"
+
+let private pyList (items: string list) : string = "[" + String.concat ", " items + "]"
+
+/// A multi-line call — the shape a node constructor takes, so a projected tree
+/// reads as authored source rather than as one long line.
+let private pyCallBlock (ctor: string) (positional: string list) (kw: (string * string) list) (depth: int) : string =
+  if List.isEmpty kw then
+    ctor + "(" + String.concat ", " positional + ")"
+  else
+    let lines =
+      (positional |> List.map (fun p -> pad (depth + 1) + p))
+      @ (kw |> List.map (fun (k, v) -> pad (depth + 1) + toSnake k + "=" + v))
+
+    ctor + "(\n" + String.concat ",\n" lines + ",\n" + pad depth + ")"
+
+let private pyStrItem (v: JsonValue) : string =
+  match v with
+  | JString s -> pq s
+  | _ -> pq ""
+
+/// A plain `dict` literal (Notify payloads, Custom props) — the one place the
+/// projection keeps the wire's own key spelling, because these are data maps
+/// rather than record fields.
+let rec private pyJson (v: JsonValue) : string =
+  match v with
+  | JNull -> "None"
+  | JBool b -> pyBool b
+  | JNumber n -> pyNum n
+  | JString s -> pq s
+  | JArray xs -> pyList (xs |> List.map pyJson)
+  | JObject ms ->
+    if List.isEmpty ms then
+      "{}"
+    else
+      "{"
+      + (ms |> List.map (fun (k, x) -> pq k + ": " + pyJson x) |> String.concat ", ")
+      + "}"
+
+/// A `Binding.Static` payload — the `pyJson` rules, with wire `null` becoming
+/// `None`, which `Static` omits on encode (absence is structural).
+let private pyStaticValue (v: JsonValue) : string = pyJson v
+
+// ── Compute layer (Binding.Transform) ────────────────────────────────────────
+//
+// The compute vocabulary lives in `fuaran_py.ui.compute` (imported as `cp`), a
+// module separate from the typed schema because several of its names collide
+// with binding cases — `Filter` is both a binding and a transform step.
+
+/// A compute cell. The named helpers rather than `cp.Cell(tag, value)`: the
+/// Python tag vocabulary is the lower-case COLUMN-TYPE name (`'int'`, `'string'`)
+/// where the wire discriminator is the capitalised cell tag (`Int`, `Str`), and
+/// the helpers are the only spelling that cannot get that mapping wrong.
+let private pyCell (helper: string) (value: string) : string = "cp." + helper + "(" + value + ")"
+
+let private pyCellLit (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Int" -> pyCell "cell_int" (numLit (numOf "value" v))
+  | Some "Float" -> pyCell "cell_float" (pyNum (numOf "value" v))
+  | Some "Bool" -> pyCell "cell_bool" (pyBool (boolOf "value" v))
+  | Some "Str" -> pyCell "cell_str" (pq (strOf "value" v))
+  | Some "Date" -> pyCell "cell_date" (pq (strOf "value" v))
+  | Some "Timestamp" -> pyCell "cell_timestamp" (pq (strOf "value" v))
+  | _ -> "cp.NULL"
+
+let rec private pyColExpr (v: JsonValue) : string =
+  match dollarType v with
+  | Some "lit" -> "cp.Lit(" + pyCellLit (fieldD "cell" v) + ")"
+  | Some "binary" ->
+    "cp.Binary("
+    + pq (strOf "op" v)
+    + ", "
+    + pyColExpr (fieldD "left" v)
+    + ", "
+    + pyColExpr (fieldD "right" v)
+    + ")"
+  | Some "not" -> "cp.Not(" + pyColExpr (fieldD "expr" v) + ")"
+  | Some "coalesce" -> "cp.Coalesce(" + pyList (arrOf "exprs" v |> List.map pyColExpr) + ")"
+  | Some "case" ->
+    let cases =
+      arrOf "cases" v
+      |> List.map (fun c -> "(" + pyColExpr (fieldD "when" c) + ", " + pyColExpr (fieldD "then" c) + ")")
+
+    "cp.Case(" + pyList cases + ", " + pyColExpr (fieldD "else" v) + ")"
+  | Some "cast" -> "cp.Cast(" + pq (strOf "type" v) + ", " + pyColExpr (fieldD "expr" v) + ")"
+  | Some "apply" ->
+    "cp.ApplyFn("
+    + pq (strOf "fn" v)
+    + ", "
+    + pyList (arrOf "args" v |> List.map pyColExpr)
+    + ")"
+  | _ -> "cp.Col(" + pq (strOf "name" v) + ")"
+
+let private pyDataSource (v: JsonValue) : string =
+  match optStr "ref" v with
+  | Some name -> "cp.Ref(" + pq name + ")"
+  | None ->
+    let schema = arrOf "schema" v
+    let cols = membersOf "columns" v
+
+    let schemaLits =
+      schema
+      |> List.map (fun e -> "(" + pq (strOf "name" e) + ", " + pq (strOf "type" e) + ")")
+
+    let columnLits =
+      schema
+      |> List.map (fun e ->
+        let name = strOf "name" e
+        let ty = strOf "type" e
+
+        let col =
+          cols
+          |> List.tryFind (fun (k, _) -> k = name)
+          |> Option.map snd
+          |> Option.defaultValue JNull
+
+        let validity = arrOf "validity" col
+
+        let cells =
+          arrOf "values" col
+          |> List.mapi (fun i value ->
+            match List.tryItem i validity with
+            | Some(JBool false) -> "cp.NULL"
+            | _ ->
+              match ty, value with
+              | "int", JNumber n -> pyCell "cell_int" (numLit n)
+              | "float", JNumber n -> pyCell "cell_float" (pyNum n)
+              | "bool", JBool b -> pyCell "cell_bool" (pyBool b)
+              | "date", JString s -> pyCell "cell_date" (pq s)
+              | "timestamp", JString s -> pyCell "cell_timestamp" (pq s)
+              | _, JString s -> pyCell "cell_str" (pq s)
+              | _ -> "cp.NULL")
+
+        "cp.Column(" + pq name + ", " + pq ty + ", " + pyList cells + ")")
+
+    "cp.Embedded(cp.Table(" + pyList schemaLits + ", " + pyList columnLits + "))"
+
+let private pyTransformStep (v: JsonValue) : string =
+  let pair (p: JsonValue) =
+    "(" + pq (strOf "a" p) + ", " + pq (strOf "b" p) + ")"
+
+  let sortKey (s: JsonValue) =
+    "(" + pq (strOf "col" s) + ", " + pq (strOf "dir" s) + ")"
+
+  let strArr (name: string) =
+    pyList (arrOf name v |> List.map pyStrItem)
+
+  match dollarType v with
+  | Some "filter" -> "cp.Filter(" + pyColExpr (fieldD "pred" v) + ")"
+  | Some "project" -> "cp.Project(" + pyList (arrOf "cols" v |> List.map pair) + ")"
+  | Some "derive" -> "cp.Derive(" + pq (strOf "name" v) + ", " + pyColExpr (fieldD "expr" v) + ")"
+  | Some "groupBy" ->
+    let aggs =
+      arrOf "aggs" v
+      |> List.map (fun a ->
+        "cp.Agg("
+        + pq (strOf "name" a)
+        + ", "
+        + pq (strOf "fn" a)
+        + ", "
+        + pq (strOf "of" a)
+        + ")")
+
+    "cp.GroupBy(" + strArr "keys" + ", " + pyList aggs + ")"
+  | Some "join" ->
+    "cp.Join("
+    + pyDataSource (fieldD "source" v)
+    + ", "
+    + pyList (arrOf "on" v |> List.map pair)
+    + ", "
+    + pq (strOf "how" v)
+    + ")"
+  | Some "window" ->
+    "cp.Window(cp.WindowSpec("
+    + strArr "partitionBy"
+    + ", "
+    + pyList (arrOf "orderBy" v |> List.map sortKey)
+    + ", "
+    + pq (strOf "fn" v)
+    + ", "
+    + pq (strOf "of" v)
+    + ", "
+    + pq (strOf "as" v)
+    + "))"
+  | Some "pivot" ->
+    "cp.Pivot(cp.PivotSpec("
+    + strArr "index"
+    + ", "
+    + pq (strOf "on" v)
+    + ", "
+    + pq (strOf "values" v)
+    + ", "
+    + pq (strOf "agg" v)
+    + "))"
+  | Some "unpivot" -> "cp.Unpivot(" + strArr "idVars" + ", " + strArr "valueVars" + ")"
+  | Some "sort" -> "cp.Sort(" + pyList (arrOf "by" v |> List.map sortKey) + ")"
+  | Some "limit" -> "cp.Limit(" + numLit (numOf "n" v) + ", " + numLit (numOf "offset" v) + ")"
+  | Some "union" -> "cp.Union(" + pyDataSource (fieldD "source" v) + ")"
+  | _ -> "cp.Distinct()"
+
+// ── Bindings / actions / text / formats ──────────────────────────────────────
+
+let private pyFormatIntent (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Currency" -> "t.FmtCurrency(" + pq (strOf "isoCode" v) + ")"
+  | Some "Percent" ->
+    (match optNum "decimals" v with
+     | Some d -> "t.FmtPercent(" + numLit d + ")"
+     | None -> "t.FmtPercent()")
+  | Some "Date" -> "t.FmtDate(" + pq (strOf "dateStyle" v) + ")"
+  | Some "RelativeTime" -> "t.FmtRelativeTime(" + pq (strOf "unit" v) + ")"
+  | Some "Duration" -> "t.FmtDuration(" + pq (strOf "unit" v) + ", " + pq (strOf "style" v) + ")"
+  | _ ->
+    (match optNum "decimals" v with
+     | Some d -> "t.FmtNumber(" + numLit d + ")"
+     | None -> "t.FmtNumber()")
+
+let private pyLocaleSource (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Explicit" -> "t.Explicit(" + pq (strOf "tag" v) + ")"
+  | _ -> "t.Ambient()"
+
+let private pyFlushTrigger (v: JsonValue) : string =
+  match dollarType v with
+  | Some "OnDebounce" -> "t.OnDebounce(" + numLit (numOf "milliseconds" v) + ")"
+  | _ -> "t.OnBlur()"
+
+let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Static" ->
+    (match JsonValue.tryField "value" v with
+     | Some(JString "<opaque>") ->
+       (match opq with
+        | Opq.Collection -> "binding.static([])"
+        | Opq.Scalar -> "binding.static('<opaque>')")
+     | Some value -> "binding.static(" + pyStaticValue value + ")"
+     | None -> "binding.static(None)")
+  | Some "Filter" -> "binding.filter(" + pq (strOf "name" v) + ")"
+  | Some "Selection" ->
+    let kw =
+      (match JsonValue.tryField "defaultValue" v with
+       | Some d -> [ "defaultValue", pyStaticValue d ]
+       | None -> [])
+      @ (match optStr "field" v with
+         | Some f -> [ "field", pq f ]
+         | None -> [])
+
+    pyCall "binding.selection" [ pq (strOf "nodeId" v) ] kw
+  | Some "State" ->
+    "binding.state("
+    + pq (strOf "key" v)
+    + ", "
+    + pyStaticValue (fieldD "defaultValue" v)
+    + ")"
+  | Some "Now" -> "binding.now()"
+  | Some "Local" ->
+    "binding.local("
+    + pyBinding Opq.Scalar (fieldD "initialFrom" v)
+    + ", "
+    + pyFlushTrigger (fieldD "flushOn" v)
+    + ")"
+  | Some "Format" ->
+    "binding.format("
+    + pyBinding Opq.Scalar (fieldD "source" v)
+    + ", "
+    + pyFormatIntent (fieldD "format" v)
+    + ", "
+    + pyLocaleSource (fieldD "locale" v)
+    + ")"
+  | Some "Transform" ->
+    // Only the `Data`-source, param-free shape has a Python spelling:
+    // `TransformBinding` carries `source` + `pipeline` and nothing else, and its
+    // `source` is a bare `DataSource` rather than the `TransformSource` DU, so
+    // neither `params` nor a `Live` source is expressible. Both are quarantined.
+    "cp.TransformBinding("
+    + pyDataSource (fieldD "source" v)
+    + ", "
+    + pyList (arrOf "pipeline" v |> List.map pyTransformStep)
+    + ")"
+  | _ ->
+    // Query / Computed / I18n / Invoke — no typed case in `fuaran_py`.
+    "binding.static(None)"
+
+/// The explicit `TextSource` record — for slots typed as raw `TextSource`, which
+/// the constructors do not coerce from a bare string.
+let private pyTextSource (v: JsonValue) : string =
+  match v with
+  | JString s -> "t.LiteralText(" + pq s + ")"
+  | _ ->
+    match dollarType v with
+    | Some "Bound" -> "t.Bound(" + pyBinding Opq.Scalar (fieldD "binding" v) + ")"
+    | _ -> "t.LiteralText(" + pq (strOf "text" v) + ")"
+
+/// A `TextInput` slot — the bare string the constructors coerce, or the explicit
+/// record for the bound / i18n forms.
+let private pyTextInput (v: JsonValue) : string =
+  match v with
+  | JString s -> pq s
+  | _ ->
+    match dollarType v with
+    | Some "Literal" -> pq (strOf "text" v)
+    | _ -> pyTextSource v
+
+let private pySelectOption (o: JsonValue) : string =
+  "t.SelectOption("
+  + pyTextSource (fieldD "label" o)
+  + ", "
+  + pq (strOf "value" o)
+  + ")"
+
+let private pyOptionsBinding (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Static" ->
+    (match JsonValue.tryField "value" v with
+     | Some(JArray opts) -> "binding.static(" + pyList (opts |> List.map pySelectOption) + ")"
+     | Some(JString "<opaque>") -> "binding.static([])"
+     | _ -> pyBinding Opq.Collection v)
+  | _ -> pyBinding Opq.Collection v
+
+let private pyMarker (m: JsonValue) : string =
+  "t.MapMarker("
+  + pyTextSource (fieldD "label" m)
+  + ", "
+  + numLit (numOf "latitude" m)
+  + ", "
+  + numLit (numOf "longitude" m)
+  + ")"
+
+let private pyMarkerBinding (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Static" ->
+    (match JsonValue.tryField "value" v with
+     | Some(JArray ms) -> "binding.static(" + pyList (ms |> List.map pyMarker) + ")"
+     | Some(JString "<opaque>") -> "binding.static([])"
+     | _ -> pyBinding Opq.Collection v)
+  | _ -> pyBinding Opq.Collection v
+
+let rec private pyAction (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Dispatch" -> "action.dispatch(0)"
+  | Some "Notify" ->
+    "action.notify("
+    + pq (strOf "channel" v)
+    + ", "
+    + pyJson (fieldD "payload" v)
+    + ")"
+  | Some "Navigate" -> "action.navigate(" + pq (strOf "route" v) + ")"
+  | Some "SetState" ->
+    (match JsonValue.tryField "valueFrom" v with
+     | Some src ->
+       "action.set_state_from("
+       + pq (strOf "key" v)
+       + ", "
+       + pyBinding Opq.Scalar src
+       + ")"
+     | None ->
+       "action.set_state("
+       + pq (strOf "key" v)
+       + ", "
+       + pyJson (fieldD "value" v)
+       + ")")
+  | Some "Chain" -> "action.chain(" + pyList (arrOf "ops" v |> List.map pyAction) + ")"
+  | Some "WriteToClipboard" -> "action.write_to_clipboard(" + pq (strOf "text" v) + ")"
+  | Some "ReadFileBody" ->
+    "action.read_file_body("
+    + pq (strOf "fileRef" v)
+    + ", "
+    + pq (strOf "encoding" v)
+    + ")"
+  | _ ->
+    // Call / AiTool / CommitLocal / Invoke — no typed case in `fuaran_py`.
+    "action.chain([])"
+
+let private pyCellFormat (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Number" ->
+    (match optNum "decimals" v with
+     | Some d -> "format.number(" + numLit d + ")"
+     | None -> "format.number()")
+  | Some "Currency" -> "format.currency(" + pq (strOf "code" v) + ")"
+  | Some "Percent" ->
+    (match optNum "decimals" v with
+     | Some d -> "format.percent(" + numLit d + ")"
+     | None -> "format.percent()")
+  | Some "SignificantDigits" -> "format.significant_digits(" + numLit (numOf "digits" v) + ")"
+  | Some "Date" -> "format.date(" + pq (strOf "format" v) + ")"
+  | Some "Duration" -> "format.duration(" + pq (strOf "unit" v) + ", " + pq (strOf "style" v) + ")"
+  | Some "RelativeTime" -> "format.relative_time(" + pq (strOf "unit" v) + ")"
+  | _ -> "format.none()"
+
+// ── Form fields / filters / grid columns / tab headers ───────────────────────
+
+let private pyCtrlDefault (kind: string) : string =
+  match kind with
+  | "Number"
+  | "RangedNumber" -> "0"
+  | "Checkbox"
+  | "Toggle" -> "False"
+  | "Choice"
+  | "SegmentedChoice" -> "None"
+  | "Range" -> "[0, 0]"
+  | "DateRange" -> "['', '']"
+  | _ -> "''"
+
+let private pyAutoBindValue (ab: AutoBind) (kind: string) : string =
+  match ab with
+  | AutoBind.Form id -> "binding.state(" + pq id + ", " + pyCtrlDefault kind + ")"
+  | AutoBind.Filter name -> "binding.filter(" + pq name + ")"
+
+let private pyFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
+  match JsonValue.tryField "value" v with
+  | Some valV ->
+    match kind with
+    // Both pair controls carry their explicit value as a bare wire object, and
+    // the Python slot takes it as it lies: `_lower` turns a `dict` into the
+    // tag-less object the encoder emits, so the pair survives unwrapped. (The
+    // TypeScript leg hydrates the same wire into a tuple, because its in-memory
+    // shape for these two slots IS a tuple — the difference is the host's, not
+    // the wire's.)
+    | "Range" when (dollarType valV).IsNone ->
+      "{'min': "
+      + pyNum (numOf "min" valV)
+      + ", 'max': "
+      + pyNum (numOf "max" valV)
+      + "}"
+    | "DateRange" when (dollarType valV).IsNone ->
+      "{'from': " + pq (strOf "from" valV) + ", 'to': " + pq (strOf "to" valV) + "}"
+    | "DateRange" when
+      (dollarType valV) = Some "State"
+      && (match JsonValue.tryField "defaultValue" valV with
+          | Some d -> (dollarType d).IsNone && (JsonValue.tryField "from" d).IsSome
+          | None -> false)
+      ->
+      // A State binding whose defaultValue is the wire's `{from,to}` pair —
+      // carried through as the object it is, for the reason above.
+      let d = fieldD "defaultValue" valV
+
+      "binding.state("
+      + pq (strOf "key" valV)
+      + ", {'from': "
+      + pq (strOf "from" d)
+      + ", 'to': "
+      + pq (strOf "to" d)
+      + "})"
+    | _ -> pyBinding Opq.Scalar valV
+  | None -> pyAutoBindValue ab kind
+
+let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
+  let kind = dollarType v |> Option.defaultValue "Text"
+  let value = pyFieldValue ab kind v
+
+  let minMaxStep (isDate: bool) =
+    let one name =
+      if isDate then
+        match optStr name v with
+        | Some s -> [ name, pq s ]
+        | None -> []
+      else
+        match optNum name v with
+        | Some n -> [ name, numLit n ]
+        | None -> []
+
+    one "min"
+    @ one "max"
+    @ (match optNum "step" v with
+       | Some s -> [ "step", numLit s ]
+       | None -> [])
+
+  match kind with
+  | "Number" -> "t.NumberField(" + value + ")"
+  | "Checkbox" -> "t.CheckboxField(" + value + ")"
+  | "Toggle" ->
+    // The one control whose Python record has BOTH slots optional, mirroring the
+    // canonical minimal `{"$type":"Toggle"}`: an omitted wire `value` must stay
+    // omitted rather than being reconstructed as its auto-binding, because here
+    // the record can say "absent" and the encoder honours it.
+    pyCall
+      "t.ToggleField"
+      []
+      ((match JsonValue.tryField "value" v with
+        | Some _ -> [ "value", value ]
+        | None -> [])
+       @ (match JsonValue.tryField "onToggle" v with
+          | Some _ -> [ "onToggle", "True" ]
+          | None -> []))
+  | "Choice" -> "t.ChoiceField(" + pyOptionsBinding (fieldD "options" v) + ", " + value + ")"
+  | "SegmentedChoice" ->
+    pyCall
+      "t.SegmentedChoice"
+      [ pyOptionsBinding (fieldD "options" v); value ]
+      [ "orientation", pq (strOf "orientation" v) ]
+  | "TextArea" -> "t.TextAreaField(" + value + ", " + numLit (numOf "rows" v) + ")"
+  | "RangedNumber" -> pyCall "t.RangedNumber" [ value ] (minMaxStep false)
+  | "Date" -> pyCall "t.DateField" [ value ] ([ "variant", pq (strOf "variant" v) ] @ minMaxStep true)
+  | "DateRange" -> pyCall "t.DateRangeField" [ value ] ([ "variant", pq (strOf "variant" v) ] @ minMaxStep true)
+  | _ -> "t.TextField(" + value + ")"
+
+/// A filter chip's control — the same vocabulary as a form field, but three of
+/// the cases carry their own filter-side dataclass.
+let private pyFilterKind (ab: AutoBind) (v: JsonValue) : string =
+  match dollarType v |> Option.defaultValue "Text" with
+  | "Choice" ->
+    "t.ChoiceFilter("
+    + pyOptionsBinding (fieldD "options" v)
+    + ", "
+    + pyFieldValue ab "Choice" v
+    + ")"
+  | "SegmentedChoice" ->
+    pyCall
+      "t.SegmentedFilter"
+      [ pyOptionsBinding (fieldD "options" v); pyFieldValue ab "SegmentedChoice" v ]
+      [ "orientation", pq (strOf "orientation" v) ]
+  | "Text" -> "t.TextFilter(" + pyFieldValue ab "Text" v + ")"
+  | _ -> pyFieldKind ab v
+
+let private pyFieldRule (v: JsonValue) : string =
+  pyCall
+    "t.FieldRule"
+    []
+    ((match optStr "format" v with
+      | Some f -> [ "format", pq f ]
+      | None -> [])
+     @ (match optStr "pattern" v with
+        | Some p -> [ "pattern", pq p ]
+        | None -> [])
+     @ (match optNum "minLength" v with
+        | Some n -> [ "minLength", numLit n ]
+        | None -> [])
+     @ (match optNum "maxLength" v with
+        | Some n -> [ "maxLength", numLit n ]
+        | None -> [])
+     @ (match JsonValue.tryField "compare" v with
+        | Some c ->
+          [ "compare",
+            "t.CompareRule("
+            + pyBinding Opq.Scalar (fieldD "against" c)
+            + ", "
+            + pq (strOf "op" c)
+            + ")" ]
+        | None -> [])
+     @ (match JsonValue.tryField "message" v with
+        | Some m -> [ "message", pyTextSource m ]
+        | None -> []))
+
+let private pyFormField (v: JsonValue) : string =
+  let id = strOf "id" v
+
+  pyCall
+    "t.FormField"
+    [ pq id
+      pyTextSource (fieldD "label" v)
+      pyFieldKind (AutoBind.Form id) (fieldD "kind" v) ]
+    ([ "required", pyBool (boolOf "required" v) ]
+     @ (match JsonValue.tryField "help" v with
+        | Some h -> [ "help", pyTextSource h ]
+        | None -> [])
+     @ (match JsonValue.tryField "rule" v with
+        | Some r -> [ "rule", pyFieldRule r ]
+        | None -> []))
+
+let private pyFilterSpec (v: JsonValue) : string =
+  let name = strOf "name" v
+
+  "t.FilterSpec("
+  + pq name
+  + ", "
+  + pyTextSource (fieldD "label" v)
+  + ", "
+  + pyFilterKind (AutoBind.Filter name) (fieldD "kind" v)
+  + ")"
+
+let private pyColumnWidth (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Fixed" -> "t.ColumnWidth(" + pq "Fixed" + ")"
+  | Some "Flex" -> "t.ColumnWidth(" + pq "Flex" + ")"
+  | _ -> "t.ColumnWidth()"
+
+let private pyGridColumn (v: JsonValue) : string =
+  pyCall
+    "t.Column"
+    [ pq (strOf "label" v) ]
+    [ "format", pyCellFormat (fieldD "format" v)
+      "kind",
+      "t.ColumnKind("
+      + pq (dollarType (fieldD "kind" v) |> Option.defaultValue "Text")
+      + ")"
+      "width", pyColumnWidth (fieldD "width" v) ]
+
+let private pyTabHeader (v: JsonValue) : string =
+  pyCall
+    "t.TabHeader"
+    [ pyTextSource (fieldD "label" v) ]
+    ((match optStr "icon" v with
+      | Some i -> [ "icon", pq i ]
+      | None -> [])
+     @ (match JsonValue.tryField "disabled" v with
+        | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
+        | None -> []))
+
+// ── Fragment parameterisation ────────────────────────────────────────────────
+
+let private pyFragScalar (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Int" -> "t.ScalarInt(" + numLit (numOf "value" v) + ")"
+  | Some "Float" -> "t.ScalarFloat(" + numLit (numOf "value" v) + ")"
+  | Some "Bool" -> "t.ScalarBool(" + pyBool (boolOf "value" v) + ")"
+  | _ -> "t.ScalarStr(" + pq (strOf "value" v) + ")"
+
+let private pyHoleSpace (v: JsonValue) : string =
+  match dollarType v with
+  | Some "IntRange" -> "t.IntRange(" + numLit (numOf "min" v) + ", " + numLit (numOf "max" v) + ")"
+  | Some "FloatRange" -> "t.FloatRange(" + numLit (numOf "min" v) + ", " + numLit (numOf "max" v) + ")"
+  | Some "StringLen" ->
+    "t.StringLen("
+    + numLit (numOf "minLen" v)
+    + ", "
+    + numLit (numOf "maxLen" v)
+    + ")"
+  | Some "Enum" -> "t.EnumSpace(" + pyList (arrOf "choices" v |> List.map pyStrItem) + ")"
+  | _ -> "t.AnyString()"
+
+let private pyHoleDecl (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Slot" ->
+    pyCall
+      "t.SlotHole"
+      [ pq (strOf "name" v) ]
+      (match optStr "kindConstraint" v with
+       | Some c -> [ "kindConstraint", pq c ]
+       | None -> [])
+  | Some "Repeat" ->
+    "t.RepeatHole("
+    + pq (strOf "name" v)
+    + ", "
+    + pyHoleSpace (fieldD "countSpace" v)
+    + ")"
+  | _ ->
+    pyCall
+      "t.ValueHole"
+      [ pq (strOf "name" v); pyHoleSpace (fieldD "space" v) ]
+      (match JsonValue.tryField "default" v with
+       | Some d -> [ "default", pyFragScalar d ]
+       | None -> [])
+
+// ── Base traits ──────────────────────────────────────────────────────────────
+
+let private pyStyleLit (v: JsonValue) : string =
+  pyCall
+    "t.SemanticStyle"
+    []
+    ([ "emphasis", pq (optStr "emphasis" v |> Option.defaultValue "Normal")
+       "tone", pq (optStr "tone" v |> Option.defaultValue "Default")
+       "weight", pq (optStr "weight" v |> Option.defaultValue "Standard") ]
+     @ (match optStr "role" v with
+        | Some r -> [ "role", pq r ]
+        | None -> [])
+     @ (match optStr "voice" v with
+        | Some vo -> [ "voice", pq vo ]
+        | None -> []))
+
+let private pyAccessibilityLit (v: JsonValue) : string =
+  pyCall
+    "t.Accessibility"
+    []
+    ((match JsonValue.tryField "label" v with
+      | Some b -> [ "label", pyBinding Opq.Scalar b ]
+      | None -> [])
+     @ (match optStr "labelledBy" v with
+        | Some s -> [ "labelledBy", pq s ]
+        | None -> [])
+     @ (match optStr "describedBy" v with
+        | Some s -> [ "describedBy", pq s ]
+        | None -> [])
+     @ (match optStr "role" v with
+        | Some s -> [ "role", pq s ]
+        | None -> [])
+     @ (match optStr "liveRegion" v with
+        | Some s -> [ "liveRegion", pq s ]
+        | None -> [])
+     @ (match JsonValue.tryField "hidden" v with
+        | Some b -> [ "hidden", pyBinding Opq.Scalar b ]
+        | None -> []))
+
+// ── The per-kind node emitter ────────────────────────────────────────────────
+
+/// The ARIA trait each `fuaran.*` constructor injects, as the wire (key, value)
+/// pairs the emitter must confirm or override to reach the wire's exact value.
+/// Deliberately NOT the TypeScript leg's `ctorAccessibility` table: two of the
+/// Python constructors' defaults differ — `scroll_area` carries `role=region`
+/// where the TS `scrollArea` carries none, and the static-rows `table`
+/// constructor carries none where `grid` carries `region` — so sharing one table
+/// was wrong in both directions, which is how `scroll-1` failed.
+let private pyCtorA11y (kindType: string) (k: JsonValue) : (string * string) list =
+  match kindType with
+  | "ScrollArea" -> [ "role", "region" ]
+  | "DataGrid" when (JsonValue.tryField "staticRows" k).IsSome -> []
+  | _ -> ctorAccessibility kindType
+
+let rec private pyNodeExpr (depth: int) (nodeV: JsonValue) : string =
+  markNode nodeV (pyNodeExprRaw depth nodeV)
+
+and private pyNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
+  let id = optStr "id" nodeV |> Option.defaultValue ""
+  let kindObj = fieldD "kind" nodeV
+  let kindType = dollarType kindObj |> Option.defaultValue ""
+
+  if kindType = "Box" then
+    pyBoxNode depth id kindObj nodeV
+  else
+    let built =
+      match pyKindCtor depth kindType id kindObj with
+      | Some ctorExpr -> ctorExpr
+      | None -> pyGenericNode depth id kindObj
+
+    // The traits the constructors do not take: `style` and `state` are absent
+    // from every `fuaran.*` signature, and the injected ARIA default has to be
+    // pinned back to the wire's exact value. `UiNode.replace` is the Python
+    // spelling of the TS leg's object spread.
+    let overrides =
+      (match JsonValue.tryField "style" nodeV with
+       | Some st -> [ "style", pyStyleLit st ]
+       | None -> [])
+      @ (match JsonValue.tryField "state" nodeV with
+         | Some st -> [ "state", pyStateLit (depth + 1) st ]
+         | None -> [])
+      @ (let wireA = JsonValue.tryField "accessibility" nodeV
+
+         if a11yMatchesCtor wireA (pyCtorA11y kindType kindObj) then
+           []
+         else
+           [ "accessibility",
+             (match wireA with
+              | Some a -> pyAccessibilityLit a
+              | None -> "None") ])
+
+    if List.isEmpty overrides then
+      built
+    else
+      "("
+      + built
+      + ").replace("
+      + (overrides |> List.map (fun (k, v) -> toSnake k + "=" + v) |> String.concat ", ")
+      + ")"
+
+and private pyStateLit (depth: int) (v: JsonValue) : string =
+  pyCall
+    "t.StateBehaviour"
+    []
+    ((match JsonValue.tryField "onLoading" v with
+      | Some n -> [ "onLoading", pyNodeExpr (depth + 1) n ]
+      | None -> [])
+     @ (match JsonValue.tryField "onEmpty" v with
+        | Some n -> [ "onEmpty", pyNodeExpr (depth + 1) n ]
+        | None -> [])
+     @ (match JsonValue.tryField "onError" v with
+        | Some _ -> [ "onError", "True" ]
+        | None -> []))
+
+and private pyChildren (depth: int) (k: JsonValue) : string =
+  let children = arrOf "children" k
+
+  if List.isEmpty children then
+    "[]"
+  else
+    "[\n"
+    + (children
+       |> List.map (fun c -> pad (depth + 2) + pyNodeExpr (depth + 2) c)
+       |> String.concat ",\n")
+    + ",\n"
+    + pad (depth + 1)
+    + "]"
+
+/// A `Box` — always the typed record rather than a role-dispatched constructor
+/// (the TS leg's choice, for its reason): `t.Box` carries `heading` alongside a
+/// `Dashboard` role, which `fuaran.dashboard` cannot, and building the node
+/// directly means no constructor ARIA default has to be unpicked.
+and private pyBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue) : string =
+  let layoutV = fieldD "layout" k
+
+  let gapKw =
+    match optNum "gap" layoutV with
+    | Some g -> [ "gap", numLit g ]
+    | None -> []
+
+  let layout =
+    match dollarType layoutV with
+    | Some "Flex" ->
+      pyCall
+        "t.FlexLayout"
+        []
+        ([ "direction", pq (strOf "direction" layoutV)
+           "wrap", pyBool (boolOf "wrap" layoutV) ]
+         @ gapKw)
+    | Some "Grid" ->
+      pyCall
+        "t.GridTemplate"
+        []
+        ([ "cols", numLit (numOf "cols" layoutV) ]
+         @ gapKw
+         @ (match optStr "templateColumns" layoutV with
+            | Some tc -> [ "templateColumns", pq tc ]
+            | None -> []))
+    | Some "Masonry" -> pyCall "t.MasonryLayout" [] ([ "cols", numLit (numOf "cols" layoutV) ] @ gapKw)
+    | _ -> "t.AutoLayout()"
+
+  let boxKw =
+    [ "children", pyChildren depth k
+      "layout", layout
+      "role", pq (strOf "role" k) ]
+    @ (match JsonValue.tryField "heading" k with
+       | Some h -> [ "heading", pyTextSource h ]
+       | None -> [])
+
+  pyCallBlock "t.UiNode" [] ([ "id", pq id; "kind", pyCall "t.Box" [] boxKw ] @ pyBaseTraits depth nodeV) depth
+
+/// The base traits for a node built as a typed record rather than through a
+/// constructor: an absent trait projects as absent, which the encoder omits.
+and private pyBaseTraits (depth: int) (nodeV: JsonValue) : (string * string) list =
+  (match JsonValue.tryField "accessibility" nodeV with
+   | Some a -> [ "accessibility", pyAccessibilityLit a ]
+   | None -> [])
+  @ (match JsonValue.tryField "style" nodeV with
+     | Some st -> [ "style", pyStyleLit st ]
+     | None -> [])
+  @ (match JsonValue.tryField "state" nodeV with
+     | Some st -> [ "state", pyStateLit (depth + 1) st ]
+     | None -> [])
+
+/// The fallback for a kind with no constructor arm: the typed record named by
+/// the wire discriminator, with each field snake-cased. This replaces the
+/// generic walker's `$type`-keeping object literal — it is the shape the kind
+/// WOULD take, so a kind `fuaran_py` does not model fails by name (an
+/// `AttributeError` naming the absent class) rather than passing as a sketch.
+and private pyGenericNode (depth: int) (id: string) (k: JsonValue) : string =
+  let kindType = dollarType k |> Option.defaultValue "Node"
+
+  let fields =
+    match k with
+    | JObject members ->
+      members
+      |> List.filter (fun (kk, _) -> kk <> "$type")
+      |> List.map (fun (kk, vv) -> kk, pyGenericValue (depth + 1) vv)
+    | _ -> []
+
+  pyCall "t.UiNode" [] [ "id", pq id; "kind", pyCall ("t." + kindType) [] fields ]
+
+and private pyGenericValue (depth: int) (v: JsonValue) : string =
+  match v with
+  | JNull -> "None"
+  | JBool b -> pyBool b
+  | JNumber n -> pyNum n
+  | JString s -> pq s
+  | JArray xs -> pyList (xs |> List.map (pyGenericValue depth))
+  | JObject _ when isNode v -> pyNodeExpr depth v
+  | JObject members ->
+    match dollarType v with
+    | Some ty ->
+      pyCall
+        ("t." + ty)
+        []
+        (members
+         |> List.filter (fun (kk, _) -> kk <> "$type")
+         |> List.map (fun (kk, vv) -> kk, pyGenericValue depth vv))
+    | None ->
+      if List.isEmpty members then
+        "{}"
+      else
+        "{"
+        + (members
+           |> List.map (fun (kk, vv) -> pq kk + ": " + pyGenericValue depth vv)
+           |> String.concat ", ")
+        + "}"
+
+and private pyFragArg (depth: int) (v: JsonValue) : string =
+  match dollarType v with
+  | Some "SlotArg" -> "t.SlotArg(" + pyNodeExpr (depth + 1) (fieldD "tree" v) + ")"
+  | _ -> pyFragScalar v
+
+and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValue) : string option =
+  let call (ctor: string) (positional: string list) (kw: (string * string) list) =
+    Some(pyCallBlock ("fuaran." + ctor) (pq id :: positional) kw depth)
+
+  match kindType with
+  // ── Layout ────────────────────────────────────────────────────────────────
+  | "SplitPanel" -> call "split_panel" [] [ "weight", numLit (numOf "weight" k); "children", pyChildren depth k ]
+  | "Tabs" ->
+    call
+      "tabs"
+      []
+      ([ "activeIndex", pyBinding Opq.Scalar (fieldD "activeIndex" k) ]
+       @ (match optStr "orientation" k with
+          | Some o -> [ "orientation", pq o ]
+          | None -> [])
+       @ (match JsonValue.tryField "tabHeaders" k with
+          | Some(JArray hs) -> [ "tabHeaders", pyList (hs |> List.map pyTabHeader) ]
+          | _ -> [])
+       @ (match JsonValue.tryField "tabTags" k with
+          | Some(JArray ts) -> [ "tabTags", pyList (ts |> List.map pyStrItem) ]
+          | _ -> [])
+       @ (match JsonValue.tryField "activeTag" k with
+          | Some tg -> [ "activeTag", pyBinding Opq.Scalar tg ]
+          | None -> [])
+       @ [ "children", pyChildren depth k ])
+  | "Stepper" ->
+    call
+      "stepper"
+      []
+      [ "activeStep", pyBinding Opq.Scalar (fieldD "activeStep" k)
+        "children", pyChildren depth k ]
+  | "SummaryList" ->
+    call
+      "summary_list"
+      []
+      ((match JsonValue.tryField "heading" k with
+        | Some h -> [ "heading", pyTextInput h ]
+        | None -> [])
+       @ [ "children", pyChildren depth k ])
+  | "Disclosure" ->
+    call
+      "disclosure"
+      []
+      [ "heading", pyTextInput (fieldD "heading" k)
+        "open", pyBinding Opq.Scalar (fieldD "open" k)
+        "defaultOpen", pyBool (boolOf "defaultOpen" k)
+        "children", pyChildren depth k ]
+  | "Modal" ->
+    call
+      "modal"
+      []
+      ((match JsonValue.tryField "heading" k with
+        | Some h -> [ "heading", pyTextInput h ]
+        | None -> [])
+       @ [ "open", pyBinding Opq.Scalar (fieldD "open" k)
+           "dismissable", pyBool (boolOf "dismissable" k) ]
+       @ (match JsonValue.tryField "onDismiss" k with
+          | Some d -> [ "onDismiss", pyAction d ]
+          | None -> [])
+       @ [ "children", pyChildren depth k ])
+  | "ScrollArea" ->
+    call
+      "scroll_area"
+      []
+      ([ "orientation", pq (strOf "orientation" k) ]
+       @ (match optNum "maxHeight" k with
+          | Some m -> [ "maxHeight", numLit m ]
+          | None -> [])
+       @ (match optNum "maxWidth" k with
+          | Some m -> [ "maxWidth", numLit m ]
+          | None -> [])
+       @ [ "children", pyChildren depth k ])
+  // ── Display ───────────────────────────────────────────────────────────────
+  | "Heading" ->
+    call
+      "heading"
+      [ pyTextInput (fieldD "text" k) ]
+      [ "level", numLit (numOf "level" k); "variant", pq (strOf "variant" k) ]
+  | "Markdown" -> call "markdown" [ pyTextInput (fieldD "text" k) ] []
+  | "Metric" ->
+    call
+      "metric"
+      []
+      ([ "label", pyTextInput (fieldD "label" k)
+         "value", pyBinding Opq.Scalar (valueOrSource k)
+         "format", pyCellFormat (fieldD "format" k) ]
+       @ (match optStr "tone" k with
+          | Some tn -> [ "tone", pq tn ]
+          | None -> [])
+       @ (match optStr "weight" k with
+          | Some w -> [ "weight", pq w ]
+          | None -> [])
+       @ (match optStr "emphasis" k with
+          | Some e -> [ "emphasis", pq e ]
+          | None -> [])
+       @ (match JsonValue.tryField "trend" k with
+          | Some tr -> [ "trend", pyBinding Opq.Scalar tr ]
+          | None -> [])
+       @ (match JsonValue.tryField "trendFormat" k with
+          | Some tf -> [ "trendFormat", pyCellFormat tf ]
+          | None -> [])
+       @ (match optStr "trendPolarity" k with
+          | Some p -> [ "trendPolarity", pq p ]
+          | None -> [])
+       @ (match optStr "icon" k with
+          | Some i -> [ "icon", pq i ]
+          | None -> [])
+       @ (match JsonValue.tryField "subtext" k with
+          | Some s -> [ "subtext", pyTextInput s ]
+          | None -> []))
+  | "Badge" -> call "badge" [] [ "label", pyTextInput (fieldD "label" k); "variant", pq (strOf "variant" k) ]
+  | "Sparkline" -> call "sparkline" [] [ "source", pyBinding Opq.Collection (fieldD "source" k) ]
+  | "Skeleton" -> call "skeleton" [ numLit (numOf "rows" k) ] []
+  | "Callout" ->
+    call
+      "callout"
+      []
+      ([ "body", pyTextInput (fieldD "body" k)
+         "tone", pq (strOf "tone" k)
+         "dismissable", pyBool (boolOf "dismissable" k) ]
+       @ (match JsonValue.tryField "heading" k with
+          | Some h -> [ "heading", pyTextInput h ]
+          | None -> [])
+       @ (match optStr "icon" k with
+          | Some i -> [ "icon", pq i ]
+          | None -> []))
+  | "Progress" ->
+    call
+      "progress"
+      []
+      ([ "fraction", pyBinding Opq.Scalar (fieldD "fraction" k)
+         "indeterminate", pyBool (boolOf "indeterminate" k)
+         "tone", pq (strOf "tone" k) ]
+       @ (match JsonValue.tryField "label" k with
+          | Some l -> [ "label", pyTextInput l ]
+          | None -> [])
+       @ (match JsonValue.tryField "caveat" k with
+          | Some c -> [ "caveat", pyTextInput c ]
+          | None -> []))
+  | "LabelValueRow" ->
+    call
+      "label_value_row"
+      []
+      ([ "label", pyTextInput (fieldD "label" k)
+         "value", pyBinding Opq.Scalar (valueOrSource k)
+         "format", pyCellFormat (fieldD "format" k)
+         "emphasis", pyBool (boolOf "emphasis" k) ]
+       @ (match JsonValue.tryField "help" k with
+          | Some h -> [ "help", pyTextInput h ]
+          | None -> []))
+  | "Link" ->
+    call
+      "link"
+      []
+      ([ "href", pyBinding Opq.Scalar (fieldD "href" k)
+         "label", pyTextInput (fieldD "label" k)
+         "download", pyBool (boolOf "download" k) ]
+       @ (match optStr "rel" k with
+          | Some r -> [ "rel", pq r ]
+          | None -> [])
+       @ (match optStr "target" k with
+          | Some tg -> [ "target", pq tg ]
+          | None -> []))
+  | "Image" ->
+    call
+      "image"
+      []
+      ([ "src", pyBinding Opq.Scalar (fieldD "src" k)
+         "alt", pyTextInput (fieldD "alt" k)
+         "variant", pq (strOf "variant" k) ]
+       @ (match optStr "fit" k with
+          | Some f -> [ "fit", pq f ]
+          | None -> [])
+       @ (match optStr "aspectRatio" k with
+          | Some a -> [ "aspectRatio", pq a ]
+          | None -> [])
+       @ (match optStr "loading" k with
+          | Some l -> [ "loading", pq l ]
+          | None -> [])
+       @ (match JsonValue.tryField "caption" k with
+          | Some c -> [ "caption", pyTextInput c ]
+          | None -> [])
+       @ (match JsonValue.tryField "expandable" k with
+          | Some(JBool b) -> [ "expandable", pyBool b ]
+          | _ -> [])
+       @ (match JsonValue.tryField "srcSet" k with
+          | Some(JArray entries) ->
+            [ "srcSet",
+              pyList (
+                entries
+                |> List.map (fun e ->
+                  "("
+                  + pyBinding Opq.Scalar (fieldD "src" e)
+                  + ", "
+                  + numLit (numOf "width" e)
+                  + ")")
+              ) ]
+          | _ -> []))
+  | "Icon" ->
+    call
+      "icon"
+      [ pq (strOf "icon" k) ]
+      ([ "size", pq (optStr "size" k |> Option.defaultValue "Medium")
+         "tone", pq (optStr "tone" k |> Option.defaultValue "Default") ]
+       @ (match optStr "label" k with
+          | Some l -> [ "label", pq l ]
+          | None -> []))
+  | "Media" ->
+    let inner = fieldD "kind" k
+    let isVideo = (dollarType inner |> Option.defaultValue "Video") = "Video"
+
+    let common =
+      [ "src", pyBinding Opq.Scalar (fieldD "src" k)
+        "label", pyTextInput (fieldD "label" k) ]
+      @ (match JsonValue.tryField "controls" k with
+         | Some(JBool b) -> [ "controls", pyBool b ]
+         | _ -> [])
+      @ (match JsonValue.tryField "loop" k with
+         | Some(JBool b) -> [ "loop", pyBool b ]
+         | _ -> [])
+
+    if isVideo then
+      call
+        "video"
+        []
+        (common
+         @ (match JsonValue.tryField "autoplay" inner with
+            | Some(JBool b) -> [ "autoplay", pyBool b ]
+            | _ -> [])
+         @ (match JsonValue.tryField "poster" inner with
+            | Some p -> [ "poster", pyBinding Opq.Scalar p ]
+            | None -> []))
+    else
+      call "audio" [] common
+  | "List" ->
+    call
+      "list"
+      []
+      [ "items", pyList (arrOf "items" k |> List.map pyTextInput)
+        "ordered", pyBool (boolOf "ordered" k) ]
+  | "Toast" ->
+    call
+      "toast"
+      []
+      [ "message", pyTextInput (fieldD "message" k)
+        "tone", pq (strOf "tone" k)
+        "open", pyBinding Opq.Scalar (fieldD "open" k)
+        "dismissable",
+        (match JsonValue.tryField "dismissable" k with
+         | Some(JBool b) -> pyBool b
+         | _ -> "True") ]
+  | "CodeBlock" ->
+    call
+      "code_block"
+      []
+      [ "code", pq (strOf "code" k)
+        "language", pq (strOf "language" k)
+        "lineNumbers", pyBool (boolOf "lineNumbers" k)
+        "highlightLines", pyList (arrOf "highlightLines" k |> List.map numItem)
+        "copyable", pyBool (boolOf "copyable" k) ]
+  | "Math" -> call "math" [ pq (strOf "source" k) ] [ "display", pq (strOf "display" k) ]
+  // ── Input ─────────────────────────────────────────────────────────────────
+  | "Button" ->
+    call
+      "button"
+      []
+      ([ "label", pyTextInput (fieldD "label" k)
+         "onClick", pyAction (fieldD "onClick" k)
+         "variant", pq (strOf "variant" k) ]
+       @ (match optStr "icon" k with
+          | Some i -> [ "icon", pq i ]
+          | None -> [])
+       @ (match JsonValue.tryField "disabled" k with
+          | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
+          | None -> []))
+  | "Select" ->
+    call
+      "select"
+      []
+      ([ "label", pyTextInput (fieldD "label" k)
+         "source", pyOptionsBinding (fieldD "source" k)
+         "value", pyBinding Opq.Scalar (fieldD "value" k) ]
+       @ (match JsonValue.tryField "placeholder" k with
+          | Some p -> [ "placeholder", pyTextInput p ]
+          | None -> [])
+       @ (match JsonValue.tryField "disabled" k with
+          | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
+          | None -> [])
+       @ (if boolOf "multiple" k then [ "multiple", "True" ] else [])
+       @ (match JsonValue.tryField "values" k with
+          | Some vs -> [ "values", pyBinding Opq.Collection vs ]
+          | None -> []))
+  | "Form" ->
+    let fs = arrOf "fields" k
+
+    let fieldsArr =
+      if List.isEmpty fs then
+        "[]"
+      else
+        "[\n"
+        + (fs |> List.map (fun f -> pad (depth + 2) + pyFormField f) |> String.concat ",\n")
+        + ",\n"
+        + pad (depth + 1)
+        + "]"
+
+    call
+      "form"
+      []
+      ([ "fields", fieldsArr
+         "onSubmit", pyAction (fieldD "onSubmit" k)
+         "submitLabel", pyTextInput (fieldD "submitLabel" k) ]
+       @ (match JsonValue.tryField "disabled" k with
+          | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
+          | None -> []))
+  | "Filters" ->
+    let items = arrOf "items" k
+
+    let specsArr =
+      if List.isEmpty items then
+        "[]"
+      else
+        "[\n"
+        + (items
+           |> List.map (fun s -> pad (depth + 2) + pyFilterSpec s)
+           |> String.concat ",\n")
+        + ",\n"
+        + pad (depth + 1)
+        + "]"
+
+    call "filters" [] [ "items", specsArr ]
+  | "FileUpload" ->
+    call
+      "file_upload"
+      []
+      ([ "label", pyTextInput (fieldD "label" k)
+         "accept", pyList (arrOf "accept" k |> List.map pyStrItem)
+         "multiple", pyBool (boolOf "multiple" k) ]
+       @ (match JsonValue.tryField "disabled" k with
+          | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
+          | None -> []))
+  // ── Visualisation ─────────────────────────────────────────────────────────
+  | "Chart" ->
+    call
+      "chart"
+      []
+      ([ "source", pyBinding Opq.Collection (fieldD "source" k)
+         "xField", pq (strOf "xField" k)
+         "yFields", pyList (arrOf "yFields" k |> List.map pyStrItem)
+         "kind", pq (strOf "kind" k)
+         "stacked", pyBool (boolOf "stacked" k) ]
+       @ (match JsonValue.tryField "title" k with
+          | Some ti -> [ "title", pyTextInput ti ]
+          | None -> []))
+  | "Table" ->
+    let rows =
+      arrOf "rows" k
+      |> List.map (fun row ->
+        match row with
+        | JArray cells -> pyList (cells |> List.map pyTextInput)
+        | _ -> "[]")
+
+    call
+      "table"
+      []
+      [ "headers", pyList (arrOf "headers" k |> List.map pyTextInput)
+        "rows", pyList rows ]
+  | "Map" ->
+    call
+      "map"
+      []
+      [ "source", pyMarkerBinding (fieldD "source" k)
+        "centreLatitude", numLit (numOf "centreLatitude" k)
+        "centreLongitude", numLit (numOf "centreLongitude" k)
+        "zoom", numLit (numOf "zoom" k) ]
+  | "DataGrid" ->
+    // A grid carrying `staticRows` is what `fuaran.table` authors — Phase 393
+    // folded the standalone `Table` kind into this mode, and the Python
+    // constructor lowers back into it, so the static form has to route there
+    // rather than through `grid` (which cannot carry rows at all).
+    (match JsonValue.tryField "staticRows" k with
+     | Some sr ->
+       let rows =
+         arrOf "rows" sr
+         |> List.map (fun row ->
+           match row with
+           | JArray cells -> pyList (cells |> List.map pyTextSource)
+           | _ -> "[]")
+
+       call
+         "table"
+         []
+         [ "headers", pyList (arrOf "headers" sr |> List.map pyTextSource)
+           "rows", pyList rows ]
+     | None ->
+       call
+         "grid"
+         []
+         [ "source", pyBinding Opq.Collection (fieldD "source" k)
+           "columns", pyList (arrOf "columns" k |> List.map pyGridColumn)
+           "editable", pyBool (boolOf "editable" k) ])
+  // ── Custom / ErrorBoundary / Fragments ────────────────────────────────────
+  | "Custom" ->
+    call
+      "custom"
+      []
+      ([ "moduleId", pq (strOf "moduleId" k)
+         "componentId", pq (strOf "componentId" k)
+         "props", pyJson (fieldD "props" k) ]
+       @ (match JsonValue.tryField "contentHash" k with
+          | Some h ->
+            [ "contentHash",
+              "t.ContentHash("
+              + pq (strOf "algorithm" h)
+              + ", "
+              + pq (strOf "hash" h)
+              + ", "
+              + pq (strOf "strictness" h)
+              + ")" ]
+          | None -> [])
+       @ (let ids = arrOf "exposedNodeIds" k
+
+          if List.isEmpty ids then
+            []
+          else
+            [ "exposedNodeIds", pyList (ids |> List.map pyStrItem) ]))
+  | "ErrorBoundary" ->
+    call
+      "error_boundary"
+      []
+      [ "child", pyNodeExpr (depth + 1) (fieldD "child" k)
+        "fallback", pyNodeExpr (depth + 1) (fieldD "fallback" k) ]
+  | "FragmentDecl" ->
+    call
+      "fragment_decl"
+      []
+      ([ "name", pq (strOf "name" k)
+         "body", pyNodeExpr (depth + 1) (fieldD "body" k) ]
+       @ (let holes = arrOf "holes" k
+
+          if List.isEmpty holes then
+            []
+          else
+            [ "holes", pyList (holes |> List.map pyHoleDecl) ])
+       @ (match JsonValue.tryField "effect" k with
+          | Some e ->
+            [ "effect",
+              "t.EffectClass("
+              + pq (strOf "hostEffect" e)
+              + ", "
+              + pq (strOf "determinism" e)
+              + ")" ]
+          | None -> []))
+  | "FragmentRef" ->
+    call
+      "fragment_ref"
+      []
+      ([ "name", pq (strOf "name" k) ]
+       @ (let args = membersOf "args" k
+
+          if List.isEmpty args then
+            []
+          else
+            [ "args",
+              "{"
+              + (args
+                 |> List.map (fun (key, a) -> pq key + ": " + pyFragArg depth a)
+                 |> String.concat ", ")
+              + "}" ]))
+  | "Switch" ->
+    let cases =
+      arrOf "cases" k
+      |> List.map (fun c ->
+        "("
+        + pq (strOf "match" c)
+        + ", "
+        + pyNodeExpr (depth + 1) (fieldD "child" c)
+        + ")")
+
+    // The Python constructor takes BOTH selector spellings, so — unlike the TS
+    // leg, which has to post-edit the built node — a non-`State` selector is
+    // expressed directly.
+    call
+      "switch"
+      []
+      ([ "cases", pyList cases
+         "default", pyNodeExpr (depth + 1) (fieldD "default" k) ]
+       @ (match JsonValue.tryField "on" k with
+          | Some onV -> [ "on", pyBinding Opq.Scalar onV ]
+          | None -> [ "stateKey", pq (strOf "stateKey" k) ]))
+  | _ -> None
+
 // ─── the modern-host Box vocabulary (Go / Kotlin / Rust / Swift) ──────────────
 //
 // These four hosts model layout with a single `Box` kind carrying `role` +
@@ -3163,6 +4537,12 @@ let private tsExprWalk (wireJson: string) : string =
   | Some tree -> renderValue tsSpec 0 tree
   | None -> "/* no decodable tree yet */"
 
+let private pyExprWalk (wireJson: string) : string =
+  match JsonHost.parse wireJson with
+  | Some tree when isNode tree -> pyNodeExpr 0 tree
+  | Some tree -> pyGenericValue 0 tree
+  | None -> "# no decodable tree yet"
+
 let private vbWalk (wireJson: string) : string =
   let body =
     match JsonHost.parse wireJson with
@@ -3194,7 +4574,15 @@ let private walkFor (target: Target) (wireJson: string) : string =
     + "// Verified projection: executing this source re-encodes byte-identically to the canonical\n"
     + "// wire JSON for every corpus-covered kind (closures/handlers are structural placeholders).\n\n"
     + tsExprWalk wireJson
-  | Target.Python -> hashHeader "Python (fuaran_py.ui)" + project pySpec wireJson
+  | Target.Python ->
+    "# The current tree as Python (fuaran_py.ui) authoring source.\n"
+    + "# Verified projection: executing this source re-encodes byte-identically to the canonical\n"
+    + "# wire JSON for every corpus-covered construct (closures/handlers are structural placeholders).\n"
+    + "#\n"
+    + "#     from fuaran_py.ui import fuaran, binding, action, format, encode\n"
+    + "#     from fuaran_py.ui import compute as cp\n"
+    + "#     from fuaran_py.schema import types as t\n\n"
+    + pyExprWalk wireJson
   | Target.FSharp -> header "F# (Fuaran.UI)" + project fsSpec wireJson
   | Target.CSharp -> header "C# (Fuaran.UI.CSharp)" + project csSpec wireJson
   | Target.VisualBasic -> vbWalk wireJson
@@ -3207,6 +4595,11 @@ let private walkFor (target: Target) (wireJson: string) : string =
 /// `tests/projection-conformance/` harness, which executes it against the real
 /// `@fuaran-ui/ui` surface and asserts a byte-identical canonical re-encode.
 let projectTypeScriptExpr (wireJson: string) : string = tsExprWalk wireJson
+
+/// The bare projected Python expression (no header) – the input of the
+/// `tests/projection-conformance/` Python arm, which executes it against the
+/// real `fuaran_py.ui` surface and asserts a byte-identical canonical re-encode.
+let projectPythonExpr (wireJson: string) : string = pyExprWalk wireJson
 
 let toTypeScript (wireJson: string) : string = walkFor Target.TypeScript wireJson
 

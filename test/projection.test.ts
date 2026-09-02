@@ -44,7 +44,10 @@ describe('source projection – per-language builder source', () => {
     const out = projectByName('python', metricNode);
     expect(out).toContain('fuaran.metric(');
     expect(out).toContain("label='Revenue'");
-    expect(out).toContain('source=binding.static(1234.5)');
+    // `value=`, not the wire's `source=`: since fuaran#1142 the Python leg emits
+    // per-kind against the real `fuaran_py.ui` constructor signatures rather than
+    // re-spelling the wire's own field names through the generic walker.
+    expect(out).toContain('value=binding.static(1234.5)');
   });
 
   it('F# projects smart-ctor + record with PascalCase fields', () => {

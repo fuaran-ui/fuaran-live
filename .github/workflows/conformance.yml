@@ -5,8 +5,8 @@ name: Projection conformance
 # projection (app/Projection.fs, Fable-compiled) must execute against the real
 # @fuaran-ui/ui surface and re-encode byte-identically to the wire fixture.
 # Any drift FAILS THE BUILD — this is the validation engine that keeps the
-# verified TS projection honest (see docs/PROJECTION_FIDELITY.md; the Python /
-# F# legs are demo-grade pending their re-authored arms).
+# verified TypeScript AND Python projections honest (see docs/PROJECTION_FIDELITY.md;
+# the F# / C# / VB legs are demo-grade pending their re-authored arms).
 #
 # This gate assembles a multi-repo layout because the Fable app build
 # project-references the sibling F# tier (the @fuaran-ui/* npm packages
@@ -85,6 +85,18 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # The PYTHON arm executes its projected source against the real fuaran-py
+      # host. Pinned to an exact published version for the reason the TS arm's
+      # note records about the npm pins: the arm's quarantine names the
+      # constructs that release does not model, so a floating version would move
+      # the set the quarantine describes without any commit here.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the Python host (fuaran-py)
+        run: python -m pip install --disable-pip-version-check fuaran-py==0.0.1
+
       # NuGet hard-errors (NU1301) on the F# tier's missing local folder feed;
       # mint it empty — Fuaran.Core.* restores from nuget.org.
       - name: Create empty local-nuget-feed
@@ -101,8 +113,12 @@ jobs:
           dotnet tool restore
           pnpm run fable:app
 
-      # Runs the TS arm: project every Node fixture, execute the generated
-      # source against @fuaran-ui/ui, byte-compare the canonical re-encode.
+      # Runs both arms: project every Node fixture, execute the generated source
+      # against @fuaran-ui/ui (TS) and fuaran_py.ui (Python), byte-compare the
+      # canonical re-encode. FUARAN_PY_PYTHON points the Python arm at the
+      # interpreter setup-python provisioned — there is no repo-local .venv here.
       - name: Conformance gate
         working-directory: workspace/fuaran-live
+        env:
+          FUARAN_PY_PYTHON: python
         run: pnpm conformance

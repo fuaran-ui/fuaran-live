@@ -181,7 +181,11 @@ describe('the projection side map', () => {
 
 describe('nearest-enclosing resolution', () => {
   it('resolves to the focused node where the language projects it', () => {
-    for (const lang of ['json', 'typescript']) {
+    // `python` joined this group at fuaran#1142: its per-kind emitter projects a
+    // state-slot placeholder as a nested constructor call with a span of its own,
+    // exactly as the TypeScript leg does, where the generic walker folded it into
+    // the parent construct.
+    for (const lang of ['json', 'typescript', 'python']) {
       expect(P.spanPathIdByName(lang, stateSlotTree, ['root', 'spinner']), lang).toBe('spinner');
       expect(P.spanPathTextByName(lang, stateSlotTree, ['root', 'spinner']), lang).toContain(
         'Loading',
@@ -190,7 +194,7 @@ describe('nearest-enclosing resolution', () => {
   });
 
   it('falls back to the closest projected ancestor where it does not', () => {
-    for (const lang of ['fsharp', 'python']) {
+    for (const lang of ['fsharp']) {
       // The state slot is folded into the parent construct, so `spinner` has no
       // span of its own here…
       expect(Array.from(P.spanIdsByName(lang, stateSlotTree)), lang).toEqual(['root']);

@@ -445,18 +445,38 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
 // silently, because the drop is the guard working and a NEW member is the guard
 // hiding something — see the second lock below for why the two are separated.
 //
-// Every member fails the same way: the schema's `Binding` `$def` is UNPARAMETERISED
-// (`"value": true` — any JSON), so a schema-driven walk cannot know that this
-// slot's `Static` needs a string, a number or an integer, and emits the valueless
-// `{"$type":"Static"}`. That form is legal — the corpus carries it in `controls-*`
-// / `form-segmented` / `multiselect-1` — but only in an auto-bound CONTROL slot,
-// where absence IS the binding. In a typed scalar slot it is WRONG_TYPE.
+// Every member fails the same way, and the way was re-measured in 2026-09 because
+// the account below used to name the wrong half of it.
 //
-// It is an expressiveness gap in the AI-tools JSON schema, not a bug in this
-// walker: no amount of care here recovers a type the schema does not carry, and
+// The walker emits a kind's REQUIRED fields and nothing else — required-ness is
+// the only signal the dialect gives it. In the schema's `Binding` `$def` the
+// `Static` arm's `value` is OPTIONAL (absence is structural: a binding carrying no
+// value omits the key rather than emitting a JSON null the wire model has no case
+// for). So the walk emits the valueless `{"$type":"Static"}` at every binding slot.
+// That form is legal — the corpus carries it in `controls-*` / `form-segmented` /
+// `multiselect-1` — but only in an auto-bound CONTROL slot, where absence IS the
+// binding ("no selection"). In a typed scalar slot it is WRONG_TYPE.
+//
+// The account this comment carried until then said the cause was that the `$def`
+// is type-ERASED (`"value": true` — any JSON). That was true of the schema this
+// repo resolves, because the pinned `Fuaran.UI.*` predates the language-tier change
+// that typed every slot's payload per element (`Binding_float` / `Binding_int` /
+// `Binding_str` / `Binding_bool` / the typed collections, each slot `$ref`ing its
+// own). It is no longer true of the EMITTER. Raising the pin therefore moves this
+// set by exactly nothing: the payload's TYPE was the half that got fixed, and the
+// half that bites here is the payload's PRESENCE.
+//
+// It remains an expressiveness gap in the schema, not a bug in this walker: no
+// amount of care here recovers a presence rule the schema does not state, and
 // guessing one from the property name is exactly the guess the synthesiser's
-// docstring refuses to make. Closing it means parameterising `Binding` in the
-// schema, which is a language-tier change.
+// docstring refuses to make. Closing it is a language-tier change, and NOT the
+// one-liner it looks like — the schema points the control slots at the same
+// `#/$defs/Binding_str` as the scalar string slots, so simply requiring `value`
+// there would start refusing the three corpus families named above. It needs a
+// distinct option-payload instantiation for the control slots. The language tier
+// pins both halves of that (a schema-legal/decoder-refused list for the scalar
+// slots, a schema-legal/decoder-accepted one for the control slots), so this set
+// and that pin fall together rather than one of them going quiet.
 const UNDECODABLE_SYNTHESIS = new Set([
   'Disclosure',
   'Image',

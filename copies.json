@@ -1,0 +1,48 @@
+{
+  "kind": "copies",
+  "producer": "fuaran-live",
+  "records": [
+    {
+      "source": "app/brand/fuaran-brand.css",
+      "consumers": [ "Fuaran/Fuaran-UI/fuaran-ui-site/content/public/brand/fuaran-brand.css" ],
+      "check": "bytes",
+      "regen": "copy the canonical artefact to the consumer path; fuaran-ui-site's BrandParity target and its CI job byte-compare all seven"
+    },
+    {
+      "source": "app/brand/fonts/OFL.txt",
+      "consumers": [ "Fuaran/Fuaran-UI/fuaran-ui-site/content/public/brand/fonts/OFL.txt" ],
+      "check": "bytes",
+      "regen": "copy the canonical artefact to the consumer path; fuaran-ui-site's BrandParity target and its CI job byte-compare all seven"
+    },
+    {
+      "source": "app/brand/fonts/eb-garamond-500-italic-latin.woff2",
+      "consumers": [ "Fuaran/Fuaran-UI/fuaran-ui-site/content/public/brand/fonts/eb-garamond-500-italic-latin.woff2" ],
+      "check": "bytes",
+      "regen": "copy the canonical artefact to the consumer path; fuaran-ui-site's BrandParity target and its CI job byte-compare all seven"
+    },
+    {
+      "source": "app/brand/fonts/ibm-plex-mono-400-latin.woff2",
+      "consumers": [ "Fuaran/Fuaran-UI/fuaran-ui-site/content/public/brand/fonts/ibm-plex-mono-400-latin.woff2" ],
+      "check": "bytes",
+      "regen": "copy the canonical artefact to the consumer path; fuaran-ui-site's BrandParity target and its CI job byte-compare all seven"
+    },
+    {
+      "source": "app/brand/fonts/ibm-plex-mono-500-latin.woff2",
+      "consumers": [ "Fuaran/Fuaran-UI/fuaran-ui-site/content/public/brand/fonts/ibm-plex-mono-500-latin.woff2" ],
+      "check": "bytes",
+      "regen": "copy the canonical artefact to the consumer path; fuaran-ui-site's BrandParity target and its CI job byte-compare all seven"
+    },
+    {
+      "source": "public/brand/fuaran-mark.svg",
+      "consumers": [ "Fuaran/Fuaran-UI/fuaran-ui-site/content/public/brand/fuaran-mark.svg" ],
+      "check": "bytes",
+      "regen": "copy the canonical artefact to the consumer path; fuaran-ui-site's BrandParity target and its CI job byte-compare all seven"
+    },
+    {
+      "source": "public/brand/fuaran-mark-mist.svg",
+      "consumers": [ "Fuaran/Fuaran-UI/fuaran-ui-site/content/public/brand/fuaran-mark-mist.svg" ],
+      "check": "bytes",
+      "regen": "copy the canonical artefact to the consumer path; fuaran-ui-site's BrandParity target and its CI job byte-compare all seven"
+    }
+  ]
+}

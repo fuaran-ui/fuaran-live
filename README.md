@@ -1,5 +1,7 @@
 # fuaran-live
 
+[![CI](https://github.com/fuaran-ui/fuaran-live/actions/workflows/ci.yml/badge.svg)](https://github.com/fuaran-ui/fuaran-live/actions/workflows/ci.yml) [![Conformance](https://github.com/fuaran-ui/fuaran-live/actions/workflows/conformance.yml/badge.svg)](https://github.com/fuaran-ui/fuaran-live/actions/workflows/conformance.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 A **serverless, client-only BYOK playground** for the [Fuaran](https://github.com/fuaran-ui) UI language. Open it in a browser, paste your own LLM API key, and prompt a model in plain language — it emits **canonical Fuaran wire-format JSON**, and the `Fuaran.UI` tree renders live in front of you. **No account, no server, no backend.**
 
 It is the thirty-second, no-login companion to the language: the interactive proof that one canonical wire-format contract, authored by an AI, renders identically across conformant hosts.

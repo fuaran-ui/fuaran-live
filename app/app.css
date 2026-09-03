@@ -2416,3 +2416,54 @@ body {
   max-height: 16rem;
   overflow-y: auto;
 }
+
+/* ── Contribute this session (anonymous) — Phase 86 ──────────────────────────
+   Rendered only when a collection endpoint is configured at build time; the
+   public build has none, so none of this is reachable there. */
+
+.fl-contribute {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.fl-contribute-intro p {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--fl-fg);
+}
+
+.fl-contribute-what {
+  color: var(--fl-muted);
+}
+
+.fl-contribute-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.fl-contribute-consent {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.fl-contribute-status {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--fl-muted);
+}
+
+.fl-contribute-endpoint {
+  margin: 0;
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  color: var(--fl-muted);
+  overflow-wrap: anywhere;
+}

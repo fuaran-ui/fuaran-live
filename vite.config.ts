@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
 import { PROVIDER_ORIGINS } from './src/byok/origins';
+import { corpusSinkConnectSrc } from './src/corpus/sink';
 
 // ─── Content-Security-Policy ─────────────────────────────────────────────────
 // The shipped static app is locked down: the only origins it may open a network
@@ -40,6 +41,21 @@ const PROVIDER_ORIGINS_CSP = PROVIDER_ORIGINS.join(' ');
 // GoSessions.defaultBaseUrl (app/showcase/GoSessions.fs).
 const BYOS_LOCAL_ORIGINS = 'http://localhost:* http://127.0.0.1:*';
 
+// The opt-in anonymous session-corpus sink (app/Contribute.fs). An operator who
+// runs their own collector sets VITE_CORPUS_SINK; that endpoint's origin — and
+// only that one — is then added to the PLAYGROUND's connect-src.
+//
+// THE PUBLIC BUILD SETS NOTHING, so this is the empty string and the policy is
+// byte-for-byte the policy it was before the feature existed. That is the
+// property worth stating rather than assuming: a corpus feature that widened
+// the shipped CSP by a character would have widened the app's egress surface
+// for every visitor, whether or not anyone ever contributed. It does not, and
+// test/corpusSink.test.ts pins the unset case against the provider list.
+//
+// The showcase policy is deliberately untouched: the showcase entries import
+// none of the session machinery and have no session to contribute.
+const CORPUS_SINK_CONNECT_SRC = corpusSinkConnectSrc(process.env.VITE_CORPUS_SINK);
+
 // Phase 85 dual-host mode frames the two same-origin render-host pages
 // (ts-host.html + fable-host.html), so `frame-src 'self'` is required. It is a
 // same-origin-only relaxation — no third-party frames — and is harmless when the
@@ -60,7 +76,7 @@ const BYOS_LOCAL_ORIGINS = 'http://localhost:* http://127.0.0.1:*';
 const prodCsp = (scriptHashes: string) =>
   [
     `default-src 'self'`,
-    `connect-src 'self' ${PROVIDER_ORIGINS_CSP}`,
+    `connect-src 'self' ${PROVIDER_ORIGINS_CSP}${CORPUS_SINK_CONNECT_SRC}`,
     `img-src 'self' data:`,
     `style-src 'self' 'unsafe-inline'`,
     `script-src 'self'${scriptHashes}`,
@@ -106,7 +122,7 @@ const showcaseCsp = (scriptHashes: string) =>
 // variant. The shipped `dist/index.html` always carries `prodCsp`.
 const devCsp = [
   `default-src 'self'`,
-  `connect-src 'self' ${PROVIDER_ORIGINS_CSP} ${pyodideCdn} ${BYOS_LOCAL_ORIGINS} ws: wss:`,
+  `connect-src 'self' ${PROVIDER_ORIGINS_CSP}${CORPUS_SINK_CONNECT_SRC} ${pyodideCdn} ${BYOS_LOCAL_ORIGINS} ws: wss:`,
   `img-src 'self' data:`,
   `style-src 'self' 'unsafe-inline'`,
   `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' ${pyodideCdn}`,

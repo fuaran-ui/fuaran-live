@@ -57,14 +57,34 @@ opens is the BYOK call to the provider origin you selected.
    exception — are scrubbed of the request's auth-header values before they reach
    the UI, the warning port, or any log. A provider that echoes back the
    credential it rejected cannot put it on screen.
-5. **No telemetry, analytics, or corpus sink.** The app ships with no
-   analytics, no error-reporting beacon, and no usage-telemetry path. Apart from
-   loading its own static assets from its own origin, there is no network egress
-   other than the provider call — and, on the optional live-drive mode, the STUN
-   server described below, which never sees UI data or the key. If an opt-in telemetry or
-   anonymous-corpus feature is ever added, it must be **key-blind by construction**
-   — it must never be able to observe the key value — and the guard test below
-   enforces that the key reaches no non-provider boundary.
+5. **No telemetry or analytics; the corpus sink is opt-in and unconfigured in
+   the public build.** The app ships with no analytics and no error-reporting
+   beacon. Apart from loading its own static assets from its own origin, there
+   is no network egress other than the provider call — and, on the optional
+   live-drive mode, the STUN server described below, which never sees UI data or
+   the key.
+
+   The one further path that exists in the code is the **opt-in anonymous
+   session-corpus contribution**, and in the public build it is not reachable:
+   its endpoint is build configuration (`VITE_CORPUS_SINK`), the public build
+   sets none, so no contribution control is rendered, no POST has a destination,
+   and the shipped `connect-src` below gains nothing. Where an operator does
+   configure a collector, the earlier condition this document set on any such
+   feature is met and is what makes it admissible: it is **key-blind by
+   construction** — the module that builds a contribution opens no key store,
+   the module holding the key stores knows nothing of the sink, and the type the
+   sink accepts has no case that could carry a key, the same construction the
+   live-drive channel uses. A contribution additionally requires an explicit
+   per-contribution consent (off by default, cleared after every attempt), and
+   the built payload is scanned for key-shaped tokens and provider endpoint URLs
+   and **refused outright** if either is present — refused rather than stripped,
+   because a payload that is key-blind by construction has no legitimate reason
+   to contain one. The prompts and the model's replies are never included; only
+   their count is. [`test/corpusSink.test.ts`](test/corpusSink.test.ts) runs in
+   the default CI test job and enforces all of it — including that the clean
+   path genuinely POSTs, so a refusal cannot be the vacuous result of a probe
+   that sent nothing. The full description is in
+   [`docs/CORPUS-SINK.md`](docs/CORPUS-SINK.md).
 
 These guarantees are not just documented — they are **tested**, by
 [`test/networkEgress.test.ts`](test/networkEgress.test.ts), which runs in CI on
@@ -127,6 +147,16 @@ custom-properties inline; no inline _scripts_ are permitted. `font-src` allows
 The dev server uses a relaxed variant (HMR needs inline script + `eval` + a
 websocket); the **shipped `dist/index.html` always carries the strict policy
 above**.
+
+One conditional entry exists and is absent from the public build: if an operator
+builds with `VITE_CORPUS_SINK` set (guarantee 5's opt-in corpus contribution),
+that endpoint's **origin** — not its path — is appended to `connect-src`. With
+the variable unset, which is how the public artefact is built, the policy is
+byte-for-byte the one printed above; `test/corpusSink.test.ts` pins that. The
+admissibility rule (`https:`, or `http:` on loopback, and nothing else) lives in
+`src/corpus/sink.ts`, which the build and the app both read — so, exactly as with
+the provider origins, the policy and the code that opens the connection cannot
+drift apart.
 
 ### What the policy does not cover — delivery, and clickjacking
 

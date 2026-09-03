@@ -98,6 +98,48 @@ type ILiveDriveChannel =
   abstract member Send: LiveDriveMessage -> unit
   abstract member Close: unit -> unit
 
+// ─── The opt-in corpus-sink seam (Phase 86) ──────────────────────────────────
+//
+// The playground can OFFER to contribute one session — the ops that built the
+// tree, the tree itself, and which provider/model produced it — to a collection
+// endpoint an operator configures. The public build configures none, so the
+// offer is not reachable there at all.
+//
+// TRUST INVARIANT (load-bearing, and the same construction `LiveDriveMessage`
+// above uses): the ONLY thing a `ContributionBundle` can carry is a document the
+// builder has already produced and verified. The BYOK key cannot reach this
+// seam, because the type has no case that could hold one and the module that
+// builds the bundle (`Contribute.fs`) never opens a key store. SECURITY.md's
+// key-handling guarantee 5 requires exactly this — "key-blind by construction"
+// — of any corpus sink, and this is that requirement expressed as a type rather
+// than as a promise.
+
+/// A verified contribution payload: the canonical bytes of one
+/// `session.fuaran.json`, after redaction and after the residue check passed.
+/// Single-case on purpose — it is a *permission slip*, not a container. Nothing
+/// but `Contribute.prepare` constructs one, so a value of this type is evidence
+/// that the guard ran.
+[<RequireQualifiedAccess>]
+type ContributionBundle = Verified of json: string
+
+/// Why a contribution did not land, or that it did. `Refused` is the guard's
+/// verdict on the payload (never the network's); `Failed` is the transport.
+[<RequireQualifiedAccess>]
+type ContributionOutcome =
+  | Sent
+  | Refused of reason: string
+  | Failed of reason: string
+
+/// One collection endpoint. The browser implementation lives in `Contribute.fs`
+/// — deliberately NOT in `Byok.fs`, which is the one module holding the key
+/// stores: the POST code and the key are never in scope together, and a
+/// source-level test asserts it.
+type IContributionSink =
+  /// The configured endpoint, for display. Empty when unconfigured — in which
+  /// case nothing offers a contribution and `Post` is never reached.
+  abstract member Endpoint: string
+  abstract member Post: ContributionBundle -> Async<ContributionOutcome>
+
 // ─── The agentic (tool-use) seam (Phase 327 – over `FuaranLive.AiWire`) ─────
 //
 // Agent mode (the self-debug loop) needs a richer call than `Send`: the model

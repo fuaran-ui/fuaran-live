@@ -130,6 +130,12 @@
          navigator because its apply path runs through the navigator's one edit
          gate rather than restating it. -->
     <Compile Include="Console.fs" />
+    <!-- The opt-in anonymous session-corpus sink. Compile-ordered after the
+         session (which is the whole of what it captures) and deliberately NOT
+         after Byok.fs for any reason of dependency: it takes none, and the
+         absence is the point — the module that builds a contribution and the
+         module that holds the key stores are never in scope together. -->
+    <Compile Include="Contribute.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

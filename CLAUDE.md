@@ -11,6 +11,7 @@ This repo sits in the Fuaran workspace alongside the `fuaran` F# language tier a
 
 - **Apache 2.0 from day one**, public by design — like `fuaran-ts`, this plants the canonical-implementation flag. It consumes only the public `@fuaran-ui/*` packages; it must never reference a private sibling or a private package name.
 - **No server, no login, no secrets.** The only key-bearing network egress anywhere is the playground's BYOK provider call from the user's browser; the visitor's key is held in the tab only and never persisted to disk by default. The showcase entries send no key anywhere (their one non-`'self'` allowance is the pinned Pyodide CDN — a static, opt-in runtime download for the in-browser Python host).
+- **The corpus sink is off in the public build, and that is a build fact rather than a runtime check.** The opt-in anonymous session-corpus contribution (`app/Contribute.fs`) posts only to an endpoint an operator sets in `VITE_CORPUS_SINK`; the public build sets none, so no control renders, no POST has a destination, and the shipped `connect-src` gains nothing. Two rules bind any change here: the builder stays **key-blind by construction** — it opens no key store and `Byok.fs` knows nothing of it, both checked at the source by `test/corpusSink.test.ts` — and the endpoint's admissibility rule stays in the one place (`src/corpus/sink.ts`) the build and the app both read, so the CSP and the code that opens the connection cannot drift. See [`docs/CORPUS-SINK.md`](docs/CORPUS-SINK.md).
 
 ## Layout
 

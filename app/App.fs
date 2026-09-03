@@ -251,6 +251,11 @@ type Model =
     /// log of every call it has run. Ephemeral, like every other pane's state —
     /// nothing here outlives the tab.
     Console: Console.State
+    /// The opt-in corpus-contribution pane (Phase 86): the per-contribution
+    /// consent (always false to begin with, and reset after every attempt) and
+    /// the outcome of the most recent one. In the public build no sink is
+    /// configured, so no affordance renders and this state is never touched.
+    Contribute: Contribute.State
   }
 
 type Msg =
@@ -323,6 +328,13 @@ type Msg =
   /// The Console pane: the composed call, and the request to run it.
   | ConsoleInput of string
   | ConsoleRun
+  // The opt-in corpus contribution (Phase 86). `ContributeConsent` carries the
+  // tick; `ContributeSend` is the explicit act, reachable only while the tick is
+  // set AND a sink is configured; `ContributeDone` folds the outcome back and
+  // clears the consent, so the next contribution is a fresh decision.
+  | ContributeConsent of bool
+  | ContributeSend
+  | ContributeDone of ContributionOutcome
   | RunParity
   | ParityReady of string
   | ParityRendered of host: string * ok: bool * canonical: string option
@@ -777,7 +789,8 @@ let private init () : Model * Cmd<Msg> =
     ConvUnseen = false
     Site = None
     Run = None
-    Console = Console.empty },
+    Console = Console.empty
+    Contribute = Contribute.empty },
   // Register the client-only enhancers once; run an initial KaTeX pass in case a
   // permalink restored a tree carrying an equation. In audience mode also
   // subscribe to the live-drive channel.
@@ -1231,6 +1244,51 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     { model with
         Console = { outcome.State with Input = "" }
         Session = Option.defaultValue model.Session outcome.Session },
+    Cmd.none
+  // ── the opt-in corpus contribution ────────────────────────────────────────
+  //
+  // Three legs, and the shape of them is the consent model. The tick is state;
+  // the send is a separate act that re-reads the tick and refuses without it,
+  // so nothing contributes as a side-effect of anything else; and the outcome
+  // clears the tick, so consent is spent by the contribution it was given for.
+  | ContributeConsent agreed ->
+    { model with
+        Contribute =
+          { model.Contribute with
+              Consented = agreed
+              Status = "" } },
+    Cmd.none
+  | ContributeSend ->
+    // Guarded on the consent AND on a configured sink. Neither guard is the
+    // only one — the button is disabled without consent and the whole section
+    // is absent without a sink — but a message handler that trusted its view
+    // would be one refactor away from being wrong.
+    if
+      not model.Contribute.Consented
+      || not Contribute.configured
+      || model.Contribute.Sending
+    then
+      model, Cmd.none
+    else
+      let meta: Contribute.Meta =
+        { ProviderId = model.ProviderId
+          ModelId = model.Model
+          CapturedAt = Contribute.isoNowUtc () }
+
+      { model with
+          Contribute = { model.Contribute with Sending = true } },
+      Cmd.OfAsync.perform
+        (fun () ->
+          async {
+            match Contribute.prepare meta model.Session with
+            | Error reason -> return ContributionOutcome.Refused reason
+            | Ok bundle -> return! Contribute.browserSink.Post bundle
+          })
+        ()
+        ContributeDone
+  | ContributeDone outcome ->
+    { model with
+        Contribute = Contribute.recorded model.Contribute outcome },
     Cmd.none
   | RunParity ->
     match parityInput model with
@@ -2582,6 +2640,34 @@ let private consolePane (model: Model) (dispatch: Msg -> unit) : ReactElement =
           Console.inputPane model.Console (ConsoleInput >> dispatch) (fun () -> dispatch ConsoleRun)
           Console.logPane model.Console ] ]
 
+/// The contribution pane: the honest copy, then the consent tick and the send.
+/// Rendered only when a sink is configured — see `contributeSection` below.
+let private contributePane (model: Model) (dispatch: Msg -> unit) : ReactElement =
+  Html.div
+    [ prop.className "fl-contribute"
+      prop.children
+        [ Contribute.intro
+          Contribute.controls
+            model.Contribute
+            (Option.isSome model.Session.Tree)
+            (ContributeConsent >> dispatch)
+            (fun () -> dispatch ContributeSend)
+          Html.p
+            [ prop.className "fl-contribute-endpoint"
+              prop.text ("This build is configured to contribute to: " + Contribute.sinkUrl) ] ] ]
+
+/// The "More tools" entry for the contribution pane — or nothing at all.
+///
+/// `Contribute.configured` is false in the public build, and then this renders
+/// `Html.none`: the shipped artefact carries no contribution affordance, not a
+/// disabled one. A control that is present-but-disabled invites the question of
+/// what disables it; an absent one answers it.
+let private contributeSection (model: Model) (dispatch: Msg -> unit) : ReactElement =
+  if Contribute.configured then
+    toolDetails "Contribute this session (anonymous)" false (contributePane model dispatch)
+  else
+    Html.none
+
 let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
   if model.IsAudience then
     audienceView model
@@ -2638,7 +2724,8 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                     (if dualHostEnabled then
                        toolDetails "Dual-host wire parity" false (parityPane model dispatch)
                      else
-                       Html.none) ] ]
+                       Html.none)
+                    contributeSection model dispatch ] ]
             (match model.Error with
              | Some e -> Html.div [ prop.className "fl-error"; prop.text (e.Source + " error: " + e.Message) ]
              | None -> Html.none) ] ]

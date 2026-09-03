@@ -111,6 +111,14 @@
 //      `toWire` projections. That payload is nonetheless a contract a reader parses, so
 //      it carries its own lock in agentReadable.test.ts (closed-set tokens, payload
 //      shapes, and the omitted-open-bound property), with a go-red self-test.
+//    - app/Contribute.fs - the session-corpus bundle builder. It hand-authors no wire:
+//      the trees it embeds are produced by the REAL `CanonicalJson` encoder and the ops
+//      are the canonical documents the session already recorded, so both are
+//      canon-by-construction. The envelope AROUND them is a sidecar document (kind /
+//      version / metadata / two trees / an op array), not a wire-format document, and a
+//      canonical round-trip lock is inapplicable to it. Its own contract - every member,
+//      the embedded op's `$type`, and the members that must NOT be there - is pinned in
+//      corpusSink.test.ts.
 //    - Every .fs showcase page built through the real `Fuaran.*` constructors +
 //      `Fuaran.UI.Renderer` - canon-by-construction, the phase's explicit out-of-scope
 //      class (the reference encoder is its own oracle).

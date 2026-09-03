@@ -2273,3 +2273,146 @@ body {
 .fl-run-step-diagnostic {
   color: var(--fl-muted);
 }
+
+/* ── the Console pane (Phase 94) ─────────────────────────────────────────────
+   Deliberately built from the tokens the run-mode journal beside it already
+   uses — same borders, same mono face, same muted/error roles — so the pane
+   reads as part of the same app rather than as a bolted-on developer tool. No
+   new brand token is introduced here. */
+
+.fl-console {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.fl-console-intro {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--fl-muted);
+}
+
+.fl-console-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.fl-console-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.fl-console-example {
+  border: 1px solid var(--fl-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fl-accent);
+  cursor: pointer;
+  padding: 0.12rem 0.6rem;
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+}
+
+.fl-console-example:hover {
+  background: var(--fl-surface);
+}
+
+.fl-console-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--fl-border);
+  border-radius: 0.4rem;
+  background: var(--fl-surface);
+  color: var(--fl-fg);
+  padding: 0.5rem 0.6rem;
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.fl-console-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.fl-console-accepted {
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  color: var(--fl-muted);
+  overflow-wrap: anywhere;
+}
+
+.fl-console-log {
+  border: 1px solid var(--fl-border);
+  border-radius: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.78rem;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.fl-console-log-title {
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fl-muted);
+  margin-bottom: 0.35rem;
+}
+
+.fl-console-empty {
+  color: var(--fl-muted);
+  font-style: italic;
+}
+
+.fl-console-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.fl-console-entry {
+  border-left: 2px solid var(--fl-border);
+  padding-left: 0.55rem;
+}
+
+.fl-console-head {
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.fl-console-info .fl-console-head {
+  color: var(--fl-fg);
+}
+
+.fl-console-refused .fl-console-head,
+.fl-console-failed .fl-console-head {
+  color: var(--fl-error-fg);
+}
+
+.fl-console-refused {
+  border-left-color: var(--fl-error-fg);
+}
+
+.fl-console-failed {
+  border-left-color: var(--fl-error-fg);
+}
+
+.fl-console-detail {
+  margin: 0.2rem 0 0;
+  font-family: var(--fuaran-font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  color: var(--fl-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 16rem;
+  overflow-y: auto;
+}

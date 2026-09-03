@@ -125,6 +125,11 @@
          closed default-deny effect registry, the live $state projection and the
          step journal — so App.fs holds only the toggle and the panes. -->
     <Compile Include="RunMode.fs" />
+    <!-- The Console: the shipped in-page introspection surface, driven from a
+         pane instead of from a DevTools global. Compile-ordered after the
+         navigator because its apply path runs through the navigator's one edit
+         gate rather than restating it. -->
+    <Compile Include="Console.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

@@ -247,6 +247,10 @@ type Model =
     /// page would; the session tree itself is untouched by anything that
     /// happens in here.
     Run: RunMode.State option
+    /// The Console pane (Phase 94): the input the visitor is composing and the
+    /// log of every call it has run. Ephemeral, like every other pane's state —
+    /// nothing here outlives the tab.
+    Console: Console.State
   }
 
 type Msg =
@@ -316,6 +320,9 @@ type Msg =
   | PairError of string
   | CancelPairing
   // Dual-host wire-parity pane (Phase 85 surfaced in-app).
+  /// The Console pane: the composed call, and the request to run it.
+  | ConsoleInput of string
+  | ConsoleRun
   | RunParity
   | ParityReady of string
   | ParityRendered of host: string * ok: bool * canonical: string option
@@ -769,7 +776,8 @@ let private init () : Model * Cmd<Msg> =
          WorkspaceTab.Conversation)
     ConvUnseen = false
     Site = None
-    Run = None },
+    Run = None
+    Console = Console.empty },
   // Register the client-only enhancers once; run an initial KaTeX pass in case a
   // permalink restored a tree carrying an equation. In audience mode also
   // subscribe to the live-drive channel.
@@ -1206,6 +1214,23 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
              false
            else
              model.ConvUnseen) },
+    Cmd.none
+  // ── the Console pane ──────────────────────────────────────────────────────
+  //
+  // `Console.run` is pure over the console state and returns the next SESSION
+  // only when an op genuinely applied — so a query, a refusal and a failure all
+  // leave the tree exactly as it was, and the one path that changes it is the
+  // one the apply pipeline permitted.
+  | ConsoleInput text ->
+    { model with
+        Console = { model.Console with Input = text } },
+    Cmd.none
+  | ConsoleRun ->
+    let outcome = Console.run model.Console model.Session
+
+    { model with
+        Console = { outcome.State with Input = "" }
+        Session = Option.defaultValue model.Session outcome.Session },
     Cmd.none
   | RunParity ->
     match parityInput model with
@@ -2542,6 +2567,21 @@ let private editorPane (model: Model) (dispatch: Msg -> unit) : ReactElement =
 let private sourcePane (model: Model) (dispatch: Msg -> unit) : ReactElement =
   ProjectionSync.SourceCard model.Session.Tree model.OutputTab (SelectOutputTab >> dispatch)
 
+/// The Console pane: the shipped in-page introspection surface, driven from the
+/// page instead of from a DevTools global. It sits with the other developer
+/// affordances under "More tools" rather than in the workspace columns — the
+/// left column's tabs are the two AUTHOR surfaces (Conversation | Editor) and
+/// the right column's Source card tabs are host LANGUAGES, so a console is a
+/// member of neither set. See `Console.fs` for why it does not register
+/// `window.__fuaran`.
+let private consolePane (model: Model) (dispatch: Msg -> unit) : ReactElement =
+  Html.div
+    [ prop.className "fl-console"
+      prop.children
+        [ Console.intro
+          Console.inputPane model.Console (ConsoleInput >> dispatch) (fun () -> dispatch ConsoleRun)
+          Console.logPane model.Console ] ]
+
 let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
   if model.IsAudience then
     audienceView model
@@ -2593,6 +2633,7 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                 prop.children
                   [ Html.h2 [ prop.className "pg-tools-title"; prop.text "More tools" ]
                     toolDetails "Examples & pattern bank" noTree (galleryPane model dispatch)
+                    toolDetails "Console: query and poke the live tree" false (consolePane model dispatch)
                     toolDetails "Compare: Fuaran vs conventional JS" false (comparePane model dispatch)
                     (if dualHostEnabled then
                        toolDetails "Dual-host wire parity" false (parityPane model dispatch)

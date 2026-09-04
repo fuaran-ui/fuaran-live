@@ -31,10 +31,13 @@ module Fuaran.Live.Gallery
 //  to keep in step.
 //
 //  VOCABULARY CEILING. The playground consumes the published `Fuaran.UI` family
-//  at the version pinned in `app/FuaranLive.fsproj` (held deliberately – the
-//  reason is recorded beside the pin). An entry may only use vocabulary that
-//  version carries; a kind added to the language later belongs in the runnable
-//  code-sample tier until the pin moves.
+//  at the version pinned in `app/FuaranLive.fsproj`. An entry may only use
+//  vocabulary that version carries; a kind added to the language later belongs in
+//  the runnable code-sample tier until the pin moves. The ceiling is real and has
+//  bound this file before – the entries below were first authored against a pin a
+//  release behind the tier, and the ONE shape they had to leave out for it stayed
+//  out for a different reason once the pin moved (see the static-table note in the
+//  regional-review entry).
 // ============================================================================
 
 open Fuaran.UI
@@ -581,17 +584,21 @@ let private regionalReview: Node<obj> =
                   YFields = [ "sales" ]
                   Title = Some(TextSource.Literal "Monthly sales")
                   ValueFormat = Some(localeFormat.currency "GBP") }
-            // A per-store breakdown as facts rather than a static table. The
-            // static-table shape is deliberately ABSENT from the live tier at
-            // this pin: the published `Fuaran.UI` version this app is held at
-            // encodes a rows-absent grid source as `{"$type":"Static"}`, where
-            // the corpus (`nodes/table-1.json`) and the `@fuaran-ui/ops` decoder
-            // this app ships with both make it `{"$type":"Static","value":[]}`.
-            // The entry would render, and its permalink would still restore —
-            // but it would not be the canonical form of itself, which is the one
-            // property this library promises. It belongs in the runnable
-            // code-sample tier (which builds against the current tier) until the
-            // pin moves. `test/permalinkGallery.test.ts` is what caught it.
+            // A per-store breakdown as a summary list rather than a static
+            // table, and the reason is a live cross-host divergence rather than
+            // taste. `Fuaran.table` lowers to a `DataGrid` whose row source is
+            // `Binding.Static None`, and the F# canonical encoder writes that as
+            // `{"$type":"Static"}` where the corpus (`nodes/table-1.json`) and the
+            // `@fuaran-ui/ops` decoder this app ships with both make it
+            // `{"$type":"Static","value":[]}`. The entry would render, and its
+            // permalink would still restore — but it would not be the canonical
+            // form of itself, which is the one property this library promises.
+            //
+            // First caught by `test/permalinkGallery.test.ts` against the earlier
+            // pin, and RE-CHECKED against the current one: the raise did not close
+            // it, so it is the encoder's, not the pin's. Fixing it belongs to the
+            // language tier. The static-table shape lives in the runnable
+            // code-sample tier meanwhile.
             Fuaran.summaryList
               "ex-regional-stores"
               { Defaults.summaryList<obj> with
@@ -810,6 +817,41 @@ let private accessibleForm: Node<obj> =
                     Label = Some(Binding.Static(Some "Callback status")) }
             ) ] }
 
+// ─── Hierarchy – a navigable tree, selection and expansion as state ───────────
+
+let private treeItem (id: string) (label: string) (children: TreeItem list) : TreeItem =
+  { Id = id
+    Label = TextSource.Literal label
+    Icon = None
+    Children = children }
+
+let private fileExplorer: Node<obj> =
+  Fuaran.dashboard
+    "ex-tree"
+    { Defaults.dashboard with
+        Children =
+          [ Fuaran.heading
+              "ex-tree-title"
+              { Level = 1
+                Text = TextSource.Literal "Project"
+                Variant = HeadingVariant.Standard }
+            Fuaran.markdown
+              "ex-tree-note"
+              "Which branches are open, and which node is selected, are **state slots** named by the tree itself – so the host writes them, a permalink restores them, and a targeted edit can address them. There is no tree widget holding private state anywhere."
+            Fuaran.treeSpec
+              "ex-tree-nav"
+              { Defaults.tree<obj> with
+                  ExpandedStateKey = Some "explorer.expanded"
+                  SelectionStateKey = Some "explorer.selected"
+                  Items =
+                    [ treeItem
+                        "src"
+                        "src"
+                        [ treeItem "src-app" "app" [ treeItem "src-app-main" "Main.fs" [] ]
+                          treeItem "src-lib" "lib" [ treeItem "src-lib-tree" "Tree.fs" [] ] ]
+                      treeItem "docs" "docs" [ treeItem "docs-readme" "README.md" [] ]
+                      treeItem "tests" "tests" [] ] } ] }
+
 /// The showcase, in display order — one cool simple app per feature area.
 ///
 /// The two headlines lead, each speaking to a different reader: the **sales
@@ -858,6 +900,10 @@ let examples: Example list =
       Feature = "Capabilities"
       Blurb = "A typed call to a host-registered computation, with the arguments checked before it runs."
       Tree = capabilityCard }
+    { Title = "Project explorer"
+      Feature = "Hierarchy"
+      Blurb = "A navigable tree whose expansion and selection are named state slots, not widget-private state."
+      Tree = fileExplorer }
     { Title = "Reusable stat card"
       Feature = "Fragments"
       Blurb = "One declared subtree expanded at three call sites, each keeping addressable ids of its own."

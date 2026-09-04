@@ -883,6 +883,22 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+.fl-gallery-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.fl-gallery-feature {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #777;
+}
+.fl-dark .fl-gallery-feature {
+  color: #999;
+}
 .fl-example {
   padding: 0.4rem 0.7rem;
   cursor: pointer;

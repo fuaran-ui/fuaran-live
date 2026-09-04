@@ -2132,15 +2132,28 @@ let private galleryPane (model: Model) (dispatch: Msg -> unit) : ReactElement =
       prop.children
         [ Html.p
             [ prop.className "fl-gallery-intro"
-              prop.text "Load an example – no key needed – then edit it by prompt:" ]
-          Html.div
-            [ prop.className "fl-gallery-buttons"
-              prop.children
-                [ for ex in Gallery.examples ->
-                    Html.button
-                      [ prop.className "fl-example"
-                        prop.text ex.Title
-                        prop.onClick (fun _ -> dispatch (LoadTree ex.Tree)) ] ] ]
+              prop.text
+                "One cool simple app per feature. Load one – no key needed – read its source in the Output box, then edit it by prompt:" ]
+          // Grouped by the entry's own `Feature` tag, in the display order of the
+          // examples that lead each area — the grouping is derived from the list,
+          // never a second list to keep in step with it.
+          for feature in Gallery.features do
+            Html.div
+              [ prop.className "fl-gallery-group"
+                prop.children
+                  [ Html.p [ prop.className "fl-gallery-feature"; prop.text feature ]
+                    Html.div
+                      [ prop.className "fl-gallery-buttons"
+                        prop.children
+                          [ for ex in Gallery.examples |> List.filter (fun e -> e.Feature = feature) ->
+                              Html.button
+                                [ prop.className "fl-example"
+                                  prop.text ex.Title
+                                  // The blurb rides the native tooltip rather than a
+                                  // second line of chrome — the pane is narrow, and a
+                                  // title attribute is announced by screen readers too.
+                                  prop.title ex.Blurb
+                                  prop.onClick (fun _ -> dispatch (LoadTree ex.Tree)) ] ] ] ] ]
           // The Pattern Bank fast path – deterministic structural lookup (the real
           // Fuaran.Core findBySignature engine), no key, no model. Picking a match
           // loads it into the playground through the same LoadTree path as the

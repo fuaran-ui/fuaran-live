@@ -63,7 +63,7 @@ jobs:
           # It was a bare commit SHA from Phase 761 until this bump, for a reason
           # that has now expired: the showcase had adopted contracts postdating
           # every released tag, so no tag could compile it, and the note here said
-          # to return to a tag once the tier cut a release carrying them. v0.70.0
+          # to return to a tag once the tier cut a release carrying them. v0.75.0
           # is that release. It carries those contracts and the print-break,
           # node-tooltip and upload-sink members the showcase source now names.
           #
@@ -74,7 +74,7 @@ jobs:
           # move off the SHA cost here.
           #
           # To bump: raise the ref in all six workflows together (grep the ref).
-          ref: v0.70.0
+          ref: v0.75.0
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4

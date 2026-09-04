@@ -153,9 +153,9 @@ let private sourceGrid (rows: Row list) : Node<Msg> =
         Columns =
           [ Column.text "quarter" (rowText "quarter")
             Column.numeric "revenue" (rowFloat "revenue")
-            |> Column.editable (fun r v -> Action.Dispatch(SetCell(rowText "quarter" r, "revenue", cellNum v)))
+            |> Column.editable (fun r v -> Action.dispatch (SetCell(rowText "quarter" r, "revenue", cellNum v)))
             Column.numeric "target" (rowFloat "target")
-            |> Column.editable (fun r v -> Action.Dispatch(SetCell(rowText "quarter" r, "target", cellNum v))) ] }
+            |> Column.editable (fun r v -> Action.dispatch (SetCell(rowText "quarter" r, "target", cellNum v))) ] }
 
 // ─── op-stream rendering (the hash-chained provenance of the edits) ──────────
 

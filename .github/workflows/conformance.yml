@@ -90,12 +90,16 @@ jobs:
       # note records about the npm pins: the arm's quarantine names the
       # constructs that release does not model, so a floating version would move
       # the set the quarantine describes without any commit here.
+      # The pin and the runner must agree on requires-python: 0.0.1 declares
+      # >=3.13 and so was UNSATISFIABLE on this 3.12 runner — pip failed at
+      # install, which failed the whole job before any test ran. 0.0.3 declares
+      # >=3.12. Move the runner and the pin together, never one alone.
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install the Python host (fuaran-py)
-        run: python -m pip install --disable-pip-version-check fuaran-py==0.0.1
+        run: python -m pip install --disable-pip-version-check fuaran-py==0.0.3
 
       # NuGet hard-errors (NU1301) on the F# tier's missing local folder feed;
       # mint it empty — Fuaran.Core.* restores from nuget.org.

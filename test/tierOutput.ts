@@ -14,10 +14,10 @@
 // Requires `pnpm run fable:app` to have produced `app/output/`.
 
 // @ts-expect-error untyped Fable output (no .d.ts is generated for it)
-export { findNode } from '../app/output/fable_modules/Fuaran.UI.Ops.0.46.0/Introspect.fs.js';
+export { findNode } from '../app/output/fable_modules/Fuaran.UI.Ops.0.70.0/Introspect.fs.js';
 // @ts-expect-error untyped Fable output
-export { decodeNode } from '../app/output/fable_modules/Fuaran.UI.Ops.0.46.0/JsonDecode.fs.js';
+export { decodeNode } from '../app/output/fable_modules/Fuaran.UI.Ops.0.70.0/JsonDecode.fs.js';
 // @ts-expect-error untyped Fable output
-export { NodeId } from '../app/output/fable_modules/Fuaran.UI.0.46.0/Types.fs.js';
+export { NodeId } from '../app/output/fable_modules/Fuaran.UI.0.70.0/Types.fs.js';
 // @ts-expect-error untyped Fable output
-export { toCssVariables } from '../app/output/fable_modules/Fuaran.UI.Renderer.Core.0.46.0/Theme.fs.js';
+export { toCssVariables } from '../app/output/fable_modules/Fuaran.UI.Renderer.Core.0.70.0/Theme.fs.js';

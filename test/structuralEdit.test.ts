@@ -485,8 +485,17 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
 // `{"$type":"Static"}` in a typed scalar `src` slot — which is the same failure
 // `Image` already carries for the same slot name. So this is one gap widening
 // its subject, not a new one.
+// `Embed` joined on the next pin raise, and it is an ARRIVAL for the same reason
+// `Media` was: the kind did not exist at the version this set was last pinned
+// against, so the palette lost nothing. It fails at the very address the two
+// paragraphs above describe — `WRONG_TYPE` at `$.kind.src.value`, the valueless
+// `{"$type":"Static"}` in a typed scalar `src` slot — which is now the THIRD
+// subject of one gap (`Image`, `Media`, `Embed`), not a third gap. `Tree` arrived
+// in the same raise and is deliberately absent from this set: its synthesised
+// default decodes, so it is offered.
 const UNDECODABLE_SYNTHESIS = new Set([
   'Disclosure',
+  'Embed',
   'Image',
   'LabelValueRow',
   'Link',

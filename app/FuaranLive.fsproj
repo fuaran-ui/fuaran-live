@@ -154,37 +154,36 @@
          reference-CSS contract), the Ops apply engine + canonical JSON codec, the
          op-record/hash-chain slice, and the structural tree diff.
 
-         HELD AT 0.46.0 DELIBERATELY, and the ceiling is set by the bounded program
-         loop below rather than by anything in this repo. 0.70.0 is published and
-         every id resolves at it, but the loop's published package interprets
+         AT 0.70.0. The family was held at 0.46.0 for one release cycle by a
+         ceiling this repo did not set: the bounded program loop below interpreted
          `Action.WriteToClipboard` by handing its payload straight to the client
-         effect of the same name — and the tier widened the action's payload to a
+         effect of the same name, and the tier had widened that payload to a
          `TextSource` while the effect kept its plain string, so the two stopped
-         fitting. The loop is a separate producer whose only published version
-         predates that, so no pin here repairs it; resolving the skew from this
-         side would mean dropping run mode, which is a worse trade than a lag.
-         0.46.0 is the newest published version below the widening. Moves when the
-         loop publishes against the current tier. -->
-    <PackageReference Include="Fuaran.UI" Version="0.46.0" />
-    <PackageReference Include="Fuaran.UI.Renderer" Version="0.46.0" />
-    <PackageReference Include="Fuaran.UI.Ops" Version="0.46.0" />
-    <PackageReference Include="Fuaran.UI.OpStream.Abstractions" Version="0.46.0" />
-    <PackageReference Include="Fuaran.UI.OpStream.Replay" Version="0.46.0" />
+         fitting — and the loop is a separate producer whose only published
+         version at the time predated the widening. THAT CEILING IS LIFTED: the
+         loop's 0.2.0 resolves the payload at dispatch and is built against this
+         tier, which it declares as its own floor. Nothing caps this family now;
+         it moves with the tier's published head. -->
+    <PackageReference Include="Fuaran.UI" Version="0.70.0" />
+    <PackageReference Include="Fuaran.UI.Renderer" Version="0.70.0" />
+    <PackageReference Include="Fuaran.UI.Ops" Version="0.70.0" />
+    <PackageReference Include="Fuaran.UI.OpStream.Abstractions" Version="0.70.0" />
+    <PackageReference Include="Fuaran.UI.OpStream.Replay" Version="0.70.0" />
     <!-- Pinned EXPLICITLY even though nothing here opens it: the bounded program
          loop below declares it only as a LOWER bound, so without this line NuGet
          picks that floor and Fable extracts a tier-version-skewed copy of its
          sources into the same compile as the family above — which fails on the
          first member either side widened. It is a Fuaran.UI.* package and moves
          with the family. -->
-    <PackageReference Include="Fuaran.UI.ServerDriven" Version="0.46.0" />
+    <PackageReference Include="Fuaran.UI.ServerDriven" Version="0.70.0" />
     <!-- The bounded program loop: the client placement that runs a wire-decoded
          program tree interactively in the browser — no hand-authored update
          function, no message type, no server. A DIFFERENT producer on its own
-         version line: its published 0.1.0 declares Fuaran.UI.* 0.35.0 as a LOWER
-         bound, which the family above satisfies, so the consumption stays
-         NU1603-clean. It is ALSO what caps that family — see the ceiling recorded
-         beside it. Apache-2.0, published on the public tier. -->
-    <PackageReference Include="Fuaran.Program.Runtime" Version="0.1.0" />
+         version line: its 0.2.0 declares Fuaran.UI.* 0.70.0 as a LOWER bound,
+         which the family above satisfies exactly, so the consumption stays
+         NU1603-clean. It USED to cap that family; 0.2.0 is built against this
+         tier and no longer does. Apache-2.0, published on the public tier. -->
+    <PackageReference Include="Fuaran.Program.Runtime" Version="0.2.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -202,17 +201,17 @@
          FSharp.Core-only + Fable-clean (source-packed under fable/), so Fable
          retranspiles the Core skeleton source in-browser. Versions matched to
          fuaran-dotnet/Directory.Packages.props. -->
-    <PackageReference Include="Fuaran.Core.Tree" Version="0.11.0" />
-    <PackageReference Include="Fuaran.Core.Ops" Version="0.11.0" />
+    <PackageReference Include="Fuaran.Core.Tree" Version="0.18.0" />
+    <PackageReference Include="Fuaran.Core.Ops" Version="0.18.0" />
     <!-- The Pattern Bank fast path runs the real Fuaran.Core signature-search
          engine (FunctionRegistry.findBySignature – the same engine powering the
          public Fuaran.UI.FastPath package). Fable-source-packed. -->
-    <PackageReference Include="Fuaran.Core.Function" Version="0.11.0" />
+    <PackageReference Include="Fuaran.Core.Function" Version="0.18.0" />
     <!-- The linked OpRecord/StreamEntry/HashChain slice (Phase 466 panel
          provenance) delegates to the Fuaran.Core op-stream skeleton, exactly as
          the real Fuaran.UI.OpStream.Abstractions.fsproj does; same linked-not-
          referenced rationale as the Core.Tree/Ops pair above. -->
-    <PackageReference Include="Fuaran.Core.OpStream" Version="0.11.0" />
+    <PackageReference Include="Fuaran.Core.OpStream" Version="0.18.0" />
   </ItemGroup>
 
 </Project>

@@ -41,6 +41,39 @@ import { projectByName } from '../app/output/Projection.js';
 const metricNode =
   '{"id":"metric-1","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"label":"Revenue","tone":"Brand","value":{"$type":"Static","value":1234.5}}}';
 
+/** One entry's `(title, feature)` tag.
+ *
+ * `Gallery.fs` documents `exampleTags` as "a JS array of two-element arrays"
+ * and builds each one as `[| e.Title; e.Feature |]`, so the pair has a fixed
+ * arity the jagged `string[]` reading throws away. Stating the tuple is what
+ * makes a known index readable under `noUncheckedIndexedAccess` — a tighter
+ * type than the one it replaces, not a looser one.
+ */
+type GalleryTag = readonly [title: string, feature: string];
+
+interface GalleryEntry {
+  readonly title: string;
+  readonly feature: string;
+  readonly wire: string;
+}
+
+/** The gallery's two cross-boundary projections, paired.
+ *
+ * The tag list and the wire list are two projections of one `examples` list,
+ * so a mismatch means one of them stopped tracking it — checked here, once,
+ * rather than by reading an index off either array unchecked at each use.
+ */
+function galleryEntries(): GalleryEntry[] {
+  const tags: GalleryTag[] = exampleTags();
+  const wires: string[] = exampleWires();
+  expect(wires.length, 'exampleWires and exampleTags disagree on entry count').toBe(tags.length);
+  return tags.map(([title, feature], i) => {
+    const wire = wires[i];
+    if (wire === undefined) throw new Error(`no wire for gallery entry "${title}"`);
+    return { title, feature, wire };
+  });
+}
+
 describe('permalink share/restore', () => {
   it('round-trips a tree through the URL fragment byte-identically', () => {
     expect(roundTrips(metricNode)).toBe(true);
@@ -62,57 +95,51 @@ describe('the gallery', () => {
   });
 
   it('covers the language vocabulary — one entry per feature area, several areas', () => {
-    const tags: string[][] = exampleTags();
-    const features = new Set(tags.map(([, feature]) => feature));
+    const features = new Set(galleryEntries().map((entry) => entry.feature));
     // The library's whole claim is breadth: a handful of demos is not a tour of
     // the language. Ten areas is the floor, not the target.
     expect(features.size).toBeGreaterThanOrEqual(10);
   });
 
   it('tags every entry with a feature area, and gives every entry a distinct title', () => {
-    const tags: string[][] = exampleTags();
+    const entries = galleryEntries();
     const titles = new Set<string>();
-    for (const [title, feature] of tags) {
+    for (const { title, feature } of entries) {
       expect(title.trim()).not.toBe('');
       expect(feature.trim()).not.toBe('');
       expect(titles.has(title), `duplicate gallery title: ${title}`).toBe(false);
       titles.add(title);
     }
-    expect(titles.size).toBe(tags.length);
+    expect(titles.size).toBe(entries.length);
   });
 
   it('emits wire the real strict decoder accepts, already in canonical form', () => {
-    const tags: string[][] = exampleTags();
-    const wires: string[] = exampleWires();
-    // The tag list and the wire list are two projections of one `examples` list,
-    // so a mismatch means one of them stopped tracking it.
-    expect(wires.length).toBe(tags.length);
-
-    wires.forEach((wire, i) => {
-      const title = tags[i][0];
+    for (const { title, wire } of galleryEntries()) {
       const decoded = decodeNode(wire);
-      expect(
-        decoded.ok,
-        `gallery entry "${title}" failed strict decode: ${JSON.stringify(decoded)}`,
-      ).toBe(true);
+      // `ok` is the discriminant of the decoder's result union, so narrowing on
+      // it is what makes `.value` readable at all — the repo's standing shape
+      // for this assertion (see `test/emitterLocks.test.ts`).
+      if (!decoded.ok) {
+        throw new Error(
+          `gallery entry "${title}" failed strict decode: ${JSON.stringify(decoded)}`,
+        );
+      }
       // decode -> re-encode is the identity: the entry is not merely decodable,
       // it is already the canonical form of itself.
       expect(encodeNode(decoded.value), `gallery entry "${title}" is not canonical`).toBe(wire);
-    });
+    }
   });
 
   it('projects every entry into every language the Output box offers', () => {
     const targets = ['json', 'typescript', 'python', 'fsharp', 'csharp', 'vb'];
-    const tags: string[][] = exampleTags();
 
-    exampleWires().forEach((wire: string, i: number) => {
-      const title = tags[i][0];
+    for (const { title, wire } of galleryEntries()) {
       for (const target of targets) {
         const source: string = projectByName(target, wire);
         expect(source.length, `gallery entry "${title}" projected empty ${target}`).toBeGreaterThan(
           0,
         );
       }
-    });
+    }
   });
 });

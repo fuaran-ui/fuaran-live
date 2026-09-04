@@ -1,0 +1,22 @@
+WEBVTT
+
+NOTE
+Chapter marks. The boundaries are the tone changes in briefing.wav, so a reader
+can hear that the marks are where the track says they are — they are generated
+from the same table (scripts/make-briefing-track.mjs), not typed twice.
+
+what-changed
+00:00:00.000 --> 00:00:06.000
+What changed
+
+where-it-lands
+00:00:06.000 --> 00:00:12.000
+Where it lands
+
+what-to-check
+00:00:12.000 --> 00:00:18.000
+What to check
+
+close
+00:00:18.000 --> 00:00:24.000
+Close

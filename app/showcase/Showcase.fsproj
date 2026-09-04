@@ -78,6 +78,10 @@
     </Compile>
     <Compile Include="Pillars.fs" />
     <Compile Include="Replay.fs" />
+    <!-- The shared shell the platform-baseline exhibit pages (Phase 1129) are
+         built out of: the page frame, the wire drawer, and the two render
+         seams. Compiled ahead of every page that uses it. -->
+    <Compile Include="Exhibit.fs" />
     <Compile Include="GoSessions.fs" />
     <Compile Include="Conformance.fs" />
     <Compile Include="Rosetta.fs" />
@@ -111,6 +115,19 @@
     <Compile Include="LocaleLens.fs" />
     <Compile Include="AgentReadable.fs" />
     <Compile Include="Navigator.fs" />
+    <!-- The platform-baseline exhibit pages (Phase 1129) — one capability of
+         the promotion-readiness wave each, in a real composition. -->
+    <Compile Include="Briefing.fs" />
+    <Compile Include="Embedded.fs" />
+    <Compile Include="Situation.fs" />
+    <Compile Include="Intake.fs" />
+    <Compile Include="Bidi.fs" />
+    <Compile Include="Invoice.fs" />
+    <Compile Include="Roster.fs" />
+    <Compile Include="Catalog.fs" />
+    <Compile Include="Outline.fs" />
+    <Compile Include="Handover.fs" />
+    <Compile Include="Attach.fs" />
     <Compile Include="Receiver.fs" />
     <Compile Include="Pages.fs" />
     <Compile Include="App.fs" />

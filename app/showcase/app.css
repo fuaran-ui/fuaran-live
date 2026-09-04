@@ -8069,3 +8069,590 @@ polygon.gi-dag-pending {
   line-height: 1.55;
   max-width: 72ch;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The platform-baseline exhibits (Phase 1129)
+
+   Eleven pages share one frame (`.px-*`, from Exhibit.fs) and then each owns a
+   short prefix of its own. Everything below is expressed in the brand tokens,
+   so both themes come for free and neither is hard-coded.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── the shared frame ── */
+.px-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+.px-title {
+  margin: 0;
+  font-family: var(--ds-font-serif);
+  font-size: clamp(1.7rem, 3.4vw, 2.4rem);
+  font-weight: 500;
+  line-height: 1.15;
+  color: var(--fuaran-color-text, #1a2026);
+}
+.px-lede {
+  margin: -0.7rem 0 0;
+  max-width: 62ch;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.px-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.px-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.1rem 1.2rem 1.25rem;
+  border: var(--ds-border);
+  border-radius: var(--ds-radius-lg, 0.75rem);
+  background: var(--fuaran-color-elevated, #fcfaf4);
+}
+.px-panel-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  color: var(--fuaran-color-text, #1a2026);
+}
+.px-panel-note {
+  margin: 0;
+  max-width: 74ch;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.px-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.25rem;
+}
+.px-points {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.px-points li {
+  margin-bottom: 0.5rem;
+  max-width: 78ch;
+}
+.px-prose {
+  margin: 0 0 0.6rem;
+  max-width: 78ch;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+
+/* the wire drawer — a <details>, so it works with scripting off */
+.px-wire {
+  font-size: 0.82rem;
+}
+.px-wire-toggle {
+  cursor: pointer;
+  color: var(--fuaran-color-accent, #1e4754);
+  font-weight: 560;
+}
+.px-wire-json {
+  margin: 0.45rem 0 0;
+  max-height: var(--ds-code-max-height, 30rem);
+  overflow: auto;
+  font-family: var(--ds-font-mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: var(--ds-radius-sm, 0.35rem);
+  padding: 0.55rem 0.65rem;
+  background: var(--fuaran-color-code-surface, #eae3d3);
+  color: var(--fuaran-color-code-text, #1a2026);
+}
+
+/* the honesty section — a claim and a limit must not look alike */
+.px-honesty {
+  padding-top: 0.4rem;
+  border-top: var(--ds-border);
+  font-size: 0.86rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.px-honesty h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  color: var(--fuaran-color-text, #1a2026);
+}
+.px-honesty ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.px-claim {
+  display: grid;
+  grid-template-columns: 5.6rem 1fr;
+  gap: 0.7rem;
+  margin-bottom: 0.55rem;
+  line-height: 1.55;
+  max-width: 82ch;
+}
+.px-claim-tag {
+  font-family: var(--ds-font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 0.15rem;
+}
+.px-claim-verified .px-claim-tag {
+  color: var(--fuaran-color-success, #2e7d5b);
+}
+.px-claim-limit .px-claim-tag {
+  color: var(--fuaran-color-critical, #b8442f);
+}
+
+/* ── Embedded (1111) ── */
+.eb-frames {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem;
+}
+.eb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.eb-card-head {
+  font-family: var(--ds-font-mono);
+  font-size: 0.72rem;
+  color: var(--fuaran-color-accent, #1e4754);
+}
+.eb-card-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.eb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.eb-table th {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: var(--ds-border);
+  color: var(--fuaran-color-text-muted, #55606b);
+  font-weight: 560;
+}
+.eb-table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: var(--ds-border);
+  vertical-align: top;
+}
+.eb-url code {
+  font-family: var(--ds-font-mono);
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+.eb-why {
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.eb-verdict {
+  font-family: var(--ds-font-mono);
+  font-size: 0.71rem;
+  word-break: break-all;
+}
+.eb-row-ok .eb-verdict {
+  color: var(--fuaran-color-success, #2e7d5b);
+}
+.eb-row-no .eb-verdict {
+  color: var(--fuaran-color-critical, #b8442f);
+}
+
+/* ── The Situation Room (1112) ── */
+.sr-readback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.6rem;
+}
+.sr-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.sr-stat-n {
+  font-family: var(--ds-font-mono);
+  font-size: 1.5rem;
+  color: var(--fuaran-color-accent, #1e4754);
+}
+.sr-stat-l {
+  font-size: 0.78rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+
+/* ── The Intake Form (1113 / 1121 / 1130) ── */
+.ik-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 1.4rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .ik-split {
+    grid-template-columns: 1fr;
+  }
+}
+.ik-side h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+.ik-readback {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--ds-radius-md, 0.5rem);
+  background: var(--fuaran-color-panel, #eae3d3);
+}
+.ik-row {
+  display: grid;
+  grid-template-columns: 6.2rem 1fr;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+}
+.ik-row-k {
+  font-family: var(--ds-font-mono);
+  font-size: 0.71rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+  padding-top: 0.08rem;
+}
+.ik-row-v {
+  word-break: break-word;
+}
+.ik-row-colour {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ik-swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 0.2rem;
+  border: var(--ds-border);
+}
+.ik-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+
+/* ── Right to Left (1114 / 1472) ── */
+.bd-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1.2rem;
+}
+.bd-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.bd-col-tag {
+  align-self: flex-start;
+  font-family: var(--ds-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.25rem;
+}
+.bd-col-no {
+  color: var(--fuaran-color-critical, #b8442f);
+  border: 1px solid currentColor;
+}
+.bd-col-yes {
+  color: var(--fuaran-color-success, #2e7d5b);
+  border: 1px solid currentColor;
+}
+.bd-col-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+
+/* ── The Invoice (1124 / 1473) ── */
+.inv-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.inv-sheet {
+  padding: 1rem 1.1rem;
+  border: var(--ds-border);
+  border-radius: var(--ds-radius-md, 0.5rem);
+  background: var(--fuaran-color-surface, #efe9dc);
+}
+.inv-decls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+.inv-decl {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.inv-decl-t {
+  font-family: var(--ds-font-mono);
+  font-size: 0.78rem;
+  color: var(--fuaran-color-accent, #1e4754);
+}
+.inv-decl-w {
+  font-size: 0.72rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.inv-decl-b {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+
+/* The chrome around the exhibit is not part of the invoice. The renderer ships
+   the break rules themselves; this only keeps the site's own furniture off the
+   paper, so the four declarations are what a reader actually sees working. */
+@media print {
+  body:has(.px-invoice) .ds-nav,
+  body:has(.px-invoice) .ds-topbar,
+  body:has(.px-invoice) .ds-footer,
+  .px-invoice .px-lede,
+  .px-invoice .px-honesty,
+  .px-invoice .px-panel-note,
+  .px-invoice .px-wire,
+  .px-invoice .inv-actions,
+  .px-invoice .inv-decls {
+    display: none !important;
+  }
+  .px-invoice .px-panel,
+  .px-invoice .inv-sheet {
+    border: none;
+    padding: 0;
+    background: none;
+  }
+}
+
+/* ── The Roster Board (1123 / 1125) ── */
+.rs-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.6rem;
+  margin-bottom: 0.3rem;
+}
+.rs-count {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.rs-count-n {
+  font-family: var(--ds-font-mono);
+  font-size: 1.4rem;
+  color: var(--fuaran-color-accent, #1e4754);
+}
+.rs-count-l {
+  font-size: 0.76rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.rs-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1.2rem;
+  align-items: start;
+}
+.rs-pane {
+  min-width: 0;
+}
+.rs-pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.86rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.rs-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+
+/* ── The Catalogue (1122) ── */
+.ct-stage {
+  min-height: 13rem;
+}
+.ct-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: var(--ds-border);
+  font-size: 0.78rem;
+}
+.ct-bar-l {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--ds-font-mono);
+  font-size: 0.72rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.ct-bar-c {
+  font-family: var(--ds-font-mono);
+  font-size: 0.72rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.ct-chip {
+  font-family: var(--ds-font-mono);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.25rem;
+  border: 1px solid currentColor;
+}
+.ct-chip-run {
+  color: var(--fuaran-color-success, #2e7d5b);
+}
+.ct-chip-pause {
+  color: var(--fuaran-color-accent, #1e4754);
+}
+.ct-chip-stop {
+  color: var(--fuaran-color-critical, #b8442f);
+}
+.ct-chip-inert {
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.ct-explain {
+  margin: 0.5rem 0 0;
+  max-width: 74ch;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+
+/* ── The Outline (1120) ── */
+.ol-tree {
+  max-width: 34rem;
+}
+.ol-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.8rem;
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: var(--ds-border);
+}
+.ol-bar-k {
+  font-family: var(--ds-font-mono);
+  font-size: 0.7rem;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.ol-bar-v {
+  font-family: var(--ds-font-mono);
+  font-size: 0.74rem;
+  color: var(--fuaran-color-accent, #1e4754);
+}
+.ol-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+
+/* ── The Handover (1126) ── */
+.hv-copies {
+  margin-top: 0.6rem;
+}
+.hv-live {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.7rem;
+  align-items: baseline;
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--ds-radius-md, 0.5rem);
+  background: var(--fuaran-color-panel, #eae3d3);
+  font-size: 0.79rem;
+}
+.hv-live-k {
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.hv-live-v {
+  font-family: var(--ds-font-mono);
+  font-size: 0.74rem;
+  word-break: break-word;
+}
+
+/* ── The Attachment (1115 / 1116 / 1117) ── */
+.at-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1.1rem;
+}
+.at-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.at-card-head {
+  font-family: var(--ds-font-mono);
+  font-size: 0.72rem;
+  color: var(--fuaran-color-accent, #1e4754);
+}
+.at-card-note {
+  margin: 0;
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.at-picked {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: var(--ds-border);
+}
+.at-picked h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.88rem;
+}
+.at-picked-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--fuaran-color-text-muted, #55606b);
+}
+.at-picked-list {
+  margin: 0;
+  font-family: var(--ds-font-mono);
+  font-size: 0.74rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: var(--ds-radius-sm, 0.35rem);
+  padding: 0.5rem 0.6rem;
+  background: var(--fuaran-color-panel, #eae3d3);
+}
+.at-picked-note {
+  margin: 0.6rem 0 0;
+  max-width: 78ch;
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #55606b);
+}

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Embedded guest</title>
+    <!--
+      The guest document the Embed exhibit frames (Phase 1129).
+
+      It is deliberately a THIRD-PARTY-SHAPED document rather than part of the
+      app: it is plain HTML with its own inline script and its own form, served
+      as a static file, and the showcase bundle imports nothing from it. What it
+      does is REPORT ON ITSELF — whether its script ran, whether it can read its
+      own origin, whether its form can submit — so a reader can see the sandbox
+      biting rather than read a caption claiming it did.
+
+      It lives on this origin because the showcase's Content-Security-Policy is
+      `default-src 'self'` with no frame-src relaxation, so a genuine third-party
+      frame is refused by the browser before the sandbox is ever consulted. That
+      is the site's zero-egress posture and it is not weakened for a demo.
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0;
+        padding: 14px 16px;
+        font:
+          13px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        background: Canvas;
+        color: CanvasText;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 10px;
+        margin: 0 0 10px;
+      }
+      dt {
+        opacity: 0.68;
+      }
+      dd {
+        margin: 0;
+        font-weight: 600;
+      }
+      .yes {
+        color: #1a7f4b;
+      }
+      .no {
+        color: #a3341f;
+      }
+      form {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      input,
+      button {
+        font: inherit;
+        padding: 3px 8px;
+      }
+      p.note {
+        margin: 10px 0 0;
+        opacity: 0.68;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>A guest document, reporting on itself</h1>
+    <dl>
+      <dt>Script ran</dt>
+      <dd id="script-ran" class="no">no &mdash; this text is the static fallback</dd>
+      <dt>Own origin readable</dt>
+      <dd id="origin" class="no">not checked (no script)</dd>
+    </dl>
+    <form method="get" action="./guest.html">
+      <label for="q">Form submit</label>
+      <input id="q" name="q" value="try me" size="10" />
+      <button type="submit">Submit</button>
+    </form>
+    <p class="note" id="form-note">
+      A submit navigates this frame. Under a sandbox with no form relaxation the browser blocks it.
+    </p>
+    <script>
+      // Whatever this writes is proof the script leg of the sandbox is open. If
+      // scripts are not relaxed, none of it runs and the static text above stands.
+      var ran = document.getElementById('script-ran');
+      ran.textContent = 'yes';
+      ran.className = 'yes';
+      var origin = document.getElementById('origin');
+      try {
+        // Under an opaque origin this throws or reads "null": the document has
+        // been given an origin of its own that matches nothing.
+        var o = String(window.location.origin);
+        var opaque = o === 'null' || o === '';
+        origin.textContent = opaque ? 'no — opaque origin' : o;
+        origin.className = opaque ? 'no' : 'yes';
+      } catch (e) {
+        origin.textContent = 'no — blocked (' + (e && e.name ? e.name : 'error') + ')';
+        origin.className = 'no';
+      }
+    </script>
+  </body>
+</html>

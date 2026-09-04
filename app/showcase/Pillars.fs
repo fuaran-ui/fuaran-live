@@ -309,6 +309,95 @@ let demos: Demo list =
         "One instant – a single epoch number on the wire – rendered in New York, Cairo, Tokyo and Bangkok at once: different words, orders, digits, even different years. The data never changes; the renderer owns the locale."
       Route = "locale-lens"
       ReplayId = None
+      Live = true }
+    // ── The platform-baseline exhibits (Phase 1129) ─────────────────────────
+    { Id = "briefing"
+      Title = "The Briefing"
+      Pillar = Pillar.Intent
+      Wow =
+        "Play it or read it — it is one node either way. Captions, subtitles, chapter marks and the full transcript all ride the same media element, so the words are on the wire whether or not anyone presses play."
+      Route = "briefing"
+      ReplayId = None
+      Live = true }
+    { Id = "invoice"
+      Title = "The Invoice"
+      Pillar = Pillar.Value
+      Wow =
+        "A document that says which of its own parts are indivisible — and nothing at all about paper. Press print and four declarations take effect that were invisible a moment before."
+      Route = "invoice"
+      ReplayId = None
+      Live = true }
+    { Id = "roster"
+      Title = "The Roster Board"
+      Pillar = Pillar.Value
+      Wow =
+        "Two grids exchange rows because they name the same channel; a third, identical and adjacent, cannot — because adjacency is layout and the permission is a name. And the rows are yours to take away."
+      Route = "roster"
+      ReplayId = None
+      Live = true }
+    { Id = "catalog"
+      Title = "The Catalogue"
+      Pillar = Pillar.Intent
+      Wow =
+        "A carousel from one number on the wire. Swipe, arrow keys, pause on hover and a one-way stop the moment you take control — none of which the document says, and all of which it gets."
+      Route = "catalog"
+      ReplayId = None
+      Live = true }
+    { Id = "outline"
+      Title = "The Outline"
+      Pillar = Pillar.Machine
+      Wow =
+        "A hierarchy that is ONE tab stop and six keys — beside the disclosure composition it is not, so you can feel the difference that made it a kind rather than read about it."
+      Route = "outline"
+      ReplayId = None
+      Live = true }
+    { Id = "handover"
+      Title = "The Handover"
+      Pillar = Pillar.Intent
+      Wow =
+        "Edit a field, press copy, and get what you are LOOKING at — because the payload is a binding that resolves when you press it. Beside it, the literal that hands you yesterday's value."
+      Route = "handover"
+      ReplayId = None
+      Live = true }
+    { Id = "attach"
+      Title = "The Attachment"
+      Pillar = Pillar.Intent
+      Wow =
+        "One file control four ways — drop, paste, camera, microphone — each an independent declaration, all off by default. Plus one that names a destination this host cannot serve, and refuses rather than pretends."
+      Route = "attach"
+      ReplayId = None
+      Live = true }
+    { Id = "situation-room"
+      Title = "The Situation Room"
+      Pillar = Pillar.Machine
+      Wow =
+        "Eleven payment numbers, eleven definitions two teams have argued about, none of which fits in a label — so each one carries its own hint, on the node, on the wire, and in the accessibility tree."
+      Route = "situation-room"
+      ReplayId = None
+      Live = true }
+    { Id = "intake"
+      Title = "The Intake Form"
+      Pillar = Pillar.Intent
+      Wow =
+        "A closed list you can type into, an open one you can add to, several values in one control, a bounded rating and a colour — the ordinary form a model reaches for, which until this release it had to fake four times over."
+      Route = "intake"
+      ReplayId = None
+      Live = true }
+    { Id = "bidi"
+      Title = "Right to Left"
+      Pillar = Pillar.Intent
+      Wow =
+        "An Arabic invoice with an English reference on it. The bidirectional algorithm gets almost all of it right unaided — and exactly one thing wrong, every time, which one slot on one node fixes."
+      Route = "bidi"
+      ReplayId = None
+      Live = true }
+    { Id = "embedded"
+      Title = "Embedded"
+      Pillar = Pillar.Machine
+      Wow =
+        "One guest document framed three times with three different relaxations, reporting on itself — watch the sandbox bite. An embed that asks for nothing gets nothing: the wire-cheapest document is the safest one."
+      Route = "embedded"
+      ReplayId = None
       Live = true } ]
 
 let demosInPillar (p: Pillar) : Demo list =

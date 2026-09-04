@@ -348,6 +348,18 @@ let renderRoute (route: Route) (replay: Replay.ReplayState) : ReactElement =
   | DemoPage d when d.Id = "locale-lens" -> LocaleLens.page
   | DemoPage d when d.Id = "go-sessions" -> GoSessions.page
   | DemoPage d when d.Id = "navigator" -> Navigator.page
+  // The platform-baseline exhibits (Phase 1129).
+  | DemoPage d when d.Id = "briefing" -> Briefing.page
+  | DemoPage d when d.Id = "embedded" -> Embedded.page
+  | DemoPage d when d.Id = "situation-room" -> Situation.page
+  | DemoPage d when d.Id = "intake" -> Intake.page
+  | DemoPage d when d.Id = "bidi" -> Bidi.page
+  | DemoPage d when d.Id = "invoice" -> Invoice.page
+  | DemoPage d when d.Id = "roster" -> Roster.page
+  | DemoPage d when d.Id = "catalog" -> Catalog.page
+  | DemoPage d when d.Id = "outline" -> Outline.page
+  | DemoPage d when d.Id = "handover" -> Handover.page
+  | DemoPage d when d.Id = "attach" -> Attach.page
   | DemoPage d -> demoPage d replay
   | EvaluationPage -> Evaluation.page
   | ContactPage -> Contact.page

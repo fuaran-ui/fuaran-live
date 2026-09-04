@@ -57,6 +57,8 @@ let private accountsGrid: Node<unit> =
     "tm-accounts"
     { Layout = LayoutMode.Grid(3, None, Some 10)
       Role = BoxRole.Group
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children =
         [ metricCard "tm-acc-1" "Stark" "£6,750"
@@ -68,6 +70,8 @@ let private initialTree: Node<unit> =
     "tm-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children =
         [ Fuaran.heading

@@ -56,6 +56,8 @@ let private baseTree: Node<unit> =
     "cc-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 10)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children =
         [ Fuaran.heading

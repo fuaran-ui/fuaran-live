@@ -141,11 +141,11 @@
          (FunctionRegistry.findBySignature) – the same engine powering the shipped
          Fuaran.UI.FastPath package. A Fable-source-packed feed package (branch-
          independent); the page defines its own pattern set over it. -->
-    <PackageReference Include="Fuaran.Core.Function" Version="0.11.0" />
+    <PackageReference Include="Fuaran.Core.Function" Version="0.18.0" />
     <!-- The Versioning Envelope page runs the real Fuaran.Core.Wire.Versioning
          negotiation + tolerant-decode substrate (envelope encode/parse, negotiate,
          decodeTolerant/reencode, classify/bump). -->
-    <PackageReference Include="Fuaran.Core.Wire" Version="0.11.0" />
+    <PackageReference Include="Fuaran.Core.Wire" Version="0.18.0" />
   </ItemGroup>
 
   <ItemGroup>

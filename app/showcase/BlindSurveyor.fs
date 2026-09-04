@@ -45,6 +45,8 @@ let private appTree (patched: bool) : Node<unit> =
     "bs-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Regional revenue")
       Children =
         [ Fuaran.callout
@@ -57,6 +59,8 @@ let private appTree (patched: bool) : Node<unit> =
             "bs-grid"
             { Layout = LayoutMode.Grid(4, Some(if patched then fixedTemplate else brokenTemplate), Some 12)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ tile "bs-emea" "EMEA" "£5,900"

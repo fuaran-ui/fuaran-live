@@ -40,27 +40,27 @@ jobs:
           # Rationale + bump procedure in ci.yml. The corpus checkout stays unpinned
           # deliberately — it is the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          # Bumped off the v0.12.0 tag (Phase 761). Two things changed at once
-          # and only together do they explain the pin:
+          # The PLAYGROUND project no longer project-references this repo at
+          # all: it consumes the language tier as published nuget.org packages at
+          # its own pin. So this checkout serves the SHOWCASE project alone, and
+          # this ref decides which tier contracts that project compiles against —
+          # a pin in every sense the package pins are, spelled as a git ref.
           #
-          #   - The PLAYGROUND project no longer project-references this repo at
-          #     all: it consumes the language tier as published nuget.org
-          #     packages at one pinned version. So this checkout now serves the
-          #     SHOWCASE project alone.
-          #   - The showcase source has adopted tier contracts that POSTDATE
-          #     every released tag — `FormField.Rule` and `RenderContext`'s
-          #     egress policy among them — so v0.12.0 could not compile it, and
-          #     no tag can: the newest release predates the contracts the source
-          #     targets. Measured, not assumed: compiling the showcase against
-          #     the 0.35.0 packages fails on exactly those members.
+          # It was a bare commit SHA from Phase 761 until this bump, for a reason
+          # that has now expired: the showcase had adopted contracts postdating
+          # every released tag, so no tag could compile it, and the note here said
+          # to return to a tag once the tier cut a release carrying them. v0.70.0
+          # is that release. It carries those contracts and the print-break,
+          # node-tooltip and upload-sink members the showcase source now names.
           #
-          # This is the situation the history above already recorded once, and
-          # the remedy is the same one — a commit SHA, which is at least as
-          # deliberate as a tag and cannot be moved. Return to a tag when the
-          # tier cuts a release carrying those contracts.
+          # A tag is immutable, so this is no less deliberate than the SHA it
+          # replaces. Bumping it is a SOURCE-AFFECTING act rather than a
+          # housekeeping one: a tier release that widens a record breaks every
+          # full-literal construction of it in app/showcase/, which is what the
+          # move off the SHA cost here.
           #
           # To bump: raise the ref in all six workflows together (grep the ref).
-          ref: 9f9b3f220bdc46e50693528285ff5aa1cda519df
+          ref: v0.70.0
           path: fuaran-dotnet
       - uses: actions/checkout@v4
         with:

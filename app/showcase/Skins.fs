@@ -146,12 +146,16 @@ let private appTree: Node<unit> =
     "sk-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Acme Billing")
       Children =
         [ Fuaran.box
             "sk-metrics"
             { Layout = LayoutMode.Flex(Orientation.Horizontal, true, None)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ metric "sk-m-mrr" "MRR (£k)" 42.5 ToneVariant.Default

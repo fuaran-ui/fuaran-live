@@ -272,6 +272,7 @@ let private renderLive (node: Node<obj>) : ReactElement =
       // refuses the rest, so it stays out of a `grep permissiveEgress` sweep
       // for hosts that opted back out of the default.
       EgressPolicy = Sanitize.denyNonLocalEgress
+      UploadSink = None
       // No user-action record sink: this is a client-only page with no
       // durable destination, and the action log is privacy-classed, so an
       // unconfigured host must record nothing and pay nothing. `None`

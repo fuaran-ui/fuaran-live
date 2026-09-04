@@ -52,6 +52,8 @@ let private artefact: Node<unit> =
     "sm-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Weekly performance")
       Children =
         [ Fuaran.markdown "sm-intro" "Your Monday digest – the very same dashboard you can open live."
@@ -59,6 +61,8 @@ let private artefact: Node<unit> =
             "sm-kpis"
             { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 12)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ kpi "sm-rev" "Revenue" "£128k"
@@ -273,6 +277,7 @@ let private renderTree (n: Node<unit>) : ReactElement =
       // Reaching `permissiveEgress` here would be the opposite claim, made
       // only to fill the field.
       EgressPolicy = Sanitize.denyNonLocalEgress
+      UploadSink = None
       // No user-action record sink: this is a client-only page with no
       // durable destination, and the action log is privacy-classed, so an
       // unconfigured host must record nothing and pay nothing. `None`

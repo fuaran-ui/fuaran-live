@@ -66,6 +66,8 @@ let private tree: Node<unit> =
     "rw-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 16)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Team dashboard")
       Children =
         [ Fuaran.gridLayout

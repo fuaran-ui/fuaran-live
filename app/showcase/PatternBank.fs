@@ -169,6 +169,8 @@ module PatternBank =
       id
       { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 12)
         Role = role
+        KeepTogether = false
+        BreakBefore = false
         Heading = heading
         Children = children }
 
@@ -177,6 +179,8 @@ module PatternBank =
       id
       { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 12)
         Role = BoxRole.Group
+        KeepTogether = false
+        BreakBefore = false
         Heading = None
         Children = children }
 

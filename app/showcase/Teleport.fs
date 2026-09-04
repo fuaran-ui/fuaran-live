@@ -184,6 +184,8 @@ let private exemplarTree (w: Wizard) : Node<unit> =
               "tp-fields"
               { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
                 Role = BoxRole.Group
+                KeepTogether = false
+                BreakBefore = false
                 Heading = None
                 Children =
                   [ Fuaran.markdown "tp-f-name" (fieldLine "Name" w.Name)

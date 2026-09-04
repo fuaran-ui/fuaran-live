@@ -59,12 +59,16 @@ let private exemplar: Node<obj> =
     "at-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Team pulse")
       Children =
         [ Fuaran.box
             "at-strip"
             { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 12)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ metric "at-deploys" "Deploys this week" 27.0 ToneVariant.Brand

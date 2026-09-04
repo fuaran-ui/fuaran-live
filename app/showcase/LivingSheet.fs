@@ -192,6 +192,8 @@ let private dashboardNode (out: Table) : Node<unit> =
     "ls-dash"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 12)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Regional performance – computed live")
       Children =
         [ for i in 0 .. n - 1 do
@@ -214,6 +216,8 @@ let private dashboardNode (out: Table) : Node<unit> =
               (sprintf "ls-region-%d" i)
               { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 10)
                 Role = BoxRole.Group
+                KeepTogether = false
+                BreakBefore = false
                 Heading = Some(TextSource.Literal region)
                 Children = cards } ] }
 

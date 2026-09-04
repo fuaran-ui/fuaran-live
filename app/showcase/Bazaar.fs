@@ -66,6 +66,8 @@ let private row (id: string) (children: Node<unit> list) : Node<unit> =
     id
     { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 8)
       Role = BoxRole.Group
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children = children }
 
@@ -176,6 +178,8 @@ let private BazaarView () : ReactElement =
         "bazaar-workspace"
         { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
           Role = BoxRole.Dashboard
+          KeepTogether = false
+          BreakBefore = false
           Heading = Some(TextSource.Literal "My composition")
           Children = mounted |> List.map (fun m -> m.Stall.Tree(sprintf "g%d-" m.Instance)) }
 

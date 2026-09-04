@@ -87,6 +87,8 @@ let private baseTree: Node<unit> =
     "nv-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 12)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children =
         [ Fuaran.heading
@@ -101,6 +103,8 @@ let private baseTree: Node<unit> =
             "nv-kpis"
             { Layout = LayoutMode.Grid(3, None, Some 10)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ kpi "nv-kpi-coverage" "Coverage" 0.842 (CellFormat.Percent(Some 1)) ToneVariant.Success
@@ -116,6 +120,8 @@ let private baseTree: Node<unit> =
             "nv-detail"
             { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 10)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ detailCard "nv-card-tests" "Tests" "1,284 passing · 0 failing · 3 skipped."
@@ -124,6 +130,8 @@ let private baseTree: Node<unit> =
             "nv-facts"
             { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 10)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ Fuaran.fact "nv-fact-branch" "Branch" "release/4120"

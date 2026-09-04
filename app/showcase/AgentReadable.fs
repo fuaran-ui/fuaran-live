@@ -492,6 +492,7 @@ let private renderLive (node: Node<obj>) : ReactElement =
       // what it affords; declaring an egress it does not use would be the one
       // affordance claim on it that was not true.
       EgressPolicy = Sanitize.denyNonLocalEgress
+      UploadSink = None
       // Client-only page with no durable destination: an unconfigured host
       // records nothing and pays nothing, and `CurrentNodeId` is renderer-owned.
       ActionSink = None

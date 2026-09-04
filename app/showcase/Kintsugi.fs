@@ -67,6 +67,8 @@ let private gridNode (fault: Fault) : Node<unit> =
     "k-grid"
     { Layout = LayoutMode.Grid(3, template, Some 10)
       Role = BoxRole.Group
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children = cells }
 
@@ -97,6 +99,8 @@ let private appTree (fault: Fault) : Node<unit> =
     "k-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Orders")
       Children =
         [ Fuaran.callout

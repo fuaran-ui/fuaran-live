@@ -64,6 +64,8 @@ let private gridBox (id: string) (children: Node<unit> list) : Node<unit> =
     id
     { Layout = LayoutMode.Grid(3, None, Some 8)
       Role = BoxRole.Group
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children = children }
 
@@ -72,6 +74,8 @@ let private dash (id: string) (heading: string) (children: Node<unit> list) : No
     id
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal heading)
       Children = children }
 

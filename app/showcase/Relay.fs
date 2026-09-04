@@ -65,7 +65,8 @@ let private metricNode (nid: string) (label: string) (value: float) : Node<unit>
     Style = None
     Accessibility = None
     Motion = None
-    ExtraAttributes = None }
+    ExtraAttributes = None
+    Tooltip = None }
 
 // An empty root the genesis op replaces – so station 1 (Python authoring the
 // base app) is itself a real chain link, not an untracked starting state.
@@ -74,6 +75,8 @@ let private seedTree: Node<unit> =
     "rl-seed"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Group
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children = [] }
 
@@ -82,12 +85,16 @@ let private genesisTree: Node<unit> =
     "rl-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, Some 14)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Q3 revenue")
       Children =
         [ Fuaran.box
             "rl-strip"
             { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 12)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ metricNode "rl-signups" "Signups" 1280.0

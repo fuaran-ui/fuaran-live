@@ -89,19 +89,24 @@ let private metricNode (nid: string) (label: string) (value: float) : Node<unit>
     Style = None
     Accessibility = None
     Motion = None
-    ExtraAttributes = None }
+    ExtraAttributes = None
+    Tooltip = None }
 
 let private exemplarTree (h: Holes) : Node<unit> =
   Fuaran.box
     "rosetta-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Revenue snapshot")
       Children =
         [ Fuaran.box
             "rosetta-strip"
             { Layout = LayoutMode.Flex(Orientation.Horizontal, true, None)
               Role = BoxRole.Group
+              KeepTogether = false
+              BreakBefore = false
               Heading = None
               Children =
                 [ metricNode "rosetta-m-a" h.LabelA h.ValueA

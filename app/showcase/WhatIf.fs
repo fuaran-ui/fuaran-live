@@ -105,6 +105,8 @@ let private group (id: string) (heading: string) (children: Node<unit> list) : N
     id
     { Layout = LayoutMode.Flex(Orientation.Horizontal, true, Some 8)
       Role = BoxRole.Group
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal heading)
       Children = children }
 
@@ -115,6 +117,8 @@ let private planTree (prefix: string) (a: Assumptions) : Node<unit> =
     (prefix + "root")
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = None
       Children =
         [ group

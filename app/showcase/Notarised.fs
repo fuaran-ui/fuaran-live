@@ -55,6 +55,8 @@ let private initialTree: Node<unit> =
     "nd-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Q3 finance review")
       Children =
         [ Fuaran.callout

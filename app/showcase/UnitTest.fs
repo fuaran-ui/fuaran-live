@@ -77,6 +77,8 @@ let private gridNode (b: Breaks) : Node<unit> =
       "channel-grid"
       { Layout = LayoutMode.Grid(4, Some template, Some 10)
         Role = BoxRole.Group
+        KeepTogether = false
+        BreakBefore = false
         Heading = None
         Children = cells }
 
@@ -99,6 +101,8 @@ let private appTree (b: Breaks) : Node<unit> =
     "app-root"
     { Layout = LayoutMode.Flex(Orientation.Vertical, false, None)
       Role = BoxRole.Dashboard
+      KeepTogether = false
+      BreakBefore = false
       Heading = Some(TextSource.Literal "Channel performance")
       Children =
         [ (if b.NoKpi then

@@ -443,69 +443,75 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
 // The set the SYNTHESISER can shape but no decoder accepts, so `defaultNodeFor`
 // drops it and the palette never offers it. Pinned by name rather than skipped
 // silently, because the drop is the guard working and a NEW member is the guard
-// hiding something — see the second lock below for why the two are separated.
+// hiding something.
 //
-// Every member fails the same way, and the way was re-measured in 2026-09 because
-// the account below used to name the wrong half of it.
+// IT IS EMPTY, and that is a result rather than an omission. It held eleven
+// kinds until the `Fuaran.UI.*` pin reached 0.75.0, and all eleven left in one
+// move — with no edit to the walker at all, which is exactly what the diagnosis
+// below predicted.
 //
 // The walker emits a kind's REQUIRED fields and nothing else — required-ness is
 // the only signal the dialect gives it. In the schema's `Binding` `$def` the
-// `Static` arm's `value` is OPTIONAL (absence is structural: a binding carrying no
-// value omits the key rather than emitting a JSON null the wire model has no case
-// for). So the walk emits the valueless `{"$type":"Static"}` at every binding slot.
-// That form is legal — the corpus carries it in `controls-*` / `form-segmented` /
-// `multiselect-1` — but only in an auto-bound CONTROL slot, where absence IS the
-// binding ("no selection"). In a typed scalar slot it is WRONG_TYPE.
+// `Static` arm's `value` USED TO BE optional in every instantiation (absence is
+// structural: a binding carrying no value omits the key rather than emitting a
+// JSON null the wire model has no case for). So the walk emitted the valueless
+// `{"$type":"Static"}` at every binding slot. That form is legal — the corpus
+// carries it in `controls-*` / `form-segmented` / `multiselect-1` — but only in
+// an auto-bound CONTROL slot, where absence IS the binding ("no selection"). In
+// a typed scalar slot it is `WRONG_TYPE`, and every member of this set failed
+// there.
 //
-// The account this comment carried until then said the cause was that the `$def`
-// is type-ERASED (`"value": true` — any JSON). That was true of the schema this
-// repo resolves, because the pinned `Fuaran.UI.*` predates the language-tier change
-// that typed every slot's payload per element (`Binding_float` / `Binding_int` /
-// `Binding_str` / `Binding_bool` / the typed collections, each slot `$ref`ing its
-// own). It is no longer true of the EMITTER. Raising the pin therefore moves this
-// set by exactly nothing: the payload's TYPE was the half that got fixed, and the
-// half that bites here is the payload's PRESENCE.
+// An earlier account here blamed the payload's TYPE (`"value": true` — any
+// JSON). That was already fixed upstream; the half that bit was the payload's
+// PRESENCE, and no amount of care in this walker recovers a presence rule the
+// schema does not state. The tier closed it by SPLITTING rather than
+// tightening: `Binding_bool` / `_float` / `_int` / `_str` now require `value` in
+// their `Static` arm, while a new `Binding_str_choice` — which the four control
+// slots `$ref` instead — keeps it optional, so the three corpus families above
+// stay legal. Both halves are pinned tier-side, so this set and that pin fall
+// together rather than one of them going quiet.
 //
-// It remains an expressiveness gap in the schema, not a bug in this walker: no
-// amount of care here recovers a presence rule the schema does not state, and
-// guessing one from the property name is exactly the guess the synthesiser's
-// docstring refuses to make. Closing it is a language-tier change, and NOT the
-// one-liner it looks like — the schema points the control slots at the same
-// `#/$defs/Binding_str` as the scalar string slots, so simply requiring `value`
-// there would start refusing the three corpus families named above. It needs a
-// distinct option-payload instantiation for the control slots. The language tier
-// pins both halves of that (a schema-legal/decoder-refused list for the scalar
-// slots, a schema-legal/decoder-accepted one for the control slots), so this set
-// and that pin fall together rather than one of them going quiet.
+// What each of the eleven emits now, and why it decodes. Two mechanisms, one
+// cause:
 //
-// `Media` joined the set with the pin raise, and it is an ARRIVAL rather than a
-// loss: the kind did not exist at the version this set was last pinned against,
-// so the palette lost nothing. It fails at exactly the address the paragraph
-// above describes — `WRONG_TYPE` at `$.kind.src.value`, the valueless
-// `{"$type":"Static"}` in a typed scalar `src` slot — which is the same failure
-// `Image` already carries for the same slot name. So this is one gap widening
-// its subject, not a new one.
-// `Embed` joined on the next pin raise, and it is an ARRIVAL for the same reason
-// `Media` was: the kind did not exist at the version this set was last pinned
-// against, so the palette lost nothing. It fails at the very address the two
-// paragraphs above describe — `WRONG_TYPE` at `$.kind.src.value`, the valueless
-// `{"$type":"Static"}` in a typed scalar `src` slot — which is now the THIRD
-// subject of one gap (`Image`, `Media`, `Embed`), not a third gap. `Tree` arrived
-// in the same raise and is deliberately absent from this set: its synthesised
-// default decodes, so it is offered.
-const UNDECODABLE_SYNTHESIS = new Set([
-  'Disclosure',
-  'Embed',
-  'Image',
-  'LabelValueRow',
-  'Link',
-  'Media',
-  'Metric',
-  'Modal',
-  'Progress',
-  'Stepper',
-  'Toast',
-]);
+//   * `Binding_str` at `Embed.src`, `Image.src`, `Link.href`, `Media.src`;
+//     `Binding_bool` at `Disclosure.open`, `Modal.open`, `Toast.open`;
+//     `Binding_int` at `Stepper.activeStep`. The `Static` arm now names `value`
+//     in its `required` list over a plain typed payload, so the walker fills it
+//     — `{"$type":"Static","value":"Value"}`, `…,"value":false`, `…,"value":1`
+//     — and the decoder takes it.
+//
+//   * `Binding_float` at `LabelValueRow.value`, `Metric.value`,
+//     `Progress.fraction`. These emit `{"$type":"Query","name":"Name"}`, not a
+//     `Static` — and the same required-key edit is why. A float payload is
+//     encoded `anyOf [number, the non-finite sentinel enum]`, which this walker
+//     does not synthesise (it reads `allOf` and `oneOf` and stops there), so
+//     requiring `value` makes the whole `Static` branch unsynthesisable and the
+//     `oneOf` walk moves on to the next legal arm instead of emitting a shape
+//     the decoder refuses. A required key that is unfillable is worth more here
+//     than an optional one that is fillable wrongly.
+//
+// The three kinds this walker still cannot shape AT ALL are pinned separately
+// below: they never reached this set, because a kind that yields no wire at all
+// is filtered out before the drop is measured.
+const UNDECODABLE_SYNTHESIS = new Set<string>([]);
+
+// The kinds the walker cannot shape at all — `defaultWireFor` returns `''`, so
+// they are filtered out of the drop measurement above before it runs. Pinned
+// because the set above is now EMPTY, and an empty drop set on its own cannot
+// tell "the palette offers this kind" from "the walker stopped producing it":
+// both read as absent. With both sets pinned, a kind can only move between
+// offered / undecodable / unshapeable by a deliberate edit here.
+//
+// All three fail for ONE reason, and it is the `anyOf` named above: a float is
+// encoded `anyOf [number, the non-finite sentinel enum]`, and at a REQUIRED
+// position with no enclosing union there is no other branch to fall to.
+// `Drawing` reaches it through `ViewBox`'s four coordinates, `Map` through
+// `centreLatitude` / `centreLongitude`, `SplitPanel` through `weight`. Teaching
+// the walker `anyOf` would very likely empty this set too — it is a walker gap
+// rather than a schema one, which is the opposite of what emptied the set above,
+// and so is its own change with its own evidence.
+const UNSHAPEABLE_SYNTHESIS = new Set(['Drawing', 'Map', 'SplitPanel']);
 
 describe('the synthesised defaults are strictly decodable and normalisation-stable', () => {
   // The subject is what the palette OFFERS, not everything the walker can shape.
@@ -574,6 +580,32 @@ describe('the synthesised defaults are strictly decodable and normalisation-stab
         'UNDECODABLE_SYNTHESIS (the schema or the walker improved); if it ENTERED, ' +
         'the palette just lost a kind and the cause is upstream, not here',
     ).toEqual([...UNDECODABLE_SYNTHESIS].sort());
+  });
+
+  // The other half of that pin, and it only became load-bearing when the set
+  // above emptied: a kind yielding no wire at all is filtered OUT of the drop
+  // measurement, so once nothing is dropped, an empty result is equally
+  // consistent with "everything decodes" and with "the walker quietly stopped
+  // shaping half the vocabulary". This is the assertion that tells them apart.
+  it('the kinds the walker cannot shape at all are exactly the pinned set', () => {
+    const s = seeded();
+    const all = schemaKinds() as string[];
+    const unshapeable = all.filter((k) => (defaultWireFor(s, k) as string) === '').sort();
+
+    // Guard the guard: a vocabulary source that went empty would satisfy both
+    // this and the lock above while proving nothing about either.
+    expect(
+      all.length,
+      'the schema names no kinds — the vocabulary source is broken',
+    ).toBeGreaterThan(20);
+
+    expect(
+      unshapeable,
+      'a kind entered or left the unshapeable set — if it LEFT, delete it from ' +
+        'UNSHAPEABLE_SYNTHESIS (the walker or the schema grew a shape it can now ' +
+        'fill); if it ENTERED, the palette just lost a kind and the walk is ' +
+        'returning "" where it used to return wire',
+    ).toEqual([...UNSHAPEABLE_SYNTHESIS].sort());
   });
 });
 

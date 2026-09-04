@@ -477,11 +477,20 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
 // pins both halves of that (a schema-legal/decoder-refused list for the scalar
 // slots, a schema-legal/decoder-accepted one for the control slots), so this set
 // and that pin fall together rather than one of them going quiet.
+//
+// `Media` joined the set with the pin raise, and it is an ARRIVAL rather than a
+// loss: the kind did not exist at the version this set was last pinned against,
+// so the palette lost nothing. It fails at exactly the address the paragraph
+// above describes — `WRONG_TYPE` at `$.kind.src.value`, the valueless
+// `{"$type":"Static"}` in a typed scalar `src` slot — which is the same failure
+// `Image` already carries for the same slot name. So this is one gap widening
+// its subject, not a new one.
 const UNDECODABLE_SYNTHESIS = new Set([
   'Disclosure',
   'Image',
   'LabelValueRow',
   'Link',
+  'Media',
   'Metric',
   'Modal',
   'Progress',

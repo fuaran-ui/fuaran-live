@@ -98,7 +98,14 @@ describe('getKindSchema (the authoritative per-kind shape lookup)', () => {
     expect(result.required).toEqual(expect.arrayContaining(['label', 'source', 'value']));
     expect(result.required).not.toContain('onChange');
     // The referenced binding/text defs travel with it – a self-contained sub-schema.
-    expect(Object.keys(result.defs)).toEqual(expect.arrayContaining(['Binding', 'TextSource']));
+    // The tier types every binding slot's payload per element rather than emitting
+    // one erased `Binding`, so the defs Select drags in are its OWN slots' types:
+    // the option list it draws from and the string it writes back. Naming them
+    // rather than the erased spelling asks a stronger question than the version
+    // of this line that predated the parameterisation.
+    expect(Object.keys(result.defs)).toEqual(
+      expect.arrayContaining(['Binding_list_SelectOption', 'Binding_str', 'TextSource']),
+    );
   });
 
   it('with no argument lists every valid kind', () => {

@@ -86,12 +86,12 @@ const required = [
   // emits it under fable_modules/<PackageId>.<Version>/. Raising the Fuaran.UI.*
   // pin in app/FuaranLive.fsproj means raising the version here and in
   // test/tierOutput.ts — the only two places the path is spelled out.
-  'app/output/fable_modules/Fuaran.UI.Ops.0.46.0/Apply.fs.js',
-  'app/output/fable_modules/Fuaran.UI.Ops.0.46.0/JsonDecode.fs.js',
-  'app/output/fable_modules/Fuaran.UI.OpStream.Abstractions.0.46.0/CanonicalJson.fs.js',
+  'app/output/fable_modules/Fuaran.UI.Ops.0.70.0/Apply.fs.js',
+  'app/output/fable_modules/Fuaran.UI.Ops.0.70.0/JsonDecode.fs.js',
+  'app/output/fable_modules/Fuaran.UI.OpStream.Abstractions.0.70.0/CanonicalJson.fs.js',
   // The bounded program loop — run mode's engine. Its absence means the loop was
   // not reached by the compile, which a green Fable run would otherwise hide.
-  'app/output/fable_modules/Fuaran.Program.Runtime.0.1.0/Program.fs.js',
+  'app/output/fable_modules/Fuaran.Program.Runtime.0.2.0/Program.fs.js',
   'app/showcase/output/App.js',
   'app/showcase/output/Receiver.js',
 ];

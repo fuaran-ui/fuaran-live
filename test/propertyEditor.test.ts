@@ -108,7 +108,12 @@ describe('field derivation is schema-driven', () => {
     for (const id of ['h', 'm', 'b']) {
       const rows = fieldSummary(findNodeJson(s, id)) as string[];
       const style = rows.filter((r) => r.startsWith('Style|')).map((r) => r.split('|')[1]);
-      expect(style.sort()).toEqual(['emphasis', 'role', 'tone', 'voice', 'weight']);
+      // `direction` joined the block with the tier raise — the bidirectional
+      // isolation token. It is an ARRIVAL, not a loss: the derivation reads the
+      // SemanticStyle schema, so it picked the token up with no change in the
+      // module, and this list is the pin that made the arrival visible rather
+      // than silent. Both directions still trip it.
+      expect(style.sort()).toEqual(['direction', 'emphasis', 'role', 'tone', 'voice', 'weight']);
       // Every style token is a bounded enum, so every one is a select.
       expect(
         rows.filter((r) => r.startsWith('Style|')).every((r) => r.split('|')[2] === 'choice'),

@@ -342,7 +342,7 @@ describe('emitter lock - Pandas Dashboard host (app/showcase/pandas-host.ts)', (
   // remove-and-insert storm; this fails instead.
   it.skipIf(noPy)(pyTitle('node ids are stable across a re-run over changed data'), () => {
     const idsOf = (wire: string): string[] =>
-      [...wire.matchAll(/"id":"([^"]+)"/g)].map((m) => m[1]).sort();
+      [...wire.matchAll(/"id":"([^"]+)"/g)].map((m) => m[1] ?? '').sort();
     const first = runCell(cell(1280, 42.5, 'Revenue climbed after the promo.'));
     const second = runCell(cell(9310, 88.1, 'Revenue fell back in the second week.'));
     expect(first).not.toBe(second);

@@ -91,7 +91,7 @@ jobs:
         env:
           VITE_SHOWCASE_ORIGIN: https://fuaran-ui.gallery
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: fuaran-live/dist
 

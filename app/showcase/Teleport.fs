@@ -243,6 +243,71 @@ let private errorText (e: TeleportError) : string =
   | TeleportError.HistoryDecode(i, _) -> sprintf "History entry %d failed to decode." i
   | TeleportError.TreeInvalid _ -> "The decoded app has broken node identity."
 
+// ─── Decode → mount ─────────────────────────────────────────────────────────
+//  A bundle carries its own TREE, and the host mounts THAT tree. The state
+//  rides alongside it and resumes the wizard chrome, but the state is not
+//  what gets rendered: re-deriving this page's exemplar from the arriving
+//  state – which is all the receive path used to read – silently discards
+//  every app that is not this page's own signup wizard. A bundle built by any
+//  other conformant host then decoded, digest-verified, had its digest
+//  announced, and was replaced on screen by the very exemplar it arrived to
+//  displace.
+
+/// What a decoded bundle mounts. `Foreign` is true when the arriving tree is
+/// NOT this page's exemplar for the arriving state – a genuinely foreign app,
+/// which this page's wizard controls cannot drive and which is re-shared as
+/// the exact bytes it arrived as (re-encoding it here would hand onward a
+/// different app under a different digest from the one just announced).
+type Mount =
+  { Tree: Node<obj>
+    Digest: string
+    Foreign: bool }
+
+let private mountOf (d: DecodedTeleport) : Mount =
+  let ownTree = CanonicalJson.encodeNode (exemplarTree (wizardOfState d.State))
+
+  { Tree = d.Tree
+    Digest = d.Digest
+    Foreign = CanonicalJson.encodeNode d.Tree <> ownTree }
+
+/// The receive path, headless: decode a bundle exactly as this page's hosts
+/// do and report what it mounts. `test/teleportReceiver.test.ts` certifies
+/// the decision against real bundles – this page's own, and a foreign host's.
+let mountReport (encoded: string) : obj =
+  match Teleport.decode encoded with
+  | Ok d ->
+    let m = mountOf d
+
+    createObj
+      [ "ok" ==> true
+        "digest" ==> m.Digest
+        "foreign" ==> m.Foreign
+        "mountedTreeJson" ==> CanonicalJson.encodeNode m.Tree ]
+  | Error e -> createObj [ "ok" ==> false; "error" ==> errorText e ]
+
+/// A foreign app: a tree this page never authors, standing in for whatever a
+/// different conformant host encodes and sends here.
+let private foreignSample: Node<obj> =
+  Fuaran.card
+    "guest-app"
+    { Defaults.card with
+        Heading = Some(TextSource.Literal "Arrived from another host")
+        Children = [ Fuaran.markdown "guest-line" "This tree was built somewhere else." ] }
+
+/// Bundles for the receiver lock: this page's own exemplar app, and the
+/// foreign app above, both encoded by the one codec the wire format defines.
+let sampleBundles: obj =
+  let orEmpty (r: Result<string, TeleportError>) =
+    match r with
+    | Ok s -> s
+    | Error _ -> ""
+
+  createObj
+    [ "exemplar" ==> orEmpty (encodeWizard seed)
+      "exemplarTreeJson" ==> CanonicalJson.encodeNode (exemplarTree seed)
+      "foreign" ==> orEmpty (Teleport.encode (TeleportBundle.ofTree foreignSample))
+      "foreignTreeJson" ==> CanonicalJson.encodeNode foreignSample ]
+
 let private sizeText (bytes: int) : string =
   if bytes < 1024 then
     sprintf "%d bytes" bytes
@@ -258,7 +323,37 @@ let private ticketStub (s: string) : string =
 //  devices produces. The decoder recomputes the digest over the whole envelope
 //  on arrival, so the altered bundle must refuse to resume.
 
-let private tamperOneByte (encoded: string) : Result<string, string> =
+/// Flip one content character inside the envelope, keeping the JSON – and the
+/// tree inside it – structurally valid, so what the decoder refuses on is the
+/// DIGEST and not a parse error. The exemplar's own heading gives the vignette
+/// its readable copy; any other app (one that arrived from another host, which
+/// this page cannot know the content of) has the first character of its first
+/// node id flipped instead – equally one byte, equally valid, equally refused.
+let private tamperOneByte (encoded: string) : Result<string * string, string> =
+  let flipFirstId (envelope: string) : Result<string * string, string> =
+    let marker = "\"id\":\""
+    let i = envelope.IndexOf marker
+
+    if i < 0 then
+      Error "no node id to alter in the envelope"
+    else
+      let at = i + marker.Length
+      let c = envelope.[at]
+
+      let swapped =
+        if System.Char.IsUpper c then
+          System.Char.ToLower c
+        else
+          System.Char.ToUpper c
+
+      if swapped = c then
+        Error "the first node id starts with a character that cannot be flipped"
+      else
+        Ok(
+          sprintf "a node id's first letter: “%c” → “%c”" c swapped,
+          envelope.Substring(0, at) + string swapped + envelope.Substring(at + 1)
+        )
+
   if not (encoded.StartsWith Teleport.FormatPrefix) then
     Error "not a teleport bundle"
   else
@@ -269,14 +364,13 @@ let private tamperOneByte (encoded: string) : Result<string, string> =
     |> Result.bind Utf8.decode
     |> Result.bind (fun envelope ->
       if envelope.Contains "New account" then
-        let tampered = envelope.Replace("New account", "New acc0unt")
-
-        Ok(
-          Teleport.FormatPrefix
-          + Base64Url.encode (Deflate.compress (Utf8.encode tampered))
-        )
+        Ok("“account” → “acc0unt”", envelope.Replace("New account", "New acc0unt"))
       else
-        Error "expected content not found in the envelope")
+        flipFirstId envelope)
+    |> Result.map (fun (what, tampered) ->
+      what,
+      Teleport.FormatPrefix
+      + Base64Url.encode (Deflate.compress (Utf8.encode tampered)))
 
 let private tamperRefusal (e: TeleportError) : string =
   match e with
@@ -286,6 +380,29 @@ let private tamperRefusal (e: TeleportError) : string =
       (carried.Substring(0, 8))
       (recomputed.Substring(0, 8))
   | other -> errorText other
+
+/// The tamper vignette, headless: stage the one-byte flip and report what the
+/// decoder did with the result. Locked by `test/teleportReceiver.test.ts` over
+/// BOTH staging paths – the exemplar's readable heading swap and the node-id
+/// flip any other host's app takes – because a vignette that cannot stage, or
+/// that trips a parse error instead of the digest check, quietly stops making
+/// the claim it is on the page to make.
+let tamperReport (encoded: string) : obj =
+  match tamperOneByte encoded with
+  | Ok(what, bad) ->
+    match Teleport.decode bad with
+    | Ok _ -> createObj [ "staged" ==> true; "what" ==> what; "refused" ==> false ]
+    | Error e ->
+      createObj
+        [ "staged" ==> true
+          "what" ==> what
+          "refused" ==> true
+          "digestMismatch"
+          ==> (match e with
+               | TeleportError.DigestMismatch _ -> true
+               | _ -> false)
+          "refusal" ==> tamperRefusal e ]
+  | Error why -> createObj [ "staged" ==> false; "why" ==> why ]
 
 // ─── Live pass + arrival state ──────────────────────────────────────────────
 
@@ -310,6 +427,10 @@ type private Arrival =
 [<ReactComponent>]
 let private TeleportView (bare: bool) : ReactElement =
   let wizard, setWizard = React.useState seed
+  // What a landed bundle mounted, with the exact bytes it landed as. `None`
+  // means this page's own live wizard owns the screen (the vacant receiver
+  // shows nothing at all until the first arrival).
+  let arrived, setArrived = React.useState (None: (Mount * string) option)
   let pass, setPass = React.useState (None: Result<Pass, string> option)
   let arrival, setArrival = React.useState Arrival.None
   let arrivalKey, setArrivalKey = React.useState 0
@@ -335,6 +456,9 @@ let private TeleportView (bare: bool) : ReactElement =
     match Teleport.decode encoded with
     | Ok d ->
       setWizard (wizardOfState d.State)
+      // Mount the tree that ARRIVED – see `mountOf`. The state resumes the
+      // wizard chrome beside it; it is not what gets rendered.
+      setArrived (Some(mountOf d, encoded))
       setArrival (Arrival.Received(d.Digest, encoded.Length))
       setArrivedLive true
       // Deterministic encode: the resumed state re-encodes to exactly
@@ -411,8 +535,12 @@ let private TeleportView (bare: bool) : ReactElement =
         Browser.Dom.window.setTimeout (
           (fun () ->
             if arrivedLive then
-              match encodeWizard wizard with
-              | Ok enc ->
+              match arrived with
+              // A bundle is mounted: the pass IS the bytes that landed, and
+              // the URL already carries them. Re-encoding here would hand
+              // onward a DIFFERENT app under a different digest from the one
+              // the arrival banner just announced.
+              | Some(m, enc) ->
                 let url = receiverUrlOf enc
 
                 setPass (
@@ -421,35 +549,60 @@ let private TeleportView (bare: bool) : ReactElement =
                       { Encoded = enc
                         Url = url
                         Qr = qrDataUrl url 4
-                        TreeJson = CanonicalJson.encodeNode (exemplarTree wizard) }
+                        TreeJson = CanonicalJson.encodeNode m.Tree }
                   )
                 )
+              | None ->
+                match encodeWizard wizard with
+                | Ok enc ->
+                  let url = receiverUrlOf enc
 
-                let h = if bare then receiverHash enc else teleportHash enc
+                  setPass (
+                    Some(
+                      Ok
+                        { Encoded = enc
+                          Url = url
+                          Qr = qrDataUrl url 4
+                          TreeJson = CanonicalJson.encodeNode (exemplarTree wizard) }
+                    )
+                  )
 
-                if h <> lastWrittenHash.current then
-                  lastWrittenHash.current <- h
-                  replaceUrl h
-              | Error e -> setPass (Some(Error(errorText e)))),
+                  let h = if bare then receiverHash enc else teleportHash enc
+
+                  if h <> lastWrittenHash.current then
+                    lastWrittenHash.current <- h
+                    replaceUrl h
+                | Error e -> setPass (Some(Error(errorText e)))),
           350
         )
 
       { new System.IDisposable with
           member _.Dispose() = Browser.Dom.window.clearTimeout id }),
-    [| box wizard; box arrivedLive |]
+    [| box wizard; box arrivedLive; box arrived |]
   )
 
+  // Editing the wizard hands the screen back to THIS page's app: the mounted
+  // arrival is released, so the live pass resumes re-encoding what the
+  // visitor is now driving rather than re-sharing bytes they have left behind.
   let update (w: Wizard) : unit =
     setWizard w
+    setArrived None
     setCopied None
     setTamper None
 
+  // Save what is on screen: the bytes a mounted arrival came in as, or – with
+  // nothing mounted – a fresh encode of the wizard the visitor is driving.
   let saveForLater () : unit =
-    match encodeWizard wizard with
-    | Ok enc ->
+    match arrived with
+    | Some(_, enc) ->
       lsSet savedKey enc
       setSavedExists true
-    | Error _ -> ()
+    | None ->
+      match encodeWizard wizard with
+      | Ok enc ->
+        lsSet savedKey enc
+        setSavedExists true
+      | Error _ -> ()
 
   let resumeSaved () : unit =
     let s = lsGet savedKey
@@ -485,13 +638,13 @@ let private TeleportView (bare: bool) : ReactElement =
       match pass with
       | Some(Ok p) ->
         match tamperOneByte p.Encoded with
-        | Ok bad ->
+        | Ok(what, bad) ->
           let refusal =
             match Teleport.decode bad with
             | Ok _ -> "the decoder accepted it – this should never happen"
             | Error e -> tamperRefusal e
 
-          setTamper (Some("flipped one byte inside the sealed envelope (“account” → “acc0unt”)", refusal))
+          setTamper (Some("flipped one byte inside the sealed envelope (" + what + ")", refusal))
         | Error e -> setTamper (Some("couldn't stage the tamper", e))
       | _ -> ()
 
@@ -577,6 +730,43 @@ let private TeleportView (bare: bool) : ReactElement =
                     { wizard with
                         Step = clampStep (wizard.Step + 1) }) ] ] ]
 
+  // What is on screen: the tree that arrived, or – with nothing mounted – the
+  // exemplar this page's own wizard drives.
+  let mountedRender =
+    match arrived with
+    | Some(m, _) -> Render.renderWithSources BindingResolver.empty ignore m.Tree
+    | None -> Render.renderWithSources BindingResolver.empty ignore (exemplarTree wizard)
+
+  let foreignMount =
+    match arrived with
+    | Some(m, _) -> m.Foreign
+    | None -> false
+
+  // A foreign app is not this page's wizard, and the signup controls cannot
+  // drive it – saying so is cheaper than letting a visitor discover it by
+  // typing into fields that silently replace the app they just received.
+  let controlPane =
+    if foreignMount then
+      Html.div
+        [ prop.className "tp-wizard tp-wizard-foreign"
+          prop.children
+            [ Html.h3 [ prop.className "tp-pane-title"; prop.text "Not this page's app" ]
+              Html.p
+                [ prop.className "tp-foreign-note"
+                  prop.text
+                    "The app beside this arrived from somewhere else, so this page's signup controls do not drive it. It renders exactly as its own host encoded it, and the pass below hands on those same bytes under the same digest." ]
+              Html.button
+                [ prop.className "tp-nav-btn"
+                  prop.text "Start this page's demo instead"
+                  prop.onClick (fun _ -> update seed) ] ] ]
+    else
+      Html.div
+        [ prop.className "tp-wizard"
+          prop.children
+            [ Html.h3 [ prop.className "tp-pane-title"; prop.text stepTitles.[clampStep wizard.Step] ]
+              stepBody
+              stepNav ] ]
+
   // Keyed by the arrival counter so a received bundle remounts the pane and
   // the materialize animation replays over the newly-resumed state.
   let livePane =
@@ -584,19 +774,19 @@ let private TeleportView (bare: bool) : ReactElement =
       [ prop.key ("tp-arrival-" + string arrivalKey)
         prop.className "tp-live tp-materialize"
         prop.children
-          [ Html.div
-              [ prop.className "tp-wizard"
-                prop.children
-                  [ Html.h3 [ prop.className "tp-pane-title"; prop.text stepTitles.[clampStep wizard.Step] ]
-                    stepBody
-                    stepNav ] ]
+          [ controlPane
             Html.div
               [ prop.className "tp-value"
                 prop.children
-                  [ Html.h3 [ prop.className "tp-pane-title"; prop.text "Your app, as a value" ]
-                    Html.div
-                      [ prop.className "tp-render"
-                        prop.children [ Render.renderWithSources BindingResolver.empty ignore (exemplarTree wizard) ] ] ] ] ] ]
+                  [ Html.h3
+                      [ prop.className "tp-pane-title"
+                        prop.text (
+                          if foreignMount then
+                            "The app that arrived"
+                          else
+                            "Your app, as a value"
+                        ) ]
+                    Html.div [ prop.className "tp-render"; prop.children [ mountedRender ] ] ] ] ] ]
 
   // ── The live boarding pass ──────────────────────────────────────────────
 
@@ -652,10 +842,23 @@ let private TeleportView (bare: bool) : ReactElement =
                            prop.children
                              [ Html.div
                                  [ prop.className "tp-size"
-                                   prop.text ("Your app is " + sizeText p.Encoded.Length) ]
+                                   prop.text (
+                                     (if foreignMount then "This app is " else "Your app is ")
+                                     + sizeText p.Encoded.Length
+                                   ) ]
                                Html.div
                                  [ prop.className "tp-pass-caption"
-                                   prop.text "re-encoded as you type – this QR is the app itself, not a link to it" ]
+                                   // With an arrival mounted the pass is NOT
+                                   // being re-encoded – it is the bytes that
+                                   // landed, handed on unchanged. Saying
+                                   // otherwise would claim the one thing the
+                                   // page must not: that these are new bytes.
+                                   prop.text (
+                                     if foreignMount then
+                                       "the exact bytes that landed here – pass them on and the digest travels unchanged"
+                                     else
+                                       "re-encoded as you type – this QR is the app itself, not a link to it"
+                                   ) ]
                                Html.code [ prop.className "tp-pass-stub"; prop.text (ticketStub p.Encoded) ]
                                Html.span
                                  [ prop.className (

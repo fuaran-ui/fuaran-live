@@ -723,6 +723,15 @@ body {
   font-size: 1rem;
 }
 
+/* A foreign app is mounted: this page's signup controls cannot drive it, so
+   the control pane says so instead of offering fields that would replace it. */
+.tp-foreign-note {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+
 .tp-field {
   display: flex;
   flex-direction: column;

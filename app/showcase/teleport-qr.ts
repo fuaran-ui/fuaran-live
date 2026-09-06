@@ -1,8 +1,13 @@
 // QR interop for the Teleport page.
 //
 // The teleported app is a self-contained string (the Fuaran teleport bundle
-// rides a URL query param); this renders that URL as a scannable QR code so a
-// phone camera can carry the whole app across. `qrcode-generator` is a tiny,
+// rides the URL FRAGMENT, never the query string — the fragment is the half a
+// browser does not send to the server, which is what makes "nothing was
+// uploaded" checkable rather than promised); this renders that URL as a
+// scannable QR code so a phone camera can carry the whole app across. The URL
+// points at the SHOWCASE origin's bare receiver (/receiver.html): the receiver
+// ships in the showcase artifact only, so that is where bundles land — see
+// `receiverOrigin` below. `qrcode-generator` is a tiny,
 // zero-dependency, pure-JS encoder – no network, no canvas, bundled by Vite,
 // so it works under the site's locked-down CSP (the data-URL it emits is an
 // `img-src data:` GIF, already allowed).

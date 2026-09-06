@@ -20,6 +20,11 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege, stated rather than inherited. This workflow reads the tree and
+# writes nothing back — no package publish, no deployment, no PR comment.
+permissions:
+  contents: read
+
 jobs:
   parity:
     runs-on: ubuntu-latest

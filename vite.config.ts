@@ -73,7 +73,17 @@ const CORPUS_SINK_CONNECT_SRC = corpusSinkConnectSrc(process.env.VITE_CORPUS_SIN
 //    ignored (with a console warning), so it lives in
 //    public/staticwebapp.config.json's globalHeaders instead, where it is
 //    actually enforced.
-const prodCsp = (scriptHashes: string) =>
+// Trusted Types: the F# renderer (Fuaran.UI.Renderer 0.77.0+) mints every raw-HTML
+// DOM sink through a named policy, `fuaran-renderer`, whose only creator applies the
+// renderer's own sanitiser. Requiring Trusted Types here has the browser refuse any
+// string that reaches a sink another way. The ts-host parity page is excepted until
+// the TypeScript renderer release that carries the same policy is pinned.
+const trustedTypesDirectives = [
+  `require-trusted-types-for 'script'`,
+  `trusted-types fuaran-renderer`,
+];
+
+const prodCsp = (scriptHashes: string, trustedTypes = true) =>
   [
     `default-src 'self'`,
     `connect-src 'self' ${PROVIDER_ORIGINS_CSP}${CORPUS_SINK_CONNECT_SRC}`,
@@ -85,6 +95,7 @@ const prodCsp = (scriptHashes: string) =>
     `base-uri 'none'`,
     `object-src 'none'`,
     `form-action 'none'`,
+    ...(trustedTypes ? trustedTypesDirectives : []),
   ].join('; ');
 
 // The showcase entries (showcase.html + receiver.html) are the zero-key-egress
@@ -180,9 +191,13 @@ function cspPlugin(): Plugin {
       handler(html, ctx) {
         const isShowcase =
           ctx.filename.endsWith('showcase.html') || ctx.filename.endsWith('receiver.html');
+        const isTsHost = ctx.filename.endsWith('ts-host.html');
+        const hashes = inlineScriptHashes(html);
         const policy = ctx.server
           ? devCsp
-          : (isShowcase ? showcaseCsp : prodCsp)(inlineScriptHashes(html));
+          : isShowcase
+            ? showcaseCsp(hashes)
+            : prodCsp(hashes, !isTsHost);
         const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}" />`;
         return html.replace('<!--CSP-INJECTION-POINT-->', meta);
       },

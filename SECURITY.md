@@ -122,7 +122,9 @@ font-src 'self' data:;
 frame-src 'self';
 base-uri 'none';
 object-src 'none';
-form-action 'none'
+form-action 'none';
+require-trusted-types-for 'script';
+trusted-types fuaran-renderer
 ```
 
 The load-bearing line is the **`connect-src`** allow-list, which names only the
@@ -143,6 +145,15 @@ widening the policy. `object-src 'none'` / `base-uri 'none'` / `form-action
 required because the renderer sets inline `style` attributes and injects theme
 custom-properties inline; no inline _scripts_ are permitted. `font-src` allows
 `data:` because the build inlines the smallest font subsets as data URIs.
+
+The two Trusted Types directives make the renderer's declared sanitisation posture
+browser-enforced: `Fuaran.UI.Renderer` (0.77.0 and later) mints every raw-HTML DOM
+sink through the one policy named here, whose only creator applies the renderer's
+own sanitiser, so a string reaching a sink by any other route is refused by the
+browser rather than by review. The showcase pages carry their own policy without
+these directives (their scripted replay writes recorded HTML directly), and the
+TypeScript render-host parity page is excepted until the TypeScript renderer
+release carrying the same policy is pinned.
 
 The dev server uses a relaxed variant (HMR needs inline script + `eval` + a
 websocket); the **shipped `dist/index.html` always carries the strict policy

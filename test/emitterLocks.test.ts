@@ -33,7 +33,24 @@
 //    - Python (pandas): re-introducing a `{"$type":"Literal","text":...}` envelope
 //      for the Markdown text in public/pandas/dash-host.py `_lit` -> decode ok but
 //      the round-trip re-encodes to the bare string, so `=== wire` fails (lock red).
-//      Reverted.
+//      Reverted. (That file is GONE as of Phase 1166 - the page now authors through
+//      the published fuaran-py package, so there is no second encoder left to drift.
+//      The mutation is kept here because it is the clearest statement of the class
+//      the surviving locks still catch.)
+//    - Wheel digest (Phase 1166): appending one byte to the vendored
+//      public/pandas/fuaran_py-0.0.4-py3-none-any.whl -> the digest assertion is red.
+//      Worth recording because the OTHER legs stayed green: zipimport tolerates
+//      trailing bytes, so the corrupted wheel still imported and still emitted
+//      canonical wire. The digest lock is the only thing standing between the page
+//      and a wheel that is not the published one. Reverted.
+//    - Canonicality (Phase 1166): making PY_BOOTSTRAP return
+//      `json.dumps(json.loads(encode(app)), sort_keys=False)` -> decode ok, re-encode
+//      differs on key order and separators, `=== wire` fails (lock red). Reverted.
+//    - Id stability (Phase 1166): dropping `name="insight"` from the locked cell's
+//      markdown call -> the id derives from the recomputed prose instead, the two
+//      runs' id sets diverge, the stability lock is red. That is exactly the hazard
+//      quick.markdown's own docstring warns about, and the reason the page's
+//      DEFAULT_CELL passes a name. Reverted.
 //
 //  ---------------------------------------------------------------------------
 //  THE INVENTORY (every surface that could hand-author wire; the deliverable). Re-run
@@ -46,9 +63,19 @@
 //       (Also byte-pinned against the Fable reference in rosettaParity.test.ts.)
 //    2. public/rosetta/py-host.py      `rosetta_encode` - independent Python Node
 //       encoder. Headless here; its Pyodide page-run is the same builder.
-//    3. public/pandas/dash-host.py     `run_cell`       - the `fuaran` Python authoring
-//       surface (metric/markdown/grid=DataGrid/dashboard). Headless here via a
-//       pandas-free default cell.
+//    3. app/showcase/pandas-host.ts    `PY_BOOTSTRAP`   - the Pandas Dashboard cell
+//       runner. Since Phase 1166 the page authors through the PUBLISHED fuaran-py
+//       package (`fuaran_py.ui.quick`) rather than a hand-rolled shim, so this file
+//       hand-authors no wire of its own - but it is still where the emitter LIVES
+//       (the bootstrap that binds the cell's `fuaran` name and calls the package's
+//       `encode`, plus the DEFAULT_CELL the page ships), which is why it moved out
+//       of the exclusions below and into this list. Locked headlessly by exec'ing
+//       that bootstrap against the VENDORED WHEEL - a pure-Python wheel is
+//       importable straight off sys.path, so the lock runs the exact bytes the
+//       browser installs, with no pip, no venv and no network. Three claims:
+//       the round-trip is canonical; the vendored bytes are the published ones
+//       (sha256 vs PyPI's JSON API); and the ids are STABLE across a data change,
+//       which is the property the page's op ticker rests on.
 //
 //  LOCKED ELSEWHERE (a canonical emitter whose lock lives with its own suite):
 //    4. app/navigator/StructuralEdit.fs `synthesiseJs` - the navigator's insert
@@ -102,8 +129,8 @@
 //      loop, and promptPack.test.ts pins the pack-byte sourcing itself.
 //    - app/showcase/{degradation,infinite-skins-audit,kintsugi-senses,surveyor-measure,
 //      teleport-qr}.ts - DOM read-back / geometry / QR helpers; author no wire.
-//    - app/showcase/pandas-host.ts - the Pyodide loader glue that EXECUTES
-//      dash-host.py; it authors no wire itself (the Python surface does, locked above).
+//      (app/showcase/pandas-host.ts was excluded here as "loader glue" until Phase
+//      1166 moved the authoring surface into it; it is emitter 3 above now.)
 //    - app/showcase/AgentReadable.fs - authors NO wire: its page tree is built through
 //      the real `Fuaran.*` constructors, and the JSON it does emit is a different
 //      vocabulary entirely (the declared-affordance `data-fuaran-*` attributes), minted
@@ -125,6 +152,8 @@
 // =============================================================================
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -133,6 +162,13 @@ import { describe, expect, it } from 'vitest';
 import { decodeNode, encodeNode } from '@fuaran-ui/ops';
 
 import { encodeWireTs } from '../app/showcase/rosetta-hosts';
+import {
+  DEFAULT_CELL,
+  FUARAN_PY_VERSION,
+  FUARAN_PY_WHEEL,
+  FUARAN_PY_WHEEL_SHA256,
+  PY_BOOTSTRAP,
+} from '../app/showcase/pandas-host';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -219,26 +255,97 @@ describe('emitter lock - Rosetta Python host (public/rosetta/py-host.py)', () =>
   );
 });
 
-// ─── 3. Pandas Dashboard - the `fuaran` Python authoring surface (headless) ──
-describe('emitter lock - Pandas Dashboard host (public/pandas/dash-host.py)', () => {
-  it.skipIf(noPy)(pyTitle('run_cell emits strictly-decodable, already-canonical wire'), () => {
-    // A pandas-free default cell that exercises every builder: metric_strip
-    // (value/source law + omit-when-default), markdown (bare-string Literal
-    // collapse), grid (a real DataGrid over an embedded columnar frame via a
-    // Transform source), and dashboard (bare-string heading).
-    const cell = [
-      'strip = fuaran.metric_strip([("Signups", 1280), ("Revenue", 42.5)])',
-      'insight = fuaran.markdown("Revenue climbed after the promo.")',
+// ─── 3. Pandas Dashboard - the published-package cell runner (headless) ──────
+//
+// Phase 1166. The page's Python is the published `fuaran-py` package plus two
+// things this repo authors: the bootstrap that binds the cell's `fuaran` name and
+// calls the package's `encode` (PY_BOOTSTRAP), and the cell the page opens with
+// (DEFAULT_CELL). Both are imported from the shipped module rather than restated
+// here, so the lock cannot drift from the page by copy.
+//
+// The install is deliberately NOT a pip install: the wheel committed under
+// public/pandas/ is pure Python, so putting it on `sys.path` imports it as a zip.
+// The lock therefore runs the exact bytes the browser installs, offline, with no
+// interpreter setup at all beyond CPython itself.
+describe('emitter lock - Pandas Dashboard host (app/showcase/pandas-host.ts)', () => {
+  const wheelPath = join(repoRoot, 'public/pandas', FUARAN_PY_WHEEL);
+
+  // A pandas-free cell exercising every builder the DEFAULT_CELL uses: metric_strip
+  // (value/source law + omit-when-default), markdown (bare-string Literal collapse),
+  // grid (a real DataGrid over an embedded columnar frame via a Transform source),
+  // and dashboard (bare-string heading). Pandas-free because pandas is not
+  // installable in a plain CPython, and a lock that skips on the machines that run
+  // it is not a lock; `pd` is bound only when pandas imports, which is exactly what
+  // makes the same bootstrap runnable here.
+  const cell = (north: number, south: number, insight: string): string =>
+    [
+      `strip = fuaran.metric_strip([("Signups", ${north}), ("Revenue", ${south})])`,
+      `insight = fuaran.markdown(${JSON.stringify(insight)}, name="insight")`,
       'grid = fuaran.grid([{"region": "North", "sales": 100}, {"region": "South", "sales": 205}])',
       'app = fuaran.dashboard("Sales snapshot", strip, insight, grid)',
     ].join('\n');
+
+  /** Exec PY_BOOTSTRAP against the vendored wheel and run `cellSource` through it. */
+  function runCell(cellSource: string): string {
     const driver = [
       'import sys',
+      'sys.path.insert(0, sys.argv[1])',
+      `bootstrap = ${JSON.stringify(PY_BOOTSTRAP)}`,
+      `cell = ${JSON.stringify(cellSource)}`,
       'ns = {}',
-      "exec(open(sys.argv[1], encoding='utf-8').read(), ns)",
-      `cell = ${JSON.stringify(cell)}`,
+      'exec(bootstrap, ns)',
       "sys.stdout.write(ns['run_cell'](cell))",
     ].join('\n');
-    assertCanonical(runPyHost('public/pandas/dash-host.py', driver));
+    const res = spawnSync(pythonBin as string, ['-c', driver, wheelPath], { encoding: 'utf8' });
+    if (res.status !== 0) {
+      throw new Error(`pandas-host cell run failed: ${res.stderr || res.stdout}`);
+    }
+    return res.stdout;
+  }
+
+  // Not skipped: reading a committed file needs no interpreter. This is the pin that
+  // makes "the published package" a checkable claim rather than a comment - a wheel
+  // built locally, or a version bumped in the filename and not the digest, fails here.
+  it('the vendored wheel is the exact artefact PyPI published', () => {
+    expect(FUARAN_PY_WHEEL).toBe(`fuaran_py-${FUARAN_PY_VERSION}-py3-none-any.whl`);
+    const bytes = readFileSync(wheelPath);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(FUARAN_PY_WHEEL_SHA256);
+  });
+
+  it.skipIf(noPy)(
+    pyTitle('the shipped default cell is valid Python for the interpreter the package targets'),
+    () => {
+      const driver = [
+        'import sys',
+        `cell = ${JSON.stringify(DEFAULT_CELL)}`,
+        "compile(cell, '<default-cell>', 'exec')",
+        "sys.stdout.write('ok')",
+      ].join('\n');
+      const res = spawnSync(pythonBin as string, ['-c', driver], { encoding: 'utf8' });
+      expect(res.stderr).toBe('');
+      expect(res.status).toBe(0);
+    },
+  );
+
+  it.skipIf(noPy)(
+    pyTitle('the cell runner emits strictly-decodable, already-canonical wire'),
+    () => {
+      assertCanonical(runCell(cell(1280, 42.5, 'Revenue climbed after the promo.')));
+    },
+  );
+
+  // Task 2 of the phase, as a property rather than a claim. quick's ids derive from
+  // kind + label + occurrence and NEVER from the data, so a re-run over changed
+  // numbers and changed prose must address the same nodes - which is what lets the
+  // page derive a short UpdateProp script and say "patched, not re-rendered". If a
+  // future release derived ids from content, the ticker would silently become a
+  // remove-and-insert storm; this fails instead.
+  it.skipIf(noPy)(pyTitle('node ids are stable across a re-run over changed data'), () => {
+    const idsOf = (wire: string): string[] =>
+      [...wire.matchAll(/"id":"([^"]+)"/g)].map((m) => m[1]).sort();
+    const first = runCell(cell(1280, 42.5, 'Revenue climbed after the promo.'));
+    const second = runCell(cell(9310, 88.1, 'Revenue fell back in the second week.'));
+    expect(first).not.toBe(second);
+    expect(idsOf(second)).toEqual(idsOf(first));
   });
 });

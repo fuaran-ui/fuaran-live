@@ -21,6 +21,7 @@
 *.pdb   binary
 *.nupkg binary
 *.snupkg binary
+*.whl   binary
 *.zip   binary
 *.tar   binary
 *.gz    binary

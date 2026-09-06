@@ -5,9 +5,11 @@ module Fuaran.Showcase.Pandas
 //  dashboard. Pillar: "one wire, many worlds".
 //
 //  A notebook cell runs real pandas over a bundled CSV IN THE BROWSER (Pyodide),
-//  then authors a Fuaran tree with a small ergonomic surface and emits canonical
-//  wire JSON. The F# host decodes that wire and renders the dashboard beside the
-//  cell – no server, no JavaScript written by the author.
+//  then authors a Fuaran tree with the PUBLISHED `fuaran-py` package's terse
+//  surface (`fuaran_py.ui.quick`, installed by micropip when the visitor first
+//  clicks Run) and emits canonical wire JSON through the package's own encoder.
+//  The F# host decodes that wire and renders the dashboard beside the cell – no
+//  server, no JavaScript written by the author.
 //
 //  The centrepiece is diff-not-rerun: on a re-run the page derives the real
 //  structural tree-diff between the previous tree and the new one
@@ -15,10 +17,13 @@ module Fuaran.Showcase.Pandas
 //  lineage) and shows the op ticker – the UI is PATCHED, not re-rendered. That is
 //  what separates this from a Streamlit server that re-runs the whole script.
 //
-//  Honest scope: pandas + the authoring + the decode + the tree-diff all run for
-//  real, client-side. Pyodide's cold start (~10 MB CPython + pandas) is lazy and
-//  behind the Run button; heavy workloads are slow in-browser – the honesty note
-//  points at the server-side fuaran-py path for those.
+//  Honest scope: pandas + the package + the authoring + the decode + the tree-diff
+//  all run for real, client-side. Pyodide's cold start (~10 MB CPython + pandas) is
+//  lazy and behind the Run button; heavy workloads are slow in-browser – the honesty
+//  note points at the same package running locally for those, which is a thing a
+//  visitor can do today (`pip install fuaran-py`). It used to promise a server-side
+//  path that nothing in the estate ships; Phase 1166 removed that claim rather than
+//  replacing it with another unshipped one.
 // ============================================================================
 
 open Fable.Core.JsInterop
@@ -38,14 +43,10 @@ let private runCellCb
   : unit =
   import "runCellCb" "./pandas-host.ts"
 
-let private defaultCell =
-  "df = pd.read_csv(\"sales.csv\")\n"
-  + "totals = df.groupby(\"region\")[\"revenue\"].sum().sort_values(ascending=False)\n"
-  + "\n"
-  + "app = fuaran.dashboard(\"Regional revenue\",\n"
-  + "    fuaran.metric_strip([(r, int(v)) for r, v in totals.items()]),\n"
-  + "    fuaran.markdown(f\"**{totals.index[0]}** leads on revenue.\"),\n"
-  + "    fuaran.grid(df.to_dict(\"records\")))"
+/// The cell the page opens with. It lives beside the bootstrap that runs it, in
+/// pandas-host.ts, so the emitter lock can exec exactly the source this page ships
+/// rather than a copy of it that could drift.
+let private defaultCell () : string = import "defaultCell" "./pandas-host.ts"
 
 // ─── op-ticker rendering ──────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ type private Phase =
 
 [<ReactComponent>]
 let private PandasView () : ReactElement =
-  let code, setCode = React.useState defaultCell
+  let code, setCode = React.useState (defaultCell ())
   let phase, setPhase = React.useState Phase.Idle
   let progress, setProgress = React.useState ""
   let tree, setTree = React.useState (None: Node<obj> option)
@@ -84,6 +85,12 @@ let private PandasView () : ReactElement =
   let wire, setWire = React.useState ""
   let err, setErr = React.useState ""
   let ranOnce, setRanOnce = React.useState false
+  // How many times the cell has produced a tree. An empty op script means two
+  // different things and the ticker must not conflate them: on run 1 there was no
+  // previous tree to diff against, and on any later run it means the re-run derived
+  // a BYTE-IDENTICAL tree – which is the id derivation's headline property, not a
+  // first render. (Reachable in one click: re-run the cell unedited.)
+  let runs, setRuns = React.useState 0
 
   let run () : unit =
     setPhase Phase.Running
@@ -115,6 +122,7 @@ let private PandasView () : ReactElement =
           setOps flat
           setTree (Some node)
           setWire w
+          setRuns (runs + 1)
           setRanOnce true
           setPhase Phase.Ready)
       (fun e ->
@@ -171,7 +179,8 @@ let private PandasView () : ReactElement =
                     | None ->
                       Html.div
                         [ prop.className "pn-empty"
-                          prop.text "Run the cell – the first click downloads CPython + pandas (~10 MB), then renders." ] ] ] ] ]
+                          prop.text
+                            "Run the cell – the first click downloads CPython + pandas (~10 MB) and installs fuaran-py, then renders." ] ] ] ] ]
 
   let ticker =
     if not ranOnce then
@@ -183,8 +192,10 @@ let private PandasView () : ReactElement =
             [ Html.div
                 [ prop.className "pn-ticker-head"
                   prop.text (
-                    if List.isEmpty ops then
+                    if List.isEmpty ops && runs <= 1 then
                       "Op ticker – first render (the whole tree was emitted)"
+                    elif List.isEmpty ops then
+                      "Op ticker – no ops: the re-run derived an identical tree, so there was nothing to patch"
                     else
                       sprintf "Op ticker – the UI was PATCHED with %d op(s), not re-rendered" (List.length ops)
                   ) ]
@@ -218,13 +229,13 @@ let private PandasView () : ReactElement =
               [ prop.children
                   [ Html.li
                       [ prop.text
-                          "Everything runs in your browser: real CPython and pandas via Pyodide compute over the bundled CSV, the ergonomic surface authors a Fuaran tree, and the F# host decodes the canonical wire and renders it. No server re-runs your script – Streamlit's model is exactly the thing this replaces." ]
+                          "Everything runs in your browser: real CPython and pandas via Pyodide compute over the bundled CSV, the published fuaran-py package — installed here with micropip, the same release you get from PyPI — authors a Fuaran tree, and the F# host decodes the canonical wire and renders it. No server re-runs your script; Streamlit's model is exactly the thing this replaces." ]
                     Html.li
                       [ prop.text
                           "Re-run with a change and the page derives the real structural tree-diff between the old tree and the new one, then shows the op ticker: the UI is patched with a handful of typed operations, not re-rendered. That is the difference between an artefact that is data and a script that re-executes." ]
                     Html.li
                       [ prop.text
-                          "Honest limits: Pyodide's cold start and heavy pandas workloads are slow in-browser, so this demo sizes its data to feel instant. For real workloads the same Python authoring runs server-side and streams ops to any host." ]
+                          "Honest limits: Pyodide's cold start and heavy pandas workloads are slow in-browser, so this demo sizes its data to feel instant. Neither limit is the language's — run pip install fuaran-py in your own environment and these same four lines author the same tree over as much data as your machine will hold." ]
                     Html.li
                       [ prop.children
                           [ Html.text

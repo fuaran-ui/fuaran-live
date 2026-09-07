@@ -37,7 +37,7 @@
   "dependencies": {
     "@fuaran-ui/ai-tools": "^0.12.0",
     "@fuaran-ui/charts": "^0.14.0",
-    "@fuaran-ui/ops": "^0.22.0",
+    "@fuaran-ui/ops": "^0.23.0",
     "@fuaran-ui/renderer": "^0.21.0",
     "@fuaran-ui/schema": "^0.20.0",
     "@fuaran-ui/ui": "^0.19.0",

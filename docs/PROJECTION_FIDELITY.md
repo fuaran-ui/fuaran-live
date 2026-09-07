@@ -67,7 +67,7 @@ the shared corpus it projects the wire JSON to Python source, **executes** the
 generated source against the real host (every fixture in ONE CPython process),
 re-encodes via `fuaran_py.ui.encode`, and asserts byte-identity with the fixture.
 Run it with `pnpm conformance`; the arm needs a CPython carrying `fuaran-py`
-(`python -m venv .venv` then `pip install fuaran-py==0.1.0`, or point
+(`python -m venv .venv` then `pip install fuaran-py==0.2.0`, or point
 `FUARAN_PY_PYTHON` at an interpreter that already has it). It **fails** rather
 than skips when the host is absent: an arm that goes green without its oracle is
 worse than no arm.
@@ -77,22 +77,25 @@ the TypeScript leg can always fall back to a typed in-memory object literal,
 Python has **no such escape hatch**: `encode` calls `.to_wire()` on the root, and
 the structural `fuaran_py.model.Obj` has no such method, so a construct the typed
 authoring model does not carry has no spelling at all. Measured against
-`fuaran-py` 0.0.1 (the newest published release, and checked against its
-development tree too), that is **55 of the 161 node fixtures**, in four families:
+`fuaran-py` 0.2.0 — the release the three workflows pin — the remaining set falls
+in three families:
 
 - **No typed node kind** — `Mount`, `Fact`, `Drawing`.
-- **No typed binding / action case** — the `Query`, `I18n` and `Invoke` bindings;
-  the `Call`, `AiTool` and `Invoke` actions.
-- **A hardcoded closure sentinel** — several records emit `onChange` /
-  `onToggle` / `onSelect` / `value` unconditionally, so the canonical minimal
-  control (`{"$type":"Text"}`) and the declarative field-named grid column are
-  unreachable: the slot is not optional in the record, and the encoder has
-  nothing to omit.
-- **A record narrower than the wire** — `Chart` reaches six slots fewer;
-  `TransformBinding` carries neither `params` nor a `Live` source; `DataGrid`
-  carries none of the declarative sort / page / edit-state slots; `Link` has no
-  `protection`, `Table` no `sortable` / `defaultSort`, `Media` no `tracks` /
-  `transcript`.
+- **No typed binding / action case** — the `Query`, `Expr` and `Invoke` bindings,
+  `TextSource.I18n`, and the `Call`, `AiTool` and `Invoke` actions.
+- **A record narrower than the wire** — `TransformBinding.source` is a bare
+  `DataSource` rather than the wire's `TransformSource`, so a `State`- or
+  `Live`-bound source has no spelling.
+
+The **hardcoded closure sentinel** family, which held every canonical minimal
+control, is EMPTY as of 0.2.0: that release made every handler an omittable flag
+and every control's `value` optional, and the projector reads both off the wire.
+It is kept named here because the shape recurs and its remedy is not the others'.
+
+The set's size is deliberately not quoted here. It is computed by arm and printed
+by the census test in `python.test.ts`, which is the only place it cannot go stale
+— a count in prose is a claim nobody re-runs, and three of this file's earlier
+counts had outlived their cause by the time anyone checked.
 
 None of that is projector lag and none of it is fixable in this repo. Every entry
 is listed in the arm's `PY_UNMODELLED` map **with the construct it needs as a

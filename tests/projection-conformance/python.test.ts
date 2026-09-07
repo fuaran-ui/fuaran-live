@@ -56,7 +56,7 @@ const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip
 /**
  * The interpreter to run the executor with. A repo-local `.venv` wins (the
  * documented local setup: `python -m venv .venv` then
- * `pip install fuaran-py==0.1.0`); FUARAN_PY_PYTHON overrides it for CI, where
+ * `pip install fuaran-py==0.2.0`); FUARAN_PY_PYTHON overrides it for CI, where
  * the interpreter is whatever actions/setup-python provisioned.
  */
 const resolvePython = (): string => {
@@ -84,9 +84,11 @@ const resolvePython = (): string => {
 // binding the typed model omits has NO spelling at all.
 //
 // Originally dated 2026-09-02 against fuaran-py 0.0.1 (PyPI); RE-MEASURED
-// 2026-09-07 against 0.0.6, and again the same day against **0.1.0**, the
-// version CI now pins — see the re-measurement notes below the family list,
-// which are where the record of what moved lives.
+// 2026-09-07 against 0.0.6, then 0.1.0, and finally against **0.2.0**, the
+// version the three workflows now pin — see the re-measurement notes below the
+// family list, which are where the record of what moved lives. Each pass is kept
+// with its own version rather than rewritten forward: what a release DID is the
+// reusable part, and a narrative edited to match the present tense loses it.
 //
 // Every entry below was measured, not assumed: the projector emits the shape the
 // typed model WOULD take, and the executor's failure — an `AttributeError` naming
@@ -286,12 +288,79 @@ const resolvePython = (): string => {
 // a text probe and says so; both its directions FAIL rather than pass, so it can
 // misdirect a message but never hold an entry it should have dropped.
 //
-// `arm` says which repository owns the cause, and `both` is not a hedge — it is
+// `arm` says which repository owns the cause, and `both` is not a hedge: it was
 // the three grid ids whose `Binding.Query` source is host lag AND whose
-// `exportable` / `keepRowsTogether` / `repeatHeader` are slots 0.1.0 models and
-// this projector does not emit. The counts by arm are `QUARANTINE_CENSUS`,
-// asserted against the map's own tally below, so no prose in this file states a
-// number the map can contradict.
+// `exportable` / `keepRowsTogether` / `repeatHeader` were slots the host modelled
+// and this projector did not emit. Phase 1581 emitted them, so `both` is EMPTY
+// and those three are plain host lag — the arm is kept because the SHAPE recurs
+// on every release that closes one half of a two-cause entry, and because an
+// entry naming only the half that happens to be someone else's is how the
+// projector's own lag went unrecorded for three passes. The counts by arm are
+// `QUARANTINE_CENSUS`, asserted against the map's own tally below, so no prose in
+// this file states a number the map can contradict.
+// ── FIFTH PASS, 2026-09-07 — RE-MEASURED AGAINST fuaran-py **0.2.0** ────────
+//
+// 0.2.0 is on PyPI and the pin was raised to it in all three workflows. It is
+// the release carrying Phases 1576 (handlers and values optional, plus
+// `t.RangeField`), 1577 (the DataGrid / Chart / tooltip / Link / Table field
+// widening) and 1585 (`Chart.stacked` omit-at-default) — so it is the largest
+// single move this quarantine has ever been measured across, and the shape of
+// the result is the fourth pass's thesis confirmed at scale.
+//
+// THIRTY-EIGHT ENTRIES WERE REMOVED, and **not one of them cleared on the pin
+// raise alone**. Every single one needed the projector taught the construct the
+// release had grown — the chart's eight new slots, the grid's declarative sort /
+// page / edit trio and its five transfer-export-print flags, the per-column
+// `sortable` / `editable`, the static table's `sortable` / `defaultSort`,
+// `Link.protection`, `UiNode.tooltip`, the buffer's `commitTo` / `codec`, and,
+// across the whole field vocabulary, a handler flag and an optional `value` read
+// from the WIRE rather than taken from the record's default. The 0.1.0 pass
+// observed that a bump "moves the work rather than removing it" and put six
+// entries behind that claim; here it is thirty-eight out of thirty-eight.
+//
+// TWO ENTRIES WERE RE-CLASSED AFTER THEIR REASON WAS RE-DERIVED BY EXECUTION,
+// and both had been masked by a token that could no longer falsify anything:
+//
+//   • `multiselect-chip-list-param` blamed `optional:Select.on_change`. In 0.2.0
+//     that slot is a `bool` flag, and `optional:` asks whether a field admits
+//     `None` — so the probe answered "the host cannot omit it" and the entry
+//     held, VACUOUSLY, while the fixture actually failed on something else
+//     entirely: the compute layer's `in` predicate, which `cp` has modelled all
+//     along and `pyColExpr` had no arm for, so it fell through to the `col`
+//     fallback and projected `cp.Col('')`. That is the identical trap the
+//     projector's own `param` arm was written to close. Fixed in
+//     `app/Projection.fs`; the entry is gone.
+//   • `composite-tabs-panels` blamed `optional:Tabs.on_select` for the same
+//     vacuous reason. Its real surviving cause is `Action.Call` on `onSubmit`,
+//     which 0.2.0 still does not model. Re-tokened, not removed.
+//
+// THE LESSON, because it is a new one and it is about the falsifier rather than
+// about any entry: an `optional:` token stops falsifying the moment the host
+// turns that slot from a closure sentinel into a BOOL FLAG. The field then exists
+// and cannot be `None`, so the probe keeps reporting "the host cannot omit this"
+// — which is now false in the only sense that matters, since the flag omits the
+// wire key perfectly well. The fourth pass built the probes to catch a reason
+// that had outlived its cause, and this is a reason whose PROBE outlived its
+// cause. Both entries were caught by the round-trip half rather than the claim
+// half, exactly as the pre-1578 passes were. A follow-up worth filing: teach
+// `optional:` to read a `bool`-typed handler field as omittable-by-flag.
+//
+// THREE `arm: 'both'` ENTRIES BECAME PLAIN HOST LAG. `grid-exportable-1`,
+// `grid-keep-rows-together-1` and `grid-repeat-header-1` each named a
+// `Binding.Query` source AND a DataGrid slot the projector did not emit; the
+// second half is emitted from this phase, so only the Query source survives and
+// the `both` arm is empty. `grid-declared-edit` and `tooltip-metric-1` were
+// re-tokened the same way, each to the second cause that was always behind the
+// first (`Binding.Query`, `TextSource.I18n`).
+//
+// WHAT SURVIVES IS ALL HOST LAG, AND ALL OF IT WAS EXECUTED THIS PASS — no entry
+// below is held on a reason inherited from an earlier measurement. `Binding.Expr`
+// is worth naming: this phase was scoped to land its predicate-slot emission, and
+// it could not, because 0.2.0's `Binding` union is still
+// `Static | State | Filter | Selection | Now | FormatBinding | Local`. The four
+// ids that need it (`expr-scalar`, `expr-params-state-selection`,
+// `switch-predicate`, `node-visible`) are host lag, not projector lag, and the
+// probe agrees.
 interface Quarantined {
   /** The host-model path this entry claims is absent — see the grammar above. */
   readonly construct: string;
@@ -339,140 +408,22 @@ const PY_UNMODELLED = new Map<string, Quarantined>([
   // writes a CLOSURE sentinel) or a field that cannot be None. `optional:` is
   // the falsifier for both.
   [
-    'form-declarative',
-    {
-      construct: 'optional:TextField.on_change',
-      arm: 'host',
-      reason: 'TextField hardcodes onChange',
-    },
-  ],
-  [
-    'form-declarative-minimal',
-    {
-      construct: 'optional:TextField.on_change',
-      arm: 'host',
-      reason: 'TextField hardcodes onChange',
-    },
-  ],
-  [
-    'form-field-rules',
-    {
-      construct: 'optional:TextField.on_change',
-      arm: 'host',
-      reason: 'TextField hardcodes onChange',
-    },
-  ],
-  [
     'composite-tabs-panels',
     {
-      construct: 'optional:Tabs.on_select',
+      construct: 'Action.Call',
       arm: 'host',
-      reason: 'Tabs hardcodes onSelect; TextField hardcodes onChange',
-    },
-  ],
-  [
-    'form-toggle',
-    {
-      construct: 'optional:CheckboxField.on_toggle',
-      arm: 'host',
-      reason: 'CheckboxField hardcodes onToggle',
-    },
-  ],
-  [
-    'form-date-range',
-    {
-      construct: 'optional:DateRangeField.on_change',
-      arm: 'host',
-      reason: 'DateRangeField hardcodes onChange',
-    },
-  ],
-  [
-    'filters-declarative',
-    {
-      construct: 'optional:TextFilter.on_change',
-      arm: 'host',
-      reason: 'TextFilter hardcodes onChange',
-    },
-  ],
-  [
-    'filters-date-range',
-    {
-      construct: 'optional:DateRangeField.on_change',
-      arm: 'host',
-      reason: 'DateRangeField hardcodes onChange',
-    },
-  ],
-  [
-    'frag-stdlib-filter-bar',
-    {
-      construct: 'optional:TextFilter.on_change',
-      arm: 'host',
-      reason: 'TextFilter hardcodes onChange',
-    },
-  ],
-  [
-    'filterable-static-dashboard',
-    {
-      construct: 'optional:ChoiceFilter.on_change',
-      arm: 'host',
-      reason: 'ChoiceFilter hardcodes onChange',
-    },
-  ],
-  [
-    'multiselect-chip-list-param',
-    { construct: 'optional:Select.on_change', arm: 'host', reason: 'Select hardcodes onChange' },
-  ],
-  [
-    'controls-declarative',
-    { construct: 'optional:Tabs.on_select', arm: 'host', reason: 'Tabs hardcodes onSelect' },
-  ],
-  [
-    'controls-closure',
-    { construct: 'Tabs.on_select_tag', arm: 'host', reason: 'Tabs has no onSelectTag' },
-  ],
-  [
-    'grid-bound-sort',
-    {
-      construct: 'DataGrid.sort_state_key',
-      arm: 'host',
-      reason: 'DataGrid has no sortStateKey / defaultSort; Column has no sortable',
+      reason:
+        'the Tabs and TextField handler halves are expressible from 0.2.0 and emitted; onSubmit is an Action.Call, which is not',
     },
   ],
   [
     'grid-declared-edit',
     {
-      construct: 'DataGrid.edit_state_key',
+      construct: 'Binding.Query',
       arm: 'host',
-      reason: 'DataGrid has no editStateKey; Column has no editable; source is a Binding.Query',
+      reason:
+        'editStateKey and the per-column editable are both modelled from 0.2.0 and both emitted; the source is a Binding.Query, which is not',
     },
-  ],
-  [
-    'grid-paged',
-    {
-      construct: 'DataGrid.page_size',
-      arm: 'host',
-      reason: 'DataGrid has no pageSize / pageStateKey',
-    },
-  ],
-  [
-    'grid-paged-sorted',
-    {
-      construct: 'DataGrid.page_size',
-      arm: 'host',
-      reason: 'DataGrid has no pageSize / pageStateKey / sortStateKey',
-    },
-  ],
-  [
-    'grid-reorderable',
-    {
-      construct: 'DataGrid.edit_state_key',
-      arm: 'host',
-      reason: 'DataGrid has no editStateKey / reorderable',
-    },
-  ],
-  [
-    'grid-sort-state-key',
-    { construct: 'DataGrid.sort_state_key', arm: 'host', reason: 'DataGrid has no sortStateKey' },
   ],
   [
     'shared-source-seeded-pair',
@@ -485,23 +436,6 @@ const PY_UNMODELLED = new Map<string, Quarantined>([
 
   // 4 — a record narrower than the wire.
   [
-    'chart-axis-titles',
-    { construct: 'Chart.x_title', arm: 'host', reason: 'Chart has no subtitle / xTitle / yTitle' },
-  ],
-  [
-    'chart-data-labels',
-    { construct: 'Chart.data_labels', arm: 'host', reason: 'Chart has no dataLabels' },
-  ],
-  [
-    'chart-legend-position',
-    { construct: 'Chart.legend_position', arm: 'host', reason: 'Chart has no legendPosition' },
-  ],
-  ['chart-temporal-x', { construct: 'Chart.x_scale', arm: 'host', reason: 'Chart has no xScale' }],
-  [
-    'chart-value-format',
-    { construct: 'Chart.value_format', arm: 'host', reason: 'Chart has no valueFormat' },
-  ],
-  [
     'badge-transform-live',
     {
       construct: 'cp.TransformSource',
@@ -510,93 +444,18 @@ const PY_UNMODELLED = new Map<string, Quarantined>([
     },
   ],
   [
-    'link-protected-1',
-    { construct: 'Link.protection', arm: 'host', reason: 'Link has no protection' },
-  ],
-  [
-    'table-sortable-1',
-    { construct: 'Table.sortable', arm: 'host', reason: 'Table has no sortable / defaultSort' },
-  ],
-  [
-    'transfer-board',
-    { construct: 'DataGrid.reorderable', arm: 'host', reason: 'DataGrid has no reorderable' },
-  ],
-  [
-    'chart-annotation-bands',
-    { construct: 'Chart.annotations', arm: 'host', reason: 'Chart has no annotations' },
-  ],
-  [
-    'chart-annotation-events',
-    { construct: 'Chart.annotations', arm: 'host', reason: 'Chart has no annotations' },
-  ],
-  [
-    'chart-annotations',
-    { construct: 'Chart.annotations', arm: 'host', reason: 'Chart has no annotations' },
-  ],
-  [
-    'tooltip-button-1',
-    { construct: 'UiNode.tooltip', arm: 'host', reason: 'UiNode has no tooltip' },
-  ],
-  [
-    'tooltip-icon-button-1',
-    { construct: 'UiNode.tooltip', arm: 'host', reason: 'UiNode has no tooltip' },
-  ],
-  [
     'tooltip-metric-1',
-    { construct: 'UiNode.tooltip', arm: 'host', reason: 'UiNode has no tooltip' },
+    {
+      construct: 'TextSource.I18n',
+      arm: 'host',
+      reason:
+        'UiNode.tooltip is modelled from 0.2.0 and emitted; this tooltip is a TextSource.I18n, which is not',
+    },
   ],
 
   // 3 (continued) — the same unomittable slot, in the controls added since 0.0.1.
   // Each of the four new field records writes `onChange` and `value` into the
   // wire unconditionally, so a canonical minimal control cannot be reached.
-  [
-    'filters-rating-colour',
-    {
-      construct: 'optional:RatingField.on_change',
-      arm: 'host',
-      reason: 'RatingField / ColorField hardcode onChange and value',
-    },
-  ],
-  [
-    'filters-tokens',
-    {
-      construct: 'optional:TokensField.on_change',
-      arm: 'host',
-      reason: 'TokensField hardcodes onChange and value',
-    },
-  ],
-  [
-    'form-combobox-freetext',
-    {
-      construct: 'optional:ComboboxField.on_change',
-      arm: 'host',
-      reason: 'ComboboxField hardcodes onChange',
-    },
-  ],
-  [
-    'form-rating-halves',
-    {
-      construct: 'optional:RatingField.on_change',
-      arm: 'host',
-      reason: 'RatingField hardcodes onChange',
-    },
-  ],
-  [
-    'form-tokens-freetext',
-    {
-      construct: 'optional:TokensField.on_change',
-      arm: 'host',
-      reason: 'TokensField hardcodes onChange and value',
-    },
-  ],
-  [
-    'popover-anchored-1',
-    { construct: 'optional:Modal.on_dismiss', arm: 'host', reason: 'Modal hardcodes onDismiss' },
-  ],
-  [
-    'popover-open-1',
-    { construct: 'optional:Modal.on_dismiss', arm: 'host', reason: 'Modal hardcodes onDismiss' },
-  ],
 
   // 2 (continued) — `Binding` is Static | State | Filter | Selection | Now |
   // FormatBinding | Local, so a `Query`-sourced control or grid has no spelling.
@@ -609,27 +468,27 @@ const PY_UNMODELLED = new Map<string, Quarantined>([
     'grid-exportable-1',
     {
       construct: 'Binding.Query',
-      arm: 'both',
-      projectorConstruct: 'DataGrid.exportable',
-      reason: 'no Binding.Query; and the projector emits no exportable',
+      arm: 'host',
+      reason:
+        'no Binding.Query — the exportable half belonged to the projector and is emitted from Phase 1581',
     },
   ],
   [
     'grid-keep-rows-together-1',
     {
       construct: 'Binding.Query',
-      arm: 'both',
-      projectorConstruct: 'DataGrid.keep_rows_together',
-      reason: 'no Binding.Query; and the projector emits no keep_rows_together',
+      arm: 'host',
+      reason:
+        'no Binding.Query — the keep_rows_together half belonged to the projector and is emitted from Phase 1581',
     },
   ],
   [
     'grid-repeat-header-1',
     {
       construct: 'Binding.Query',
-      arm: 'both',
-      projectorConstruct: 'DataGrid.repeat_header',
-      reason: 'no Binding.Query; and the projector emits no repeat_header',
+      arm: 'host',
+      reason:
+        'no Binding.Query — the repeat_header half belonged to the projector and is emitted from Phase 1581',
     },
   ],
 
@@ -688,14 +547,6 @@ const PY_UNMODELLED = new Map<string, Quarantined>([
   // `Local` writes `onCommit` unconditionally and carries neither `codec` nor
   // `commitTo`, and the wire refuses a document carrying both commit spellings,
   // so the declarative buffer has no reachable shape at all.
-  [
-    'form-local-declared',
-    {
-      construct: 'optional:Local.on_commit',
-      arm: 'host',
-      reason: 'Local hardcodes onCommit — no codec / commitTo',
-    },
-  ],
 ]);
 
 /** The map's own tally, by arm — computed, and rendered into the census test's name. */
@@ -711,7 +562,7 @@ const tallyByArm = () => {
  * one the map actually holds — the three passes above each carried counts in
  * prose, and prose cannot be wrong out loud.
  */
-const QUARANTINE_CENSUS = { host: 69, projector: 0, both: 3 } as const;
+const QUARANTINE_CENSUS = { host: 34, projector: 0, both: 0 } as const;
 
 /**
  * What the projector's generated source must contain for it to be EMITTING the
@@ -801,7 +652,7 @@ describe('Python projection conformance (Node corpus)', () => {
   it('the Python executor ran', () => {
     // A hard failure, never a skip: a conformance arm that goes green without
     // its oracle is worse than no arm at all. Install the host with
-    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.1.0`, or point
+    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.2.0`, or point
     // FUARAN_PY_PYTHON at an interpreter that already has it.
     expect(fatal, fatal ?? '').toBeUndefined();
   });

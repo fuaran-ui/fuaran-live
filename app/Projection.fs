@@ -3135,6 +3135,23 @@ let private pyNum (n: float) : string =
   else
     rendered
 
+/// A typed FLOAT slot, read from the wire (Phase 1596). §7's non-finite
+/// sentinels ride the wire as the STRINGS `"NaN"` / `"Infinity"` /
+/// `"-Infinity"`, and a typed slot takes them as the Python floats the canonical
+/// encoder writes back as those same strings. The generic fallback this replaces
+/// passed the string straight through, which round-tripped by coincidence — the
+/// slot is a float, and a string reaching it only survived because nothing typed
+/// it on the way.
+let private pyFloat (v: JsonValue) : string =
+  match v with
+  | JString "NaN" -> "float('nan')"
+  | JString "Infinity" -> "float('inf')"
+  | JString "-Infinity" -> "float('-inf')"
+  | JNumber n -> pyNum n
+  | _ -> "0"
+
+let private pyFloatOf (name: string) (v: JsonValue) : string = pyFloat (fieldD name v)
+
 /// A call with positional then keyword arguments; keyword names are snake_case.
 let private pyCall (ctor: string) (positional: string list) (kw: (string * string) list) : string =
   let args = positional @ (kw |> List.map (fun (k, v) -> toSnake k + "=" + v))
@@ -3444,6 +3461,21 @@ let private pyFlushTrigger (v: JsonValue) : string =
   | Some "OnDebounce" -> "t.OnDebounce(" + numLit (numOf "milliseconds" v) + ")"
   | _ -> "t.OnBlur()"
 
+/// An `Invoke` — the SAME typed record in a value slot and in an action slot
+/// (Phase 1596, modelled by fuaran-py from 0.3.0), so both legs share this one
+/// spelling rather than each growing its own. `args` is written by the record
+/// unconditionally, and `InvokeArg.value` is a string in the model as it is on
+/// the wire.
+let private pyInvoke (v: JsonValue) : string =
+  "t.Invoke("
+  + pq (strOf "capabilityId" v)
+  + ", "
+  + pyList (
+    arrOf "args" v
+    |> List.map (fun a -> "t.InvokeArg(" + pq (strOf "addr" a) + ", " + pq (strOf "value" a) + ")")
+  )
+  + ")"
+
 let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
   match dollarType v with
   | Some "Static" ->
@@ -3527,8 +3559,21 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
              + ")")
          ))
     + ")"
+  // Phase 1596 — `Query` and `Invoke`, modelled by fuaran-py from 0.3.0. The
+  // deps tuple is omitted from the wire when empty, so a dependency-free query
+  // is byte-identical to its pre-`dependsOn` form and the argument is dropped.
+  | Some "Query" ->
+    (match arrOf "dependsOn" v with
+     | [] -> "t.Query(" + pq (strOf "name" v) + ")"
+     | deps ->
+       "t.Query("
+       + pq (strOf "name" v)
+       + ", "
+       + pyList (deps |> List.map pyStrItem)
+       + ")")
+  | Some "Invoke" -> pyInvoke v
   | _ ->
-    // Query / Computed / I18n / Invoke — no typed case in `fuaran_py`.
+    // Expr / Computed — no typed case in `fuaran_py`.
     "binding.static(None)"
 
 /// The explicit `TextSource` record — for slots typed as raw `TextSource`, which
@@ -3539,6 +3584,13 @@ let private pyTextSource (v: JsonValue) : string =
   | _ ->
     match dollarType v with
     | Some "Bound" -> "t.Bound(" + pyBinding Opq.Scalar (fieldD "binding" v) + ")"
+    // Phase 1596 — the third `TextSource` case, modelled by fuaran-py from
+    // 0.3.0. `args` is written unconditionally by the record, so an empty map
+    // needs no argument: `t.I18n(key)` and `t.I18n(key, {})` are one document.
+    | Some "I18n" ->
+      (match membersOf "args" v with
+       | [] -> "t.I18n(" + pq (strOf "key" v) + ")"
+       | _ -> "t.I18n(" + pq (strOf "key" v) + ", " + pyJson (fieldD "args" v) + ")")
     | _ -> "t.LiteralText(" + pq (strOf "text" v) + ")"
 
 /// A `TextInput` slot — the bare string the constructors coerce, or the explicit
@@ -3584,6 +3636,17 @@ let private pyMarkerBinding (v: JsonValue) : string =
      | Some(JString "<opaque>") -> "binding.static([])"
      | _ -> pyBinding Opq.Collection v)
   | _ -> pyBinding Opq.Collection v
+
+/// A `Call`'s declarative result target (Phase 1596). The Python case names
+/// deliberately differ from the wire tags they encode — `t.IntoState` writes
+/// `{"$type":"State"}` and `t.IntoQuery` writes `{"$type":"Query"}` — because
+/// `State` and `Query` are already taken by the binding union in the same
+/// module, so reading the wire tag as the class name is exactly the mistake to
+/// avoid here.
+let private pyCallTarget (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Query" -> "t.IntoQuery(" + pq (strOf "name" v) + ")"
+  | _ -> "t.IntoState(" + pq (strOf "key" v) + ")"
 
 let rec private pyAction (v: JsonValue) : string =
   match dollarType v with
@@ -3654,8 +3717,25 @@ let rec private pyAction (v: JsonValue) : string =
   // Phase 1537 — a bare node id, never a `TextSource`: it addresses a node in
   // this document, which the author wrote.
   | Some "Focus" -> "t.Focus(" + pq (strOf "nodeId" v) + ")"
+  // Phase 1596 — `Call` / `AiTool` / `Invoke`, modelled by fuaran-py from 0.3.0.
+  // `on_result` is a bool the record turns into the `"<closure>"` sentinel, and
+  // it is read from the WIRE KEY's presence for the reason `pyHandler` states:
+  // the record's own default is what a projector that omitted the argument
+  // would silently adopt.
+  | Some "Call" ->
+    pyCall
+      "t.Call"
+      [ pq (strOf "endpoint" v) ]
+      ((match JsonValue.tryField "into" v with
+        | Some target -> [ "into", pyCallTarget target ]
+        | None -> [])
+       @ (match JsonValue.tryField "onResult" v with
+          | Some _ -> [ "onResult", "True" ]
+          | None -> []))
+  | Some "AiTool" -> "t.AiTool(" + pq (strOf "toolName" v) + ", " + pyJson (fieldD "args" v) + ")"
+  | Some "Invoke" -> pyInvoke v
   | _ ->
-    // Call / AiTool / CommitLocal / Invoke — no typed case in `fuaran_py`.
+    // CommitLocal — no typed case in `fuaran_py`.
     "action.chain([])"
 
 // ── Form fields / filters / grid columns / tab headers ───────────────────────
@@ -4121,6 +4201,133 @@ let private pyHoleDecl (v: JsonValue) : string =
       (match JsonValue.tryField "default" v with
        | Some d -> [ "default", pyFragScalar d ]
        | None -> [])
+
+// ── Drawing (Phase 1596) — the vector vocabulary fuaran-py modelled in 0.3.0 ──
+//
+// Every slot below is a typed record: `t.ViewBox` / `t.DrawPoint` /
+// `t.DrawStyle`, the five curve commands and the nine shapes. Before 0.3.0 the
+// kind had no constructor arm and fell to `pyGenericNode`, which re-spells the
+// wire's own object shape — `t.Drawing(view_box={'height': 100, …})` — and
+// round-trips only because the host's lowering passes a raw dict straight
+// through. That is the structural escape this leg's header forbids, and the
+// cost is not stylistic: the same projection would have gone on "passing" had
+// 0.3.0 modelled `Drawing` and NONE of its nine shapes, so the arm would have
+// certified a host gap as conformance. A typed record spells exactly what the
+// model carries and nothing more, which is the property the quarantine beside
+// this file measures.
+
+/// A `DrawStyle` — every slot optional, so only the keys the wire carries are
+/// emitted. `rotation` rides EVEN AT ZERO: an explicitly-upright label and one
+/// that never mentioned rotation are two different documents.
+let private pyDrawStyle (v: JsonValue) : string =
+  let bindingSlot (name: string) =
+    match JsonValue.tryField name v with
+    | Some b -> [ name, pyBinding Opq.Scalar b ]
+    | None -> []
+
+  let strSlot (name: string) =
+    match optStr name v with
+    | Some s -> [ name, pq s ]
+    | None -> []
+
+  let numSlot (name: string) =
+    match JsonValue.tryField name v with
+    | Some(JNumber n) -> [ name, pyNum n ]
+    | _ -> []
+
+  pyCall
+    "t.DrawStyle"
+    []
+    (bindingSlot "fill"
+     @ bindingSlot "stroke"
+     @ bindingSlot "strokeWidth"
+     @ bindingSlot "opacity"
+     @ strSlot "textAnchor"
+     @ numSlot "fontSize"
+     @ strSlot "emphasis"
+     @ strSlot "fontFamily"
+     @ strSlot "markId"
+     @ numSlot "rotation"
+     @ (match JsonValue.tryField "tip" v with
+        | Some tip -> [ "tip", pyTextSource tip ]
+        | None -> []))
+
+/// The `style=` keyword a shape contributes — omitted where the wire's style is
+/// `{}`, which is exactly what the record's own empty default writes back.
+let private pyDrawStyleKw (v: JsonValue) : (string * string) list =
+  match JsonValue.tryField "style" v with
+  | Some(JObject(_ :: _) as st) -> [ "style", pyDrawStyle st ]
+  | _ -> []
+
+let private pyDrawPoint (v: JsonValue) : string =
+  "t.DrawPoint(" + pyFloatOf "x" v + ", " + pyFloatOf "y" v + ")"
+
+let private pyCurveCommand (v: JsonValue) : string =
+  match dollarType v with
+  | Some "MoveTo" -> "t.MoveTo(" + pyDrawPoint (fieldD "to" v) + ")"
+  | Some "LineTo" -> "t.LineTo(" + pyDrawPoint (fieldD "to" v) + ")"
+  | Some "CubicTo" ->
+    "t.CubicTo("
+    + pyDrawPoint (fieldD "control1" v)
+    + ", "
+    + pyDrawPoint (fieldD "control2" v)
+    + ", "
+    + pyDrawPoint (fieldD "to" v)
+    + ")"
+  | Some "QuadraticTo" ->
+    "t.QuadraticTo("
+    + pyDrawPoint (fieldD "control" v)
+    + ", "
+    + pyDrawPoint (fieldD "to" v)
+    + ")"
+  | _ -> "t.Close()"
+
+/// The nine shapes. Coordinates are positional in the record's own order;
+/// `Group` is the one case that recurses, over shapes rather than over nodes.
+let rec private pyShape (v: JsonValue) : string =
+  let style = pyDrawStyleKw v
+
+  match dollarType v with
+  | Some "Group" -> pyCall "t.Group" [ pyList (arrOf "children" v |> List.map pyShape) ] style
+  | Some "Rectangle" ->
+    pyCall
+      "t.Rectangle"
+      [ pyFloatOf "x" v; pyFloatOf "y" v; pyFloatOf "width" v; pyFloatOf "height" v ]
+      ((match JsonValue.tryField "cornerRadius" v with
+        | Some(JNumber n) -> [ "cornerRadius", pyNum n ]
+        | _ -> [])
+       @ style)
+  | Some "Line" -> pyCall "t.Line" [ pyFloatOf "x1" v; pyFloatOf "y1" v; pyFloatOf "x2" v; pyFloatOf "y2" v ] style
+  | Some "Polyline" -> pyCall "t.Polyline" [ pyList (arrOf "points" v |> List.map pyDrawPoint) ] style
+  | Some "Polygon" -> pyCall "t.Polygon" [ pyList (arrOf "points" v |> List.map pyDrawPoint) ] style
+  | Some "Curve" -> pyCall "t.Curve" [ pyList (arrOf "commands" v |> List.map pyCurveCommand) ] style
+  | Some "Circle" -> pyCall "t.Circle" [ pyFloatOf "cx" v; pyFloatOf "cy" v; pyFloatOf "r" v ] style
+  | Some "Ellipse" ->
+    pyCall "t.Ellipse" [ pyFloatOf "cx" v; pyFloatOf "cy" v; pyFloatOf "rx" v; pyFloatOf "ry" v ] style
+  // `Label.text` is a raw `TextSource` rather than the coerced `TextInput`, so
+  // the bare wire string takes the explicit `t.LiteralText` record.
+  | _ -> pyCall "t.Label" [ pyFloatOf "x" v; pyFloatOf "y" v; pyTextSource (fieldD "text" v) ] style
+
+let private pyViewBox (v: JsonValue) : string =
+  "t.ViewBox("
+  + pyFloatOf "minX" v
+  + ", "
+  + pyFloatOf "minY" v
+  + ", "
+  + pyFloatOf "width" v
+  + ", "
+  + pyFloatOf "height" v
+  + ")"
+
+/// A `Mount`'s guest channel (Phase 1596) — `message_shape` rides only on the
+/// two-way form the wire spells it on.
+let private pyGuestChannel (v: JsonValue) : string =
+  pyCall
+    "t.GuestChannel"
+    [ pq (strOf "direction" v) ]
+    (match optStr "messageShape" v with
+     | Some m -> [ "messageShape", pq m ]
+     | None -> [])
 
 // ── Base traits ──────────────────────────────────────────────────────────────
 
@@ -4688,6 +4895,27 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
         "highlightLines", pyList (arrOf "highlightLines" k |> List.map numItem)
         "copyable", pyBool (boolOf "copyable" k) ]
   | "Math" -> call "math" [ pq (strOf "source" k) ] [ "display", pq (strOf "display" k) ]
+  // Phase 1596 — `Fact`, modelled by fuaran-py from 0.3.0. `tone` and
+  // `emphasis` carry record defaults the wire omits at, so each is emitted only
+  // where the wire states it rather than restated from the default.
+  | "Fact" ->
+    call
+      "fact"
+      []
+      ([ "label", pyTextInput (fieldD "label" k)
+         "value", pyTextInput (fieldD "value" k) ]
+       @ (match optStr "tone" k with
+          | Some tone -> [ "tone", pq tone ]
+          | None -> [])
+       @ (match JsonValue.tryField "emphasis" k with
+          | Some(JBool b) -> [ "emphasis", pyBool b ]
+          | _ -> [])
+       @ (match JsonValue.tryField "help" k with
+          | Some h -> [ "help", pyTextInput h ]
+          | None -> [])
+       @ (match optStr "icon" k with
+          | Some i -> [ "icon", pq i ]
+          | None -> []))
   // ── Input ─────────────────────────────────────────────────────────────────
   | "Button" ->
     call
@@ -4931,6 +5159,22 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
                [ "repeatHeader", "True" ]
              else
                [])))
+  // Phase 1596 — `Drawing`, modelled by fuaran-py from 0.3.0. The root `style`
+  // is omitted where the wire's is `{}`, exactly as a shape's is; `shapes` rides
+  // always, the empty list included, because it is what the kind is for.
+  | "Drawing" ->
+    call
+      "drawing"
+      []
+      ([ "viewBox", pyViewBox (fieldD "viewBox" k)
+         "shapes", pyList (arrOf "shapes" k |> List.map pyShape) ]
+       @ pyDrawStyleKw k
+       @ (match JsonValue.tryField "title" k with
+          | Some ti -> [ "title", pyTextInput ti ]
+          | None -> [])
+       @ (match JsonValue.tryField "description" k with
+          | Some d -> [ "description", pyTextInput d ]
+          | None -> []))
   // ── Custom / ErrorBoundary / Fragments ────────────────────────────────────
   | "Custom" ->
     call
@@ -4999,6 +5243,31 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
                  |> List.map (fun (key, a) -> pq key + ": " + pyFragArg depth a)
                  |> String.concat ", ")
               + "}" ]))
+  // Phase 1596 — `Mount`, modelled by fuaran-py from 0.3.0. `inputs` reuses the
+  // `FragmentArg` vocabulary above rather than growing a second one, which is
+  // also what the generic fallback got wrong: it read the wire's `$type` as a
+  // class name and reached for a `t.Str` that has never existed. `on_bubble`
+  // defaults True and the wire omits `onBubble` when there is no handler, so the
+  // absent key is the one that has to be said out loud.
+  | "Mount" ->
+    call
+      "mount"
+      []
+      ([ "scopeId", pq (strOf "scopeId" k)
+         "channel", pyGuestChannel (fieldD "channel" k)
+         "capabilities", pyList (arrOf "capabilities" k |> List.map pyStrItem) ]
+       @ (match membersOf "inputs" k with
+          | [] -> []
+          | args ->
+            [ "inputs",
+              "{"
+              + (args
+                 |> List.map (fun (key, a) -> pq key + ": " + pyFragArg depth a)
+                 |> String.concat ", ")
+              + "}" ])
+       @ (match JsonValue.tryField "onBubble" k with
+          | Some _ -> []
+          | None -> [ "onBubble", "False" ]))
   | "Switch" ->
     let caseVs = arrOf "cases" k
 

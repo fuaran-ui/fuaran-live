@@ -159,7 +159,17 @@ def main() -> int:
     # `import *`: a projected expression that reaches for a name outside this
     # list is a projector defect, and it must fail here rather than resolve to
     # something the surface does not actually export.
+    #
+    # `float` is the one BUILTIN admitted, and it is admitted for a reason the
+    # rule above does not cover: §7's non-finite sentinels ride the wire as the
+    # strings "NaN" / "Infinity" / "-Infinity" but are FLOATS in every typed slot
+    # that carries them, and Python spells those three values only as
+    # `float('nan')` / `float('inf')` / `float('-inf')` — there is no literal.
+    # It resolves to a number rather than to any part of the host surface, so it
+    # cannot stand in for a construct the model omits, which is the property the
+    # explicit list exists to protect.
     namespace = {
+        "float": float,
         "fuaran": fuaran,
         "binding": binding,
         "action": action,

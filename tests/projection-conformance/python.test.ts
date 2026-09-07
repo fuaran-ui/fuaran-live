@@ -15,6 +15,14 @@
 // outside the typed model can take. Where the TS leg can always emit a typed
 // in-memory literal, the Python leg cannot — see PY_UNMODELLED below.
 //
+// Three slots typed as a raw wire `Value` (`UiNode.visible`, `SwitchCase.when`,
+// `Navigate.route`) would accept a hand-built `Obj` and so would let the
+// projector spell anything at all, which would dissolve this whole map. The
+// projector's own rule — stated where it is enforced, in app/Projection.fs's
+// Python-leg header — is to build every such value from a TYPED RECORD and lower
+// it with that record's `to_wire`, so an absent case stays absent and this arm
+// keeps measuring what it claims to measure.
+//
 // Requires `pnpm run fable:app` (the app build) to have produced app/output/,
 // and a CPython with `fuaran-py` installed (see resolvePython).
 
@@ -48,7 +56,7 @@ const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip
 /**
  * The interpreter to run the executor with. A repo-local `.venv` wins (the
  * documented local setup: `python -m venv .venv` then
- * `pip install fuaran-py==0.0.6`); FUARAN_PY_PYTHON overrides it for CI, where
+ * `pip install fuaran-py==0.1.0`); FUARAN_PY_PYTHON overrides it for CI, where
  * the interpreter is whatever actions/setup-python provisioned.
  */
 const resolvePython = (): string => {
@@ -76,8 +84,9 @@ const resolvePython = (): string => {
 // binding the typed model omits has NO spelling at all.
 //
 // Originally dated 2026-09-02 against fuaran-py 0.0.1 (PyPI); RE-MEASURED
-// 2026-09-07 against 0.0.6, the version CI pins — see the re-measurement note
-// below the family list, which is where the record of what moved lives.
+// 2026-09-07 against 0.0.6, and again the same day against **0.1.0**, the
+// version CI now pins — see the re-measurement notes below the family list,
+// which are where the record of what moved lives.
 //
 // Every entry below was measured, not assumed: the projector emits the shape the
 // typed model WOULD take, and the executor's failure — an `AttributeError` naming
@@ -94,22 +103,30 @@ const resolvePython = (): string => {
 //      reached — the slot is not optional in the record, and the encoder has
 //      nothing to omit.
 //   4. A NARROWER RECORD. `Chart` reaches eight slots fewer than the wire;
-//      `TransformBinding` carries neither `params` nor a `Live` source;
-//      `DataGrid` carries none of the declarative sort / page / edit-state slots
-//      and no `reorderable`; `Link` has no `protection`; `Table` no `sortable` /
-//      `defaultSort`; `UiNode` no `tooltip`.
+//      `TransformBinding.source` is a bare `DataSource` rather than the wire's
+//      `TransformSource` DU, so a `State`- or `Live`-bound source has no
+//      spelling; `DataGrid` carries none of the declarative sort / page /
+//      edit-state slots and no `reorderable`; `Link` has no `protection`;
+//      `Table` no `sortable` / `defaultSort`; `UiNode` no `tooltip`.
 //   5. AN ENCODER THAT DISAGREES WITH THE WIRE. §2 rule 2 orders object keys by
-//      UTF-16 CODE UNIT; 0.0.6's canonical writer sorts by Python's code-point
-//      order, which differs the moment a key is non-BMP. Not a modelling gap and
-//      the only entry of its family, but it fails here for the same reason the
-//      rest do — the pinned host cannot produce the bytes — and it is fixable
-//      only in that host.
+//      UTF-16 CODE UNIT; the canonical writer up to 0.0.6 sorted by Python's
+//      code-point order, which differs the moment a key is non-BMP. Not a
+//      modelling gap, but it failed here for the same reason the rest do — the
+//      pinned host could not produce the bytes — and it was fixable only in that
+//      host, which 0.1.0 did. The family is currently EMPTY; it is kept named
+//      because the shape recurs and its remedy is not the others'.
 //
 // None of this is projector lag, and none of it is fixable in this repo — which
 // is why these are named with their cause rather than left to fail. The day
 // fuaran-py grows one of these constructs, the entries naming it are removable by
 // search, and the test below FAILS if one starts round-tripping while still
 // listed, so the set cannot quietly outlive its cause.
+//
+// That first clause is an INTENT rather than an invariant, and the 0.1.0 pass
+// below is what proved the difference: six entries turned out to be projector lag
+// wearing a host-lag reason, and they were found only because a stale reason was
+// re-derived by running the fixture. A quarantine is exactly as honest as its last
+// measurement, and a reason nobody re-runs decays into a claim.
 //
 // RE-MEASURED 2026-09-07 against fuaran-py **0.0.6** — the version CI pins, and
 // five releases past the 0.0.1 the original note measured. Three things came out
@@ -162,6 +179,56 @@ const resolvePython = (): string => {
 // key and the fixture fails on its one real cause. An entry naming two causes
 // when one of them is ours is how a quarantine starts drifting away from what
 // it describes.
+//
+// ── THIRD PASS, 2026-09-07, RE-MEASURED AGAINST fuaran-py **0.1.0** ──────────
+//
+// 0.1.0 is on PyPI and the CI pin was raised to it in all three workflows that
+// install the host (ci / conformance / azure-static-web-apps-showcase — the
+// conformance one had been left at 0.0.3 and was raised with them). The set went
+// from **85 entries to 72**: THIRTEEN were removed, every one of them forced by
+// the self-clearing test below rather than merely invited by it, and FIFTEEN
+// surviving reasons were re-derived by execution.
+//
+// The thirteen split three ways, and the split is the finding:
+//
+//   • ONE cleared on the pin raise ALONE, with nothing written anywhere:
+//     `custom-nonascii-keys`. 0.1.0's canonical writer sorts object keys by
+//     UTF-16 code unit.
+//   • SIX cleared once the PYTHON LEG OF THE PROJECTOR was taught the construct
+//     0.1.0 had grown: `format-since` (`t.FmtSince`), `action-navigate-target`
+//     and `action-navigate-bound` (`Navigate`'s `target`, and a route that is a
+//     `TextSource`), `action-focus` (`t.Focus`), `action-confirm-cancel`
+//     (`t.Confirm`) and `switch-predicate-only` (`SwitchCase.when`). This is the
+//     half the previous pass could not predict and did not: it recorded these as
+//     host lag, which they were, and the release turned them into PROJECTOR lag
+//     rather than into passes. A quarantine entry that clears on a version bump
+//     is the exception; the rule is that the bump moves the work rather than
+//     removing it.
+//   • SIX more were never host lag at all, and were found only because
+//     re-deriving a stale reason means running the fixture. `Column.field_name`
+//     and `DataGrid.row_key_field` have been modelled since 0.0.6 and the
+//     projector emitted neither, so twelve entries carried the reason `Column
+//     has no field` while failing on the projector; teaching the two slots (plus
+//     `t.TonedPillColumnKind`, `cp.Param` and `TransformBinding.params`, each
+//     modelled and each unemitted) cleared `grid-editable-state`,
+//     `grid-field-named`, `grid-toned-pill`, `switch-on-selection`,
+//     `scalar-transform-composition` and `grid-transform-param`.
+//
+// What the fifteen re-derived reasons say, in one sentence each: the seven
+// surviving grid entries name the DataGrid / Column slots 0.1.0 genuinely lacks
+// (`sortStateKey`, `defaultSort`, `pageSize`, `pageStateKey`, `editStateKey`,
+// `reorderable`, per-column `sortable` / `editable`) instead of a `field` slot
+// that exists; `badge-transform-live` and `shared-source-seeded-pair` name a
+// STATE-bound transform source rather than the `Live` one the old wording
+// claimed (the fixture's source is `{"$type":"State"}` — the name misled);
+// `switch-predicate`, `node-visible` and `action-confirm` name the second cause
+// that was always behind the first, each a construct 0.1.0 still does not model
+// (`Binding.Expr`, `Binding.Query`, `Action.Call`); and three `grid-*` entries
+// gain the projector-side half they also carry, so the next reader does not
+// expect a `Binding.Query` fix alone to clear them.
+//
+// Nothing in the surviving 72 is now believed to be release lag: every entry was
+// executed against 0.1.0 this pass and fails on a construct absent from it.
 const PY_UNMODELLED = new Map<string, string>([
   // 1 — no typed node kind.
   ['mount-1', 'no t.Mount'],
@@ -189,7 +256,7 @@ const PY_UNMODELLED = new Map<string, string>([
   ['form-declarative', 'TextField hardcodes onChange'],
   ['form-declarative-minimal', 'TextField hardcodes onChange'],
   ['form-field-rules', 'TextField hardcodes onChange'],
-  ['composite-tabs-panels', 'TextField hardcodes onChange'],
+  ['composite-tabs-panels', 'Tabs hardcodes onSelect; TextField hardcodes onChange'],
   ['form-toggle', 'CheckboxField hardcodes onToggle'],
   ['form-date-range', 'DateRangeField hardcodes onChange'],
   ['filters-declarative', 'TextFilter hardcodes onChange'],
@@ -199,18 +266,19 @@ const PY_UNMODELLED = new Map<string, string>([
   ['multiselect-chip-list-param', 'Select hardcodes onChange'],
   ['controls-declarative', 'Tabs hardcodes onSelect'],
   ['controls-closure', 'Tabs has no onSelectTag'],
-  ['grid-bound-sort', 'Column has no field, hardcodes value'],
-  ['grid-declared-edit', 'Column has no field, hardcodes value'],
-  ['grid-editable-state', 'Column has no field, hardcodes value'],
-  ['grid-field-named', 'Column has no field, hardcodes value'],
-  ['grid-paged', 'Column has no field, hardcodes value'],
-  ['grid-paged-sorted', 'Column has no field, hardcodes value'],
-  ['grid-reorderable', 'Column has no field, hardcodes value'],
-  ['grid-sort-state-key', 'Column has no field, hardcodes value'],
-  ['grid-toned-pill', 'Column has no field, hardcodes value'],
-  ['scalar-transform-composition', 'Column has no field, hardcodes value'],
-  ['shared-source-seeded-pair', 'Column has no field, hardcodes value'],
-  ['switch-on-selection', 'Column has no field, hardcodes value'],
+  ['grid-bound-sort', 'DataGrid has no sortStateKey / defaultSort; Column has no sortable'],
+  [
+    'grid-declared-edit',
+    'DataGrid has no editStateKey; Column has no editable; source is a Binding.Query',
+  ],
+  ['grid-paged', 'DataGrid has no pageSize / pageStateKey'],
+  ['grid-paged-sorted', 'DataGrid has no pageSize / pageStateKey / sortStateKey'],
+  ['grid-reorderable', 'DataGrid has no editStateKey / reorderable'],
+  ['grid-sort-state-key', 'DataGrid has no sortStateKey'],
+  [
+    'shared-source-seeded-pair',
+    'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+  ],
 
   // 4 — a record narrower than the wire.
   ['chart-axis-titles', 'Chart has no subtitle / xTitle / yTitle'],
@@ -218,8 +286,10 @@ const PY_UNMODELLED = new Map<string, string>([
   ['chart-legend-position', 'Chart has no legendPosition'],
   ['chart-temporal-x', 'Chart has no xScale'],
   ['chart-value-format', 'Chart has no valueFormat'],
-  ['badge-transform-live', 'TransformBinding has no Live source'],
-  ['grid-transform-param', 'TransformBinding has no params'],
+  [
+    'badge-transform-live',
+    'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+  ],
   ['link-protected-1', 'Link has no protection'],
   ['table-sortable-1', 'Table has no sortable / defaultSort'],
   ['transfer-board', 'DataGrid has no reorderable'],
@@ -229,7 +299,6 @@ const PY_UNMODELLED = new Map<string, string>([
   ['tooltip-button-1', 'UiNode has no tooltip'],
   ['tooltip-icon-button-1', 'UiNode has no tooltip'],
   ['tooltip-metric-1', 'UiNode has no tooltip'],
-  ['format-since', 'no FormatIntent.Since — on fuaran-py main since f473bd1'],
 
   // 3 (continued) — the closure sentinel, in the controls added since 0.0.1.
   // Each of the four new field records emits `onChange` and `value`
@@ -246,44 +315,42 @@ const PY_UNMODELLED = new Map<string, string>([
   // FormatBinding | Local, so a `Query`-sourced control or grid has no spelling.
   ['form-combobox-query', 'no Binding.Query'],
   ['form-tokens-query', 'no Binding.Query'],
-  ['grid-exportable-1', 'no Binding.Query'],
-  ['grid-keep-rows-together-1', 'no Binding.Query'],
-  ['grid-repeat-header-1', 'no Binding.Query'],
+  ['grid-exportable-1', 'no Binding.Query; and fuaran.grid takes no exportable'],
+  ['grid-keep-rows-together-1', 'no Binding.Query; and fuaran.grid takes no keep_rows_together'],
+  ['grid-repeat-header-1', 'no Binding.Query; and fuaran.grid takes no repeat_header'],
 
   // 1 (continued).
   ['now-grain', 'no t.Fact'],
 
-  // 5 — the encoder's key order.
-  [
-    'custom-nonascii-keys',
-    'canonical writer sorts object keys by code point, not UTF-16 code unit — on fuaran-py main since 71225ed',
-  ],
+  // Family 5 — the encoder's key order — is EMPTY as of the 0.1.0 pin raise:
+  // `custom-nonascii-keys` was its only member and 0.1.0 sorts by UTF-16 code
+  // unit. The family stays named in the list above because the SHAPE recurs (an
+  // encoder that disagrees with the wire is not a modelling gap and has a
+  // different remedy), not because anything is currently in it.
 
-  // ── The 2026-09-07 second pass — eleven fixtures the corpus gained after the
-  // measurement above, every one of them RELEASE lag rather than a modelling
-  // gap: nine of the eleven are already on fuaran-py main, so a release past
-  // 0.0.6 plus a CI pin raise clears them with no work here or there. The
-  // two that are not are the pair naming `Binding.Expr`, which the Python
-  // `Binding` union does not carry on any branch.
+  // ── What survives the 2026-09-07 second pass, re-measured against 0.1.0.
+  // Every id below fails on a construct 0.1.0 does not model ANYWHERE; the ones
+  // whose reason used to name a construct the release has since grown are
+  // rewritten to name what they now actually fail on, which is in each case a
+  // SECOND cause that was always there behind the first.
   //
   // 1 (continued) — no typed binding case.
   ['expr-scalar', 'no Binding.Expr'],
   ['expr-params-state-selection', 'no Binding.Expr'],
-
-  // 2 (continued) — no typed action case, and a narrower one.
-  ['action-confirm', 'no Action.Confirm — on fuaran-py main since dd40204'],
-  ['action-confirm-cancel', 'no Action.Confirm — on fuaran-py main since dd40204'],
-  ['action-focus', 'no Action.Focus — on fuaran-py main since dd40204'],
-  ['action-navigate-target', 'Navigate has no target — on fuaran-py main since ec18597'],
   [
-    'action-navigate-bound',
-    'Navigate.route is a bare str, not a TextSource — on fuaran-py main since ec18597',
+    'switch-predicate',
+    'SwitchCase.when is modelled from 0.1.0; the predicate is a Binding.Expr, which is not',
+  ],
+  [
+    'node-visible',
+    'UiNode.visible is modelled from 0.1.0; two predicates are Binding.Expr / Binding.Query, which are not',
   ],
 
-  // 4 (continued) — a record narrower than the wire.
-  ['switch-predicate', 'SwitchCase has no when — on fuaran-py main since e956a1f'],
-  ['switch-predicate-only', 'SwitchCase has no when — on fuaran-py main since e956a1f'],
-  ['node-visible', 'UiNode has no visible — on fuaran-py main since e956a1f'],
+  // 2 (continued) — no typed action case.
+  [
+    'action-confirm',
+    'Action.Confirm is modelled from 0.1.0; the confirmed branch is an Action.Call, which is not',
+  ],
 
   // 3 (continued) — the closure sentinel, on the buffer rather than a control.
   // `Local` emits `onCommit` unconditionally and carries neither `codec` nor
@@ -336,7 +403,7 @@ describe('Python projection conformance (Node corpus)', () => {
   it('the Python executor ran', () => {
     // A hard failure, never a skip: a conformance arm that goes green without
     // its oracle is worse than no arm at all. Install the host with
-    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.0.6`, or point
+    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.1.0`, or point
     // FUARAN_PY_PYTHON at an interpreter that already has it.
     expect(fatal, fatal ?? '').toBeUndefined();
   });

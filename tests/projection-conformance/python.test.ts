@@ -56,7 +56,7 @@ const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip
 /**
  * The interpreter to run the executor with. A repo-local `.venv` wins (the
  * documented local setup: `python -m venv .venv` then
- * `pip install fuaran-py==0.2.0`); FUARAN_PY_PYTHON overrides it for CI, where
+ * `pip install fuaran-py==0.3.0`); FUARAN_PY_PYTHON overrides it for CI, where
  * the interpreter is whatever actions/setup-python provisioned.
  */
 const resolvePython = (): string => {
@@ -117,6 +117,12 @@ const resolvePython = (): string => {
 //      pinned host could not produce the bytes — and it was fixable only in that
 //      host, which 0.1.0 did. The family is currently EMPTY; it is kept named
 //      because the shape recurs and its remedy is not the others'.
+//
+// The five families are the CAUSES this quarantine has met, dated 0.0.1, not a
+// description of what is in the map now — families 1, 3 and 5 are empty as of
+// the sixth pass below, and family 2 holds only the `Expr` binding. Each pass
+// records what it measured against its own version; the map itself is the only
+// present tense in this file.
 //
 // None of this is projector lag, and none of it is fixable in this repo — which
 // is why these are named with their cause rather than left to fail. The day
@@ -361,6 +367,68 @@ const resolvePython = (): string => {
 // ids that need it (`expr-scalar`, `expr-params-state-selection`,
 // `switch-predicate`, `node-visible`) are host lag, not projector lag, and the
 // probe agrees.
+// ── SIXTH PASS, 2026-09-07 — RE-MEASURED AGAINST fuaran-py **0.3.0** ────────
+//
+// 0.3.0 is on PyPI and the pin was raised to it in all three workflows. It is
+// the release carrying Phases 1579 (the Drawing / Fact / Mount node kinds) and
+// 1580 (`Binding.Query`, `Binding.Invoke`, `Action.Call` / `Invoke` / `AiTool`,
+// and `TextSource.I18n`). TWENTY-EIGHT ENTRIES WERE REMOVED and SIX survive, so
+// what is left here is smaller than the set of causes the family list above
+// enumerates — read that list as the history it is and this note as the state.
+//
+// THE SPLIT IS THE FINDING, AND IT INVERTS THE FIFTH PASS'S. Twelve entries
+// cleared ON THE PIN RAISE ALONE — every `Drawing`, `Fact` and `Mount` id — where
+// the 0.2.0 pass cleared none that way and concluded that a bump "moves the work
+// rather than removing it". Both observations are right and the discriminator is
+// not the release: it is whether the projector was ALREADY emitting the
+// construct. It was, for all three kinds, because a kind with no constructor arm
+// falls to `pyGenericNode`, which spells `t.<WireTag>(<wire keys snake-cased>)` —
+// so the day the host grew the class, the fallback's guess became correct.
+//
+// THAT IS ALSO WHY TWELVE PASSING FIXTURES WERE NOT LEFT ALONE. The fallback
+// reaches the host's records but fills their slots with RAW DICTS
+// (`t.Drawing(view_box={'height': 100, …})`), and the host's lowering passes a
+// dict straight through. So the arm would have gone on reporting green had 0.3.0
+// modelled `Drawing` and none of its nine shapes — it would have been certifying
+// a host gap as conformance, which is the exact failure the leg's header forbids
+// for `UiNode.visible` and names as the reason the quarantine means anything.
+// `app/Projection.fs` now emits `t.ViewBox` / `t.DrawPoint` / `t.DrawStyle`, the
+// five curve commands, the nine shapes, `t.GuestChannel` and the `FragmentArg`
+// vocabulary through the real `fuaran.drawing` / `.fact` / `.mount`
+// constructors. The fallback's own limit is visible in the one id it could not
+// carry: `mount-2` read the wire tag `Str` as a class name and reached for a
+// `t.Str` that has never existed in any release.
+//
+// SIXTEEN CLEARED ONCE THE PROJECTOR WAS TAUGHT the constructs 0.3.0 grew —
+// `t.Query`, `t.Invoke` / `t.InvokeArg`, `t.I18n`, `t.Call` with
+// `t.IntoState` / `t.IntoQuery`, and `t.AiTool`. Two details are worth keeping:
+// the `Call` target's Python case names deliberately differ from the wire tags
+// they encode (`t.IntoState` writes `{"$type":"State"}`), because `State` and
+// `Query` are already taken by the binding union in the same module; and
+// `on_result` is read from the wire KEY's presence rather than left to the
+// record's default, for the reason `pyHandler` states on the projector side.
+//
+// ONE EXECUTOR CHANGE WAS NEEDED and it is the only builtin the eval namespace
+// admits: §7's non-finite sentinels ride the wire as the strings `"NaN"` /
+// `"Infinity"` / `"-Infinity"` and are FLOATS in every typed slot that carries
+// them, which Python spells only as `float('nan')` — there is no literal. The
+// generic fallback never needed it because it passed the STRING through, which
+// round-tripped by coincidence. `float` resolves to a number and to no part of
+// the host surface, so it cannot stand in for a construct the model omits.
+//
+// WHAT SURVIVES IS ALL HOST LAG AND ALL OF IT WAS EXECUTED THIS PASS. Four ids
+// need `Binding.Expr`, which 1580 declined with its reasons: 0.3.0's `Binding`
+// union is `Static | State | Filter | Selection | Now | FormatBinding | Local |
+// Query | Invoke`, and the probe agrees. Two need a `TransformSource`-typed
+// `TransformBinding.source`, still a bare `DataSource` in the model. The
+// `Binding.Local` declarative-buffer entry the fifth pass expected to survive is
+// NOT here: it never had one, and this is the second pass to note its absence
+// rather than a third to imply it.
+//
+// The `optional:` follow-up the fifth pass filed is still open and is still
+// worth doing — no entry now standing uses that token, so the trap it names is
+// dormant rather than fixed, and it will bite the next entry that reaches for it.
+
 interface Quarantined {
   /** The host-model path this entry claims is absent — see the grammar above. */
   readonly construct: string;
@@ -376,138 +444,15 @@ interface Quarantined {
 }
 
 const PY_UNMODELLED = new Map<string, Quarantined>([
-  // 1 — no typed node kind.
-  ['mount-1', { construct: 't.Mount', arm: 'host', reason: 'no t.Mount' }],
-  ['mount-2', { construct: 't.Mount', arm: 'host', reason: 'no t.Mount' }],
-  ['fact-1', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
-  ['now-environment-binding', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
-  ['master-detail-multi-field', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
-  ['master-detail-preselected', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
-  [
-    'master-detail-preselected-second-row',
-    { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' },
-  ],
-  ['drawing-1', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
-  ['drawing-empty', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
-  ['drawing-nonfinite-sentinels', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
-  ['drawing-rotated-labels', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
-  ['drawing-tipped-shapes', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
+  // What survives the 2026-09-07 SIXTH pass, re-measured against 0.3.0. Six
+  // entries, two causes, both of them host lag with the probe agreeing; the
+  // twenty-eight the release and this phase cleared are gone from the map and
+  // accounted for in the sixth-pass note above rather than commented out here.
 
-  // 2 — no typed binding / action case.
-  ['query-dependson', { construct: 'Binding.Query', arm: 'host', reason: 'no Binding.Query' }],
-  ['metric-invoke', { construct: 'Binding.Invoke', arm: 'host', reason: 'no Binding.Invoke' }],
-  [
-    'image-caption-i18n-1',
-    { construct: 'TextSource.I18n', arm: 'host', reason: 'no TextSource.I18n' },
-  ],
-  ['btn-invoke', { construct: 'Action.Invoke', arm: 'host', reason: 'no Action.Invoke' }],
-  ['btn-json-payloads', { construct: 'Action.AiTool', arm: 'host', reason: 'no Action.AiTool' }],
-  ['call-into', { construct: 'Action.Call', arm: 'host', reason: 'no Action.Call' }],
-
-  // 3 — a slot the record cannot omit: either no field at all (the `to_wire`
-  // writes a CLOSURE sentinel) or a field that cannot be None. `optional:` is
-  // the falsifier for both.
-  [
-    'composite-tabs-panels',
-    {
-      construct: 'Action.Call',
-      arm: 'host',
-      reason:
-        'the Tabs and TextField handler halves are expressible from 0.2.0 and emitted; onSubmit is an Action.Call, which is not',
-    },
-  ],
-  [
-    'grid-declared-edit',
-    {
-      construct: 'Binding.Query',
-      arm: 'host',
-      reason:
-        'editStateKey and the per-column editable are both modelled from 0.2.0 and both emitted; the source is a Binding.Query, which is not',
-    },
-  ],
-  [
-    'shared-source-seeded-pair',
-    {
-      construct: 'cp.TransformSource',
-      arm: 'host',
-      reason: 'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
-    },
-  ],
-
-  // 4 — a record narrower than the wire.
-  [
-    'badge-transform-live',
-    {
-      construct: 'cp.TransformSource',
-      arm: 'host',
-      reason: 'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
-    },
-  ],
-  [
-    'tooltip-metric-1',
-    {
-      construct: 'TextSource.I18n',
-      arm: 'host',
-      reason:
-        'UiNode.tooltip is modelled from 0.2.0 and emitted; this tooltip is a TextSource.I18n, which is not',
-    },
-  ],
-
-  // 3 (continued) — the same unomittable slot, in the controls added since 0.0.1.
-  // Each of the four new field records writes `onChange` and `value` into the
-  // wire unconditionally, so a canonical minimal control cannot be reached.
-
-  // 2 (continued) — `Binding` is Static | State | Filter | Selection | Now |
-  // FormatBinding | Local, so a `Query`-sourced control or grid has no spelling.
-  // The three `arm: 'both'` grid ids additionally name the DataGrid slot 0.1.0
-  // models and this projector does not emit — the half that is fixable HERE, and
-  // that would go unrecorded if the Query source were the only cause named.
-  ['form-combobox-query', { construct: 'Binding.Query', arm: 'host', reason: 'no Binding.Query' }],
-  ['form-tokens-query', { construct: 'Binding.Query', arm: 'host', reason: 'no Binding.Query' }],
-  [
-    'grid-exportable-1',
-    {
-      construct: 'Binding.Query',
-      arm: 'host',
-      reason:
-        'no Binding.Query — the exportable half belonged to the projector and is emitted from Phase 1581',
-    },
-  ],
-  [
-    'grid-keep-rows-together-1',
-    {
-      construct: 'Binding.Query',
-      arm: 'host',
-      reason:
-        'no Binding.Query — the keep_rows_together half belonged to the projector and is emitted from Phase 1581',
-    },
-  ],
-  [
-    'grid-repeat-header-1',
-    {
-      construct: 'Binding.Query',
-      arm: 'host',
-      reason:
-        'no Binding.Query — the repeat_header half belonged to the projector and is emitted from Phase 1581',
-    },
-  ],
-
-  // 1 (continued).
-  ['now-grain', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
-
-  // Family 5 — the encoder's key order — is EMPTY as of the 0.1.0 pin raise:
-  // `custom-nonascii-keys` was its only member and 0.1.0 sorts by UTF-16 code
-  // unit. The family stays named in the list above because the SHAPE recurs (an
-  // encoder that disagrees with the wire is not a modelling gap and has a
-  // different remedy), not because anything is currently in it.
-
-  // ── What survives the 2026-09-07 second pass, re-measured against 0.1.0.
-  // Every id below fails on a construct 0.1.0 does not model ANYWHERE; the ones
-  // whose reason used to name a construct the release has since grown are
-  // rewritten to name what they now actually fail on, which is in each case a
-  // SECOND cause that was always there behind the first.
-  //
-  // 1 (continued) — no typed binding case.
+  // 1 — no typed binding case. `Binding` is Static | State | Filter | Selection
+  // | Now | FormatBinding | Local | Query | Invoke, so a predicate binding has
+  // no spelling in any slot. 1580 declined to model `Expr` with its reasons, so
+  // this is a standing gap rather than a release still in flight.
   ['expr-scalar', { construct: 'Binding.Expr', arm: 'host', reason: 'no Binding.Expr' }],
   [
     'expr-params-state-selection',
@@ -519,7 +464,7 @@ const PY_UNMODELLED = new Map<string, Quarantined>([
       construct: 'Binding.Expr',
       arm: 'host',
       reason:
-        'SwitchCase.when is modelled from 0.1.0; the predicate is a Binding.Expr, which is not',
+        'SwitchCase.when is modelled from 0.1.0 and emitted; the predicate is a Binding.Expr, which is not modelled',
     },
   ],
   [
@@ -528,25 +473,30 @@ const PY_UNMODELLED = new Map<string, Quarantined>([
       construct: 'Binding.Expr',
       arm: 'host',
       reason:
-        'UiNode.visible is modelled from 0.1.0; two predicates are Binding.Expr / Binding.Query, which are not',
+        'UiNode.visible is modelled from 0.1.0 and emitted, and its Binding.Query predicate is modelled from 0.3.0 and emitted; the remaining predicate is a Binding.Expr, which is not modelled',
     },
   ],
 
-  // 2 (continued) — no typed action case.
+  // 2 — a record narrower than the wire. `TransformBinding.source` is a bare
+  // `DataSource` rather than the wire's `TransformSource` DU, so a source that
+  // is `{"$type":"State"}` has no spelling at all — the fixture reads as a
+  // literal table where the wire names a state key.
   [
-    'action-confirm',
+    'badge-transform-live',
     {
-      construct: 'Action.Call',
+      construct: 'cp.TransformSource',
       arm: 'host',
-      reason:
-        'Action.Confirm is modelled from 0.1.0; the confirmed branch is an Action.Call, which is not',
+      reason: 'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
     },
   ],
-
-  // 3 (continued) — the unomittable slot, on the buffer rather than a control.
-  // `Local` writes `onCommit` unconditionally and carries neither `codec` nor
-  // `commitTo`, and the wire refuses a document carrying both commit spellings,
-  // so the declarative buffer has no reachable shape at all.
+  [
+    'shared-source-seeded-pair',
+    {
+      construct: 'cp.TransformSource',
+      arm: 'host',
+      reason: 'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+    },
+  ],
 ]);
 
 /** The map's own tally, by arm — computed, and rendered into the census test's name. */
@@ -562,7 +512,7 @@ const tallyByArm = () => {
  * one the map actually holds — the three passes above each carried counts in
  * prose, and prose cannot be wrong out loud.
  */
-const QUARANTINE_CENSUS = { host: 34, projector: 0, both: 0 } as const;
+const QUARANTINE_CENSUS = { host: 6, projector: 0, both: 0 } as const;
 
 /**
  * What the projector's generated source must contain for it to be EMITTING the
@@ -652,7 +602,7 @@ describe('Python projection conformance (Node corpus)', () => {
   it('the Python executor ran', () => {
     // A hard failure, never a skip: a conformance arm that goes green without
     // its oracle is worse than no arm at all. Install the host with
-    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.2.0`, or point
+    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.3.0`, or point
     // FUARAN_PY_PYTHON at an interpreter that already has it.
     expect(fatal, fatal ?? '').toBeUndefined();
   });

@@ -67,7 +67,7 @@ the shared corpus it projects the wire JSON to Python source, **executes** the
 generated source against the real host (every fixture in ONE CPython process),
 re-encodes via `fuaran_py.ui.encode`, and asserts byte-identity with the fixture.
 Run it with `pnpm conformance`; the arm needs a CPython carrying `fuaran-py`
-(`python -m venv .venv` then `pip install fuaran-py==0.2.0`, or point
+(`python -m venv .venv` then `pip install fuaran-py==0.3.0`, or point
 `FUARAN_PY_PYTHON` at an interpreter that already has it). It **fails** rather
 than skips when the host is absent: an arm that goes green without its oracle is
 worse than no arm.
@@ -77,20 +77,24 @@ the TypeScript leg can always fall back to a typed in-memory object literal,
 Python has **no such escape hatch**: `encode` calls `.to_wire()` on the root, and
 the structural `fuaran_py.model.Obj` has no such method, so a construct the typed
 authoring model does not carry has no spelling at all. Measured against
-`fuaran-py` 0.2.0 — the release the three workflows pin — the remaining set falls
-in three families:
+`fuaran-py` 0.3.0 — the release the three workflows pin — the remaining set falls
+in two families:
 
-- **No typed node kind** — `Mount`, `Fact`, `Drawing`.
-- **No typed binding / action case** — the `Query`, `Expr` and `Invoke` bindings,
-  `TextSource.I18n`, and the `Call`, `AiTool` and `Invoke` actions.
+- **No typed binding case** — `Binding.Expr`. The union runs Static, State,
+  Filter, Selection, Now, FormatBinding, Local, Query, Invoke — and no further, so
+  a predicate binding has no spelling in any slot that takes one.
 - **A record narrower than the wire** — `TransformBinding.source` is a bare
   `DataSource` rather than the wire's `TransformSource`, so a `State`- or
   `Live`-bound source has no spelling.
 
-The **hardcoded closure sentinel** family, which held every canonical minimal
-control, is EMPTY as of 0.2.0: that release made every handler an omittable flag
-and every control's `value` optional, and the projector reads both off the wire.
-It is kept named here because the shape recurs and its remedy is not the others'.
+Two families that held most of this set are now EMPTY, and each is kept named
+because its shape recurs and its remedy is not the others'. The **hardcoded
+closure sentinel**, which held every canonical minimal control, emptied at 0.2.0:
+that release made every handler an omittable flag and every control's `value`
+optional, and the projector reads both off the wire. **No typed node kind**
+emptied at 0.3.0, which grew `Drawing`, `Fact` and `Mount` — along with the
+`Query` and `Invoke` bindings, `TextSource.I18n` and the `Call` / `AiTool` /
+`Invoke` actions, which between them emptied most of the second family too.
 
 The set's size is deliberately not quoted here. It is computed by arm and printed
 by the census test in `python.test.ts`, which is the only place it cannot go stale

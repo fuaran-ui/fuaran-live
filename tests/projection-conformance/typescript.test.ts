@@ -97,12 +97,27 @@ const evalExpr = (expr: string): Node<unknown> => {
 //      and the projector still emitted a bare `DataSource`, which crashed the
 //      encoder rather than merely dropping a key — 13 ids at once.
 //
-// The pins are current as of 2026-08-30: ops 0.19.0, schema 0.18.0, ui 0.17.0,
+// The pins were current as of 2026-08-30: ops 0.19.0, schema 0.18.0, ui 0.17.0,
 // renderer 0.17.0, charts 0.11.0, ai-tools 0.11.0 — each the newest version its
 // own package line publishes, verified against registry.npmjs.org. They are NOT
 // one uniform number, and reading the v0.19.0 release tag as one is how this
 // repo would have re-pinned five of the six packages to a version that does not
-// exist.
+// exist. They have since moved (ops 0.22.0, schema 0.20.0, ui 0.19.0, renderer
+// 0.21.0, charts 0.14.0, ai-tools 0.12.0) — still six independent lines.
+//
+// 2026-09-07 — the corpus had grown past the projector again, 48 ids' worth,
+// and the set is STILL empty because every one of them was taught rather than
+// listed. Two of the sixteen families were not missing slots but missing KINDS
+// (`Embed`, `Tree`): the projector fell through to the illustrative generic
+// sketch, which emits `fuaran.embed('id', {…})` — a two-argument call no ctor
+// in this tier takes — so those failed as a TypeError rather than as a byte
+// difference. Worth knowing, because a `Cannot read properties of undefined`
+// from this arm reads like a harness fault and is not one: it is the fallback
+// telling you a kind has no arm.
+//
+// Nothing here was package lag. Each of the 48 was checked against the pinned
+// `@fuaran-ui/ops` encoder before it was taught, and every field the corpus
+// asked for was already there to be emitted.
 //
 // If a future corpus addition lands here as a failure, the choice is to teach
 // the projector or — where a slot genuinely has no reachable ctor and no

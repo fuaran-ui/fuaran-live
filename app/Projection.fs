@@ -774,6 +774,18 @@ let rec private tsColExpr (v: JsonValue) : string =
         "fn", qs (strOf "fn" v)
         "args", "[" + (arrOf "args" v |> List.map tsColExpr |> String.concat ", ") + "]" ]
   | Some "param" -> tsInline [ "kind", qs "param"; "name", qs (strOf "name" v) ]
+  | Some "isNull" -> tsInline [ "kind", qs "isNull"; "expr", tsColExpr (fieldD "expr" v) ]
+  // The wire spells BOTH membership forms `in`; the in-memory model splits them
+  // by which payload is carried — a literal `items` list, or the `param` naming
+  // a transform parameter resolved at evaluation time.
+  | Some "in" ->
+    (match optStr "param" v with
+     | Some p -> tsInline [ "kind", qs "inParam"; "expr", tsColExpr (fieldD "expr" v); "param", qs p ]
+     | None ->
+       tsInline
+         [ "kind", qs "in"
+           "expr", tsColExpr (fieldD "expr" v)
+           "items", "[" + (arrOf "items" v |> List.map tsColExpr |> String.concat ", ") + "]" ])
   | _ -> tsInline [ "kind", qs "col"; "name", qs (strOf "name" v) ]
 
 /// Reconstruct the in-memory `DataSource` from its columnar wire form
@@ -915,6 +927,17 @@ let private tsFormatIntent (v: JsonValue) : string =
      | None -> "{ kind: 'Percent' }")
   | Some "Date" -> tsInline [ "kind", qs "Date"; "dateStyle", qs (strOf "dateStyle" v) ]
   | Some "RelativeTime" -> tsInline [ "kind", qs "RelativeTime"; "unit", qs (strOf "unit" v) ]
+  | Some "Duration" ->
+    tsInline
+      [ "kind", qs "Duration"
+        "unit", qs (strOf "unit" v)
+        "style", qs (strOf "style" v) ]
+  // Phase 1533 — elapsed-time-since. `unit` is omitted when absent, and the
+  // absence IS the auto-selection request rather than a default to spell out.
+  | Some "Since" ->
+    (match optStr "unit" v with
+     | Some u -> tsInline [ "kind", qs "Since"; "unit", qs u ]
+     | None -> "{ kind: 'Since' }")
   | _ ->
     (match optNum "decimals" v with
      | Some d -> tsInline [ "kind", qs "Number"; "decimals", numLit d ]
@@ -1005,7 +1028,13 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
     // Phase 765 — the host-furnished instant. `project` is erased on encode
     // (the wire form is the bare `{"$type":"Now"}`), so the identity keeps
     // the round-trip byte-exact; no smart-ctor exists in the TS tier yet.
-    "{ kind: 'Now', project: (iso) => iso }"
+    // Phase 1533 — the declared `grain` DOES ride the wire, and only when the
+    // author named one, so it projects as present-or-absent, never as a default.
+    "{ kind: 'Now', project: (iso) => iso"
+    + (match optStr "grain" v with
+       | Some g -> ", grain: " + qs g
+       | None -> "")
+    + " }"
   | Some "Local" ->
     "binding.local("
     + tsBinding Opq.Scalar (fieldD "initialFrom" v)
@@ -1199,7 +1228,13 @@ let rec private tsAction (v: JsonValue) : string =
     + (arrOf "ops" v |> List.map tsAction |> String.concat ", ")
     + "])"
   | Some "CommitLocal" -> "action.commitLocal(" + qs (strOf "nodeId" v) + ")"
-  | Some "WriteToClipboard" -> "action.writeToClipboard(" + qs (strOf "text" v) + ")"
+  // The clipboard payload is a `TextSource`, not a bare string: the canonical
+  // `Literal` form IS the bare JSON string, but a `Bound` payload rides as the
+  // envelope and must project as one (reading it with `strOf` erased it to '').
+  | Some "WriteToClipboard" -> "action.writeToClipboard(" + tsTextInput (fieldD "text" v) + ")"
+  // Phase 1124 — the reader's own print dialogue. It takes nothing, and the
+  // encoder refuses any member beside `$type`.
+  | Some "Print" -> "action.print()"
   | Some "ReadFileBody" ->
     "action.readFileBody({ id: "
     + qs (strOf "fileRef" v)
@@ -1252,14 +1287,23 @@ type private AutoBind =
 let private ctrlDefault (kind: string) : string =
   match kind with
   | "Number"
+  // Phase 1122 — a rating reads the numeric control default.
+  | "Rating"
   | "RangedNumber" -> "0"
   // Phase 766 — Toggle shares Checkbox's boolean value slot.
   | "Checkbox"
   | "Toggle" -> "false"
+  // Phase 1119 — a combobox reads the choice control default (unset).
+  | "Combobox"
   | "Choice"
   | "SegmentedChoice" -> "undefined"
   | "Range" -> "[0, 0]"
   | "DateRange" -> "['', '']"
+  // Phase 1121 — an auto-bound token field starts with no chips at all.
+  | "Tokens" -> "[]"
+  // Phase 1130 — the unset swatch: `#000000` is the native colour input's own
+  // default, and the one `#rrggbb` form the control can hold.
+  | "Color" -> "'#000000'"
   | _ -> "''" // Text / TextArea / Date
 
 let private tsAutoBindValue (ab: AutoBind) (kind: string) : string =
@@ -1389,6 +1433,44 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
           "variant", qs (strOf "variant" v)
           "constraints", tsConstraints true v ]
     )
+  // Phase 1130 — the colour swatch: the plain value/handler pair.
+  | "Color" -> tsInline ([ "kind", qs "Color" ] @ handler "onChange" @ [ "value", value ])
+  // Phase 1122 — the rating scale. `max` is required in memory (the encoder
+  // always writes it); `allowHalf` is false-by-default and omitted there.
+  | "Rating" ->
+    tsInline (
+      [ "kind", qs "Rating" ]
+      @ (if boolOf "allowHalf" v then [ "allowHalf", "true" ] else [])
+      @ [ "max", numLit (numOf "max" v) ]
+      @ handler "onChange"
+      @ [ "value", value ]
+    )
+  // Phase 1119 — the free-text-or-pick combobox. `options` is required in
+  // memory; `allowFreeText` defaults to FALSE, so an absent wire field is false.
+  | "Combobox" ->
+    tsInline (
+      [ "kind", qs "Combobox"; "allowFreeText", boolLit (boolOf "allowFreeText" v) ]
+      @ handler "onChange"
+      @ [ "options", tsOptionsBinding (fieldD "options" v); "value", value ]
+    )
+  // Phase 1121 — the chip list. `allowFreeText` defaults to TRUE here (the
+  // encoder writes it only when false), so an ABSENT wire field is `true` —
+  // the one place in the field vocabulary where absence is not `false`.
+  | "Tokens" ->
+    tsInline (
+      [ "kind", qs "Tokens"
+        "allowFreeText",
+        boolLit (
+          match JsonValue.tryField "allowFreeText" v with
+          | Some(JBool b) -> b
+          | _ -> true
+        ) ]
+      @ handler "onChange"
+      @ (match JsonValue.tryField "suggestions" v with
+         | Some s -> [ "suggestions", tsOptionsBinding s ]
+         | None -> [])
+      @ [ "value", value ]
+    )
   | _ -> tsInline ([ "kind", qs "Text" ] @ handler "onChange" @ [ "value", value ])
 
 /// A `FormField`'s declared constraint (Phase 864) — the ACCEPTED SET, where
@@ -1467,6 +1549,64 @@ let private tsGridColumn (v: JsonValue) : string =
       "format", tsCellFormat (fieldD "format" v)
       "kind", tsInline [ "kind", qs (dollarType (fieldD "kind" v) |> Option.defaultValue "Text") ]
       "width", tsColumnWidth (fieldD "width" v) ]
+
+/// A `Tree` row (Phase 1120) — recursive, `children` omitted-when-empty and
+/// `icon` omitted-when-absent, both of which the ctor re-normalises.
+let rec private tsTreeItem (v: JsonValue) : string =
+  tsInline (
+    [ "id", qs (strOf "id" v); "label", tsTextInput (fieldD "label" v) ]
+    @ (match JsonValue.tryField "children" v with
+       | Some(JArray cs) when not (List.isEmpty cs) ->
+         [ "children", "[" + (cs |> List.map tsTreeItem |> String.concat ", ") + "]" ]
+       | _ -> [])
+    @ (match optStr "icon" v with
+       | Some i -> [ "icon", qs i ]
+       | None -> [])
+  )
+
+/// A chart annotation (Phase 1534) — the reference line, the event marker and
+/// the shaded band, each with an optional `label`. No ctor surface reaches them,
+/// so they project as the typed spec literal the post-edit spread carries.
+let private tsChartAnnotation (v: JsonValue) : string =
+  let annX (x: JsonValue) =
+    match dollarType x with
+    | Some "Date" -> tsInline [ "kind", qs "Date"; "iso", qs (strOf "iso" x) ]
+    | _ -> tsInline [ "kind", qs "Category"; "key", qs (strOf "key" x) ]
+
+  let range (r: JsonValue) =
+    match dollarType r with
+    | Some "XRange" ->
+      tsInline
+        [ "kind", qs "XRange"
+          "from", annX (fieldD "from" r)
+          "to", annX (fieldD "to" r) ]
+    | _ ->
+      tsInline
+        [ "kind", qs "ValueRange"
+          "from", numLit (numOf "from" r)
+          "to", numLit (numOf "to" r) ]
+
+  let label =
+    match JsonValue.tryField "label" v with
+    | Some l -> [ "label", tsTextSourceLit l ]
+    | None -> []
+
+  match dollarType v with
+  | Some "EventMarker" -> tsInline ([ "kind", qs "EventMarker"; "at", annX (fieldD "at" v) ] @ label)
+  | Some "RangeBand" -> tsInline ([ "kind", qs "RangeBand"; "range", range (fieldD "range" v) ] @ label)
+  | _ -> tsInline ([ "kind", qs "ReferenceLine"; "value", numLit (numOf "value" v) ] @ label)
+
+/// A `Media` timed-text track (Phase 1114). `default` is omitted-when-false, so
+/// it rides only where the wire asserts it; the ctor coerces `label` from the
+/// wire's bare string and passes a `src` Binding straight through.
+let private tsMediaTrack (v: JsonValue) : string =
+  tsInline (
+    [ "kind", qs (strOf "kind" v)
+      "src", tsBinding Opq.Scalar (fieldD "src" v)
+      "srcLang", qs (strOf "srcLang" v)
+      "label", tsTextInput (fieldD "label" v) ]
+    @ (if boolOf "default" v then [ "default", "true" ] else [])
+  )
 
 let private tsTabHeader (v: JsonValue) : string =
   tsInline (
@@ -1551,6 +1691,12 @@ let private tsStyleLit (v: JsonValue) : string =
        | None -> [])
     @ (match optStr "voice" v with
        | Some vo -> [ "voice", qs vo ]
+       | None -> [])
+    // Phase 1533 — the writing-direction slot. `auto` is the default and the
+    // encoder omits it, so an absent wire field must project as ABSENT here
+    // (spelling it out as 'auto' would be a non-default override on re-encode).
+    @ (match optStr "direction" v with
+       | Some d -> [ "direction", qs d ]
        | None -> [])
   )
 
@@ -1760,6 +1906,13 @@ and private tsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
                (match wireA with
                 | Some a -> tsAccessibilityLit a
                 | None -> "undefined") ])
+        // Phase 1112 — the node-level tooltip trait. No smart ctor carries it,
+        // so it rides the same override spread the other base traits take. It is
+        // a `TextSource` in memory even where the wire spells it as a bare
+        // string, so it takes the explicit object form.
+        @ (match JsonValue.tryField "tooltip" nodeV with
+           | Some t -> [ "tooltip", tsTextSourceLit t ]
+           | None -> [])
 
       if List.isEmpty overrides then
         ctorExpr
@@ -1868,6 +2021,9 @@ and private tsBaseTraits (depth: int) (nodeV: JsonValue) : (string * string) lis
   @ (match JsonValue.tryField "accessibility" nodeV with
      | Some a -> [ "accessibility", tsAccessibilityLit a ]
      | None -> [])
+  @ (match JsonValue.tryField "tooltip" nodeV with
+     | Some t -> [ "tooltip", tsTextSourceLit t ]
+     | None -> [])
 
 and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue) : string =
   // 0.2.0 — the consolidated `Box` layout kind (`role` + `layout`, absorbing
@@ -1913,6 +2069,17 @@ and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue
       @ (match JsonValue.tryField "heading" k with
          | Some h -> [ "heading", tsTextSourceLit h ]
          | None -> [])
+      // Phase 1124 — the print-pagination hints. Both are `false`-by-default
+      // booleans the encoder omits at their default, so they ride only when the
+      // wire asserts them.
+      @ (if boolOf "keepTogether" k then
+           [ "keepTogether", "true" ]
+         else
+           [])
+      @ (if boolOf "breakBefore" k then
+           [ "breakBefore", "true" ]
+         else
+           [])
     )
 
   tsObjLit
@@ -2032,6 +2199,27 @@ and private tsDataGridNode (depth: int) (id: string) (k: JsonValue) (nodeV: Json
          | None -> [])
       @ (match optStr "editStateKey" k with
          | Some s -> [ "editStateKey", qs s ]
+         | None -> [])
+      // Phase 1124 — the grid's print-pagination hints (`false`-by-default, so
+      // omitted at their default) and the drag-transfer keys (optional strings
+      // naming the transfer group a row may leave / join).
+      @ (if boolOf "exportable" k then
+           [ "exportable", "true" ]
+         else
+           [])
+      @ (if boolOf "keepRowsTogether" k then
+           [ "keepRowsTogether", "true" ]
+         else
+           [])
+      @ (if boolOf "repeatHeader" k then
+           [ "repeatHeader", "true" ]
+         else
+           [])
+      @ (match optStr "transferOutKey" k with
+         | Some s -> [ "transferOutKey", qs s ]
+         | None -> [])
+      @ (match optStr "transferInKey" k with
+         | Some s -> [ "transferInKey", qs s ]
          | None -> [])
       @ staticRows
     )
@@ -2196,6 +2384,15 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
            "dismissable", boolLit (boolOf "dismissable" k) ]
        @ (match JsonValue.tryField "onDismiss" k with
           | Some d -> [ "onDismiss", tsAction d ]
+          | None -> [])
+       // Phase 1113 — the popover form: `modality` selects the presentation
+       // (Dialog is the default and the encoder omits it) and `anchor` names the
+       // node the popover hangs off. Both optional, both omitted when absent.
+       @ (match optStr "modality" k with
+          | Some m -> [ "modality", qs m ]
+          | None -> [])
+       @ (match optStr "anchor" k with
+          | Some a -> [ "anchor", qs a ]
           | None -> [])
        @ [ "children", tsChildren depth k ])
   | "ScrollArea" ->
@@ -2392,6 +2589,15 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       @ (match JsonValue.tryField "loop" k with
          | Some(JBool b) -> [ "loop", boolLit b ]
          | _ -> [])
+      // Phase 1114 — the timed-text `tracks` and the `transcript` fallback. A
+      // track's `label` is a `TextSource` in memory though the wire spells it as
+      // a bare string; `default` is omitted-when-false.
+      @ (match JsonValue.tryField "tracks" k with
+         | Some(JArray ts) -> [ "tracks", "[" + (ts |> List.map tsMediaTrack |> String.concat ", ") + "]" ]
+         | _ -> [])
+      @ (match JsonValue.tryField "transcript" k with
+         | Some t -> [ "transcript", tsTextInput t ]
+         | None -> [])
 
     if isVideo then
       call
@@ -2405,6 +2611,37 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
             | None -> []))
     else
       call "audio" common
+  // Phase 1111 — the sandboxed third-party embed. `aspectRatio` defaults to
+  // `Natural` and `permissions` to the empty list (total denial); the encoder
+  // omits both at their default, so each rides only where the wire asserts it.
+  | "Embed" ->
+    call
+      "embed"
+      ([ idF
+         "src", tsBinding Opq.Scalar (fieldD "src" k)
+         "title", tsTextInput (fieldD "title" k) ]
+       @ (match optStr "aspectRatio" k with
+          | Some a -> [ "aspectRatio", qs a ]
+          | None -> [])
+       @ (match JsonValue.tryField "permissions" k with
+          | Some(JArray ps) -> [ "permissions", "[" + (ps |> List.map strItem |> String.concat ", ") + "]" ]
+          | _ -> []))
+  // Phase 1120 — the hierarchical disclosure list. `onSelect` is a closure the
+  // encoder erases, so its presence (not its body) is what must be projected.
+  | "Tree" ->
+    call
+      "tree"
+      ([ idF
+         "items", "[" + (arrOf "items" k |> List.map tsTreeItem |> String.concat ", ") + "]" ]
+       @ (match optStr "expandedStateKey" k with
+          | Some s -> [ "expandedStateKey", qs s ]
+          | None -> [])
+       @ (match optStr "selectionStateKey" k with
+          | Some s -> [ "selectionStateKey", qs s ]
+          | None -> [])
+       @ (match JsonValue.tryField "onSelect" k with
+          | Some _ -> [ "onSelect", "() => action.chain([])" ]
+          | None -> []))
   | "List" ->
     call
       "list"
@@ -2528,6 +2765,24 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
          "onSelect", "() => action.chain([])" ]
        @ (match JsonValue.tryField "disabled" k with
           | Some d -> [ "disabled", tsBinding Opq.Scalar d ]
+          | None -> [])
+       // Phase 1123 — the intake affordances. `dropTarget` / `acceptPaste` are
+       // `false`-by-default booleans the encoder omits at their default;
+       // `capture` names a device and `destination` a server-side bucket, both
+       // optional strings omitted when absent.
+       @ (if boolOf "dropTarget" k then
+            [ "dropTarget", "true" ]
+          else
+            [])
+       @ (if boolOf "acceptPaste" k then
+            [ "acceptPaste", "true" ]
+          else
+            [])
+       @ (match optStr "capture" k with
+          | Some c -> [ "capture", qs c ]
+          | None -> [])
+       @ (match optStr "destination" k with
+          | Some d -> [ "destination", qs d ]
           | None -> []))
   // ── Visualisation ─────────────────────────────────────────────────────────
   | "Chart" ->
@@ -2575,6 +2830,10 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       @ (match optStr "xScale" k with
          | Some s -> [ "xScale", qs s ]
          | None -> [])
+      @ (match JsonValue.tryField "annotations" k with
+         | Some(JArray anns) ->
+           [ "annotations", "[" + (anns |> List.map tsChartAnnotation |> String.concat ", ") + "]" ]
+         | _ -> [])
 
     if List.isEmpty extras then
       Some ctorExpr
@@ -2724,10 +2983,15 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     | None ->
       call
         "switch"
-        [ idF
-          "stateKey", qs (strOf "stateKey" k)
-          "cases", "[" + cases + "]"
-          "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
+        ([ idF
+           "stateKey", qs (strOf "stateKey" k)
+           "cases", "[" + cases + "]"
+           "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
+         // Phase 1531 — the carousel's self-advance interval, optional and
+         // omitted when absent (a switch with no interval never advances itself).
+         @ (match optNum "autoAdvanceMs" k with
+            | Some ms -> [ "autoAdvanceMs", numLit ms ]
+            | None -> []))
   | _ -> None
 
 // ─── Python (fuaran_py.ui) — per-kind exact emission (Phase 1142) ─────────────

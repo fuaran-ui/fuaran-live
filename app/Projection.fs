@@ -3402,7 +3402,12 @@ let rec private pyAction (v: JsonValue) : string =
        + pyJson (fieldD "value" v)
        + ")")
   | Some "Chain" -> "action.chain(" + pyList (arrOf "ops" v |> List.map pyAction) + ")"
-  | Some "WriteToClipboard" -> "action.write_to_clipboard(" + pq (strOf "text" v) + ")"
+  // The clipboard payload is a `TextSource`: `Literal`'s canonical form is the
+  // bare JSON string, but a `Bound` payload rides as the envelope and must
+  // project as one (reading it with `strOf` erased it to '').
+  | Some "WriteToClipboard" -> "action.write_to_clipboard(" + pyTextInput (fieldD "text" v) + ")"
+  // Phase 1124 — the reader's own print dialogue; it takes nothing.
+  | Some "Print" -> "action.print()"
   | Some "ReadFileBody" ->
     "action.read_file_body("
     + pq (strOf "fileRef" v)
@@ -3435,13 +3440,19 @@ let private pyCellFormat (v: JsonValue) : string =
 let private pyCtrlDefault (kind: string) : string =
   match kind with
   | "Number"
+  | "Rating"
   | "RangedNumber" -> "0"
   | "Checkbox"
   | "Toggle" -> "False"
+  | "Combobox"
   | "Choice"
   | "SegmentedChoice" -> "None"
   | "Range" -> "[0, 0]"
   | "DateRange" -> "['', '']"
+  // Phase 1121 — an auto-bound token field starts with no chips at all.
+  | "Tokens" -> "[]"
+  // Phase 1130 — the unset swatch, the one `#rrggbb` form the control can hold.
+  | "Color" -> "'#000000'"
   | _ -> "''"
 
 let private pyAutoBindValue (ab: AutoBind) (kind: string) : string =
@@ -3535,6 +3546,40 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
   | "RangedNumber" -> pyCall "t.RangedNumber" [ value ] (minMaxStep false)
   | "Date" -> pyCall "t.DateField" [ value ] ([ "variant", pq (strOf "variant" v) ] @ minMaxStep true)
   | "DateRange" -> pyCall "t.DateRangeField" [ value ] ([ "variant", pq (strOf "variant" v) ] @ minMaxStep true)
+  // Phase 1130 — the colour swatch: value only.
+  | "Color" -> "t.ColorField(" + value + ")"
+  // Phase 1122 — `max` is the case's only required member; `allow_half` omits
+  // at False.
+  | "Rating" ->
+    pyCall
+      "t.RatingField"
+      [ numLit (numOf "max" v); value ]
+      (if boolOf "allowHalf" v then
+         [ "allow_half", "True" ]
+       else
+         [])
+  // Phase 1119 — `allow_free_text` omits at False here (the opposite polarity
+  // to `Tokens`, whose suggestion source is optional and this one's required).
+  | "Combobox" ->
+    pyCall
+      "t.ComboboxField"
+      [ pyOptionsBinding (fieldD "options" v); value ]
+      (if boolOf "allowFreeText" v then
+         [ "allow_free_text", "True" ]
+       else
+         [])
+  // Phase 1121 — `allow_free_text` defaults to TRUE, so an ABSENT wire field is
+  // `true`: the one place in the field vocabulary where absence is not `false`.
+  | "Tokens" ->
+    pyCall
+      "t.TokensField"
+      [ value ]
+      ((match JsonValue.tryField "allowFreeText" v with
+        | Some(JBool false) -> [ "allow_free_text", "False" ]
+        | _ -> [])
+       @ (match JsonValue.tryField "suggestions" v with
+          | Some s -> [ "suggestions", pyOptionsBinding s ]
+          | None -> []))
   | _ -> "t.TextField(" + value + ")"
 
 /// A filter chip's control — the same vocabulary as a form field, but three of
@@ -3628,6 +3673,18 @@ let private pyGridColumn (v: JsonValue) : string =
       + ")"
       "width", pyColumnWidth (fieldD "width" v) ]
 
+/// A `Media` timed-text track (Phase 1110). `default` omits at False; the track
+/// record takes its `label` as a `TextSource` and its `src` as a `Binding`.
+let private pyMediaTrack (v: JsonValue) : string =
+  pyCall
+    "t.TrackEntry"
+    []
+    ([ "kind", pq (strOf "kind" v)
+       "label", pyTextSource (fieldD "label" v)
+       "src", pyBinding Opq.Scalar (fieldD "src" v)
+       "srcLang", pq (strOf "srcLang" v) ]
+     @ (if boolOf "default" v then [ "default", "True" ] else []))
+
 let private pyTabHeader (v: JsonValue) : string =
   pyCall
     "t.TabHeader"
@@ -3698,6 +3755,11 @@ let private pyStyleLit (v: JsonValue) : string =
         | None -> [])
      @ (match optStr "voice" v with
         | Some vo -> [ "voice", pq vo ]
+        | None -> [])
+     // Phase 1533 — the writing-direction slot; `auto` is the default and the
+     // record omits it there, so an absent wire field must project as absent.
+     @ (match optStr "direction" v with
+        | Some d -> [ "direction", pq d ]
         | None -> []))
 
 let private pyAccessibilityLit (v: JsonValue) : string =
@@ -3852,6 +3914,15 @@ and private pyBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue
     @ (match JsonValue.tryField "heading" k with
        | Some h -> [ "heading", pyTextSource h ]
        | None -> [])
+    // Phase 1473 — the print-pagination hints, both omitted-when-false.
+    @ (if boolOf "keepTogether" k then
+         [ "keep_together", "True" ]
+       else
+         [])
+    @ (if boolOf "breakBefore" k then
+         [ "break_before", "True" ]
+       else
+         [])
 
   pyCallBlock "t.UiNode" [] ([ "id", pq id; "kind", pyCall "t.Box" [] boxKw ] @ pyBaseTraits depth nodeV) depth
 
@@ -3976,6 +4047,14 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
            "dismissable", pyBool (boolOf "dismissable" k) ]
        @ (match JsonValue.tryField "onDismiss" k with
           | Some d -> [ "onDismiss", pyAction d ]
+          | None -> [])
+       // Phase 1119 — the anchored popover form. `Blocking` is the identity and
+       // omits at it; `anchor` names the node the surface is positioned against.
+       @ (match optStr "modality" k with
+          | Some m -> [ "modality", pq m ]
+          | None -> [])
+       @ (match optStr "anchor" k with
+          | Some a -> [ "anchor", pq a ]
           | None -> [])
        @ [ "children", pyChildren depth k ])
   | "ScrollArea" ->
@@ -4138,6 +4217,14 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       @ (match JsonValue.tryField "loop" k with
          | Some(JBool b) -> [ "loop", pyBool b ]
          | _ -> [])
+      // Phase 1110/1114 — the timed-text tracks and the transcript fallback.
+      // `tracks` omits at the empty list, `transcript` when absent.
+      @ (match JsonValue.tryField "tracks" k with
+         | Some(JArray ts) when not (List.isEmpty ts) -> [ "tracks", pyList (ts |> List.map pyMediaTrack) ]
+         | _ -> [])
+      @ (match JsonValue.tryField "transcript" k with
+         | Some t -> [ "transcript", pyTextInput t ]
+         | None -> [])
 
     if isVideo then
       call
@@ -4257,6 +4344,23 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
          "multiple", pyBool (boolOf "multiple" k) ]
        @ (match JsonValue.tryField "disabled" k with
           | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
+          | None -> [])
+       // Phase 1123 — the intake affordances. `dropTarget` / `acceptPaste` omit
+       // at False; `capture` names a device and `destination` a server-side
+       // bucket, both optional and omitted when absent.
+       @ (if boolOf "dropTarget" k then
+            [ "dropTarget", "True" ]
+          else
+            [])
+       @ (if boolOf "acceptPaste" k then
+            [ "acceptPaste", "True" ]
+          else
+            [])
+       @ (match optStr "capture" k with
+          | Some c -> [ "capture", pq c ]
+          | None -> [])
+       @ (match optStr "destination" k with
+          | Some d -> [ "destination", pq d ]
           | None -> []))
   // ── Visualisation ─────────────────────────────────────────────────────────
   | "Chart" ->
@@ -4399,14 +4503,49 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     // The Python constructor takes BOTH selector spellings, so — unlike the TS
     // leg, which has to post-edit the built node — a non-`State` selector is
     // expressed directly.
-    call
-      "switch"
-      []
-      ([ "cases", pyList cases
-         "default", pyNodeExpr (depth + 1) (fieldD "default" k) ]
-       @ (match JsonValue.tryField "on" k with
-          | Some onV -> [ "on", pyBinding Opq.Scalar onV ]
-          | None -> [ "stateKey", pq (strOf "stateKey" k) ]))
+    match optNum "autoAdvanceMs" k with
+    | None ->
+      call
+        "switch"
+        []
+        ([ "cases", pyList cases
+           "default", pyNodeExpr (depth + 1) (fieldD "default" k) ]
+         @ (match JsonValue.tryField "on" k with
+            | Some onV -> [ "on", pyBinding Opq.Scalar onV ]
+            | None -> [ "stateKey", pq (strOf "stateKey" k) ]))
+    | Some ms ->
+      // Phase 1531 — the carousel's self-advance interval is a slot on the
+      // record but not a parameter of `fuaran.switch`, so a switch declaring one
+      // projects as the typed node literal (the ctor injects no ARIA default, so
+      // the two forms are otherwise the same node).
+      let typedCases =
+        arrOf "cases" k
+        |> List.map (fun c ->
+          "t.SwitchCase(match="
+          + pq (strOf "match" c)
+          + ", child="
+          + pyNodeExpr (depth + 1) (fieldD "child" c)
+          + ")")
+
+      Some(
+        "t.UiNode(id="
+        + pq id
+        + ", kind="
+        + pyCall
+            "t.Switch"
+            []
+            ([ "stateKey",
+               (match JsonValue.tryField "on" k with
+                | Some _ -> "None"
+                | None -> pq (strOf "stateKey" k))
+               "cases", pyList typedCases
+               "default", pyNodeExpr (depth + 1) (fieldD "default" k) ]
+             @ (match JsonValue.tryField "on" k with
+                | Some onV -> [ "on", pyBinding Opq.Scalar onV ]
+                | None -> [])
+             @ [ "autoAdvanceMs", numLit ms ])
+        + ")"
+      )
   | _ -> None
 
 // ─── the modern-host Box vocabulary (Go / Kotlin / Rust / Swift) ──────────────

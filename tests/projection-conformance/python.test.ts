@@ -48,7 +48,7 @@ const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip
 /**
  * The interpreter to run the executor with. A repo-local `.venv` wins (the
  * documented local setup: `python -m venv .venv` then
- * `pip install fuaran-py==0.0.1`); FUARAN_PY_PYTHON overrides it for CI, where
+ * `pip install fuaran-py==0.0.6`); FUARAN_PY_PYTHON overrides it for CI, where
  * the interpreter is whatever actions/setup-python provisioned.
  */
 const resolvePython = (): string => {
@@ -75,14 +75,14 @@ const resolvePython = (): string => {
 // here it is structural: `encode` requires a `.to_wire()` root, so a kind or a
 // binding the typed model omits has NO spelling at all.
 //
-// Dated 2026-09-02, measured against fuaran-py 0.0.1 (PyPI) — the newest
-// published release. Every entry below was verified to be absent from BOTH that
-// release and the current development tree, so none of them is a pin-lag
-// artefact.
+// Originally dated 2026-09-02 against fuaran-py 0.0.1 (PyPI); RE-MEASURED
+// 2026-09-07 against 0.0.6, the version CI pins — see the re-measurement note
+// below the family list, which is where the record of what moved lives.
+//
 // Every entry below was measured, not assumed: the projector emits the shape the
 // typed model WOULD take, and the executor's failure — an `AttributeError` naming
 // an absent class, or a byte difference in a slot the record cannot carry — is
-// what identified the cause. The causes fall into four families:
+// what identified the cause. The causes fall into five families:
 //
 //   1. NO TYPED KIND. `encode` requires a `.to_wire()` root, so a node kind the
 //      model omits has no spelling at all: Mount, Fact, Drawing.
@@ -93,11 +93,17 @@ const resolvePython = (): string => {
 //      (`{"$type":"Text"}`) and the declarative field-named grid column cannot be
 //      reached — the slot is not optional in the record, and the encoder has
 //      nothing to omit.
-//   4. A NARROWER RECORD. `Chart` reaches six slots fewer than the wire;
+//   4. A NARROWER RECORD. `Chart` reaches eight slots fewer than the wire;
 //      `TransformBinding` carries neither `params` nor a `Live` source;
-//      `DataGrid` carries none of the declarative sort / page / edit-state slots;
-//      `Link` has no `protection`; `Table` no `sortable` / `defaultSort`; `Media`
-//      no `tracks` / `transcript`.
+//      `DataGrid` carries none of the declarative sort / page / edit-state slots
+//      and no `reorderable`; `Link` has no `protection`; `Table` no `sortable` /
+//      `defaultSort`; `UiNode` no `tooltip`.
+//   5. AN ENCODER THAT DISAGREES WITH THE WIRE. §2 rule 2 orders object keys by
+//      UTF-16 CODE UNIT; 0.0.6's canonical writer sorts by Python's code-point
+//      order, which differs the moment a key is non-BMP. Not a modelling gap and
+//      the only entry of its family, but it fails here for the same reason the
+//      rest do — the pinned host cannot produce the bytes — and it is fixable
+//      only in that host.
 //
 // None of this is projector lag, and none of it is fixable in this repo — which
 // is why these are named with their cause rather than left to fail. The day
@@ -105,9 +111,33 @@ const resolvePython = (): string => {
 // search, and the test below FAILS if one starts round-tripping while still
 // listed, so the set cannot quietly outlive its cause.
 //
-// Dated 2026-09-02, measured against fuaran-py 0.0.1 (PyPI) — the newest
-// published release. Each absent construct was checked against the current
-// development tree as well, so no entry here is a pin-lag artefact.
+// RE-MEASURED 2026-09-07 against fuaran-py **0.0.6** — the version CI pins, and
+// five releases past the 0.0.1 the original note measured. Three things came out
+// of that pass and each is worth stating, because the set is only as honest as
+// its last measurement:
+//
+//   • THREE ENTRIES WERE REMOVED. 0.0.6 grew `Media.tracks` / `Media.transcript`,
+//     so `media-audio-transcript-1`, `media-video-captions-1` and
+//     `media-video-tracks-2` now round-trip once the projector emits them — which
+//     it does. The self-clearing test below is what forced the removal rather
+//     than merely inviting it.
+//   • TWENTY-TWO ENTRIES WERE ADDED, all of them corpus growth this repo cannot
+//     absorb: chart annotations, the node-level tooltip, `Format.Since`, the
+//     anchored-popover pair, the grid print/transfer trio, the new field controls
+//     and the non-BMP key ordering. Each was measured the same way — project,
+//     execute, read the executor's `AttributeError` or the byte difference.
+//   • SOME SURVIVING REASONS NAME A 0.0.1 CAUSE. `Column has no field` is the
+//     clearest: 0.0.6 DOES carry `Column.field_name`, and those fixtures now fail
+//     on a different slot of the same record. They stay because they still fail
+//     — verified, not assumed — but their wording is older than their cause, and
+//     re-deriving each is work this pass did not do.
+//
+// Every entry below was additionally checked against fuaran-py `origin/main`, so
+// the release-lag half is separable: `Format.Since` and `Binding.Now.grain` are
+// modelled on main since f473bd1, and the UTF-16 key ordering since 71225ed, so
+// a host release plus a CI pin raise clears `format-since` and
+// `custom-nonascii-keys` with no work here. Nothing else in the set is modelled
+// anywhere yet.
 const PY_UNMODELLED = new Map<string, string>([
   // 1 — no typed node kind.
   ['mount-1', 'no t.Mount'],
@@ -168,9 +198,42 @@ const PY_UNMODELLED = new Map<string, string>([
   ['grid-transform-param', 'TransformBinding has no params'],
   ['link-protected-1', 'Link has no protection'],
   ['table-sortable-1', 'Table has no sortable / defaultSort'],
-  ['media-audio-transcript-1', 'Media has no transcript'],
-  ['media-video-captions-1', 'Media has no tracks'],
-  ['media-video-tracks-2', 'Media has no tracks'],
+  ['transfer-board', 'DataGrid has no reorderable'],
+  ['chart-annotation-bands', 'Chart has no annotations'],
+  ['chart-annotation-events', 'Chart has no annotations'],
+  ['chart-annotations', 'Chart has no annotations'],
+  ['tooltip-button-1', 'UiNode has no tooltip'],
+  ['tooltip-icon-button-1', 'UiNode has no tooltip'],
+  ['tooltip-metric-1', 'UiNode has no tooltip'],
+  ['format-since', 'no FormatIntent.Since — on fuaran-py main since f473bd1'],
+
+  // 3 (continued) — the closure sentinel, in the controls added since 0.0.1.
+  // Each of the four new field records emits `onChange` and `value`
+  // unconditionally, so a canonical minimal control cannot be reached.
+  ['filters-rating-colour', 'RatingField / ColorField hardcode onChange and value'],
+  ['filters-tokens', 'TokensField hardcodes onChange and value'],
+  ['form-combobox-freetext', 'ComboboxField hardcodes onChange'],
+  ['form-rating-halves', 'RatingField hardcodes onChange'],
+  ['form-tokens-freetext', 'TokensField hardcodes onChange and value'],
+  ['popover-anchored-1', 'Modal hardcodes onDismiss'],
+  ['popover-open-1', 'Modal hardcodes onDismiss'],
+
+  // 2 (continued) — `Binding` is Static | State | Filter | Selection | Now |
+  // FormatBinding | Local, so a `Query`-sourced control or grid has no spelling.
+  ['form-combobox-query', 'no Binding.Query'],
+  ['form-tokens-query', 'no Binding.Query'],
+  ['grid-exportable-1', 'no Binding.Query'],
+  ['grid-keep-rows-together-1', 'no Binding.Query'],
+  ['grid-repeat-header-1', 'no Binding.Query'],
+
+  // 1 (continued).
+  ['now-grain', 'no t.Fact'],
+
+  // 5 — the encoder's key order.
+  [
+    'custom-nonascii-keys',
+    'canonical writer sorts object keys by code point, not UTF-16 code unit — on fuaran-py main since 71225ed',
+  ],
 ]);
 
 interface ExecResult {
@@ -217,7 +280,7 @@ describe('Python projection conformance (Node corpus)', () => {
   it('the Python executor ran', () => {
     // A hard failure, never a skip: a conformance arm that goes green without
     // its oracle is worse than no arm at all. Install the host with
-    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.0.1`, or point
+    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.0.6`, or point
     // FUARAN_PY_PYTHON at an interpreter that already has it.
     expect(fatal, fatal ?? '').toBeUndefined();
   });

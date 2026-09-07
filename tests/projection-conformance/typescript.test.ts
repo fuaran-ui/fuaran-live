@@ -119,6 +119,33 @@ const evalExpr = (expr: string): Node<unknown> => {
 // `@fuaran-ui/ops` encoder before it was taught, and every field the corpus
 // asked for was already there to be emitted.
 //
+// 2026-09-07, second pass — the corpus moved 27 commits under that measurement
+// and brought eleven more, taught the same way and again with nothing left to
+// list: node-level `visible`, predicate (`when`) switch cases, `Binding.Expr`
+// with its `params`, the declarative `Local` buffer (`codec` + `commitTo`),
+// `Navigate` over a `TextSource` with a `target`, and `Action.Confirm` /
+// `Action.Focus`.
+//
+// Two of those are worth knowing about, because both fail SILENTLY rather than
+// loudly:
+//
+//   • A CTOR THAT DROPS WHAT IT DOES NOT RECOGNISE. `fuaran.switch` maps every
+//     case through `{ match: c.match, child: c.child }`, so a `when` case
+//     reaches the encoder carrying NEITHER key — and an absent `match` is
+//     simply omitted, so nothing throws and the bytes are merely wrong. The
+//     projection post-edits `spec.cases`, which is the same escape the Phase
+//     768 `on` selector already takes.
+//   • A SLOT WITH TWO MUTUALLY EXCLUSIVE SPELLINGS. `binding.local` REQUIRES an
+//     `onCommit` closure, and a document carrying both `onCommit` and
+//     `commitTo` is a decode refusal — so the declarative buffer is not
+//     reachable through the ctor at all, and takes the literal form.
+//
+// Package lag again empty: `Binding.Expr`, `SwitchCase.when`, `Node.visible`,
+// `LocalBinding.codec` / `.commitTo`, `NavigateTarget` and the `Confirm` /
+// `Focus` action cases are all in the pinned `@fuaran-ui/schema` 0.20.0 and are
+// all encoded by the pinned `ops` 0.22.0 — checked in the dist before each was
+// taught, not assumed from the version number.
+//
 // If a future corpus addition lands here as a failure, the choice is to teach
 // the projector or — where a slot genuinely has no reachable ctor and no
 // literal form — to reinstate this set with the id and a DATED reason. Prefer

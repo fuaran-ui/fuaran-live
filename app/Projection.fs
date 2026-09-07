@@ -1036,11 +1036,35 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
        | None -> "")
     + " }"
   | Some "Local" ->
-    "binding.local("
-    + tsBinding Opq.Scalar (fieldD "initialFrom" v)
-    + ", "
-    + tsFlushTrigger (fieldD "flushOn" v)
-    + ", () => action.chain([]), () => ({ ok: false, error: '' }))"
+    // The buffer has two commit spellings and they are mutually exclusive: a
+    // host `onCommit` closure (`binding.local`'s ctor, which requires one), or
+    // the DECLARATIVE `commitTo` + `codec` pair a decoding host builds its own
+    // `format` / `parse` from. No ctor reaches the second — passing an
+    // `onCommit` would make the document a decode refusal — so it takes the
+    // literal form. `format` and `parse` ride the wire as closure sentinels
+    // either way, so only `parse` need be spelled.
+    let codec = JsonValue.tryField "codec" v
+    let commitTo = optStr "commitTo" v
+
+    if codec.IsSome || commitTo.IsSome then
+      "{ kind: 'Local', local: { initialFrom: "
+      + tsBinding Opq.Scalar (fieldD "initialFrom" v)
+      + ", flushOn: "
+      + tsFlushTrigger (fieldD "flushOn" v)
+      + ", parse: () => ({ ok: false, error: '' })"
+      + (match codec with
+         | Some c -> ", codec: " + tsFormatIntent c
+         | None -> "")
+      + (match commitTo with
+         | Some k -> ", commitTo: " + qs k
+         | None -> "")
+      + " } }"
+    else
+      "binding.local("
+      + tsBinding Opq.Scalar (fieldD "initialFrom" v)
+      + ", "
+      + tsFlushTrigger (fieldD "flushOn" v)
+      + ", () => action.chain([]), () => ({ ok: false, error: '' }))"
   | Some "Format" ->
     "binding.format("
     + tsBinding Opq.Scalar (fieldD "source" v)
@@ -1053,22 +1077,7 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
     // Raw `Binding.Transform` literal (not `binding.transform`, whose ctor takes
     // no `params`): `params` binds `ColExpr.Param` names to scalar sources (0.2.x
     // Phase 424), omitted-when-empty so a param-free Transform is byte-identical.
-    let paramsArr = arrOf "params" v
-
-    let paramsPart =
-      if List.isEmpty paramsArr then
-        ""
-      else
-        ", params: ["
-        + (paramsArr
-           |> List.map (fun p ->
-             "{ from: "
-             + tsBinding Opq.Scalar (fieldD "from" p)
-             + ", name: "
-             + qs (strOf "name" p)
-             + " }")
-           |> String.concat ", ")
-        + "]"
+    let paramsPart = tsBindingParams v
 
     // The `source` slot is a `TransformSource` DU, not a bare `DataSource`:
     // `Data` carries the columnar / `ref` table, `Live` preserves a
@@ -1095,7 +1104,35 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
     + paramsPart
     + " }"
   | Some "Invoke" -> "binding.invoke(" + qs (strOf "capabilityId" v) + ", " + tsInvokeArgs v + ")"
+  // Phase 1538 — a scalar `ColExpr` evaluated over `params`, with no table
+  // anywhere: the arithmetic half of `Transform` addressed to a value slot. No
+  // ctor carries it, so it takes the literal form, and `params` is the same
+  // omitted-when-empty list the Transform arm carries (a param-free expression
+  // is a closed computation over literals).
+  | Some "Expr" ->
+    "{ kind: 'Expr', expr: "
+    + tsColExpr (fieldD "expr" v)
+    + tsBindingParams v
+    + " }"
   | _ -> "binding.static(undefined)"
+
+/// The `params` list a `Binding.Transform` / `Binding.Expr` binds its
+/// `ColExpr.Param` names through — omitted when empty, so a param-free binding
+/// is byte-identical to its pre-`params` form.
+and private tsBindingParams (v: JsonValue) : string =
+  match arrOf "params" v with
+  | [] -> ""
+  | ps ->
+    ", params: ["
+    + (ps
+       |> List.map (fun p ->
+         "{ from: "
+         + tsBinding Opq.Scalar (fieldD "from" p)
+         + ", name: "
+         + qs (strOf "name" p)
+         + " }")
+       |> String.concat ", ")
+    + "]"
 
 /// The explicit `TextSource` object form – for record fields typed as raw
 /// `TextSource` (FormField.label, TabHeader.label, FilterSpec.label, SelectOption
@@ -1205,7 +1242,17 @@ let rec private tsAction (v: JsonValue) : string =
     + ", "
     + tsJson (fieldD "payload" v)
     + ")"
-  | Some "Navigate" -> "action.navigate(" + qs (strOf "route" v) + ")"
+  // Phase 1536 — the route is a `TextSource`, so a tree can name a destination
+  // it computes from what the reader selected. `target` is omitted at `Self`,
+  // and a literal route in the current context keeps the short `navigate`
+  // spelling (identical bytes, and the commonest intent stays readable).
+  | Some "Navigate" ->
+    let route = fieldD "route" v
+
+    (match route, optStr "target" v with
+     | JString s, (None | Some "Self") -> "action.navigate(" + qs s + ")"
+     | _, Some t when t <> "Self" -> "action.navigateTo(" + tsTextSourceLit route + ", " + qs t + ")"
+     | _, _ -> "action.navigateTo(" + tsTextSourceLit route + ")")
   | Some "SetState" ->
     // `value` (a literal) and `valueFrom` (a Binding read at dispatch time) are
     // sibling slots with distinct ctors; `valueFrom` wins when present.
@@ -1235,6 +1282,22 @@ let rec private tsAction (v: JsonValue) : string =
   // Phase 1124 — the reader's own print dialogue. It takes nothing, and the
   // encoder refuses any member beside `$type`.
   | Some "Print" -> "action.print()"
+  // Phase 1537 — ask, then continue. The first case to recurse into NAMED
+  // members rather than a list, so a reader looking only for `ops` misses both
+  // continuations; `onCancel` is omitted when absent, and its absence means
+  // nothing happens rather than some substituted default.
+  | Some "Confirm" ->
+    "action.confirm("
+    + tsTextInput (fieldD "prompt" v)
+    + ", "
+    + tsAction (fieldD "onConfirm" v)
+    + (match JsonValue.tryField "onCancel" v with
+       | Some c -> ", " + tsAction c
+       | None -> "")
+    + ")"
+  // Phase 1537 — a bare node id, never a `TextSource`: it addresses a node in
+  // this document, which the author wrote.
+  | Some "Focus" -> "action.focus(" + qs (strOf "nodeId" v) + ")"
   | Some "ReadFileBody" ->
     "action.readFileBody({ id: "
     + qs (strOf "fileRef" v)
@@ -1913,6 +1976,13 @@ and private tsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
         @ (match JsonValue.tryField "tooltip" nodeV with
            | Some t -> [ "tooltip", tsTextSourceLit t ]
            | None -> [])
+        // Phase 1535 — conditional presence. A `Binding<boolean>` whose resolved
+        // `false` removes the node entirely, which is a different statement from
+        // `accessibility.hidden` (rendered, occupying space, out of the a11y
+        // tree). No smart ctor carries it, so it rides the override spread.
+        @ (match JsonValue.tryField "visible" nodeV with
+           | Some vis -> [ "visible", tsBinding Opq.Scalar vis ]
+           | None -> [])
 
       if List.isEmpty overrides then
         ctorExpr
@@ -2023,6 +2093,9 @@ and private tsBaseTraits (depth: int) (nodeV: JsonValue) : (string * string) lis
      | None -> [])
   @ (match JsonValue.tryField "tooltip" nodeV with
      | Some t -> [ "tooltip", tsTextSourceLit t ]
+     | None -> [])
+  @ (match JsonValue.tryField "visible" nodeV with
+     | Some vis -> [ "visible", tsBinding Opq.Scalar vis ]
      | None -> [])
 
 and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue) : string =
@@ -2946,52 +3019,64 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
                  |> String.concat ", ")
               + " }" ]))
   | "Switch" ->
+    let caseVs = arrOf "cases" k
+
+    // Phase 1535 — a case selects on `match` (the selector's string form) OR on
+    // `when` (a predicate consulting no selector at all), never both. The ctor
+    // maps every case to `{ match, child }` and drops anything else, so a `when`
+    // case reaches the encoder carrying NEITHER key — silently, since an absent
+    // `match` is simply omitted. Predicate cases therefore ride the same spec
+    // post-edit the Phase 768 `on` selector takes.
     let cases =
-      arrOf "cases" k
+      caseVs
       |> List.map (fun c ->
-        "{ match: "
-        + qs (strOf "match" c)
-        + ", child: "
+        (match JsonValue.tryField "when" c with
+         | Some w -> "{ when: " + tsBinding Opq.Scalar w + ", "
+         | None -> "{ match: " + qs (strOf "match" c) + ", ")
+        + "child: "
         + tsNodeExpr (depth + 1) (fieldD "child" c)
         + " }")
       |> String.concat ", "
+
+    let hasPredicate =
+      caseVs |> List.exists (fun c -> (JsonValue.tryField "when" c).IsSome)
 
     // Phase 768 — the selector is any Binding. The State form keeps its compact
     // `stateKey` wire spelling and the smart-ctor expresses it directly; a
     // non-State `on` (Selection etc.) has NO ctor surface in the TS tier yet,
     // so the projection post-edits the built node's spec — exact, executable,
     // and honest about the ctor gap (a future SwitchOptions.on simplifies it).
-    match JsonValue.tryField "on" k with
-    | Some onV ->
-      let built =
-        "fuaran.switch("
-        + tsObjLit
-            [ idF
-              "stateKey", "''"
-              "cases", "[" + cases + "]"
-              "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
-            depth
-        + ")"
+    let onV = JsonValue.tryField "on" k
 
+    let specOverrides =
+      (if hasPredicate then [ "cases", "[" + cases + "]" ] else [])
+      @ (match onV with
+         | Some o -> [ "on", tsBinding Opq.Scalar o ]
+         | None -> [])
+
+    let ctorFields =
+      [ idF
+        "stateKey", (if onV.IsSome then "''" else qs (strOf "stateKey" k))
+        // The cases the ctor would drop are supplied by the post-edit instead of
+        // being built twice — the child subtrees are projected once either way.
+        "cases", (if hasPredicate then "[]" else "[" + cases + "]")
+        "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
+      // Phase 1531 — the carousel's self-advance interval, optional and
+      // omitted when absent (a switch with no interval never advances itself).
+      @ (match optNum "autoAdvanceMs" k with
+         | Some ms -> [ "autoAdvanceMs", numLit ms ]
+         | None -> [])
+
+    if List.isEmpty specOverrides then
+      call "switch" ctorFields
+    else
       Some(
-        "(() => { const n = "
-        + built
-        + "; return { ...n, kind: { ...n.kind, spec: { ...n.kind.spec, on: "
-        + tsBinding Opq.Scalar onV
+        "(() => { const n = fuaran.switch("
+        + tsObjLit ctorFields depth
+        + "); return { ...n, kind: { ...n.kind, spec: { ...n.kind.spec, "
+        + (specOverrides |> List.map (fun (n, x) -> n + ": " + x) |> String.concat ", ")
         + " } } }; })()"
       )
-    | None ->
-      call
-        "switch"
-        ([ idF
-           "stateKey", qs (strOf "stateKey" k)
-           "cases", "[" + cases + "]"
-           "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
-         // Phase 1531 — the carousel's self-advance interval, optional and
-         // omitted when absent (a switch with no interval never advances itself).
-         @ (match optNum "autoAdvanceMs" k with
-            | Some ms -> [ "autoAdvanceMs", numLit ms ]
-            | None -> []))
   | _ -> None
 
 // ─── Python (fuaran_py.ui) — per-kind exact emission (Phase 1142) ─────────────
@@ -3520,7 +3605,17 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
        | None -> [])
 
   match kind with
-  | "Number" -> "t.NumberField(" + value + ")"
+  // `on_change` is the one closure slot this record can suppress (it defaults to
+  // True, and the ABSENT wire key is what arms a renderer's write-back default),
+  // so a control writing its own slot projects it off rather than emitting a
+  // sentinel the wire does not carry.
+  | "Number" ->
+    pyCall
+      "t.NumberField"
+      [ value ]
+      (match JsonValue.tryField "onChange" v with
+       | Some _ -> []
+       | None -> [ "on_change", "False" ])
   | "Checkbox" -> "t.CheckboxField(" + value + ")"
   | "Toggle" ->
     // The one control whose Python record has BOTH slots optional, mirroring the

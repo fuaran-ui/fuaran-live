@@ -150,10 +150,11 @@ The two Trusted Types directives make the renderer's declared sanitisation postu
 browser-enforced: `Fuaran.UI.Renderer` (0.77.0 and later) mints every raw-HTML DOM
 sink through the one policy named here, whose only creator applies the renderer's
 own sanitiser, so a string reaching a sink by any other route is refused by the
-browser rather than by review. The showcase pages carry their own policy without
-these directives (their scripted replay writes recorded HTML directly), and the
-TypeScript render-host parity page is excepted until the TypeScript renderer
-release carrying the same policy is pinned.
+browser rather than by review. The TypeScript
+render-host parity page runs under the same directives, since `@fuaran-ui/renderer`
+(0.21.0 and later) mints through the same policy name. The showcase pages carry
+their own policy without these directives, because their scripted replay writes
+recorded HTML directly.
 
 The dev server uses a relaxed variant (HMR needs inline script + `eval` + a
 websocket); the **shipped `dist/index.html` always carries the strict policy

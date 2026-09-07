@@ -138,6 +138,30 @@ const resolvePython = (): string => {
 // a host release plus a CI pin raise clears `format-since` and
 // `custom-nonascii-keys` with no work here. Nothing else in the set is modelled
 // anywhere yet.
+//
+// SECOND PASS, same day, against the same 0.0.6 — the corpus moved 27 commits
+// under the first measurement and arrived carrying eleven more fixtures, all of
+// them failing on BOTH arms. The TypeScript half was projector lag and was
+// taught (see the sibling arm's note); the Python half is entirely host lag and
+// is the block at the end of this map. What is worth recording is the SHAPE of
+// that half, because it inverts the ratio above: nine of the eleven are already
+// on fuaran-py main — `SwitchCase.when` and `UiNode.visible` since e956a1f,
+// `Navigate` over a `TextSource` with a `target` since ec18597, `Action.Confirm`
+// and `Action.Focus` since dd40204 — so a release past 0.0.6 and a CI pin raise
+// clears them with no code written anywhere, exactly as `format-since` does.
+// Only `Binding.Expr` (2 ids) is unmodelled on every branch: the Python
+// `Binding` union is still `Static | State | Filter | Selection | Now |
+// FormatBinding | Local`, and `Local` still emits `onCommit` unconditionally
+// with no `codec` / `commitTo` beside it (1 id).
+//
+// One SECOND cause was removed rather than listed, and the distinction is the
+// point of measuring twice: `form-local-declared` also carried a spurious
+// `onChange` because the projector built `t.NumberField(value)` and took the
+// record's `on_change=True` default. That record CAN say False — it is not a
+// hardcoded sentinel like `TextField`'s — so the projector now reads the wire's
+// key and the fixture fails on its one real cause. An entry naming two causes
+// when one of them is ours is how a quarantine starts drifting away from what
+// it describes.
 const PY_UNMODELLED = new Map<string, string>([
   // 1 — no typed node kind.
   ['mount-1', 'no t.Mount'],
@@ -234,6 +258,38 @@ const PY_UNMODELLED = new Map<string, string>([
     'custom-nonascii-keys',
     'canonical writer sorts object keys by code point, not UTF-16 code unit — on fuaran-py main since 71225ed',
   ],
+
+  // ── The 2026-09-07 second pass — eleven fixtures the corpus gained after the
+  // measurement above, every one of them RELEASE lag rather than a modelling
+  // gap: nine of the eleven are already on fuaran-py main, so a release past
+  // 0.0.6 plus a CI pin raise clears them with no work here or there. The
+  // two that are not are the pair naming `Binding.Expr`, which the Python
+  // `Binding` union does not carry on any branch.
+  //
+  // 1 (continued) — no typed binding case.
+  ['expr-scalar', 'no Binding.Expr'],
+  ['expr-params-state-selection', 'no Binding.Expr'],
+
+  // 2 (continued) — no typed action case, and a narrower one.
+  ['action-confirm', 'no Action.Confirm — on fuaran-py main since dd40204'],
+  ['action-confirm-cancel', 'no Action.Confirm — on fuaran-py main since dd40204'],
+  ['action-focus', 'no Action.Focus — on fuaran-py main since dd40204'],
+  ['action-navigate-target', 'Navigate has no target — on fuaran-py main since ec18597'],
+  [
+    'action-navigate-bound',
+    'Navigate.route is a bare str, not a TextSource — on fuaran-py main since ec18597',
+  ],
+
+  // 4 (continued) — a record narrower than the wire.
+  ['switch-predicate', 'SwitchCase has no when — on fuaran-py main since e956a1f'],
+  ['switch-predicate-only', 'SwitchCase has no when — on fuaran-py main since e956a1f'],
+  ['node-visible', 'UiNode has no visible — on fuaran-py main since e956a1f'],
+
+  // 3 (continued) — the closure sentinel, on the buffer rather than a control.
+  // `Local` emits `onCommit` unconditionally and carries neither `codec` nor
+  // `commitTo`, and the wire refuses a document carrying both commit spellings,
+  // so the declarative buffer has no reachable shape at all.
+  ['form-local-declared', 'Local hardcodes onCommit — no codec / commitTo'],
 ]);
 
 interface ExecResult {

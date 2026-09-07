@@ -71,8 +71,11 @@ describe('ts-receiver.html — the host with no F# on it', () => {
   });
 
   it('imports nothing Fable-compiled', () => {
-    const imports = [...entrySource.matchAll(/from\s+'([^']+)'/g)].map((m) => m[1]);
-    const bare = [...entrySource.matchAll(/^import\s+'([^']+)';/gm)].map((m) => m[1]);
+    // `m[1]` is `string | undefined` under `noUncheckedIndexedAccess`, and the
+    // assertion is sound rather than convenient: both patterns carry exactly one
+    // capture group, so a match always has it.
+    const imports = [...entrySource.matchAll(/from\s+'([^']+)'/g)].map((m) => m[1]!);
+    const bare = [...entrySource.matchAll(/^import\s+'([^']+)';/gm)].map((m) => m[1]!);
     for (const spec of [...imports, ...bare]) {
       expect(spec, `${spec} reaches Fable-compiled output`).not.toMatch(/(^|\/)output\//);
       expect(spec.toLowerCase(), `${spec} names Fable`).not.toContain('fable');

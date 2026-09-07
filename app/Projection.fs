@@ -3159,6 +3159,27 @@ let private pyStrItem (v: JsonValue) : string =
   | JString s -> pq s
   | _ -> pq ""
 
+/// A control's handler slot, read from the WIRE KEY's presence and passed
+/// explicitly — never left to the record's own default.
+///
+/// From fuaran-py 0.2.0 every handler is a `bool` flag the encoder turns into
+/// the `"<closure>"` sentinel, and the defaults are NOT uniform: `on_change` and
+/// `on_select` default True, `on_toggle` and `on_select_tag` default False, and
+/// `ToggleField.on_toggle` defaults False where `CheckboxField.on_toggle`
+/// defaults True. A projector that omitted the argument would therefore emit
+/// whichever sentinel that release happens to default to rather than the one the
+/// fixture carries, and would break silently on a release that flipped one. The
+/// wire key's presence is the whole signal, so it is the whole input here.
+let private pyHandler (wireKey: string) (pyKw: string) (v: JsonValue) : (string * string) list =
+  [ pyKw, pyBool (JsonValue.tryField wireKey v).IsSome ]
+
+/// A tri-state `bool | None` slot: `False` and ABSENT are two different
+/// documents, so the keyword is emitted only where the wire carries the key.
+let private pyTriBool (wireKey: string) (pyKw: string) (v: JsonValue) : (string * string) list =
+  match JsonValue.tryField wireKey v with
+  | Some(JBool b) -> [ pyKw, pyBool b ]
+  | _ -> []
+
 /// A plain `dict` literal (Notify payloads, Custom props) — the one place the
 /// projection keeps the wire's own key spelling, because these are data maps
 /// rather than record fields.
@@ -3234,6 +3255,26 @@ let rec private pyColExpr (v: JsonValue) : string =
   // the `col` fallback and projected as a COLUMN reference: same shape, wrong
   // discriminator, and nothing raised.
   | Some "param" -> "cp.Param(" + pq (strOf "name" v) + ")"
+  // Phase 1581 — membership. The same trap the `param` arm above records, one
+  // discriminator further on: with no arm of its own `in` fell through to the
+  // `col` fallback and projected as `cp.Col('')` — a column reference named by
+  // a key the node does not carry, which neither raises nor resembles the wire.
+  // It was found by re-deriving `multiselect-chip-list-param`'s reason, which
+  // had blamed the host for a handler slot 0.2.0 made expressible.
+  //
+  // `cp.InList` is the sibling case for a literal set. The corpus reaches only
+  // the parameterised form today, so that branch is the mapping rather than a
+  // measurement — the discriminator is shared and the fallback is what a missing
+  // arm costs here.
+  | Some "in" ->
+    (match optStr "param" v with
+     | Some p -> "cp.InParam(" + pyColExpr (fieldD "expr" v) + ", " + pq p + ")"
+     | None ->
+       "cp.InList("
+       + pyColExpr (fieldD "expr" v)
+       + ", "
+       + pyList (arrOf "items" v |> List.map pyColExpr)
+       + ")")
   | _ -> "cp.Col(" + pq (strOf "name" v) + ")"
 
 let private pyDataSource (v: JsonValue) : string =
@@ -3345,6 +3386,32 @@ let private pyTransformStep (v: JsonValue) : string =
 
 // ── Bindings / actions / text / formats ──────────────────────────────────────
 
+/// A COLUMN's `CellFormat` — the `format.*` helper namespace.
+///
+/// Deliberately adjacent to `pyFormatIntent` below, which projects the `Format`
+/// union instead: the two vocabularies overlap by name and differ by one wire
+/// key, and reaching for the wrong one is a silent byte difference rather than
+/// an error. `format.currency` emits `"code"`; `t.FmtCurrency` emits `"isoCode"`.
+/// A column takes the first; `Chart.value_format` and `binding.format` take the
+/// second. Moved above `pyBinding` in Phase 1581, which gave the `Local` case a
+/// `codec` slot and so made a binding depend on this.
+let private pyCellFormat (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Number" ->
+    (match optNum "decimals" v with
+     | Some d -> "format.number(" + numLit d + ")"
+     | None -> "format.number()")
+  | Some "Currency" -> "format.currency(" + pq (strOf "code" v) + ")"
+  | Some "Percent" ->
+    (match optNum "decimals" v with
+     | Some d -> "format.percent(" + numLit d + ")"
+     | None -> "format.percent()")
+  | Some "SignificantDigits" -> "format.significant_digits(" + numLit (numOf "digits" v) + ")"
+  | Some "Date" -> "format.date(" + pq (strOf "format" v) + ")"
+  | Some "Duration" -> "format.duration(" + pq (strOf "unit" v) + ", " + pq (strOf "style" v) + ")"
+  | Some "RelativeTime" -> "format.relative_time(" + pq (strOf "unit" v) + ")"
+  | _ -> "format.none()"
+
 let private pyFormatIntent (v: JsonValue) : string =
   match dollarType v with
   | Some "Currency" -> "t.FmtCurrency(" + pq (strOf "isoCode" v) + ")"
@@ -3411,12 +3478,24 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
     (match optStr "grain" v with
      | Some g -> "t.Now(" + pq g + ")"
      | None -> "binding.now()")
+  // Phase 1581 — `commit_to` / `codec` are modelled from 0.2.0, and with them
+  // the DECLARATIVE buffer becomes reachable. `on_commit` is deliberately left
+  // to the record: it defaults to `commit_to is None`, which is exactly the
+  // wire's own rule (a buffer that names a commit target writes no `onCommit`
+  // closure), so stating it would restate the host's semantics rather than read
+  // the wire's. The wire refuses a document carrying both commit spellings, so
+  // there is no case where both are present to disagree about.
   | Some "Local" ->
-    "binding.local("
-    + pyBinding Opq.Scalar (fieldD "initialFrom" v)
-    + ", "
-    + pyFlushTrigger (fieldD "flushOn" v)
-    + ")"
+    pyCall
+      "binding.local"
+      [ pyBinding Opq.Scalar (fieldD "initialFrom" v)
+        pyFlushTrigger (fieldD "flushOn" v) ]
+      ((match optStr "commitTo" v with
+        | Some c -> [ "commitTo", pq c ]
+        | None -> [])
+       @ (match JsonValue.tryField "codec" v with
+          | Some c -> [ "codec", pyCellFormat c ]
+          | None -> []))
   | Some "Format" ->
     "binding.format("
     + pyBinding Opq.Scalar (fieldD "source" v)
@@ -3579,23 +3658,6 @@ let rec private pyAction (v: JsonValue) : string =
     // Call / AiTool / CommitLocal / Invoke — no typed case in `fuaran_py`.
     "action.chain([])"
 
-let private pyCellFormat (v: JsonValue) : string =
-  match dollarType v with
-  | Some "Number" ->
-    (match optNum "decimals" v with
-     | Some d -> "format.number(" + numLit d + ")"
-     | None -> "format.number()")
-  | Some "Currency" -> "format.currency(" + pq (strOf "code" v) + ")"
-  | Some "Percent" ->
-    (match optNum "decimals" v with
-     | Some d -> "format.percent(" + numLit d + ")"
-     | None -> "format.percent()")
-  | Some "SignificantDigits" -> "format.significant_digits(" + numLit (numOf "digits" v) + ")"
-  | Some "Date" -> "format.date(" + pq (strOf "format" v) + ")"
-  | Some "Duration" -> "format.duration(" + pq (strOf "unit" v) + ", " + pq (strOf "style" v) + ")"
-  | Some "RelativeTime" -> "format.relative_time(" + pq (strOf "unit" v) + ")"
-  | _ -> "format.none()"
-
 // ── Form fields / filters / grid columns / tab headers ───────────────────────
 
 let private pyCtrlDefault (kind: string) : string =
@@ -3631,12 +3693,15 @@ let private pyFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
     // TypeScript leg hydrates the same wire into a tuple, because its in-memory
     // shape for these two slots IS a tuple — the difference is the host's, not
     // the wire's.)
-    | "Range" when (dollarType valV).IsNone ->
-      "{'min': "
-      + pyNum (numOf "min" valV)
-      + ", 'max': "
-      + pyNum (numOf "max" valV)
-      + "}"
+    // Phase 1581 — since 0.2.0 models `RangeField`, its literal pair has a TYPED
+    // spelling: `value: Binding | tuple[float, float]`, lowered by the record's
+    // own `to_wire` into the bare `{"max":…,"min":…}` object. A dict would reach
+    // the same bytes through `_lower`, but only by taking a path the annotation
+    // does not admit — and "build every value from a typed record" is the rule
+    // this whole leg's measurement rests on. `DateRange` keeps its wire-object
+    // spelling deliberately: its record is unchanged by this release and the
+    // decision to pass the pair through is recorded above.
+    | "Range" when (dollarType valV).IsNone -> "(" + pyNum (numOf "min" valV) + ", " + pyNum (numOf "max" valV) + ")"
     | "DateRange" when (dollarType valV).IsNone ->
       "{'from': " + pq (strOf "from" valV) + ", 'to': " + pq (strOf "to" valV) + "}"
     | "DateRange" when
@@ -3663,6 +3728,20 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
   let kind = dollarType v |> Option.defaultValue "Text"
   let value = pyFieldValue ab kind v
 
+  /// The `value` slot as a KEYWORD, present only where the wire carries one.
+  ///
+  /// Every control record made `value` optional in fuaran-py 0.2.0, and absence
+  /// is not expressible any other way: `t.Static(None)` encodes
+  /// `"value":{"$type":"Static"}`, which is a different document from a control
+  /// with no `value` key at all. Before 0.2.0 the slot was required, so the
+  /// projector had to reconstruct the control's auto-binding — which is exactly
+  /// why the canonical minimal control was unreachable and its fixtures were
+  /// quarantined.
+  let optValue =
+    match JsonValue.tryField "value" v with
+    | Some _ -> [ "value", value ]
+    | None -> []
+
   let minMaxStep (isDate: bool) =
     let one name =
       if isDate then
@@ -3680,95 +3759,135 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
        | Some s -> [ "step", numLit s ]
        | None -> [])
 
+  // Every arm below reads its handler slot(s) off the WIRE and passes the flag
+  // explicitly (`pyHandler`), and carries `value` only where the wire does
+  // (`optValue`). Both became expressible in fuaran-py 0.2.0; before it, a
+  // control could neither suppress its handler sentinel nor omit its value, and
+  // the whole closure-sentinel quarantine family is what that cost.
   match kind with
-  // `on_change` is the one closure slot this record can suppress (it defaults to
-  // True, and the ABSENT wire key is what arms a renderer's write-back default),
-  // so a control writing its own slot projects it off rather than emitting a
-  // sentinel the wire does not carry.
-  | "Number" ->
-    pyCall
-      "t.NumberField"
-      [ value ]
-      (match JsonValue.tryField "onChange" v with
-       | Some _ -> []
-       | None -> [ "on_change", "False" ])
-  | "Checkbox" -> "t.CheckboxField(" + value + ")"
-  | "Toggle" ->
-    // The one control whose Python record has BOTH slots optional, mirroring the
-    // canonical minimal `{"$type":"Toggle"}`: an omitted wire `value` must stay
-    // omitted rather than being reconstructed as its auto-binding, because here
-    // the record can say "absent" and the encoder honours it.
-    pyCall
-      "t.ToggleField"
-      []
-      ((match JsonValue.tryField "value" v with
-        | Some _ -> [ "value", value ]
-        | None -> [])
-       @ (match JsonValue.tryField "onToggle" v with
-          | Some _ -> [ "onToggle", "True" ]
-          | None -> []))
-  | "Choice" -> "t.ChoiceField(" + pyOptionsBinding (fieldD "options" v) + ", " + value + ")"
+  | "Number" -> pyCall "t.NumberField" [] (optValue @ pyHandler "onChange" "on_change" v)
+  | "Checkbox" -> pyCall "t.CheckboxField" [] (optValue @ pyHandler "onToggle" "on_toggle" v)
+  | "Toggle" -> pyCall "t.ToggleField" [] (optValue @ pyHandler "onToggle" "on_toggle" v)
+  | "Choice" ->
+    pyCall "t.ChoiceField" [ pyOptionsBinding (fieldD "options" v) ] (optValue @ pyHandler "onChange" "on_change" v)
   | "SegmentedChoice" ->
     pyCall
       "t.SegmentedChoice"
-      [ pyOptionsBinding (fieldD "options" v); value ]
-      [ "orientation", pq (strOf "orientation" v) ]
-  | "TextArea" -> "t.TextAreaField(" + value + ", " + numLit (numOf "rows" v) + ")"
-  | "RangedNumber" -> pyCall "t.RangedNumber" [ value ] (minMaxStep false)
-  | "Date" -> pyCall "t.DateField" [ value ] ([ "variant", pq (strOf "variant" v) ] @ minMaxStep true)
-  | "DateRange" -> pyCall "t.DateRangeField" [ value ] ([ "variant", pq (strOf "variant" v) ] @ minMaxStep true)
+      [ pyOptionsBinding (fieldD "options" v) ]
+      (optValue
+       @ [ "orientation", pq (strOf "orientation" v) ]
+       @ pyHandler "onChange" "on_change" v)
+  | "TextArea" ->
+    pyCall
+      "t.TextAreaField"
+      []
+      (optValue
+       @ [ "rows", numLit (numOf "rows" v) ]
+       @ pyHandler "onChange" "on_change" v)
+  | "RangedNumber" -> pyCall "t.RangedNumber" [] (optValue @ minMaxStep false @ pyHandler "onChange" "on_change" v)
+  // Phase 1581 — the slider pair, modelled by fuaran-py from 0.2.0. Before it
+  // there was no `RangeField` at all and this kind fell through to the `Text`
+  // fallback, which is a different record and a different document.
+  | "Range" -> pyCall "t.RangeField" [] (optValue @ minMaxStep false @ pyHandler "onChange" "on_change" v)
+  | "Date" ->
+    pyCall
+      "t.DateField"
+      []
+      (optValue
+       @ [ "variant", pq (strOf "variant" v) ]
+       @ minMaxStep true
+       @ pyHandler "onChange" "on_change" v)
+  | "DateRange" ->
+    pyCall
+      "t.DateRangeField"
+      []
+      (optValue
+       @ [ "variant", pq (strOf "variant" v) ]
+       @ minMaxStep true
+       @ pyHandler "onChange" "on_change" v)
   // Phase 1130 — the colour swatch: value only.
-  | "Color" -> "t.ColorField(" + value + ")"
+  | "Color" -> pyCall "t.ColorField" [] (optValue @ pyHandler "onChange" "on_change" v)
   // Phase 1122 — `max` is the case's only required member; `allow_half` omits
   // at False.
   | "Rating" ->
     pyCall
       "t.RatingField"
-      [ numLit (numOf "max" v); value ]
-      (if boolOf "allowHalf" v then
-         [ "allow_half", "True" ]
-       else
-         [])
+      [ numLit (numOf "max" v) ]
+      (optValue
+       @ (if boolOf "allowHalf" v then
+            [ "allow_half", "True" ]
+          else
+            [])
+       @ pyHandler "onChange" "on_change" v)
   // Phase 1119 — `allow_free_text` omits at False here (the opposite polarity
   // to `Tokens`, whose suggestion source is optional and this one's required).
   | "Combobox" ->
     pyCall
       "t.ComboboxField"
-      [ pyOptionsBinding (fieldD "options" v); value ]
-      (if boolOf "allowFreeText" v then
-         [ "allow_free_text", "True" ]
-       else
-         [])
+      [ pyOptionsBinding (fieldD "options" v) ]
+      (optValue
+       @ (if boolOf "allowFreeText" v then
+            [ "allow_free_text", "True" ]
+          else
+            [])
+       @ pyHandler "onChange" "on_change" v)
   // Phase 1121 — `allow_free_text` defaults to TRUE, so an ABSENT wire field is
   // `true`: the one place in the field vocabulary where absence is not `false`.
   | "Tokens" ->
     pyCall
       "t.TokensField"
-      [ value ]
-      ((match JsonValue.tryField "allowFreeText" v with
-        | Some(JBool false) -> [ "allow_free_text", "False" ]
-        | _ -> [])
+      []
+      (optValue
+       @ (match JsonValue.tryField "allowFreeText" v with
+          | Some(JBool false) -> [ "allow_free_text", "False" ]
+          | _ -> [])
        @ (match JsonValue.tryField "suggestions" v with
           | Some s -> [ "suggestions", pyOptionsBinding s ]
-          | None -> []))
-  | _ -> "t.TextField(" + value + ")"
+          | None -> [])
+       @ pyHandler "onChange" "on_change" v)
+  | _ -> pyCall "t.TextField" [] (optValue @ pyHandler "onChange" "on_change" v)
 
 /// A filter chip's control — the same vocabulary as a form field, but three of
 /// the cases carry their own filter-side dataclass.
 let private pyFilterKind (ab: AutoBind) (v: JsonValue) : string =
-  match dollarType v |> Option.defaultValue "Text" with
+  let kind = dollarType v |> Option.defaultValue "Text"
+
+  let optValue slot =
+    match JsonValue.tryField "value" v with
+    | Some _ -> [ "value", pyFieldValue ab slot v ]
+    | None -> []
+
+  match kind with
   | "Choice" ->
-    "t.ChoiceFilter("
-    + pyOptionsBinding (fieldD "options" v)
-    + ", "
-    + pyFieldValue ab "Choice" v
-    + ")"
+    pyCall
+      "t.ChoiceFilter"
+      [ pyOptionsBinding (fieldD "options" v) ]
+      (optValue "Choice" @ pyHandler "onChange" "on_change" v)
   | "SegmentedChoice" ->
     pyCall
       "t.SegmentedFilter"
-      [ pyOptionsBinding (fieldD "options" v); pyFieldValue ab "SegmentedChoice" v ]
-      [ "orientation", pq (strOf "orientation" v) ]
-  | "Text" -> "t.TextFilter(" + pyFieldValue ab "Text" v + ")"
+      [ pyOptionsBinding (fieldD "options" v) ]
+      (optValue "SegmentedChoice"
+       @ [ "orientation", pq (strOf "orientation" v) ]
+       @ pyHandler "onChange" "on_change" v)
+  | "Text" -> pyCall "t.TextFilter" [] (optValue "Text" @ pyHandler "onChange" "on_change" v)
+  // Phase 1581 — the filter-side slider. `t.RangeFilter` is the alias of
+  // `t.RangeField`, and it arrived with it in 0.2.0.
+  | "Range" ->
+    pyCall
+      "t.RangeFilter"
+      []
+      (optValue "Range"
+       @ (match optNum "min" v with
+          | Some n -> [ "min", numLit n ]
+          | None -> [])
+       @ (match optNum "max" v with
+          | Some n -> [ "max", numLit n ]
+          | None -> [])
+       @ (match optNum "step" v with
+          | Some n -> [ "step", numLit n ]
+          | None -> [])
+       @ pyHandler "onChange" "on_change" v)
   | _ -> pyFieldKind ab v
 
 let private pyFieldRule (v: JsonValue) : string =
@@ -3862,6 +3981,60 @@ let private pyColumnKind (v: JsonValue) : string =
        | None -> [])
   | other -> "t.ColumnKind(" + pq other + ")"
 
+/// A declarative sort seed — shared by the grid and by the static table, which
+/// carries it inside `staticRows`. Both members are required on the record.
+let private pyDefaultSort (v: JsonValue) : string =
+  "t.DefaultSort("
+  + numLit (numOf "column" v)
+  + ", "
+  + pq (strOf "direction" v)
+  + ")"
+
+/// A chart annotation's x-address (Phase 1581). The Python class names differ
+/// from the wire discriminators — `Category` / `Date` lower from
+/// `AnnotationCategory` / `AnnotationDate` — so this mapping is the one place
+/// that correspondence is spelled, rather than being re-derived per call site.
+let private pyAnnotationX (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Date" -> "t.AnnotationDate(" + pq (strOf "iso" v) + ")"
+  | _ -> "t.AnnotationCategory(" + pq (strOf "key" v) + ")"
+
+/// A `RangeBand`'s span: a value interval or a pair of x-addresses.
+///
+/// Both records name their lower bound `from_`, because `from` is a Python
+/// keyword — so the usual snake-casing of the wire key would emit a syntax
+/// error, and these two are passed POSITIONALLY to sidestep it entirely.
+let private pyAnnotationRange (v: JsonValue) : string =
+  match dollarType v with
+  | Some "XRange" ->
+    "t.XRange("
+    + pyAnnotationX (fieldD "from" v)
+    + ", "
+    + pyAnnotationX (fieldD "to" v)
+    + ")"
+  | _ -> "t.ValueRange(" + pyNum (numOf "from" v) + ", " + pyNum (numOf "to" v) + ")"
+
+/// One chart annotation (§4l, closed at three members). The optional `label` is
+/// the second positional on all three and is omitted exactly where the wire
+/// omits the key — passing `None` would reach the same bytes, but omitting is
+/// what keeps the projection readable as authored source.
+let private pyChartAnnotation (v: JsonValue) : string =
+  let label =
+    match JsonValue.tryField "label" v with
+    | Some l -> [ pyTextSource l ]
+    | None -> []
+
+  match dollarType v with
+  | Some "EventMarker" ->
+    "t.EventMarker("
+    + String.concat ", " (pyAnnotationX (fieldD "at" v) :: label)
+    + ")"
+  | Some "RangeBand" ->
+    "t.RangeBand("
+    + String.concat ", " (pyAnnotationRange (fieldD "range" v) :: label)
+    + ")"
+  | _ -> "t.ReferenceLine(" + String.concat ", " (pyNum (numOf "value" v) :: label) + ")"
+
 let private pyGridColumn (v: JsonValue) : string =
   pyCall
     "t.Column"
@@ -3874,7 +4047,12 @@ let private pyGridColumn (v: JsonValue) : string =
      // is the record's own rule rather than something to arrange here.
      @ (match optStr "field" v with
         | Some f -> [ "fieldName", pq f ]
-        | None -> []))
+        | None -> [])
+     // Phase 1581 — per-column overrides, modelled from 0.2.0 and tri-state on
+     // both sides: `sortable=False` and an omitted `sortable` are two different
+     // documents, so neither is emitted where the wire carries no key.
+     @ pyTriBool "sortable" "sortable" v
+     @ pyTriBool "editable" "editable" v)
 
 /// A `Media` timed-text track (Phase 1110). `default` omits at False; the track
 /// record takes its `label` as a `TextSource` and its `src` as a `Binding`.
@@ -4053,6 +4231,13 @@ and private pyNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
       @ (match JsonValue.tryField "visible" nodeV with
          | Some vis -> [ "visible", pyVisible vis ]
          | None -> [])
+      // Phase 1581 — `UiNode` grew `tooltip` as a sixth member in 0.2.0. It is a
+      // `TextSource`, so a bare wire string is the `LiteralText` canonical form
+      // and a bound hint is `t.Bound(...)`; no `fuaran.*` constructor takes it,
+      // which is why it rides the same `replace` seam `visible` does.
+      @ (match JsonValue.tryField "tooltip" nodeV with
+         | Some tip -> [ "tooltip", pyTextSource tip ]
+         | None -> [])
 
     if List.isEmpty overrides then
       built
@@ -4158,6 +4343,9 @@ and private pyBaseTraits (depth: int) (nodeV: JsonValue) : (string * string) lis
   @ (match JsonValue.tryField "visible" nodeV with
      | Some vis -> [ "visible", pyVisible vis ]
      | None -> [])
+  @ (match JsonValue.tryField "tooltip" nodeV with
+     | Some tip -> [ "tooltip", pyTextSource tip ]
+     | None -> [])
 
 /// The fallback for a kind with no constructor arm: the typed record named by
 /// the wire discriminator, with each field snake-cased. This replaces the
@@ -4233,13 +4421,16 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match JsonValue.tryField "activeTag" k with
           | Some tg -> [ "activeTag", pyBinding Opq.Scalar tg ]
           | None -> [])
+       @ pyHandler "onSelect" "on_select" k
+       @ pyHandler "onSelectTag" "on_select_tag" k
        @ [ "children", pyChildren depth k ])
   | "Stepper" ->
     call
       "stepper"
       []
-      [ "activeStep", pyBinding Opq.Scalar (fieldD "activeStep" k)
-        "children", pyChildren depth k ]
+      ([ "activeStep", pyBinding Opq.Scalar (fieldD "activeStep" k) ]
+       @ pyHandler "onSelect" "on_select" k
+       @ [ "children", pyChildren depth k ])
   | "SummaryList" ->
     call
       "summary_list"
@@ -4252,10 +4443,11 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "disclosure"
       []
-      [ "heading", pyTextInput (fieldD "heading" k)
-        "open", pyBinding Opq.Scalar (fieldD "open" k)
-        "defaultOpen", pyBool (boolOf "defaultOpen" k)
-        "children", pyChildren depth k ]
+      ([ "heading", pyTextInput (fieldD "heading" k)
+         "open", pyBinding Opq.Scalar (fieldD "open" k)
+         "defaultOpen", pyBool (boolOf "defaultOpen" k) ]
+       @ pyHandler "onToggle" "on_toggle" k
+       @ [ "children", pyChildren depth k ])
   | "Modal" ->
     call
       "modal"
@@ -4265,9 +4457,15 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
         | None -> [])
        @ [ "open", pyBinding Opq.Scalar (fieldD "open" k)
            "dismissable", pyBool (boolOf "dismissable" k) ]
-       @ (match JsonValue.tryField "onDismiss" k with
-          | Some d -> [ "onDismiss", pyAction d ]
-          | None -> [])
+       // `on_dismiss` defaults to the no-op `Chain`, which the encoder writes
+       // as a real `onDismiss` key — so a wire that omits the slot has to say
+       // `None` explicitly. This is the one handler in the vocabulary that is an
+       // ACTION rather than a bool flag, so it is the one place absence is
+       // declared by an argument instead of by `pyHandler`.
+       @ [ "onDismiss",
+           (match JsonValue.tryField "onDismiss" k with
+            | Some d -> pyAction d
+            | None -> "None") ]
        // Phase 1119 — the anchored popover form. `Blocking` is the identity and
        // omits at it; `anchor` names the node the surface is positioned against.
        @ (match optStr "modality" k with
@@ -4379,6 +4577,10 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | None -> [])
        @ (match optStr "target" k with
           | Some tg -> [ "target", pq tg ]
+          | None -> [])
+       // Phase 1581 — the mailto/tel obfuscation hint, modelled from 0.2.0.
+       @ (match optStr "protection" k with
+          | Some pr -> [ "protection", pq pr ]
           | None -> []))
   | "Image" ->
     call
@@ -4516,7 +4718,9 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (if boolOf "multiple" k then [ "multiple", "True" ] else [])
        @ (match JsonValue.tryField "values" k with
           | Some vs -> [ "values", pyBinding Opq.Collection vs ]
-          | None -> []))
+          | None -> [])
+       @ pyHandler "onChange" "on_change" k
+       @ pyHandler "onChangeMulti" "on_change_multi" k)
   | "Form" ->
     let fs = arrOf "fields" k
 
@@ -4581,7 +4785,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | None -> [])
        @ (match optStr "destination" k with
           | Some d -> [ "destination", pq d ]
-          | None -> []))
+          | None -> [])
+       @ pyHandler "onSelect" "on_select" k)
   // ── Visualisation ─────────────────────────────────────────────────────────
   | "Chart" ->
     call
@@ -4594,7 +4799,37 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
          "stacked", pyBool (boolOf "stacked" k) ]
        @ (match JsonValue.tryField "title" k with
           | Some ti -> [ "title", pyTextInput ti ]
-          | None -> []))
+          | None -> [])
+       // Phase 1581 — the eight slots fuaran-py 0.2.0 added to `Chart`. Every
+       // one is optional on both sides, so each is emitted exactly where the
+       // wire carries it. `valueFormat` takes the `Format` union (`pyFormatIntent`
+       // — `t.FmtCurrency('GBP')`, emitting `isoCode`), NOT the `CellFormat` the
+       // column vocabulary uses, whose currency case emits `code` instead: the
+       // two differ by one key and by nothing else visible.
+       @ (match JsonValue.tryField "subtitle" k with
+          | Some st -> [ "subtitle", pyTextInput st ]
+          | None -> [])
+       @ (match JsonValue.tryField "xTitle" k with
+          | Some x -> [ "xTitle", pyTextInput x ]
+          | None -> [])
+       @ (match JsonValue.tryField "yTitle" k with
+          | Some y -> [ "yTitle", pyTextInput y ]
+          | None -> [])
+       @ (match JsonValue.tryField "valueFormat" k with
+          | Some f -> [ "valueFormat", pyFormatIntent f ]
+          | None -> [])
+       @ (match optStr "legendPosition" k with
+          | Some l -> [ "legendPosition", pq l ]
+          | None -> [])
+       @ (match optStr "dataLabels" k with
+          | Some d -> [ "dataLabels", pq d ]
+          | None -> [])
+       @ (match optStr "xScale" k with
+          | Some x -> [ "xScale", pq x ]
+          | None -> [])
+       @ (match JsonValue.tryField "annotations" k with
+          | Some(JArray ans) -> [ "annotations", pyList (ans |> List.map pyChartAnnotation) ]
+          | _ -> []))
   | "Table" ->
     let rows =
       arrOf "rows" k
@@ -4633,8 +4868,14 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        call
          "table"
          []
-         [ "headers", pyList (arrOf "headers" sr |> List.map pyTextSource)
-           "rows", pyList rows ]
+         ([ "headers", pyList (arrOf "headers" sr |> List.map pyTextSource)
+            "rows", pyList rows ]
+          // Phase 1581 — both land INSIDE `staticRows`, and `sortable` is
+          // tri-state there: `false` and absent are different documents.
+          @ pyTriBool "sortable" "sortable" sr
+          @ (match JsonValue.tryField "defaultSort" sr with
+             | Some ds -> [ "defaultSort", pyDefaultSort ds ]
+             | None -> []))
      | None ->
        call
          "grid"
@@ -4647,7 +4888,49 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           // erased `rowKey`.
           @ (match optStr "rowKeyField" k with
              | Some f -> [ "rowKeyField", pq f ]
-             | None -> [])))
+             | None -> [])
+          // Phase 1581 — the declarative sort / page / edit slots and the five
+          // transfer / export / print flags. The record carried the last five
+          // before 0.2.0; the CONSTRUCTOR did not reach them, which is why three
+          // grid ids were quarantined against the host for a `Binding.Query`
+          // source while ALSO failing on a slot fixable here.
+          @ (match optStr "sortStateKey" k with
+             | Some sk -> [ "sortStateKey", pq sk ]
+             | None -> [])
+          @ (match JsonValue.tryField "defaultSort" k with
+             | Some ds -> [ "defaultSort", pyDefaultSort ds ]
+             | None -> [])
+          @ (match optNum "pageSize" k with
+             | Some n -> [ "pageSize", numLit n ]
+             | None -> [])
+          @ (match optStr "pageStateKey" k with
+             | Some pk -> [ "pageStateKey", pq pk ]
+             | None -> [])
+          @ (match optStr "editStateKey" k with
+             | Some ek -> [ "editStateKey", pq ek ]
+             | None -> [])
+          @ (if boolOf "reorderable" k then
+               [ "reorderable", "True" ]
+             else
+               [])
+          @ (match optStr "transferOutKey" k with
+             | Some tk -> [ "transferOutKey", pq tk ]
+             | None -> [])
+          @ (match optStr "transferInKey" k with
+             | Some tk -> [ "transferInKey", pq tk ]
+             | None -> [])
+          @ (if boolOf "exportable" k then
+               [ "exportable", "True" ]
+             else
+               [])
+          @ (if boolOf "keepRowsTogether" k then
+               [ "keepRowsTogether", "True" ]
+             else
+               [])
+          @ (if boolOf "repeatHeader" k then
+               [ "repeatHeader", "True" ]
+             else
+               [])))
   // ── Custom / ErrorBoundary / Fragments ────────────────────────────────────
   | "Custom" ->
     call

@@ -135,7 +135,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install the Python host (fuaran-py)
-        run: python -m pip install --disable-pip-version-check fuaran-py==0.1.0
+        run: python -m pip install --disable-pip-version-check fuaran-py==0.2.0
 
       # The F# tier's nuget.config declares a local folder feed at a fixed
       # relative depth; NuGet hard-errors (NU1301) on a missing folder source,

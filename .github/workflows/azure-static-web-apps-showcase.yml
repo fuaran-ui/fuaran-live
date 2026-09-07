@@ -130,7 +130,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install the Python host (fuaran-py)
-        run: python -m pip install --disable-pip-version-check fuaran-py==0.1.0
+        run: python -m pip install --disable-pip-version-check fuaran-py==0.2.0
 
       - name: Publish the conformance report
         env:

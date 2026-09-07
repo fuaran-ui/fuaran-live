@@ -61,6 +61,25 @@ function runFable(args) {
     .filter((l) => !TOLERATED.test(l));
 }
 
+// NOTE ON THE DEVELOPMENT-ONLY IN-PAGE SURFACE.
+//
+// The renderer's console global and its relay listener register only under an
+// EXPLICIT opt-in: the `FUARAN_DEBUG_GLOBAL` compilation symbol, or a runtime
+// switch the host calls by name. Neither is passed here, and neither is passed
+// anywhere in this repo, so the bundles this script produces expose no such
+// surface — which is what a publicly served bundle must be able to say.
+//
+// It reads as a non-event, and it was not one. The gate used to be the `DEBUG`
+// symbol, which Fable sets by default and which every ordinary development
+// build of every consumer sets in any case; so the surface was compiled IN here
+// and the only thing standing in front of it was the host's own argument. Do
+// not add `--define FUARAN_DEBUG_GLOBAL` to the invocations below: this script
+// builds the artefact that is served, and the flag belongs — if anywhere — in a
+// local one-off command, never in the committed build.
+//
+// (`-c Release` is a second, coarser lever: it additionally drops the
+// development-only arms Fable gates on `DEBUG`. It is not passed here either,
+// and the surface above does not depend on it.)
 const errors = [
   ...runFable(['app', '--outDir', 'app/output']),
   // The showcase is its own Fable project (app/showcase/Showcase.fsproj) — the

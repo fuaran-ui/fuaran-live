@@ -15,11 +15,18 @@ module Fuaran.Live.Console
 //
 //  The renderer already ships this exact method surface: `DebugGlobal`, the
 //  in-page introspection REPL. What it ALSO ships is a deliberate production
-//  gate — `register` publishes `window.__fuaran` only under a DEBUG build with
-//  an explicit host opt-in, so in a release build the global is `undefined` and
-//  the whole registration is dead-code-eliminated. That gate is the right
-//  posture and this pane does not touch it: the shipped site registers no
-//  global, and a visitor's DevTools console still finds `__fuaran` undefined.
+//  gate — `register` publishes `window.__fuaran` only under an EXPLICIT opt-in:
+//  the `FUARAN_DEBUG_GLOBAL` compilation symbol, or a runtime switch a host
+//  calls by name, ANDed with the host's own `debug:` argument. This build passes
+//  neither, so the global is `undefined` on the served site and a visitor's
+//  DevTools console finds nothing.
+//
+//  That description used to say "under a DEBUG build … dead-code-eliminated",
+//  and both halves were wrong here. `DEBUG` is set by default by the very build
+//  this repo runs, so the registration was compiled IN and the only thing in
+//  front of it was the host argument; and elimination cannot be claimed of a
+//  gate that includes a runtime switch. The claim above is the narrower one that
+//  is true. This pane does not touch the gate either way.
 //
 //  Instead the pane calls `DebugGlobal.buildGlobalWith`, which builds the SAME
 //  surface object the global would have been bound to and carries no gate of its

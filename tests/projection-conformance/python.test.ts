@@ -184,10 +184,11 @@ const resolvePython = (): string => {
 //
 // 0.1.0 is on PyPI and the CI pin was raised to it in all three workflows that
 // install the host (ci / conformance / azure-static-web-apps-showcase — the
-// conformance one had been left at 0.0.3 and was raised with them). The set went
-// from **85 entries to 72**: THIRTEEN were removed, every one of them forced by
-// the self-clearing test below rather than merely invited by it, and FIFTEEN
-// surviving reasons were re-derived by execution.
+// conformance one had been left at 0.0.3 and was raised with them). THIRTEEN
+// entries were removed, every one of them forced by the self-clearing test below
+// rather than merely invited by it, and FIFTEEN surviving reasons were re-derived
+// by execution. (The set's size is no longer stated here; it is computed — see
+// the fourth pass below and `QUARANTINE_CENSUS`.)
 //
 // The thirteen split three ways, and the split is the finding:
 //
@@ -227,100 +228,413 @@ const resolvePython = (): string => {
 // gain the projector-side half they also carry, so the next reader does not
 // expect a `Binding.Query` fix alone to clear them.
 //
-// Nothing in the surviving 72 is now believed to be release lag: every entry was
-// executed against 0.1.0 this pass and fails on a construct absent from it.
-const PY_UNMODELLED = new Map<string, string>([
+// Nothing in the surviving set was then believed to be release lag: every entry
+// was executed against 0.1.0 this pass and fails on a construct absent from it.
+//
+// ── FOURTH PASS, 2026-09-07 — EVERY REASON CARRIES A FALSIFIER ───────────────
+//
+// The three passes above share one weakness, and it is not any of the reasons
+// they got wrong — it is that a wrong reason could only ever be found by a human
+// re-deriving it. Twelve entries blamed a host that had carried
+// `Column.field_name` since 0.0.6, and six more blamed a release for what the
+// projector had never emitted. The self-clearing test below has always checked
+// the OUTCOME (a quarantined fixture that starts round-tripping fails), and
+// nothing at all checked the CLAIM.
+//
+// So each entry now carries a machine-readable `construct` beside the human
+// sentence, and two probes falsify it. The prose reason stays, because a
+// sentence is what a reader needs and a token is what a test needs.
+//
+// THE TOKEN GRAMMAR — a construct token is a HOST-MODEL PATH, resolved against
+// the installed interpreter by `resolve_construct` in `python_exec.py`:
+//
+//   `t.Drawing`                  a symbol the module must export. Module prefixes
+//                                are the projector's own namespace (`t`, `cp`,
+//                                `binding`, …); bare names resolve in `t`.
+//   `Binding.Query`              a CASE of a union alias — resolved from the
+//                                union's own arguments, so the day the union
+//                                grows the case the probe sees it.
+//   `Chart.annotations`          a FIELD of a record.
+//   `optional:Modal.on_dismiss`  the record can OMIT this slot. This is the
+//                                closure-sentinel family's falsifier, and it
+//                                covers both shapes that force a key into the
+//                                wire: no field at all (`TextField`, whose
+//                                `to_wire` writes `"onChange": CLOSURE`) and a
+//                                field that cannot be None (`Modal.on_dismiss`,
+//                                defaulted to an empty `Chain`). A token naming
+//                                neither a field nor a wire key the record
+//                                writes is REFUSED as a typo, not read as a
+//                                verdict.
+//
+// THE TWO PROBES, and the failure each one exists to produce:
+//
+//   1. THE HOST PROBE. For an entry blaming the host, the pinned host must NOT
+//      model the construct. If it does, the entry is a claim about a gap that
+//      has been closed and the test fails by name — which is the mirror of the
+//      self-clearing test, applied to the reason rather than to the outcome.
+//   2. THE PROJECTOR PROBE. When the host DOES model it, the two causes are told
+//      apart by the projected source: a construct the projector never emits is
+//      PROJECTOR lag, and the failure names `app/Projection.fs` and asks for
+//      `arm: 'projector'` — the 2026-09-07 `Column.field_name` finding, made
+//      mechanical. A construct the projector DOES emit means the entry has
+//      simply outlived its cause: remove it.
+//
+// The projector probe reads generated source, so what it looks for is the
+// projector's own emission rule (stated in `app/Projection.fs`'s Python-leg
+// header): every value is built from a TYPED RECORD, so a construct in the
+// output appears either as `t.X(` / `cp.X(` or as a `snake_case=` keyword. It is
+// a text probe and says so; both its directions FAIL rather than pass, so it can
+// misdirect a message but never hold an entry it should have dropped.
+//
+// `arm` says which repository owns the cause, and `both` is not a hedge — it is
+// the three grid ids whose `Binding.Query` source is host lag AND whose
+// `exportable` / `keepRowsTogether` / `repeatHeader` are slots 0.1.0 models and
+// this projector does not emit. The counts by arm are `QUARANTINE_CENSUS`,
+// asserted against the map's own tally below, so no prose in this file states a
+// number the map can contradict.
+interface Quarantined {
+  /** The host-model path this entry claims is absent — see the grammar above. */
+  readonly construct: string;
+  /** Which repository owns the cause. `both` additionally sets `projectorConstruct`. */
+  readonly arm: 'host' | 'projector' | 'both';
+  /** The sentence for the human. Free text; the `construct` is what the probes read. */
+  readonly reason: string;
+  /**
+   * For `arm: 'both'` — the construct the host DOES model and `app/Projection.fs`
+   * does not emit. Probed exactly as a `projector` entry's `construct` is.
+   */
+  readonly projectorConstruct?: string;
+}
+
+const PY_UNMODELLED = new Map<string, Quarantined>([
   // 1 — no typed node kind.
-  ['mount-1', 'no t.Mount'],
-  ['mount-2', 'no t.Mount'],
-  ['fact-1', 'no t.Fact'],
-  ['now-environment-binding', 'no t.Fact'],
-  ['master-detail-multi-field', 'no t.Fact'],
-  ['master-detail-preselected', 'no t.Fact'],
-  ['master-detail-preselected-second-row', 'no t.Fact'],
-  ['drawing-1', 'no t.Drawing'],
-  ['drawing-empty', 'no t.Drawing'],
-  ['drawing-nonfinite-sentinels', 'no t.Drawing'],
-  ['drawing-rotated-labels', 'no t.Drawing'],
-  ['drawing-tipped-shapes', 'no t.Drawing'],
+  ['mount-1', { construct: 't.Mount', arm: 'host', reason: 'no t.Mount' }],
+  ['mount-2', { construct: 't.Mount', arm: 'host', reason: 'no t.Mount' }],
+  ['fact-1', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
+  ['now-environment-binding', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
+  ['master-detail-multi-field', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
+  ['master-detail-preselected', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
+  [
+    'master-detail-preselected-second-row',
+    { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' },
+  ],
+  ['drawing-1', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
+  ['drawing-empty', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
+  ['drawing-nonfinite-sentinels', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
+  ['drawing-rotated-labels', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
+  ['drawing-tipped-shapes', { construct: 't.Drawing', arm: 'host', reason: 'no t.Drawing' }],
 
   // 2 — no typed binding / action case.
-  ['query-dependson', 'no Binding.Query'],
-  ['metric-invoke', 'no Binding.Invoke'],
-  ['image-caption-i18n-1', 'no TextSource.I18n'],
-  ['btn-invoke', 'no Action.Invoke'],
-  ['btn-json-payloads', 'no Action.AiTool'],
-  ['call-into', 'no Action.Call'],
+  ['query-dependson', { construct: 'Binding.Query', arm: 'host', reason: 'no Binding.Query' }],
+  ['metric-invoke', { construct: 'Binding.Invoke', arm: 'host', reason: 'no Binding.Invoke' }],
+  [
+    'image-caption-i18n-1',
+    { construct: 'TextSource.I18n', arm: 'host', reason: 'no TextSource.I18n' },
+  ],
+  ['btn-invoke', { construct: 'Action.Invoke', arm: 'host', reason: 'no Action.Invoke' }],
+  ['btn-json-payloads', { construct: 'Action.AiTool', arm: 'host', reason: 'no Action.AiTool' }],
+  ['call-into', { construct: 'Action.Call', arm: 'host', reason: 'no Action.Call' }],
 
-  // 3 — a hardcoded closure sentinel the record cannot omit.
-  ['form-declarative', 'TextField hardcodes onChange'],
-  ['form-declarative-minimal', 'TextField hardcodes onChange'],
-  ['form-field-rules', 'TextField hardcodes onChange'],
-  ['composite-tabs-panels', 'Tabs hardcodes onSelect; TextField hardcodes onChange'],
-  ['form-toggle', 'CheckboxField hardcodes onToggle'],
-  ['form-date-range', 'DateRangeField hardcodes onChange'],
-  ['filters-declarative', 'TextFilter hardcodes onChange'],
-  ['filters-date-range', 'DateRangeField hardcodes onChange'],
-  ['frag-stdlib-filter-bar', 'TextFilter hardcodes onChange'],
-  ['filterable-static-dashboard', 'ChoiceFilter hardcodes onChange'],
-  ['multiselect-chip-list-param', 'Select hardcodes onChange'],
-  ['controls-declarative', 'Tabs hardcodes onSelect'],
-  ['controls-closure', 'Tabs has no onSelectTag'],
-  ['grid-bound-sort', 'DataGrid has no sortStateKey / defaultSort; Column has no sortable'],
+  // 3 — a slot the record cannot omit: either no field at all (the `to_wire`
+  // writes a CLOSURE sentinel) or a field that cannot be None. `optional:` is
+  // the falsifier for both.
+  [
+    'form-declarative',
+    {
+      construct: 'optional:TextField.on_change',
+      arm: 'host',
+      reason: 'TextField hardcodes onChange',
+    },
+  ],
+  [
+    'form-declarative-minimal',
+    {
+      construct: 'optional:TextField.on_change',
+      arm: 'host',
+      reason: 'TextField hardcodes onChange',
+    },
+  ],
+  [
+    'form-field-rules',
+    {
+      construct: 'optional:TextField.on_change',
+      arm: 'host',
+      reason: 'TextField hardcodes onChange',
+    },
+  ],
+  [
+    'composite-tabs-panels',
+    {
+      construct: 'optional:Tabs.on_select',
+      arm: 'host',
+      reason: 'Tabs hardcodes onSelect; TextField hardcodes onChange',
+    },
+  ],
+  [
+    'form-toggle',
+    {
+      construct: 'optional:CheckboxField.on_toggle',
+      arm: 'host',
+      reason: 'CheckboxField hardcodes onToggle',
+    },
+  ],
+  [
+    'form-date-range',
+    {
+      construct: 'optional:DateRangeField.on_change',
+      arm: 'host',
+      reason: 'DateRangeField hardcodes onChange',
+    },
+  ],
+  [
+    'filters-declarative',
+    {
+      construct: 'optional:TextFilter.on_change',
+      arm: 'host',
+      reason: 'TextFilter hardcodes onChange',
+    },
+  ],
+  [
+    'filters-date-range',
+    {
+      construct: 'optional:DateRangeField.on_change',
+      arm: 'host',
+      reason: 'DateRangeField hardcodes onChange',
+    },
+  ],
+  [
+    'frag-stdlib-filter-bar',
+    {
+      construct: 'optional:TextFilter.on_change',
+      arm: 'host',
+      reason: 'TextFilter hardcodes onChange',
+    },
+  ],
+  [
+    'filterable-static-dashboard',
+    {
+      construct: 'optional:ChoiceFilter.on_change',
+      arm: 'host',
+      reason: 'ChoiceFilter hardcodes onChange',
+    },
+  ],
+  [
+    'multiselect-chip-list-param',
+    { construct: 'optional:Select.on_change', arm: 'host', reason: 'Select hardcodes onChange' },
+  ],
+  [
+    'controls-declarative',
+    { construct: 'optional:Tabs.on_select', arm: 'host', reason: 'Tabs hardcodes onSelect' },
+  ],
+  [
+    'controls-closure',
+    { construct: 'Tabs.on_select_tag', arm: 'host', reason: 'Tabs has no onSelectTag' },
+  ],
+  [
+    'grid-bound-sort',
+    {
+      construct: 'DataGrid.sort_state_key',
+      arm: 'host',
+      reason: 'DataGrid has no sortStateKey / defaultSort; Column has no sortable',
+    },
+  ],
   [
     'grid-declared-edit',
-    'DataGrid has no editStateKey; Column has no editable; source is a Binding.Query',
+    {
+      construct: 'DataGrid.edit_state_key',
+      arm: 'host',
+      reason: 'DataGrid has no editStateKey; Column has no editable; source is a Binding.Query',
+    },
   ],
-  ['grid-paged', 'DataGrid has no pageSize / pageStateKey'],
-  ['grid-paged-sorted', 'DataGrid has no pageSize / pageStateKey / sortStateKey'],
-  ['grid-reorderable', 'DataGrid has no editStateKey / reorderable'],
-  ['grid-sort-state-key', 'DataGrid has no sortStateKey'],
+  [
+    'grid-paged',
+    {
+      construct: 'DataGrid.page_size',
+      arm: 'host',
+      reason: 'DataGrid has no pageSize / pageStateKey',
+    },
+  ],
+  [
+    'grid-paged-sorted',
+    {
+      construct: 'DataGrid.page_size',
+      arm: 'host',
+      reason: 'DataGrid has no pageSize / pageStateKey / sortStateKey',
+    },
+  ],
+  [
+    'grid-reorderable',
+    {
+      construct: 'DataGrid.edit_state_key',
+      arm: 'host',
+      reason: 'DataGrid has no editStateKey / reorderable',
+    },
+  ],
+  [
+    'grid-sort-state-key',
+    { construct: 'DataGrid.sort_state_key', arm: 'host', reason: 'DataGrid has no sortStateKey' },
+  ],
   [
     'shared-source-seeded-pair',
-    'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+    {
+      construct: 'cp.TransformSource',
+      arm: 'host',
+      reason: 'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+    },
   ],
 
   // 4 — a record narrower than the wire.
-  ['chart-axis-titles', 'Chart has no subtitle / xTitle / yTitle'],
-  ['chart-data-labels', 'Chart has no dataLabels'],
-  ['chart-legend-position', 'Chart has no legendPosition'],
-  ['chart-temporal-x', 'Chart has no xScale'],
-  ['chart-value-format', 'Chart has no valueFormat'],
+  [
+    'chart-axis-titles',
+    { construct: 'Chart.x_title', arm: 'host', reason: 'Chart has no subtitle / xTitle / yTitle' },
+  ],
+  [
+    'chart-data-labels',
+    { construct: 'Chart.data_labels', arm: 'host', reason: 'Chart has no dataLabels' },
+  ],
+  [
+    'chart-legend-position',
+    { construct: 'Chart.legend_position', arm: 'host', reason: 'Chart has no legendPosition' },
+  ],
+  ['chart-temporal-x', { construct: 'Chart.x_scale', arm: 'host', reason: 'Chart has no xScale' }],
+  [
+    'chart-value-format',
+    { construct: 'Chart.value_format', arm: 'host', reason: 'Chart has no valueFormat' },
+  ],
   [
     'badge-transform-live',
-    'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+    {
+      construct: 'cp.TransformSource',
+      arm: 'host',
+      reason: 'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+    },
   ],
-  ['link-protected-1', 'Link has no protection'],
-  ['table-sortable-1', 'Table has no sortable / defaultSort'],
-  ['transfer-board', 'DataGrid has no reorderable'],
-  ['chart-annotation-bands', 'Chart has no annotations'],
-  ['chart-annotation-events', 'Chart has no annotations'],
-  ['chart-annotations', 'Chart has no annotations'],
-  ['tooltip-button-1', 'UiNode has no tooltip'],
-  ['tooltip-icon-button-1', 'UiNode has no tooltip'],
-  ['tooltip-metric-1', 'UiNode has no tooltip'],
+  [
+    'link-protected-1',
+    { construct: 'Link.protection', arm: 'host', reason: 'Link has no protection' },
+  ],
+  [
+    'table-sortable-1',
+    { construct: 'Table.sortable', arm: 'host', reason: 'Table has no sortable / defaultSort' },
+  ],
+  [
+    'transfer-board',
+    { construct: 'DataGrid.reorderable', arm: 'host', reason: 'DataGrid has no reorderable' },
+  ],
+  [
+    'chart-annotation-bands',
+    { construct: 'Chart.annotations', arm: 'host', reason: 'Chart has no annotations' },
+  ],
+  [
+    'chart-annotation-events',
+    { construct: 'Chart.annotations', arm: 'host', reason: 'Chart has no annotations' },
+  ],
+  [
+    'chart-annotations',
+    { construct: 'Chart.annotations', arm: 'host', reason: 'Chart has no annotations' },
+  ],
+  [
+    'tooltip-button-1',
+    { construct: 'UiNode.tooltip', arm: 'host', reason: 'UiNode has no tooltip' },
+  ],
+  [
+    'tooltip-icon-button-1',
+    { construct: 'UiNode.tooltip', arm: 'host', reason: 'UiNode has no tooltip' },
+  ],
+  [
+    'tooltip-metric-1',
+    { construct: 'UiNode.tooltip', arm: 'host', reason: 'UiNode has no tooltip' },
+  ],
 
-  // 3 (continued) — the closure sentinel, in the controls added since 0.0.1.
-  // Each of the four new field records emits `onChange` and `value`
-  // unconditionally, so a canonical minimal control cannot be reached.
-  ['filters-rating-colour', 'RatingField / ColorField hardcode onChange and value'],
-  ['filters-tokens', 'TokensField hardcodes onChange and value'],
-  ['form-combobox-freetext', 'ComboboxField hardcodes onChange'],
-  ['form-rating-halves', 'RatingField hardcodes onChange'],
-  ['form-tokens-freetext', 'TokensField hardcodes onChange and value'],
-  ['popover-anchored-1', 'Modal hardcodes onDismiss'],
-  ['popover-open-1', 'Modal hardcodes onDismiss'],
+  // 3 (continued) — the same unomittable slot, in the controls added since 0.0.1.
+  // Each of the four new field records writes `onChange` and `value` into the
+  // wire unconditionally, so a canonical minimal control cannot be reached.
+  [
+    'filters-rating-colour',
+    {
+      construct: 'optional:RatingField.on_change',
+      arm: 'host',
+      reason: 'RatingField / ColorField hardcode onChange and value',
+    },
+  ],
+  [
+    'filters-tokens',
+    {
+      construct: 'optional:TokensField.on_change',
+      arm: 'host',
+      reason: 'TokensField hardcodes onChange and value',
+    },
+  ],
+  [
+    'form-combobox-freetext',
+    {
+      construct: 'optional:ComboboxField.on_change',
+      arm: 'host',
+      reason: 'ComboboxField hardcodes onChange',
+    },
+  ],
+  [
+    'form-rating-halves',
+    {
+      construct: 'optional:RatingField.on_change',
+      arm: 'host',
+      reason: 'RatingField hardcodes onChange',
+    },
+  ],
+  [
+    'form-tokens-freetext',
+    {
+      construct: 'optional:TokensField.on_change',
+      arm: 'host',
+      reason: 'TokensField hardcodes onChange and value',
+    },
+  ],
+  [
+    'popover-anchored-1',
+    { construct: 'optional:Modal.on_dismiss', arm: 'host', reason: 'Modal hardcodes onDismiss' },
+  ],
+  [
+    'popover-open-1',
+    { construct: 'optional:Modal.on_dismiss', arm: 'host', reason: 'Modal hardcodes onDismiss' },
+  ],
 
   // 2 (continued) — `Binding` is Static | State | Filter | Selection | Now |
   // FormatBinding | Local, so a `Query`-sourced control or grid has no spelling.
-  ['form-combobox-query', 'no Binding.Query'],
-  ['form-tokens-query', 'no Binding.Query'],
-  ['grid-exportable-1', 'no Binding.Query; and fuaran.grid takes no exportable'],
-  ['grid-keep-rows-together-1', 'no Binding.Query; and fuaran.grid takes no keep_rows_together'],
-  ['grid-repeat-header-1', 'no Binding.Query; and fuaran.grid takes no repeat_header'],
+  // The three `arm: 'both'` grid ids additionally name the DataGrid slot 0.1.0
+  // models and this projector does not emit — the half that is fixable HERE, and
+  // that would go unrecorded if the Query source were the only cause named.
+  ['form-combobox-query', { construct: 'Binding.Query', arm: 'host', reason: 'no Binding.Query' }],
+  ['form-tokens-query', { construct: 'Binding.Query', arm: 'host', reason: 'no Binding.Query' }],
+  [
+    'grid-exportable-1',
+    {
+      construct: 'Binding.Query',
+      arm: 'both',
+      projectorConstruct: 'DataGrid.exportable',
+      reason: 'no Binding.Query; and the projector emits no exportable',
+    },
+  ],
+  [
+    'grid-keep-rows-together-1',
+    {
+      construct: 'Binding.Query',
+      arm: 'both',
+      projectorConstruct: 'DataGrid.keep_rows_together',
+      reason: 'no Binding.Query; and the projector emits no keep_rows_together',
+    },
+  ],
+  [
+    'grid-repeat-header-1',
+    {
+      construct: 'Binding.Query',
+      arm: 'both',
+      projectorConstruct: 'DataGrid.repeat_header',
+      reason: 'no Binding.Query; and the projector emits no repeat_header',
+    },
+  ],
 
   // 1 (continued).
-  ['now-grain', 'no t.Fact'],
+  ['now-grain', { construct: 't.Fact', arm: 'host', reason: 'no t.Fact' }],
 
   // Family 5 — the encoder's key order — is EMPTY as of the 0.1.0 pin raise:
   // `custom-nonascii-keys` was its only member and 0.1.0 sorts by UTF-16 code
@@ -335,29 +649,91 @@ const PY_UNMODELLED = new Map<string, string>([
   // SECOND cause that was always there behind the first.
   //
   // 1 (continued) — no typed binding case.
-  ['expr-scalar', 'no Binding.Expr'],
-  ['expr-params-state-selection', 'no Binding.Expr'],
+  ['expr-scalar', { construct: 'Binding.Expr', arm: 'host', reason: 'no Binding.Expr' }],
+  [
+    'expr-params-state-selection',
+    { construct: 'Binding.Expr', arm: 'host', reason: 'no Binding.Expr' },
+  ],
   [
     'switch-predicate',
-    'SwitchCase.when is modelled from 0.1.0; the predicate is a Binding.Expr, which is not',
+    {
+      construct: 'Binding.Expr',
+      arm: 'host',
+      reason:
+        'SwitchCase.when is modelled from 0.1.0; the predicate is a Binding.Expr, which is not',
+    },
   ],
   [
     'node-visible',
-    'UiNode.visible is modelled from 0.1.0; two predicates are Binding.Expr / Binding.Query, which are not',
+    {
+      construct: 'Binding.Expr',
+      arm: 'host',
+      reason:
+        'UiNode.visible is modelled from 0.1.0; two predicates are Binding.Expr / Binding.Query, which are not',
+    },
   ],
 
   // 2 (continued) — no typed action case.
   [
     'action-confirm',
-    'Action.Confirm is modelled from 0.1.0; the confirmed branch is an Action.Call, which is not',
+    {
+      construct: 'Action.Call',
+      arm: 'host',
+      reason:
+        'Action.Confirm is modelled from 0.1.0; the confirmed branch is an Action.Call, which is not',
+    },
   ],
 
-  // 3 (continued) — the closure sentinel, on the buffer rather than a control.
-  // `Local` emits `onCommit` unconditionally and carries neither `codec` nor
+  // 3 (continued) — the unomittable slot, on the buffer rather than a control.
+  // `Local` writes `onCommit` unconditionally and carries neither `codec` nor
   // `commitTo`, and the wire refuses a document carrying both commit spellings,
   // so the declarative buffer has no reachable shape at all.
-  ['form-local-declared', 'Local hardcodes onCommit — no codec / commitTo'],
+  [
+    'form-local-declared',
+    {
+      construct: 'optional:Local.on_commit',
+      arm: 'host',
+      reason: 'Local hardcodes onCommit — no codec / commitTo',
+    },
+  ],
 ]);
+
+/** The map's own tally, by arm — computed, and rendered into the census test's name. */
+const tallyByArm = () => {
+  const tally = { host: 0, projector: 0, both: 0 };
+  for (const q of PY_UNMODELLED.values()) tally[q.arm] += 1;
+  return tally;
+};
+
+/**
+ * The quarantine's size, by which repository owns the cause. DECLARED here and
+ * asserted against `tallyByArm()` below, so the one number a reader sees is the
+ * one the map actually holds — the three passes above each carried counts in
+ * prose, and prose cannot be wrong out loud.
+ */
+const QUARANTINE_CENSUS = { host: 69, projector: 0, both: 3 } as const;
+
+/**
+ * What the projector's generated source must contain for it to be EMITTING the
+ * construct a token names.
+ *
+ * The projector's Python leg builds every value from a typed record (its own
+ * rule — see `app/Projection.fs`'s Python-leg header), so a construct it emits
+ * appears in exactly one of two shapes: a qualified constructor (`t.Drawing(`,
+ * `cp.Param(`) for a class or union case, or a keyword argument (`field_name=`)
+ * for a record slot. Anchoring on those two shapes rather than on the bare word
+ * is what keeps a fixture id like `'drawing-1'` from reading as an emission of
+ * `t.Drawing`.
+ */
+const emissionPattern = (construct: string): RegExp => {
+  const leaf = construct
+    .replace(/^optional:/, '')
+    .split('.')
+    .pop()!;
+  return /^[a-z]/.test(leaf)
+    ? new RegExp(String.raw`\b${leaf}\s*=`)
+    : new RegExp(String.raw`\b[a-z]+\.${leaf}\b`);
+};
 
 interface ExecResult {
   readonly id: string;
@@ -366,7 +742,12 @@ interface ExecResult {
   readonly error?: string;
 }
 
+/** One construct token, resolved against the INSTALLED host by the executor. */
+type ConstructVerdict = { models: boolean; detail: string } | { error: string };
+
 let executed: Map<string, ExecResult> = new Map();
+let projected: Map<string, string> = new Map();
+let constructs: Record<string, ConstructVerdict> = {};
 let fatal: string | undefined;
 
 beforeAll(() => {
@@ -374,9 +755,21 @@ beforeAll(() => {
     id: f.id,
     expr: projectPythonExpr(readFileSync(resolve(corpusDir, f.inputFile), 'utf8').trim()) as string,
   }));
+  projected = new Map(cases.map((c) => [c.id, c.expr]));
+
+  // Every token any entry names, host- and projector-side alike, resolved in the
+  // same process that executes the corpus — so the probe and the round-trip can
+  // never disagree about which interpreter they measured.
+  const tokens = [
+    ...new Set(
+      [...PY_UNMODELLED.values()].flatMap((q) =>
+        q.projectorConstruct ? [q.construct, q.projectorConstruct] : [q.construct],
+      ),
+    ),
+  ];
 
   const proc = spawnSync(resolvePython(), [resolve(here, 'python_exec.py')], {
-    input: JSON.stringify({ cases }),
+    input: JSON.stringify({ cases, constructs: tokens }),
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -390,13 +783,18 @@ beforeAll(() => {
     return;
   }
 
-  const payload = JSON.parse(proc.stdout) as { fatal?: string; results?: ExecResult[] };
+  const payload = JSON.parse(proc.stdout) as {
+    fatal?: string;
+    results?: ExecResult[];
+    constructs?: Record<string, ConstructVerdict>;
+  };
   if (payload.fatal) {
     fatal = payload.fatal;
     return;
   }
 
   executed = new Map((payload.results ?? []).map((r) => [r.id, r]));
+  constructs = payload.constructs ?? {};
 }, 300_000);
 
 describe('Python projection conformance (Node corpus)', () => {
@@ -419,11 +817,81 @@ describe('Python projection conformance (Node corpus)', () => {
     }
   });
 
+  const census = tallyByArm();
+  it(`the quarantine census — host ${census.host} / projector ${census.projector} / both ${census.both} — is the map's own tally`, () => {
+    // Generated, not narrated: the counts are in this test's NAME, so every run
+    // prints them, and the declared constant is what makes a drifted count fail
+    // rather than merely read as out of date. The prose above quotes no total.
+    expect(
+      census,
+      `QUARANTINE_CENSUS is stale — the map now tallies host ${census.host} / projector ${census.projector} / both ${census.both}`,
+    ).toEqual({ ...QUARANTINE_CENSUS });
+  });
+
+  it('every construct token resolves against the pinned host', () => {
+    // A token the executor cannot resolve is a claim about nothing. It is
+    // reported here, once, rather than inside each entry probe — a misspelled
+    // record name would otherwise read as "the host lacks it", which is exactly
+    // the vacuous hold this phase exists to make impossible.
+    const unresolved = Object.entries(constructs)
+      .filter(([, v]) => 'error' in v)
+      .map(([token, v]) => `${token}: ${(v as { error: string }).error}`);
+    expect(unresolved, `unresolvable construct token(s):\n  ${unresolved.join('\n  ')}`).toEqual(
+      [],
+    );
+  });
+
   for (const f of nodeFixtures) {
     const wireOf = () => readFileSync(resolve(corpusDir, f.inputFile), 'utf8').trim();
+    const entry = PY_UNMODELLED.get(f.id);
 
-    if (PY_UNMODELLED.has(f.id)) {
-      it(`${f.id} is unmodelled by fuaran_py (${PY_UNMODELLED.get(f.id)})`, () => {
+    if (entry) {
+      it(`${f.id} — the reason's construct is where it says it is (${entry.construct})`, () => {
+        if (fatal) return; // the executor test above already fails, loudly
+
+        /** Host lag: the pinned host must NOT model what the entry blames it for. */
+        const hostSide = (token: string) => {
+          const verdict = constructs[token];
+          if (!verdict || 'error' in verdict) return; // reported by the token test above
+          if (!verdict.models) return; // the entry holds
+
+          const source = projected.get(f.id) ?? '';
+          const emitted = emissionPattern(token).test(source);
+          expect(
+            verdict.models,
+            emitted
+              ? `'${f.id}' blames the host for '${token}', but the pinned host MODELS it (${verdict.detail}) and the projector already emits it — REMOVE the entry or re-derive its reason`
+              : `'${f.id}' blames the host for '${token}', but the pinned host MODELS it (${verdict.detail}) and app/Projection.fs never emits it — this is PROJECTOR lag: re-class the entry as arm: 'projector' (or teach app/Projection.fs)`,
+          ).toBe(false);
+        };
+
+        /** Projector lag: the host models it and app/Projection.fs must not emit it. */
+        const projectorSide = (token: string) => {
+          const verdict = constructs[token];
+          if (!verdict || 'error' in verdict) return;
+          expect(
+            verdict.models,
+            `'${f.id}' claims app/Projection.fs lags on '${token}', but the pinned host does not model it (${verdict.detail}) — this is HOST lag: re-class the entry as arm: 'host'`,
+          ).toBe(true);
+          const source = projected.get(f.id) ?? '';
+          expect(
+            emissionPattern(token).test(source),
+            `'${f.id}' claims app/Projection.fs lags on '${token}', but the projected source already emits it — REMOVE the entry or re-derive its reason`,
+          ).toBe(false);
+        };
+
+        if (entry.arm === 'host' || entry.arm === 'both') hostSide(entry.construct);
+        if (entry.arm === 'projector') projectorSide(entry.construct);
+        if (entry.arm === 'both') {
+          expect(
+            entry.projectorConstruct,
+            `'${f.id}' is arm: 'both' and must name its projectorConstruct`,
+          ).toBeDefined();
+          projectorSide(entry.projectorConstruct!);
+        }
+      });
+
+      it(`${f.id} is unmodelled by fuaran_py (${entry.reason})`, () => {
         const result = executed.get(f.id);
         if (!result?.ok) return; // still un-projectable — the entry holds
         expect(

@@ -94,11 +94,17 @@ development tree too), that is **55 of the 161 node fixtures**, in four families
   `protection`, `Table` no `sortable` / `defaultSort`, `Media` no `tracks` /
   `transcript`.
 
-None of that is projector lag and none of it is fixable in this repo. Each of
-the 55 is listed **with the construct it needs** in the arm's `PY_UNMODELLED`
-map, and the arm fails if one starts round-tripping while still listed — so the
-set cannot quietly outlive its cause, and closing it is a matter of teaching
-`fuaran-py`, one named construct at a time. For those fixtures the projection
+None of that is projector lag and none of it is fixable in this repo. Every entry
+is listed in the arm's `PY_UNMODELLED` map **with the construct it needs as a
+machine-readable token** and an `arm` naming which repository owns the cause, and
+two probes keep both honest: the arm fails if a quarantined fixture starts
+round-tripping while still listed, and it fails again if the pinned host turns out
+to MODEL the construct an entry blames it for — in which case the failure says
+whether that is a stale entry to remove or projector lag to teach
+`app/Projection.fs`. The set's size is not quoted here or anywhere else in prose;
+it is computed by arm and printed by the census test in that file. Closing the set
+is a matter of teaching `fuaran-py`, one named construct at a time. For those
+fixtures the projection
 still emits the shape the typed model _would_ take, so pasting it raises an
 `AttributeError` naming the absent class rather than silently producing something
 that looks authored and is not.

@@ -121,7 +121,20 @@ jobs:
       # the deploy when the gate fails — a broken gate must not ship. The Fable
       # compile is invoked here because the harness executes the projector from
       # app/output/; the build step below reuses the same cached emission.
+      # The conformance gate's PYTHON arm executes its projected source against
+      # the real fuaran-py host (see ci.yml for the pin/runner agreement rule).
+      # Without an interpreter and the host installed, every Python fixture
+      # fails on `No module named 'fuaran_py'` — a red that measures nothing.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the Python host (fuaran-py)
+        run: python -m pip install --disable-pip-version-check fuaran-py==0.0.6
+
       - name: Publish the conformance report
+        env:
+          FUARAN_PY_PYTHON: python
         run: |
           pnpm run fable:app
           pnpm run conformance:report

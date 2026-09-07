@@ -3101,6 +3101,19 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
 //    projected exactly at all. Those are named — with the missing construct — in
 //    the arm's quarantine and in docs/PROJECTION_FIDELITY.md rather than being
 //    sketched into a shape that would read as faithful.
+//
+//    That second point needs one qualification since fuaran-py 0.1.0, and the
+//    qualification is what keeps the quarantine meaningful. Three slots are
+//    typed as a raw wire `Value` rather than as the record they describe —
+//    `UiNode.visible`, `SwitchCase.when` and `Navigate.route` — and the encoder
+//    accepts a hand-built `Obj` in each. Taking that would dissolve the whole
+//    quarantine, because `_lower` passes an `Obj` through wherever a `Binding`
+//    is expected, so `Binding.Expr` and `Binding.Query` would "project" in every
+//    slot while remaining unmodelled. THE RULE HERE IS THEREFORE: build the
+//    value from a TYPED RECORD, and lower it with that record's own `to_wire`
+//    where the host's slot does not lower it for you. That can spell exactly
+//    what the typed model carries and nothing more, so an absent case is still
+//    absent — which is what the arm is measuring.
 
 let private pq (s: string) : string = "'" + escape '\'' s + "'"
 
@@ -3216,6 +3229,11 @@ let rec private pyColExpr (v: JsonValue) : string =
     + ", "
     + pyList (arrOf "args" v |> List.map pyColExpr)
     + ")"
+  // fuaran#1170 — a declared parameter read at evaluation time. It carries a
+  // `name` exactly as a `col` does, so without its own arm it fell through to
+  // the `col` fallback and projected as a COLUMN reference: same shape, wrong
+  // discriminator, and nothing raised.
+  | Some "param" -> "cp.Param(" + pq (strOf "name" v) + ")"
   | _ -> "cp.Col(" + pq (strOf "name" v) + ")"
 
 let private pyDataSource (v: JsonValue) : string =
@@ -3337,6 +3355,13 @@ let private pyFormatIntent (v: JsonValue) : string =
   | Some "Date" -> "t.FmtDate(" + pq (strOf "dateStyle" v) + ")"
   | Some "RelativeTime" -> "t.FmtRelativeTime(" + pq (strOf "unit" v) + ")"
   | Some "Duration" -> "t.FmtDuration(" + pq (strOf "unit" v) + ", " + pq (strOf "style" v) + ")"
+  // Phase 1533 — elapsed-time-since, modelled by fuaran-py from 0.1.0. `unit`
+  // absent is the auto-selection request rather than a default to spell out, so
+  // the projection omits the argument exactly where the wire omits the field.
+  | Some "Since" ->
+    (match optStr "unit" v with
+     | Some u -> "t.FmtSince(" + pq u + ")"
+     | None -> "t.FmtSince()")
   | _ ->
     (match optNum "decimals" v with
      | Some d -> "t.FmtNumber(" + numLit d + ")"
@@ -3379,7 +3404,13 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
     + ", "
     + pyStaticValue (fieldD "defaultValue" v)
     + ")"
-  | Some "Now" -> "binding.now()"
+  // Phase 1533 — `grain` is the one thing a `Now` carries on the wire, and only
+  // when it is not the `Second` default. `binding.now()` takes no argument, so a
+  // grain-bearing Now takes the typed record; a bare one keeps the helper.
+  | Some "Now" ->
+    (match optStr "grain" v with
+     | Some g -> "t.Now(" + pq g + ")"
+     | None -> "binding.now()")
   | Some "Local" ->
     "binding.local("
     + pyBinding Opq.Scalar (fieldD "initialFrom" v)
@@ -3395,14 +3426,27 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
     + pyLocaleSource (fieldD "locale" v)
     + ")"
   | Some "Transform" ->
-    // Only the `Data`-source, param-free shape has a Python spelling:
-    // `TransformBinding` carries `source` + `pipeline` and nothing else, and its
-    // `source` is a bare `DataSource` rather than the `TransformSource` DU, so
-    // neither `params` nor a `Live` source is expressible. Both are quarantined.
+    // `TransformBinding.source` is a bare `DataSource` rather than the wire's
+    // `TransformSource` DU, so a `State`- or `Live`-sourced transform still has
+    // no spelling and stays quarantined. `params` does have one from 0.1.0 —
+    // omitted from the wire when empty, so a param-free binding is unchanged.
     "cp.TransformBinding("
     + pyDataSource (fieldD "source" v)
     + ", "
     + pyList (arrOf "pipeline" v |> List.map pyTransformStep)
+    + (match arrOf "params" v with
+       | [] -> ""
+       | ps ->
+         ", "
+         + pyList (
+           ps
+           |> List.map (fun p ->
+             "cp.ParamDecl("
+             + pq (strOf "name" p)
+             + ", "
+             + pyBinding Opq.Scalar (fieldD "from" p)
+             + ")")
+         ))
     + ")"
   | _ ->
     // Query / Computed / I18n / Invoke — no typed case in `fuaran_py`.
@@ -3471,7 +3515,24 @@ let rec private pyAction (v: JsonValue) : string =
     + ", "
     + pyJson (fieldD "payload" v)
     + ")"
-  | Some "Navigate" -> "action.navigate(" + pq (strOf "route" v) + ")"
+  // Phase 1536 — the route is a `TextSource`, so a tree can name a destination
+  // it computes from what the reader selected, and `target` names the browsing
+  // context (omitted at `Self`). `t.Navigate` places the route into its `Obj`
+  // WITHOUT lowering it, so a bound route is handed over already lowered: the
+  // typed `t.Bound` record's own `to_wire`, never a hand-built structural
+  // literal — see the leg's header note on why that distinction is the whole
+  // meaning of the quarantine beside it.
+  | Some "Navigate" ->
+    let route = fieldD "route" v
+
+    let routeArg =
+      match route with
+      | JString s -> pq s
+      | _ -> pyTextSource route + ".to_wire()"
+
+    (match optStr "target" v with
+     | Some tg when tg <> "Self" -> "action.navigate(" + routeArg + ", " + pq tg + ")"
+     | _ -> "action.navigate(" + routeArg + ")")
   | Some "SetState" ->
     (match JsonValue.tryField "valueFrom" v with
      | Some src ->
@@ -3499,6 +3560,21 @@ let rec private pyAction (v: JsonValue) : string =
     + ", "
     + pq (strOf "encoding" v)
     + ")"
+  // Phase 1537 — ask, then continue. The first case to recurse into NAMED
+  // members rather than a list; `on_cancel` rides only when the wire carries it,
+  // and its absence means nothing happens rather than some substituted default.
+  // `t.Confirm` lowers its own members, so the prompt is handed over as the
+  // typed `TextSource` it is.
+  | Some "Confirm" ->
+    pyCall
+      "t.Confirm"
+      [ pyTextInput (fieldD "prompt" v); pyAction (fieldD "onConfirm" v) ]
+      (match JsonValue.tryField "onCancel" v with
+       | Some c -> [ "onCancel", pyAction c ]
+       | None -> [])
+  // Phase 1537 — a bare node id, never a `TextSource`: it addresses a node in
+  // this document, which the author wrote.
+  | Some "Focus" -> "t.Focus(" + pq (strOf "nodeId" v) + ")"
   | _ ->
     // Call / AiTool / CommitLocal / Invoke — no typed case in `fuaran_py`.
     "action.chain([])"
@@ -3757,16 +3833,48 @@ let private pyColumnWidth (v: JsonValue) : string =
   | Some "Flex" -> "t.ColumnWidth(" + pq "Flex" + ")"
   | _ -> "t.ColumnWidth()"
 
+/// A column's cell kind. Every kind but one carries a `(row) -> …` closure that
+/// erases to `"<closure>"`, so the bare discriminator is the whole of it; Phase
+/// 750's toned pill holds no closure at all and therefore survives the wire with
+/// its `field` / `map` / `default` intact, and `fuaran_py` models it as its own
+/// record. `default` is omitted at `Default`, so an absent wire field
+/// reconstructs as the record's own default rather than being spelled out.
+let private pyColumnKind (v: JsonValue) : string =
+  match dollarType v |> Option.defaultValue "Text" with
+  | "TonedPill" ->
+    let mapLit =
+      membersOf "map" v
+      |> List.map (fun (value, tone) ->
+        pq value
+        + ": "
+        + pq (
+          match tone with
+          | JString t -> t
+          | _ -> ""
+        ))
+      |> String.concat ", "
+
+    pyCall
+      "t.TonedPillColumnKind"
+      [ pq (strOf "field" v); "{" + mapLit + "}" ]
+      (match optStr "default" v with
+       | Some d -> [ "default", pq d ]
+       | None -> [])
+  | other -> "t.ColumnKind(" + pq other + ")"
+
 let private pyGridColumn (v: JsonValue) : string =
   pyCall
     "t.Column"
     [ pq (strOf "label" v) ]
-    [ "format", pyCellFormat (fieldD "format" v)
-      "kind",
-      "t.ColumnKind("
-      + pq (dollarType (fieldD "kind" v) |> Option.defaultValue "Text")
-      + ")"
-      "width", pyColumnWidth (fieldD "width" v) ]
+    ([ "format", pyCellFormat (fieldD "format" v)
+       "kind", pyColumnKind (fieldD "kind" v)
+       "width", pyColumnWidth (fieldD "width" v) ]
+     // `field` (declarative) and `value` (closure) are sibling optional slots:
+     // naming a `field_name` emits `field` and omits the erased `value`, which
+     // is the record's own rule rather than something to arrange here.
+     @ (match optStr "field" v with
+        | Some f -> [ "fieldName", pq f ]
+        | None -> []))
 
 /// A `Media` timed-text track (Phase 1110). `default` omits at False; the track
 /// record takes its `label` as a `TextSource` and its `src` as a `Binding`.
@@ -3882,6 +3990,17 @@ let private pyAccessibilityLit (v: JsonValue) : string =
 
 // ── The per-kind node emitter ────────────────────────────────────────────────
 
+/// `UiNode.visible` (fuaran#1535, modelled by fuaran-py from 0.1.0) — a
+/// `Binding[bool]` whose resolved False removes the node entirely.
+///
+/// `UiNode.to_wire` copies this slot into the extras WITHOUT lowering it, so the
+/// typed binding is handed over already lowered by its own `to_wire`. That is
+/// deliberately not the same thing as writing the wire out by hand: it can spell
+/// exactly what the typed model carries and nothing else, so a `Binding` case
+/// `fuaran_py` does not model still cannot be projected here — see the leg's
+/// header note.
+let private pyVisible (v: JsonValue) : string = pyBinding Opq.Scalar v + ".to_wire()"
+
 /// The ARIA trait each `fuaran.*` constructor injects, as the wire (key, value)
 /// pairs the emitter must confirm or override to reach the wire's exact value.
 /// Deliberately NOT the TypeScript leg's `ctorAccessibility` table: two of the
@@ -3931,6 +4050,9 @@ and private pyNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
              (match wireA with
               | Some a -> pyAccessibilityLit a
               | None -> "None") ])
+      @ (match JsonValue.tryField "visible" nodeV with
+         | Some vis -> [ "visible", pyVisible vis ]
+         | None -> [])
 
     if List.isEmpty overrides then
       built
@@ -4032,6 +4154,9 @@ and private pyBaseTraits (depth: int) (nodeV: JsonValue) : (string * string) lis
      | None -> [])
   @ (match JsonValue.tryField "state" nodeV with
      | Some st -> [ "state", pyStateLit (depth + 1) st ]
+     | None -> [])
+  @ (match JsonValue.tryField "visible" nodeV with
+     | Some vis -> [ "visible", pyVisible vis ]
      | None -> [])
 
 /// The fallback for a kind with no constructor arm: the typed record named by
@@ -4514,9 +4639,15 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        call
          "grid"
          []
-         [ "source", pyBinding Opq.Collection (fieldD "source" k)
-           "columns", pyList (arrOf "columns" k |> List.map pyGridColumn)
-           "editable", pyBool (boolOf "editable" k) ])
+         ([ "source", pyBinding Opq.Collection (fieldD "source" k)
+            "columns", pyList (arrOf "columns" k |> List.map pyGridColumn)
+            "editable", pyBool (boolOf "editable" k) ]
+          // `rowKey` (closure) and `rowKeyField` (declarative) mirror the column
+          // pair above: naming the field emits `rowKeyField` and omits the
+          // erased `rowKey`.
+          @ (match optStr "rowKeyField" k with
+             | Some f -> [ "rowKeyField", pq f ]
+             | None -> [])))
   // ── Custom / ErrorBoundary / Fragments ────────────────────────────────────
   | "Custom" ->
     call
@@ -4586,20 +4717,32 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
                  |> String.concat ", ")
               + "}" ]))
   | "Switch" ->
-    let cases =
-      arrOf "cases" k
-      |> List.map (fun c ->
-        "("
-        + pq (strOf "match" c)
-        + ", "
-        + pyNodeExpr (depth + 1) (fieldD "child" c)
-        + ")")
+    let caseVs = arrOf "cases" k
+
+    // Phase 1535 — a case selects on `match` (the selector's string form) OR on
+    // `when` (a predicate consulting no selector at all), never both. The
+    // `fuaran.switch` ctor takes `(match, child)` PAIRS and so cannot carry a
+    // predicate at all — it would reach the encoder with neither key, silently,
+    // since an absent `match` is simply omitted. A switch with any predicate
+    // case therefore takes the typed node literal, exactly as an
+    // `autoAdvanceMs`-bearing one already does.
+    let hasPredicate =
+      caseVs |> List.exists (fun c -> (JsonValue.tryField "when" c).IsSome)
 
     // The Python constructor takes BOTH selector spellings, so — unlike the TS
     // leg, which has to post-edit the built node — a non-`State` selector is
     // expressed directly.
-    match optNum "autoAdvanceMs" k with
-    | None ->
+    match optNum "autoAdvanceMs" k, hasPredicate with
+    | None, false ->
+      let cases =
+        caseVs
+        |> List.map (fun c ->
+          "("
+          + pq (strOf "match" c)
+          + ", "
+          + pyNodeExpr (depth + 1) (fieldD "child" c)
+          + ")")
+
       call
         "switch"
         []
@@ -4608,16 +4751,19 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
          @ (match JsonValue.tryField "on" k with
             | Some onV -> [ "on", pyBinding Opq.Scalar onV ]
             | None -> [ "stateKey", pq (strOf "stateKey" k) ]))
-    | Some ms ->
+    | autoAdvance, _ ->
       // Phase 1531 — the carousel's self-advance interval is a slot on the
       // record but not a parameter of `fuaran.switch`, so a switch declaring one
       // projects as the typed node literal (the ctor injects no ARIA default, so
-      // the two forms are otherwise the same node).
+      // the two forms are otherwise the same node). A predicate case takes the
+      // same route, for the same reason.
       let typedCases =
-        arrOf "cases" k
+        caseVs
         |> List.map (fun c ->
-          "t.SwitchCase(match="
-          + pq (strOf "match" c)
+          "t.SwitchCase("
+          + (match JsonValue.tryField "when" c with
+             | Some w -> "when=" + pyBinding Opq.Scalar w
+             | None -> "match=" + pq (strOf "match" c))
           + ", child="
           + pyNodeExpr (depth + 1) (fieldD "child" c)
           + ")")
@@ -4638,7 +4784,9 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
              @ (match JsonValue.tryField "on" k with
                 | Some onV -> [ "on", pyBinding Opq.Scalar onV ]
                 | None -> [])
-             @ [ "autoAdvanceMs", numLit ms ])
+             @ (match autoAdvance with
+                | Some ms -> [ "autoAdvanceMs", numLit ms ]
+                | None -> []))
         + ")"
       )
   | _ -> None

@@ -191,7 +191,9 @@ function cspPlugin(): Plugin {
       order: 'post',
       handler(html, ctx) {
         const isShowcase =
-          ctx.filename.endsWith('showcase.html') || ctx.filename.endsWith('receiver.html');
+          ctx.filename.endsWith('showcase.html') ||
+          ctx.filename.endsWith('receiver.html') ||
+          ctx.filename.endsWith('ts-receiver.html');
         const hashes = inlineScriptHashes(html);
         const policy = ctx.server ? devCsp : isShowcase ? showcaseCsp(hashes) : prodCsp(hashes);
         const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}" />`;
@@ -243,8 +245,15 @@ export default defineConfig({
     // real entry keeps default dev/build from depending on a built fuaran-ts;
     // dual-host mode adds the host pages back explicitly.
     entries: dualHost
-      ? ['index.html', 'showcase.html', 'receiver.html', 'ts-host.html', 'fable-host.html']
-      : ['index.html', 'showcase.html', 'receiver.html'],
+      ? [
+          'index.html',
+          'showcase.html',
+          'receiver.html',
+          'ts-receiver.html',
+          'ts-host.html',
+          'fable-host.html',
+        ]
+      : ['index.html', 'showcase.html', 'receiver.html', 'ts-receiver.html'],
   },
   build: showcaseSite
     ? {
@@ -254,7 +263,11 @@ export default defineConfig({
           // (HOST 2). The receiver is deliberately a separate, visibly vacant
           // page, self-contained so it can be deployed to a second origin
           // unchanged. The CSP plugin's transformIndexHtml applies to both.
-          input: { main: 'showcase.html', receiver: 'receiver.html' },
+          input: {
+            main: 'showcase.html',
+            receiver: 'receiver.html',
+            tsReceiver: 'ts-receiver.html',
+          },
         },
       }
     : dualHost

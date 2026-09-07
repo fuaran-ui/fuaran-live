@@ -26,5 +26,11 @@
 
     "noEmit": true
   },
-  "include": ["src", "test", "vite.config.ts", "vitest.config.ts"]
+  // `app/` is the Fable projects' directory and is deliberately NOT swept: its
+  // *.ts helpers are page-local interop shims that predate this config and have
+  // never been typechecked. The ONE exception is the pure-TypeScript receiver
+  // entry (Phase 1589), which is a page rather than a shim — it holds the
+  // decode-and-render path for HOST 3 and is checked here rather than trusted
+  // to esbuild, which strips types without reading them.
+  "include": ["src", "test", "vite.config.ts", "vitest.config.ts", "app/showcase/tsReceiver.tsx"]
 }

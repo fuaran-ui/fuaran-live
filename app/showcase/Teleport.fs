@@ -1050,7 +1050,23 @@ let private TeleportView (bare: bool) : ReactElement =
                               [ prop.href (if bare then "/#/pillar/machine" else "#/pillar/machine")
                                 prop.text "default-deny gate" ]
                             Html.text
-                              " on the way in. \"Continue on your phone\" isn't a feature here; it falls out of treating the app as data." ] ] ] ] ] ]
+                              " on the way in. \"Continue on your phone\" isn't a feature here; it falls out of treating the app as data." ] ]
+                    // Two receivers, two different claims — and only the pair
+                    // adds up to "this is a wire format". Naming which is which
+                    // is the point: a vacant host shows the app was not already
+                    // there, and a foreign host shows the bytes are not private
+                    // to the runtime that made them.
+                    Html.li
+                      [ prop.children
+                          [ Html.text "Two receivers demonstrate two different halves of the claim. The "
+                            Html.a [ prop.href (receiverOrigin () + "/receiver.html"); prop.text "bare receiver" ]
+                            Html.text
+                              " is VACANT – it ships a player and no application, so what materializes on it came out of the fragment and nowhere else. The "
+                            Html.a
+                              [ prop.href (receiverOrigin () + "/ts-receiver.html")
+                                prop.text "TypeScript receiver" ]
+                            Html.text
+                              " is FOREIGN – there is no F# on that page at all, and the app it renders was minted by the F# tier. A bundle that only resumes inside its own producer's runtime is a save file; one that resumes in another language's runtime is a wire format." ] ] ] ] ] ]
 
   let mainAssembly =
     Html.div
@@ -1101,6 +1117,14 @@ let private TeleportView (bare: bool) : ReactElement =
               [ prop.className "rcv-waiting"
                 prop.children [ Html.span [ prop.className "rcv-cursor" ]; Html.text " waiting for bytes…" ] ]
             arrivalBanner // a failed decode reports here even pre-arrival
+            Html.p
+              [ prop.className "rcv-line"
+                prop.children
+                  [ Html.text "This host proves the app was not already here. Its sibling, the "
+                    Html.a
+                      [ prop.href (receiverOrigin () + "/ts-receiver.html")
+                        prop.text "TypeScript receiver" ]
+                    Html.text ", proves the other half: no F# on the page at all, rendering an app the F# tier minted." ] ]
             Html.p
               [ prop.className "rcv-hint"
                 prop.text "Scan a boarding pass to land an app on this host – or paste one:" ]

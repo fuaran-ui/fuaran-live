@@ -14,6 +14,9 @@ importers:
       '@fuaran-ui/charts':
         specifier: ^0.14.0
         version: 0.14.0(@fuaran-ui/ops@0.23.0(@fuaran-ui/schema@0.20.0))(@fuaran-ui/schema@0.20.0)
+      '@fuaran-ui/op-stream':
+        specifier: ^0.11.0
+        version: 0.11.0(@fuaran-ui/ops@0.23.0(@fuaran-ui/schema@0.20.0))(@fuaran-ui/schema@0.20.0)
       '@fuaran-ui/ops':
         specifier: ^0.23.0
         version: 0.23.0(@fuaran-ui/schema@0.20.0)
@@ -466,6 +469,12 @@ packages:
     peerDependencies:
       '@fuaran-ui/ops': ^0.22.0
       '@fuaran-ui/schema': ^0.20.0
+
+  '@fuaran-ui/op-stream@0.11.0':
+    resolution: {integrity: sha512-RmzNzVdQLbff22L3ojhgSx4HD2isZnDvep0o69R8KqIdd0xVuqh0im7fhVgBjaQICL1EyN6Ypz8sft52L0KJIw==}
+    peerDependencies:
+      '@fuaran-ui/ops': ^0.19.0
+      '@fuaran-ui/schema': ^0.18.0
 
   '@fuaran-ui/ops@0.23.0':
     resolution: {integrity: sha512-K4Jtn6xLGBq95v9p1rc5yPZnBCMKmvpbJyBcBXnj74wgohYSynPcfyuJ19dDjXAiCxVcX+pRqOvBiu1I9oBp9Q==}
@@ -1365,6 +1374,11 @@ snapshots:
       react: 19.2.8
 
   '@fuaran-ui/charts@0.14.0(@fuaran-ui/ops@0.23.0(@fuaran-ui/schema@0.20.0))(@fuaran-ui/schema@0.20.0)':
+    dependencies:
+      '@fuaran-ui/ops': 0.23.0(@fuaran-ui/schema@0.20.0)
+      '@fuaran-ui/schema': 0.20.0
+
+  '@fuaran-ui/op-stream@0.11.0(@fuaran-ui/ops@0.23.0(@fuaran-ui/schema@0.20.0))(@fuaran-ui/schema@0.20.0)':
     dependencies:
       '@fuaran-ui/ops': 0.23.0(@fuaran-ui/schema@0.20.0)
       '@fuaran-ui/schema': 0.20.0

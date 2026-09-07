@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--CSP-INJECTION-POINT-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A Fuaran host with no F# on it. This page is TypeScript end to end; the app it renders was minted by the F# tier and arrived as bytes, digest-verified."
+    />
+    <title>Foreign host – an F#-made app, rendered by TypeScript</title>
+    <link rel="icon" href="data:," />
+    <!-- Pre-paint theme resolution: persisted choice -> OS preference. Sets the
+         .ds-dark chrome class before first paint so a dark-preference load never
+         flashes light. Byte-identical to receiver.html's, deliberately: the two
+         receivers differ in what they prove, never in how they look. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('fuaran-theme');
+          var dark =
+            t === 'dark' ||
+            (t !== 'light' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('ds-dark');
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="rcv">
+    <!-- HOST 3. The bare receiver next door (receiver.html) proves one half of
+         teleport's claim — a VACANT host, so what materialises arrived as bytes.
+         This document proves the other half: a FOREIGN host. Its only script is
+         the TypeScript module below; nothing here loads Fable-compiled output,
+         which you can check against receiver.html, whose script tag names
+         app/showcase/output/Receiver.js. The app that appears was minted by the
+         F# tier and decoded here by @fuaran-ui/op-stream. -->
+    <div id="fuaran-ts-receiver-root"></div>
+    <script type="module" src="/app/showcase/tsReceiver.tsx"></script>
+  </body>
+</html>

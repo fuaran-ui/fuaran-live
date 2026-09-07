@@ -67,7 +67,7 @@ the shared corpus it projects the wire JSON to Python source, **executes** the
 generated source against the real host (every fixture in ONE CPython process),
 re-encodes via `fuaran_py.ui.encode`, and asserts byte-identity with the fixture.
 Run it with `pnpm conformance`; the arm needs a CPython carrying `fuaran-py`
-(`python -m venv .venv` then `pip install fuaran-py==0.0.1`, or point
+(`python -m venv .venv` then `pip install fuaran-py==0.1.0`, or point
 `FUARAN_PY_PYTHON` at an interpreter that already has it). It **fails** rather
 than skips when the host is absent: an arm that goes green without its oracle is
 worse than no arm.

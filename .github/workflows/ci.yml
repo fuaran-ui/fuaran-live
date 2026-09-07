@@ -125,15 +125,17 @@ jobs:
       # The pin and the runner must agree on requires-python: 0.0.1 declares
       # >=3.13 and so was UNSATISFIABLE on this 3.12 runner — pip failed at
       # install, which failed the whole job before any test ran. 0.0.3 and every
-      # later release declare >=3.12 (0.0.6 pinned 2026-09-07: the decoder routes every
-      # container's children, and the showcase's Pandas cell runs the published host).
+      # later release declare >=3.12 (0.1.0 pinned 2026-09-07: it models
+      # SwitchCase.when, UiNode.visible, Navigate over a TextSource with a target,
+      # Action.Confirm/Focus, Format.Since, Binding.Now.grain, Binding.Expr, and
+      # sorts object keys by code point — eleven quarantined ids clear on the raise).
       # Move the runner and the pin together, never one alone.
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install the Python host (fuaran-py)
-        run: python -m pip install --disable-pip-version-check fuaran-py==0.0.6
+        run: python -m pip install --disable-pip-version-check fuaran-py==0.1.0
 
       # The F# tier's nuget.config declares a local folder feed at a fixed
       # relative depth; NuGet hard-errors (NU1301) on a missing folder source,

@@ -483,7 +483,8 @@ let private modeToggle: Node<obj> =
               { Defaults.switch<obj> with
                   On = Binding.State("gallery.mode", Some "calm")
                   Cases =
-                    [ { Match = "calm"
+                    [ { Match = Some "calm"
+                        When = None
                         Child =
                           Fuaran.callout
                             "ex-toggle-calm"
@@ -492,7 +493,8 @@ let private modeToggle: Node<obj> =
                                 Heading = Some(TextSource.Literal "Calm")
                                 Body =
                                   TextSource.Literal "Quiet tones, generous spacing, nothing shouting for attention." } }
-                      { Match = "bold"
+                      { Match = Some "bold"
+                        When = None
                         Child =
                           Fuaran.callout
                             "ex-toggle-bold"

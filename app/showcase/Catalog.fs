@@ -87,7 +87,8 @@ let private slide (id: string) (heading: string) (blurb: string) (price: string)
                 Emphasis = true } ] }
 
 let private cases: SwitchCase<obj> list =
-  [ { Match = "loom"
+  [ { Match = Some "loom"
+      When = None
       Child =
         slide
           "ct-loom"
@@ -95,7 +96,8 @@ let private cases: SwitchCase<obj> list =
           "A single-width Hattersley, restored and running. Woven to order in lengths of nine yards; the warp is set once a season, so the colourway you choose is the colourway that season has."
           "£420"
           "Made to order" }
-    { Match = "press"
+    { Match = Some "press"
+      When = None
       Child =
         slide
           "ct-press"
@@ -103,7 +105,8 @@ let private cases: SwitchCase<obj> list =
           "An 1858 hand press, cast iron, still on its original platen. Prints a forme up to crown folio. Sold with the frisket, the tympan and about forty pounds of type nobody has sorted."
           "£3,100"
           "One only" }
-    { Match = "kiln"
+    { Match = Some "kiln"
+      When = None
       Child =
         slide
           "ct-kiln"
@@ -111,7 +114,8 @@ let private cases: SwitchCase<obj> list =
           "Not for sale — the kiln is the reason for the rest of it. Fired twice a year to 1,280 degrees over three days, which is why the glaze is never quite the same twice and why we do not photograph it in advance."
           "—"
           "Not for sale" }
-    { Match = "bench"
+    { Match = Some "bench"
+      When = None
       Child =
         slide
           "ct-bench"

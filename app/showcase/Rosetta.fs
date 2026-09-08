@@ -90,7 +90,8 @@ let private metricNode (nid: string) (label: string) (value: float) : Node<unit>
     Accessibility = None
     Motion = None
     ExtraAttributes = None
-    Tooltip = None }
+    Tooltip = None
+    Visible = None }
 
 let private exemplarTree (h: Holes) : Node<unit> =
   Fuaran.box

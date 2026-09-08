@@ -66,7 +66,8 @@ let private metricNode (nid: string) (label: string) (value: float) : Node<unit>
     Accessibility = None
     Motion = None
     ExtraAttributes = None
-    Tooltip = None }
+    Tooltip = None
+    Visible = None }
 
 // An empty root the genesis op replaces – so station 1 (Python authoring the
 // base app) is itself a real chain link, not an untracked starting state.

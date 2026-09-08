@@ -496,7 +496,13 @@ let private renderLive (node: Node<obj>) : ReactElement =
       // Client-only page with no durable destination: an unconfigured host
       // records nothing and pays nothing, and `CurrentNodeId` is renderer-owned.
       ActionSink = None
-      CurrentNodeId = None }
+      CurrentNodeId = None
+      // Phase 1532 - this render declares no per-render Custom content-hash
+      // floor, so the process floor (`CustomHash.installCustomHashFloor`)
+      // decides. `None` is the renderer's own default at every convenience
+      // entry point, and the field is raise-only, so declaring nothing here
+      // can never weaken a floor the host installed.
+      CustomHashFloor = None }
     node
 
 let private renderStatic (n: Node<'msg>) : ReactElement =

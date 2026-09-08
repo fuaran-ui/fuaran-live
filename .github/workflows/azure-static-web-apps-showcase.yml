@@ -157,6 +157,10 @@ jobs:
         run: pnpm run build:showcase
         env:
           VITE_PLAYGROUND_ORIGIN: https://fuaran-ui.live
+          # Phase 450 — the legacy-host redirect is compiled in for main-branch
+          # builds only (push + dispatch); a PR preview serves itself and gets none.
+          # See vite.config.ts `legacyHostRedirectScript`.
+          VITE_CANONICAL_ORIGIN: ${{ github.event_name != 'pull_request' && 'https://fuaran-ui.gallery' || '' }}
 
       - name: Deploy
         # A push to main builds but does NOT publish — publication is deliberate

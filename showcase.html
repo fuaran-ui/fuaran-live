@@ -9,6 +9,29 @@
       content="fuaran-live – the Fuaran capability showcase. Small, self-contained pages, each staging one capability of UI-as-typed-data. Zero egress: nothing leaves your browser."
     />
     <title>Fuaran UI Gallery</title>
+    <!-- Canonical URL + social card (Phase 450). The origin is the custom domain,
+         never the host's default hostname; the card is a static 1200x630 PNG under
+         public/brand and is referenced absolutely because crawlers fetch it off-site. -->
+    <link rel="canonical" href="https://fuaran-ui.gallery/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Fuaran UI" />
+    <meta property="og:title" content="Fuaran UI Gallery" />
+    <meta
+      property="og:description"
+      content="fuaran-live – the Fuaran capability showcase. Small, self-contained pages, each staging one capability of UI-as-typed-data. Zero egress: nothing leaves your browser."
+    />
+    <meta property="og:url" content="https://fuaran-ui.gallery/" />
+    <meta property="og:image" content="https://fuaran-ui.gallery/brand/og-fuaran-ui-gallery.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Fuaran UI Gallery" />
+    <meta
+      name="twitter:description"
+      content="fuaran-live – the Fuaran capability showcase. Small, self-contained pages, each staging one capability of UI-as-typed-data. Zero egress: nothing leaves your browser."
+    />
+    <meta name="twitter:image" content="https://fuaran-ui.gallery/brand/og-fuaran-ui-gallery.png" />
+    <!--LEGACY-HOST-REDIRECT-INJECTION-POINT-->
     <link rel="icon" type="image/svg+xml" href="brand/fuaran-favicon.svg" />
     <!-- Pre-paint theme resolution: persisted choice -> OS preference. Sets the
          .ds-dark chrome class before first paint so a dark-preference load never

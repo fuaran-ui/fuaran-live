@@ -182,6 +182,33 @@ function inlineScriptHashes(html: string): string {
   return hashes.length > 0 ? ` ${hashes.join(' ')}` : '';
 }
 
+// Phase 450 — the legacy-host redirect. Each artifact serves at a custom domain
+// (fuaran-ui.live / fuaran-ui.gallery), but the Static Web App's DEFAULT
+// hostname keeps answering, and a static host cannot 301 by Host header. So the
+// production document carries a pre-paint script: when it finds itself on an
+// `*.azurestaticapps.net` hostname it replaces the location with the canonical
+// origin, keeping path, query AND fragment — which is the reason it is a script
+// rather than a meta-refresh: fragments do not ride a server redirect, and the
+// share permalinks live in the fragment. Emitted ONLY when the build declares a
+// canonical origin (VITE_CANONICAL_ORIGIN — set by the deploy workflows for
+// main-branch builds, never for PR previews, whose hostnames are also
+// `*.azurestaticapps.net` and must keep serving themselves). A build with the
+// variable unset ships no redirect at all: dev, tests and previews are
+// untouched. `location.origin !== o` is belt-and-braces against a
+// misconfigured origin redirecting to itself.
+const canonicalOrigin = (process.env.VITE_CANONICAL_ORIGIN ?? '').trim();
+const LEGACY_REDIRECT_INJECTION_POINT = '<!--LEGACY-HOST-REDIRECT-INJECTION-POINT-->';
+function legacyHostRedirectScript(origin: string): string {
+  if (!/^https:\/\/[a-z0-9.-]+$/i.test(origin)) {
+    throw new Error(`VITE_CANONICAL_ORIGIN must be a bare https origin, got: ${origin}`);
+  }
+  return (
+    `<script>(function(){var o='${origin}';` +
+    `if(location.origin!==o&&/\\.azurestaticapps\\.net$/i.test(location.hostname)){` +
+    `location.replace(o+location.pathname+location.search+location.hash);}})();</script>`
+  );
+}
+
 function cspPlugin(): Plugin {
   return {
     name: 'fuaran-live-csp',
@@ -194,10 +221,18 @@ function cspPlugin(): Plugin {
           ctx.filename.endsWith('showcase.html') ||
           ctx.filename.endsWith('receiver.html') ||
           ctx.filename.endsWith('ts-receiver.html');
-        const hashes = inlineScriptHashes(html);
+        // Legacy-host redirect (Phase 450) — injected BEFORE the hash pass so it
+        // ships under the strict policy like the theme script. See
+        // `legacyHostRedirectScript` for what it does and when it is emitted.
+        // A function replacer, so `$`-sequences in the script are never read
+        // as String.replace substitution patterns.
+        const redirect =
+          !ctx.server && canonicalOrigin ? legacyHostRedirectScript(canonicalOrigin) : '';
+        const withRedirect = html.replace(LEGACY_REDIRECT_INJECTION_POINT, () => redirect);
+        const hashes = inlineScriptHashes(withRedirect);
         const policy = ctx.server ? devCsp : isShowcase ? showcaseCsp(hashes) : prodCsp(hashes);
         const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}" />`;
-        return html.replace('<!--CSP-INJECTION-POINT-->', meta);
+        return withRedirect.replace('<!--CSP-INJECTION-POINT-->', meta);
       },
     },
   };

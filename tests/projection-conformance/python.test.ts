@@ -56,7 +56,7 @@ const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip
 /**
  * The interpreter to run the executor with. A repo-local `.venv` wins (the
  * documented local setup: `python -m venv .venv` then
- * `pip install fuaran-py==0.3.0`); FUARAN_PY_PYTHON overrides it for CI, where
+ * `pip install fuaran-py==0.4.0`); FUARAN_PY_PYTHON overrides it for CI, where
  * the interpreter is whatever actions/setup-python provisioned.
  */
 const resolvePython = (): string => {
@@ -602,7 +602,7 @@ describe('Python projection conformance (Node corpus)', () => {
   it('the Python executor ran', () => {
     // A hard failure, never a skip: a conformance arm that goes green without
     // its oracle is worse than no arm at all. Install the host with
-    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.3.0`, or point
+    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.4.0`, or point
     // FUARAN_PY_PYTHON at an interpreter that already has it.
     expect(fatal, fatal ?? '').toBeUndefined();
   });

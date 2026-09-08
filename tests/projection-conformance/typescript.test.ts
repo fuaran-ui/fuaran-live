@@ -36,7 +36,11 @@ import type { Node } from '@fuaran-ui/schema';
 
 // Fable-generated JS — no .d.ts; vitest runs it via esbuild (no typecheck).
 // @ts-expect-error untyped Fable output
-import { projectTypeScriptExpr } from '../../app/output/Projection.js';
+import {
+  projectTypeScriptExpr,
+  projectByName,
+  absentRequiredMembers,
+} from '../../app/output/Projection.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const corpusDir = resolve(here, '../../../wire-format-fixtures');
@@ -152,6 +156,159 @@ const evalExpr = (expr: string): Node<unknown> => {
 // teaching it: the previous list decayed for eight days precisely because a
 // list is easier to append to than an emitter is to extend.
 const PROJECTOR_LAGGING = new Set<string>([]);
+
+// -- Omit-at-default cover (Phase 1603) --------------------------------------
+//
+// A member the canonical encoder OMITS AT ITS DEFAULT is this projector's
+// sharpest failure mode, because the omitted form is the one a byte comparison
+// can fail on while the spelled form sails through. `Tabs.activeIndex` is the
+// worked example: the projector read it with the total accessor, handed the
+// resulting absence to the binding projector, and got back an EXPLICIT `Static`
+// that the builder's own `?? Static 0` could no longer fill and the encoder's
+// `value === 0` test could no longer drop -- so a key the fixture does not have
+// survived the re-encode, on three fixtures at once, and read as a package-pin
+// lag rather than as a projector defect.
+//
+// The loop below already round-trips every node fixture, so this cover is not
+// about reaching more fixtures; it is about making the omitted side NAMED and
+// NON-VACUOUS. Per slot it requires the corpus to exercise BOTH sides -- at
+// least one fixture that omits the member and at least one that spells it --
+// and requires neither side to be quarantined. Without that, a corpus in which
+// every carrier happened to spell the slot would pass this arm with the omitted
+// path never executed, which is precisely the state that let the defect ship.
+//
+// A NEW omit-at-default slot adds a row here in the same change-set that
+// teaches the encoder to omit it. `Navigate.target` is listed beside
+// `Tabs.activeIndex` because `Navigate` already omits it at `Self`, and it is
+// the slot the next binding-level omission lands on -- covered before it lands.
+interface OmitAtDefault {
+  /** The member the encoder drops when it holds the slot's identity value. */
+  readonly slot: string;
+  /** The `$type` of the object that carries it. */
+  readonly carrier: string;
+}
+
+const OMIT_AT_DEFAULT: readonly OmitAtDefault[] = [
+  { slot: 'activeIndex', carrier: 'Tabs' },
+  { slot: 'target', carrier: 'Navigate' },
+];
+
+/** Every object in a decoded wire tree whose `$type` is `carrier`. */
+const objectsOfType = (v: unknown, carrier: string): Record<string, unknown>[] => {
+  const found: Record<string, unknown>[] = [];
+  const walk = (x: unknown): void => {
+    if (Array.isArray(x)) {
+      for (const e of x) walk(e);
+      return;
+    }
+    if (x === null || typeof x !== 'object') return;
+    const o = x as Record<string, unknown>;
+    if (o.$type === carrier) found.push(o);
+    for (const e of Object.values(o)) walk(e);
+  };
+  walk(v);
+  return found;
+};
+
+const wireOfFixture = (f: ManifestEntry): string =>
+  readFileSync(resolve(corpusDir, f.inputFile), 'utf8').trim();
+
+describe('omit-at-default members (Phase 1603)', () => {
+  for (const { slot, carrier } of OMIT_AT_DEFAULT) {
+    const carrying = nodeFixtures
+      .map((f) => ({ f, objs: objectsOfType(JSON.parse(wireOfFixture(f)), carrier) }))
+      .filter((x) => x.objs.length > 0);
+    const omitting = carrying.filter((x) => x.objs.some((o) => !(slot in o)));
+    const spelling = carrying.filter((x) => x.objs.some((o) => slot in o));
+
+    it(`${carrier}.${slot}: the corpus exercises BOTH the omitted and the spelled form`, () => {
+      expect(
+        omitting.map((x) => x.f.id),
+        `no ${carrier} fixture omits '${slot}' - the omitted path is unexercised, so byte-identity here proves nothing about it`,
+      ).not.toHaveLength(0);
+      expect(
+        spelling.map((x) => x.f.id),
+        `no ${carrier} fixture spells '${slot}' - the present path is unexercised`,
+      ).not.toHaveLength(0);
+    });
+
+    it(`${carrier}.${slot}: no fixture carrying it is quarantined`, () => {
+      const quarantined = carrying.map((x) => x.f.id).filter((id) => PROJECTOR_LAGGING.has(id));
+      expect(
+        quarantined,
+        `quarantining a ${carrier} fixture drops '${slot}' out of the byte cover`,
+      ).toEqual([]);
+    });
+
+    it(`${carrier}.${slot}: the omitted form re-encodes WITHOUT the member`, () => {
+      for (const { f } of omitting) {
+        const wire = wireOfFixture(f);
+        const back = encodeNode(evalExpr(projectTypeScriptExpr(wire) as string));
+        expect(back, `projected TS source for ${f.id} must re-encode byte-identically`).toBe(wire);
+        const spelledInWire = objectsOfType(JSON.parse(wire), carrier).filter(
+          (o) => slot in o,
+        ).length;
+        const spelledInBack = objectsOfType(JSON.parse(back), carrier).filter(
+          (o) => slot in o,
+        ).length;
+        expect(
+          spelledInBack,
+          `${f.id}: the wire spells '${slot}' on ${spelledInWire} ${carrier}(s); an explicit default in the re-encode is the activeIndex defect`,
+        ).toBe(spelledInWire);
+      }
+    });
+  }
+});
+
+// -- The absent-is-error classification, checked (Phase 1603) ----------------
+//
+// `app/Projection.fs` reads every wire member through one of three accessors,
+// and which one a site uses IS its classification: `fieldOpt` (absent-is-omit,
+// spelled as a source omission), `fieldOrIdentity` (absent-is-omit, spelled as
+// the slot's identity default, where the target model has no absence there),
+// and `fieldReq` (absent-is-error - a canonical emission always carries the
+// member at this site). The byte comparison below checks the first two. This is
+// what checks the third: `fieldReq` records every absence BY NAME, and a name
+// appearing after the whole canonical corpus has been projected through every
+// target is a site whose classification is wrong.
+//
+// It is the assertion the `activeIndex` defect needed and did not have. That
+// member was read as mandatory at a site where the wire omits it, and the only
+// signal was three fixtures failing a byte comparison for a reason that read as
+// a package-pin lag. Here the same mistake fails by member name, on the first
+// corpus that omits it, whether or not any byte comparison notices.
+describe('absent-is-error sites (Phase 1603)', () => {
+  it('no `fieldReq` member is ever absent over the canonical node corpus', () => {
+    const targets = [
+      'json',
+      'typescript',
+      'python',
+      'fsharp',
+      'csharp',
+      'vb',
+      'go',
+      'kotlin',
+      'rust',
+      'swift',
+    ];
+    for (const f of nodeFixtures) {
+      const wire = wireOfFixture(f);
+      for (const t of targets) {
+        // An illustrative leg may not model a kind at all, and a throw there is
+        // a different finding from the one this test makes.
+        try {
+          projectByName(t, wire);
+        } catch {
+          /* not what this test measures */
+        }
+      }
+    }
+    expect(
+      [...(absentRequiredMembers() as Iterable<string>)].sort(),
+      "each name is a member the corpus omits at a site classified absent-is-error in app/Projection.fs - move that site to `fieldOpt` (source omission) or `fieldOrIdentity` (the slot's identity default)",
+    ).toEqual([]);
+  });
+});
 
 describe('TS projection conformance (Node corpus)', () => {
   it('the corpus is present and non-trivial', () => {

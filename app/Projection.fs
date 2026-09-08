@@ -25,10 +25,19 @@ module Fuaran.Live.Projection
 //  holds, encoded to its canonical JSON – using the vendored `FuaranLive.AiWire`
 //  `JsonValue` model the connectors already pulled in (Phase 327). It is pure
 //  string generation, never touches the unbuilt `@fuaran-ui/*` runtime, and
-//  **never crashes**: any value it does not specifically understand falls
-//  through a generic object / array / literal path (the TS leg falls back to
-//  the same sketch for a non-corpus kind), so an uncovered kind still projects
-//  rather than throwing.
+//  **never crashes on a tree it does not understand**: any value it does not
+//  specifically recognise falls through a generic object / array / literal path
+//  (the TS leg falls back to the same sketch for a non-corpus kind), so an
+//  uncovered kind still projects rather than throwing.
+//
+//  There is exactly ONE throwing path, added by Phase 1603, and it is not that
+//  case: a wire member that is PRESENT carrying an explicit JSON `null`. A
+//  canonical emission never contains one (WIRE_FORMAT §4 rule 4 — absence is
+//  structural), and the two positions a decoder accepts one at are normalised
+//  rather than refused, so it fires only on input no conformant encoder
+//  produces. Both readings available to it are wrong — as an absence it
+//  silently drops input, as a value it emits a default the encoder cannot drop
+//  — so it names the member instead. See "Wire-field accessors" below.
 // ============================================================================
 
 open Fable.Core.JsInterop
@@ -647,10 +656,118 @@ let private tsInline (fields: (string * string) list) : string =
     + (fields |> List.map (fun (k, v) -> k + ": " + v) |> String.concat ", ")
     + " }"
 
-// Wire-field accessors (total; the canonical corpus always carries the
-// mandatory keys, so the defaults only fire on non-canonical input).
-let private fieldD (name: string) (v: JsonValue) : JsonValue =
-  v |> JsonValue.tryField name |> Option.defaultValue JNull
+// ── Wire-field accessors (Phase 1603) ───────────────────────────────────────
+//
+// There used to be ONE accessor here and it was total: `fieldD` answered `JNull`
+// for a member the wire OMITTED and `JNull` for one it carried as an explicit
+// `null`, so no call site could tell the two apart. That conflation is the
+// `Tabs.activeIndex` defect: an omitted omit-at-default member reached the
+// binding projector as `JNull` and came back out as an EXPLICIT `Static`, which
+// the builder's own default could no longer fill and the encoder could no longer
+// omit — so a key the fixture does not have survived the re-encode. `activeIndex`
+// is only the FIRST omit-at-default binding slot, so the fix has to be the class
+// rather than the instance.
+//
+// Every read is therefore CLASSIFIED by which accessor it uses:
+//
+//   absent-is-omit   `fieldOpt`        the member is optional at this site, so an
+//                                      absent one is OMITTED from the emission
+//                                      and the re-encode carries no key either.
+//   absent-is-omit   `fieldOrIdentity` the same classification, spelled as the
+//                                      slot's IDENTITY DEFAULT — for a target
+//                                      model that has no absence at a slot the
+//                                      wire omits at its default. Which of the
+//                                      two spellings a site takes is decided by
+//                                      the target, never by the wire.
+//   absent-is-error  `fieldReq`        a canonical emission always carries the
+//                                      member at this site, so absence is
+//                                      malformed input rather than a shape to
+//                                      project. It stays TOTAL — the projector
+//                                      never crashes on a tree it does not
+//                                      understand — but every absence is RECORDED
+//                                      BY NAME and `tests/projection-conformance/`
+//                                      asserts the record stays EMPTY over the
+//                                      canonical node corpus. A fixture that later
+//                                      omits one fails there, by name, instead of
+//                                      quietly projecting a default.
+//
+// `WIRE_FORMAT.md` §4 rule 4 is what makes the split decidable: "`null` does not
+// appear anywhere in a canonical Fuaran emission … absence is structural,
+// expressed by a missing key". A member present AS null is therefore UNREADABLE
+// — neither the absence the wire spells structurally nor a value the model has —
+// and the accessors REFUSE it BY NAME rather than picking one of the two wrong
+// readings. Reading it as absent would silently drop input; reading it as a value
+// re-emits a default the encoder cannot drop, which is the defect above.
+
+/// The refusal an accessor makes for a member that is present but carries an
+/// explicit JSON `null`. Unreachable from any canonical emission (§4 rule 4) and
+/// from the two lenient positions, which `fieldOrIdentity` normalises — so it
+/// fires only on input no conformant encoder produces, and naming the member is
+/// the only honest thing left to say about it.
+let private unreadableMember (name: string) : 'a =
+  failwithf
+    "Projection: wire member '%s' is present but carries an explicit null; a canonical emission spells absence structurally (WIRE_FORMAT §4 rule 4)"
+    name
+
+/// Absent reads at `fieldReq` — **absent-is-error** — sites, by member name.
+/// A diagnostic accumulator, not projector state: nothing reads it during a
+/// projection and the emission does not depend on it. It exists so the
+/// classification above is CHECKED rather than asserted — see
+/// `absentRequiredMembers`.
+let mutable private absentRequired: Set<string> = Set.empty
+
+/// The member names an **absent-is-error** read has found absent since this
+/// module was loaded. The conformance harness projects the canonical node corpus
+/// through every target and requires this to be empty; a name appearing here is a
+/// site whose classification is wrong and which belongs on `fieldOpt`.
+let absentRequiredMembers () : string list = absentRequired |> Set.toList
+
+/// **absent-is-omit.** `None` for a member the wire does not carry, so the site
+/// omits it and the re-encode carries no key either. An unreadable member is
+/// refused by name (see above) rather than folded into the absent case.
+let private fieldOpt (name: string) (v: JsonValue) : JsonValue option =
+  match JsonValue.tryField name v with
+  | None -> None
+  | Some JNull -> unreadableMember name
+  | Some x -> Some x
+
+/// **absent-is-omit, spelled as the slot's IDENTITY DEFAULT.** The second of the
+/// two absent-is-omit spellings, and which one a site takes is decided by the
+/// TARGET model, not by the wire: several in-memory models have no absence at a
+/// slot the wire omits at its default. A grid column's `format` / `width` are
+/// the worked example — `@fuaran-ui/ops` dereferences `c.format.kind` and
+/// `c.width.kind` unconditionally and then drops the value when it is the
+/// identity, and `fuaran_py`'s `binding.state` takes `default_value` as a
+/// REQUIRED positional — so at those sites the projection of an absent member is
+/// the identity (`{ kind: 'None' }`, `{ kind: 'Auto' }`, `None`), which every
+/// slot projector already yields for `JNull`, and the re-encode drops it.
+///
+/// This is the case `Tabs.activeIndex` is NOT, and the pair is the whole point of
+/// the classification: there the ctor's own `?? Static 0` could not fire over an
+/// explicit `Static`, so the default SURVIVED the re-encode and a key the fixture
+/// does not have appeared in the bytes. Naming the two spellings apart is what
+/// makes the difference readable at the site instead of discoverable only from a
+/// failing fixture.
+///
+/// A member present as `null` reads as the identity too, rather than being
+/// refused: `Binding.Static.value` and `Binding.State.defaultValue` are the two
+/// positions a decoder accepts `null` at as §16 shorthand for absence
+/// (WIRE_FORMAT §4 rule 4), and normalising it here is what the decoder does.
+let private fieldOrIdentity (name: string) (v: JsonValue) : JsonValue =
+  match JsonValue.tryField name v with
+  | None
+  | Some JNull -> JNull
+  | Some x -> x
+
+/// **absent-is-error.** Total, so the projector still never crashes, but the
+/// absence is recorded by name for the conformance assertion described above.
+let private fieldReq (name: string) (v: JsonValue) : JsonValue =
+  match JsonValue.tryField name v with
+  | None ->
+    absentRequired <- Set.add name absentRequired
+    JNull
+  | Some JNull -> unreadableMember name
+  | Some x -> x
 
 let private optStr (name: string) (v: JsonValue) : string option =
   match JsonValue.tryField name v with
@@ -741,14 +858,14 @@ let private tsCellLit (v: JsonValue) : string =
 
 let rec private tsColExpr (v: JsonValue) : string =
   match dollarType v with
-  | Some "lit" -> tsInline [ "kind", qs "lit"; "cell", tsCellLit (fieldD "cell" v) ]
+  | Some "lit" -> tsInline [ "kind", qs "lit"; "cell", tsCellLit (fieldReq "cell" v) ]
   | Some "binary" ->
     tsInline
       [ "kind", qs "binary"
         "op", qs (strOf "op" v)
-        "left", tsColExpr (fieldD "left" v)
-        "right", tsColExpr (fieldD "right" v) ]
-  | Some "not" -> tsInline [ "kind", qs "not"; "expr", tsColExpr (fieldD "expr" v) ]
+        "left", tsColExpr (fieldReq "left" v)
+        "right", tsColExpr (fieldReq "right" v) ]
+  | Some "not" -> tsInline [ "kind", qs "not"; "expr", tsColExpr (fieldReq "expr" v) ]
   | Some "coalesce" ->
     tsInline
       [ "kind", qs "coalesce"
@@ -756,35 +873,35 @@ let rec private tsColExpr (v: JsonValue) : string =
   | Some "case" ->
     let cases =
       arrOf "cases" v
-      |> List.map (fun c -> tsInline [ "when", tsColExpr (fieldD "when" c); "then", tsColExpr (fieldD "then" c) ])
+      |> List.map (fun c -> tsInline [ "when", tsColExpr (fieldReq "when" c); "then", tsColExpr (fieldReq "then" c) ])
       |> String.concat ", "
 
     tsInline
       [ "kind", qs "case"
         "cases", "[" + cases + "]"
-        "else", tsColExpr (fieldD "else" v) ]
+        "else", tsColExpr (fieldReq "else" v) ]
   | Some "cast" ->
     tsInline
       [ "kind", qs "cast"
         "type", qs (strOf "type" v)
-        "expr", tsColExpr (fieldD "expr" v) ]
+        "expr", tsColExpr (fieldReq "expr" v) ]
   | Some "apply" ->
     tsInline
       [ "kind", qs "apply"
         "fn", qs (strOf "fn" v)
         "args", "[" + (arrOf "args" v |> List.map tsColExpr |> String.concat ", ") + "]" ]
   | Some "param" -> tsInline [ "kind", qs "param"; "name", qs (strOf "name" v) ]
-  | Some "isNull" -> tsInline [ "kind", qs "isNull"; "expr", tsColExpr (fieldD "expr" v) ]
+  | Some "isNull" -> tsInline [ "kind", qs "isNull"; "expr", tsColExpr (fieldReq "expr" v) ]
   // The wire spells BOTH membership forms `in`; the in-memory model splits them
   // by which payload is carried — a literal `items` list, or the `param` naming
   // a transform parameter resolved at evaluation time.
   | Some "in" ->
     (match optStr "param" v with
-     | Some p -> tsInline [ "kind", qs "inParam"; "expr", tsColExpr (fieldD "expr" v); "param", qs p ]
+     | Some p -> tsInline [ "kind", qs "inParam"; "expr", tsColExpr (fieldReq "expr" v); "param", qs p ]
      | None ->
        tsInline
          [ "kind", qs "in"
-           "expr", tsColExpr (fieldD "expr" v)
+           "expr", tsColExpr (fieldReq "expr" v)
            "items", "[" + (arrOf "items" v |> List.map tsColExpr |> String.concat ", ") + "]" ])
   | _ -> tsInline [ "kind", qs "col"; "name", qs (strOf "name" v) ]
 
@@ -853,7 +970,7 @@ let private tsTransformStep (v: JsonValue) : string =
     "[" + (arrOf name v |> List.map strItem |> String.concat ", ") + "]"
 
   match dollarType v with
-  | Some "filter" -> tsInline [ "kind", qs "filter"; "pred", tsColExpr (fieldD "pred" v) ]
+  | Some "filter" -> tsInline [ "kind", qs "filter"; "pred", tsColExpr (fieldReq "pred" v) ]
   | Some "project" ->
     tsInline
       [ "kind", qs "project"
@@ -862,7 +979,7 @@ let private tsTransformStep (v: JsonValue) : string =
     tsInline
       [ "kind", qs "derive"
         "name", qs (strOf "name" v)
-        "expr", tsColExpr (fieldD "expr" v) ]
+        "expr", tsColExpr (fieldReq "expr" v) ]
   | Some "groupBy" ->
     let aggs =
       arrOf "aggs" v
@@ -877,7 +994,7 @@ let private tsTransformStep (v: JsonValue) : string =
   | Some "join" ->
     tsInline
       [ "kind", qs "join"
-        "source", tsDataSource (fieldD "source" v)
+        "source", tsDataSource (fieldReq "source" v)
         "on", "[" + (arrOf "on" v |> List.map pair |> String.concat ", ") + "]"
         "how", qs (strOf "how" v) ]
   | Some "window" ->
@@ -913,7 +1030,7 @@ let private tsTransformStep (v: JsonValue) : string =
       [ "kind", qs "limit"
         "n", numLit (numOf "n" v)
         "offset", numLit (numOf "offset" v) ]
-  | Some "union" -> tsInline [ "kind", qs "union"; "source", tsDataSource (fieldD "source" v) ]
+  | Some "union" -> tsInline [ "kind", qs "union"; "source", tsDataSource (fieldReq "source" v) ]
   | _ -> "{ kind: 'distinct' }"
 
 // ── Bindings / actions / text / formats ───────────────────────────────────────
@@ -1006,10 +1123,16 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
        | None -> "")
     + " }"
   | Some "State" ->
+    // `defaultValue` is absent-is-omit spelled as the IDENTITY DEFAULT: the ctor
+    // declares the argument as required, so the absence is spelled `undefined`
+    // and the encoder drops it (`b.defaultValue == null ? [] : …`) — and the
+    // `Switch.on` short spelling keys off the same `undefined`. A §16 lenient
+    // `null` here reads as the same absence, which is what the decoder does
+    // with it.
     "binding.state("
     + qs (strOf "key" v)
     + ", "
-    + tsStaticValue (fieldD "defaultValue" v)
+    + tsStaticValue (fieldOrIdentity "defaultValue" v)
     + ")"
   | Some "Computed" -> "binding.computed(() => undefined)"
   | Some "I18n" ->
@@ -1048,9 +1171,9 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
 
     if codec.IsSome || commitTo.IsSome then
       "{ kind: 'Local', local: { initialFrom: "
-      + tsBinding Opq.Scalar (fieldD "initialFrom" v)
+      + tsBinding Opq.Scalar (fieldReq "initialFrom" v)
       + ", flushOn: "
-      + tsFlushTrigger (fieldD "flushOn" v)
+      + tsFlushTrigger (fieldReq "flushOn" v)
       + ", parse: () => ({ ok: false, error: '' })"
       + (match codec with
          | Some c -> ", codec: " + tsFormatIntent c
@@ -1061,17 +1184,17 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
       + " } }"
     else
       "binding.local("
-      + tsBinding Opq.Scalar (fieldD "initialFrom" v)
+      + tsBinding Opq.Scalar (fieldReq "initialFrom" v)
       + ", "
-      + tsFlushTrigger (fieldD "flushOn" v)
+      + tsFlushTrigger (fieldReq "flushOn" v)
       + ", () => action.chain([]), () => ({ ok: false, error: '' }))"
   | Some "Format" ->
     "binding.format("
-    + tsBinding Opq.Scalar (fieldD "source" v)
+    + tsBinding Opq.Scalar (fieldReq "source" v)
     + ", "
-    + tsFormatIntent (fieldD "format" v)
+    + tsFormatIntent (fieldReq "format" v)
     + ", "
-    + tsLocaleSource (fieldD "locale" v)
+    + tsLocaleSource (fieldReq "locale" v)
     + ")"
   | Some "Transform" ->
     // Raw `Binding.Transform` literal (not `binding.transform`, whose ctor takes
@@ -1086,7 +1209,7 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
     // structurally — a `Live` source rides as a Binding case object (it has a
     // `$type`), a `Data` source as the bare table — and `initial` is the
     // decode-time snapshot, never encoded, so the empty table round-trips.
-    let srcV = fieldD "source" v
+    let srcV = fieldReq "source" v
 
     let sourcePart =
       match dollarType srcV with
@@ -1111,7 +1234,7 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
   // is a closed computation over literals).
   | Some "Expr" ->
     "{ kind: 'Expr', expr: "
-    + tsColExpr (fieldD "expr" v)
+    + tsColExpr (fieldReq "expr" v)
     + tsBindingParams v
     + " }"
   | _ -> "binding.static(undefined)"
@@ -1127,7 +1250,7 @@ and private tsBindingParams (v: JsonValue) : string =
     + (ps
        |> List.map (fun p ->
          "{ from: "
-         + tsBinding Opq.Scalar (fieldD "from" p)
+         + tsBinding Opq.Scalar (fieldReq "from" p)
          + ", name: "
          + qs (strOf "name" p)
          + " }")
@@ -1144,7 +1267,10 @@ let private tsTextSourceLit (v: JsonValue) : string =
   | JString s -> "{ kind: 'Literal', value: " + qs s + " }"
   | _ ->
     match dollarType v with
-    | Some "Bound" -> "{ kind: 'Bound', binding: " + tsBinding Opq.Scalar (fieldD "binding" v) + " }"
+    | Some "Bound" ->
+      "{ kind: 'Bound', binding: "
+      + tsBinding Opq.Scalar (fieldReq "binding" v)
+      + " }"
     | Some "I18n" ->
       let args =
         membersOf "args" v
@@ -1168,7 +1294,7 @@ let private tsTextInput (v: JsonValue) : string =
 /// A `SelectOption` (Choice / SegmentedChoice / Select) — the `label` rides the
 /// wire as a bare string but is a `TextSource` in memory, so it must be wrapped.
 let private tsSelectOption (o: JsonValue) : string =
-  tsInline [ "label", tsTextSourceLit (fieldD "label" o); "value", qs (strOf "value" o) ]
+  tsInline [ "label", tsTextSourceLit (fieldReq "label" o); "value", qs (strOf "value" o) ]
 
 /// A collection binding whose element type is `SelectOption` — the `Static`
 /// array form wraps each option's `label` as a `TextSource`; everything else
@@ -1240,14 +1366,14 @@ let rec private tsAction (v: JsonValue) : string =
     "action.notify("
     + qs (strOf "channel" v)
     + ", "
-    + tsJson (fieldD "payload" v)
+    + tsJson (fieldReq "payload" v)
     + ")"
   // Phase 1536 — the route is a `TextSource`, so a tree can name a destination
   // it computes from what the reader selected. `target` is omitted at `Self`,
   // and a literal route in the current context keeps the short `navigate`
   // spelling (identical bytes, and the commonest intent stays readable).
   | Some "Navigate" ->
-    let route = fieldD "route" v
+    let route = fieldReq "route" v
 
     (match route, optStr "target" v with
      | JString s, (None | Some "Self") -> "action.navigate(" + qs s + ")"
@@ -1263,12 +1389,17 @@ let rec private tsAction (v: JsonValue) : string =
        + ", "
        + tsBinding Opq.Scalar src
        + ")"
-     | None -> "action.setState(" + qs (strOf "key" v) + ", " + tsJson (fieldD "value" v) + ")")
+     | None ->
+       "action.setState("
+       + qs (strOf "key" v)
+       + ", "
+       + tsJson (fieldReq "value" v)
+       + ")")
   | Some "AiTool" ->
     "action.aiTool("
     + qs (strOf "toolName" v)
     + ", "
-    + tsJson (fieldD "args" v)
+    + tsJson (fieldReq "args" v)
     + ")"
   | Some "Chain" ->
     "action.chain(["
@@ -1278,7 +1409,7 @@ let rec private tsAction (v: JsonValue) : string =
   // The clipboard payload is a `TextSource`, not a bare string: the canonical
   // `Literal` form IS the bare JSON string, but a `Bound` payload rides as the
   // envelope and must project as one (reading it with `strOf` erased it to '').
-  | Some "WriteToClipboard" -> "action.writeToClipboard(" + tsTextInput (fieldD "text" v) + ")"
+  | Some "WriteToClipboard" -> "action.writeToClipboard(" + tsTextInput (fieldReq "text" v) + ")"
   // Phase 1124 — the reader's own print dialogue. It takes nothing, and the
   // encoder refuses any member beside `$type`.
   | Some "Print" -> "action.print()"
@@ -1288,9 +1419,9 @@ let rec private tsAction (v: JsonValue) : string =
   // nothing happens rather than some substituted default.
   | Some "Confirm" ->
     "action.confirm("
-    + tsTextInput (fieldD "prompt" v)
+    + tsTextInput (fieldReq "prompt" v)
     + ", "
-    + tsAction (fieldD "onConfirm" v)
+    + tsAction (fieldReq "onConfirm" v)
     + (match JsonValue.tryField "onCancel" v with
        | Some c -> ", " + tsAction c
        | None -> "")
@@ -1400,7 +1531,7 @@ let private tsFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
       // A State binding whose defaultValue is the wire's `{from,to}` pair: the
       // in-memory shape is the TUPLE (the `Range` precedent), so the generic
       // object-literal projection would hand the encoder a shape it cannot take.
-      let d = fieldD "defaultValue" valV
+      let d = fieldReq "defaultValue" valV
 
       "binding.state("
       + qs (strOf "key" valV)
@@ -1452,13 +1583,13 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
     tsInline (
       [ "kind", qs "Choice" ]
       @ handler "onChange"
-      @ [ "options", tsOptionsBinding (fieldD "options" v); "value", value ]
+      @ [ "options", tsOptionsBinding (fieldReq "options" v); "value", value ]
     )
   | "SegmentedChoice" ->
     tsInline (
       [ "kind", qs "SegmentedChoice" ]
       @ handler "onChange"
-      @ [ "options", tsOptionsBinding (fieldD "options" v)
+      @ [ "options", tsOptionsBinding (fieldReq "options" v)
           "orientation", qs (strOf "orientation" v)
           "value", value ]
     )
@@ -1514,7 +1645,7 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
     tsInline (
       [ "kind", qs "Combobox"; "allowFreeText", boolLit (boolOf "allowFreeText" v) ]
       @ handler "onChange"
-      @ [ "options", tsOptionsBinding (fieldD "options" v); "value", value ]
+      @ [ "options", tsOptionsBinding (fieldReq "options" v); "value", value ]
     )
   // Phase 1121 — the chip list. `allowFreeText` defaults to TRUE here (the
   // encoder writes it only when false), so an ABSENT wire field is `true` —
@@ -1561,7 +1692,7 @@ let private tsFieldRule (v: JsonValue) : string =
          [ "compare",
            tsInline
              [ "op", qs (strOf "op" c)
-               "against", tsBinding Opq.Scalar (fieldD "against" c) ] ]
+               "against", tsBinding Opq.Scalar (fieldReq "against" c) ] ]
        | None -> [])
     @ (match JsonValue.tryField "message" v with
        | Some m -> [ "message", tsTextSourceLit m ]
@@ -1573,8 +1704,8 @@ let private tsFormField (depth: int) (v: JsonValue) : string =
 
   let fields =
     [ "id", qs id
-      "label", tsTextSourceLit (fieldD "label" v)
-      "kind", tsFieldKindLit (AutoBind.Form id) (fieldD "kind" v)
+      "label", tsTextSourceLit (fieldReq "label" v)
+      "kind", tsFieldKindLit (AutoBind.Form id) (fieldReq "kind" v)
       "required", boolLit (boolOf "required" v) ]
     @ (match JsonValue.tryField "help" v with
        | Some h -> [ "help", tsTextSourceLit h ]
@@ -1590,8 +1721,8 @@ let private tsFilterSpec (depth: int) (v: JsonValue) : string =
 
   tsObjLit
     [ "name", qs name
-      "label", tsTextSourceLit (fieldD "label" v)
-      "field", tsFieldKindLit (AutoBind.Filter name) (fieldD "kind" v) ]
+      "label", tsTextSourceLit (fieldReq "label" v)
+      "field", tsFieldKindLit (AutoBind.Filter name) (fieldReq "kind" v) ]
     depth
 
 /// A grid's declared initial sort — the zero-based column index plus a
@@ -1606,18 +1737,20 @@ let private tsColumnWidth (v: JsonValue) : string =
   | _ -> "{ kind: 'Auto' }"
 
 let private tsGridColumn (v: JsonValue) : string =
+  // `format` / `width` are absent-is-omit spelled as the IDENTITY DEFAULT: the
+  // column model requires both slots and the encoder drops each at its identity.
   tsInline
     [ "label", qs (strOf "label" v)
       "value", "() => ({ kind: 'Empty' })"
-      "format", tsCellFormat (fieldD "format" v)
-      "kind", tsInline [ "kind", qs (dollarType (fieldD "kind" v) |> Option.defaultValue "Text") ]
-      "width", tsColumnWidth (fieldD "width" v) ]
+      "format", tsCellFormat (fieldOrIdentity "format" v)
+      "kind", tsInline [ "kind", qs (dollarType (fieldReq "kind" v) |> Option.defaultValue "Text") ]
+      "width", tsColumnWidth (fieldOrIdentity "width" v) ]
 
 /// A `Tree` row (Phase 1120) — recursive, `children` omitted-when-empty and
 /// `icon` omitted-when-absent, both of which the ctor re-normalises.
 let rec private tsTreeItem (v: JsonValue) : string =
   tsInline (
-    [ "id", qs (strOf "id" v); "label", tsTextInput (fieldD "label" v) ]
+    [ "id", qs (strOf "id" v); "label", tsTextInput (fieldReq "label" v) ]
     @ (match JsonValue.tryField "children" v with
        | Some(JArray cs) when not (List.isEmpty cs) ->
          [ "children", "[" + (cs |> List.map tsTreeItem |> String.concat ", ") + "]" ]
@@ -1641,8 +1774,8 @@ let private tsChartAnnotation (v: JsonValue) : string =
     | Some "XRange" ->
       tsInline
         [ "kind", qs "XRange"
-          "from", annX (fieldD "from" r)
-          "to", annX (fieldD "to" r) ]
+          "from", annX (fieldReq "from" r)
+          "to", annX (fieldReq "to" r) ]
     | _ ->
       tsInline
         [ "kind", qs "ValueRange"
@@ -1655,8 +1788,8 @@ let private tsChartAnnotation (v: JsonValue) : string =
     | None -> []
 
   match dollarType v with
-  | Some "EventMarker" -> tsInline ([ "kind", qs "EventMarker"; "at", annX (fieldD "at" v) ] @ label)
-  | Some "RangeBand" -> tsInline ([ "kind", qs "RangeBand"; "range", range (fieldD "range" v) ] @ label)
+  | Some "EventMarker" -> tsInline ([ "kind", qs "EventMarker"; "at", annX (fieldReq "at" v) ] @ label)
+  | Some "RangeBand" -> tsInline ([ "kind", qs "RangeBand"; "range", range (fieldReq "range" v) ] @ label)
   | _ -> tsInline ([ "kind", qs "ReferenceLine"; "value", numLit (numOf "value" v) ] @ label)
 
 /// A `Media` timed-text track (Phase 1114). `default` is omitted-when-false, so
@@ -1665,15 +1798,15 @@ let private tsChartAnnotation (v: JsonValue) : string =
 let private tsMediaTrack (v: JsonValue) : string =
   tsInline (
     [ "kind", qs (strOf "kind" v)
-      "src", tsBinding Opq.Scalar (fieldD "src" v)
+      "src", tsBinding Opq.Scalar (fieldReq "src" v)
       "srcLang", qs (strOf "srcLang" v)
-      "label", tsTextInput (fieldD "label" v) ]
+      "label", tsTextInput (fieldReq "label" v) ]
     @ (if boolOf "default" v then [ "default", "true" ] else [])
   )
 
 let private tsTabHeader (v: JsonValue) : string =
   tsInline (
-    [ "label", tsTextSourceLit (fieldD "label" v) ]
+    [ "label", tsTextSourceLit (fieldReq "label" v) ]
     @ (match optStr "icon" v with
        | Some i -> [ "icon", "iconSource(" + qs i + ")" ]
        | None -> [])
@@ -1727,12 +1860,12 @@ let private tsHoleDecl (v: JsonValue) : string =
     tsInline
       [ "kind", qs "Repeat"
         "name", qs (strOf "name" v)
-        "countSpace", tsHoleSpace (fieldD "countSpace" v) ]
+        "countSpace", tsHoleSpace (fieldReq "countSpace" v) ]
   | _ ->
     tsInline (
       [ "kind", qs "Value"
         "name", qs (strOf "name" v)
-        "space", tsHoleSpace (fieldD "space" v) ]
+        "space", tsHoleSpace (fieldReq "space" v) ]
       @ (match JsonValue.tryField "default" v with
          | Some d -> [ "default", tsFragScalar d ]
          | None -> [])
@@ -1831,12 +1964,12 @@ let private a11yMatchesCtor (wire: JsonValue option) (expected: (string * string
 let private valueOrSource (k: JsonValue) : JsonValue =
   match JsonValue.tryField "value" k with
   | Some v -> v
-  | None -> fieldD "source" k
+  | None -> fieldReq "source" k
 
 /// A `DataGrid`'s erased column: `field` (declarative) and `value` (closure) are
 /// sibling optional slots; `format`/`width` project their (default-omitted) form.
 let private tsGridColumnErased (v: JsonValue) : string =
-  let kindObj = fieldD "kind" v
+  let kindObj = fieldReq "kind" v
 
   let cellKind =
     match dollarType kindObj |> Option.defaultValue "Text" with
@@ -1874,8 +2007,8 @@ let private tsGridColumnErased (v: JsonValue) : string =
   tsInline (
     [ "kind", cellKind
       "label", qs (strOf "label" v)
-      "format", tsCellFormat (fieldD "format" v)
-      "width", tsColumnWidth (fieldD "width" v) ]
+      "format", tsCellFormat (fieldOrIdentity "format" v)
+      "width", tsColumnWidth (fieldOrIdentity "width" v) ]
     @ (match JsonValue.tryField "value" v with
        | Some _ -> [ "value", "() => ({ kind: 'Text', value: '' })" ]
        | None -> [])
@@ -1921,7 +2054,7 @@ let rec private tsNodeExpr (depth: int) (nodeV: JsonValue) : string =
 
 and private tsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
   let id = optStr "id" nodeV |> Option.defaultValue ""
-  let kindObj = fieldD "kind" nodeV
+  let kindObj = fieldReq "kind" nodeV
   let kindType = dollarType kindObj |> Option.defaultValue ""
 
   if kindType = "Mount" then
@@ -2023,13 +2156,13 @@ and private tsChildren (depth: int) (k: JsonValue) : string =
 
 and private tsFragArg (depth: int) (v: JsonValue) : string =
   match dollarType v with
-  | Some "SlotArg" -> "{ kind: 'slot', tree: " + tsNodeExpr (depth + 1) (fieldD "tree" v) + " }"
+  | Some "SlotArg" -> "{ kind: 'slot', tree: " + tsNodeExpr (depth + 1) (fieldReq "tree" v) + " }"
   | _ -> "{ kind: 'value', value: " + tsFragScalar v + " }"
 
 and private tsMountNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue) : string =
   // `@fuaran-ui/ui` ships no Mount smart ctor (Phase 265 landed wire parity
   // only), so Mount projects as the typed in-memory node literal directly.
-  let channelV = fieldD "channel" k
+  let channelV = fieldReq "channel" k
 
   let channel =
     tsInline (
@@ -2103,7 +2236,7 @@ and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue
   // Dashboard / Stack / GridLayout / Card). Projected as the typed in-memory
   // node literal rather than a ctor, so a `Dashboard`-role Box can carry a
   // `heading` (the `dashboard` ctor takes none) and no ctor ARIA default leaks.
-  let layoutV = fieldD "layout" k
+  let layoutV = fieldReq "layout" k
 
   // `gap` is an optional slot on every laid-out `BoxLayout` case (Flex / Grid /
   // Masonry), omitted-when-absent so a gapless layout stays byte-identical.
@@ -2166,8 +2299,8 @@ and private tsFactNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValu
   // typed in-memory Display node literal.
   let spec =
     tsInline (
-      [ "label", tsTextSourceLit (fieldD "label" k)
-        "value", tsTextSourceLit (fieldD "value" k)
+      [ "label", tsTextSourceLit (fieldReq "label" k)
+        "value", tsTextSourceLit (fieldReq "value" k)
         // `tone` is required by the spec (encoder omits it when 'Default'); an
         // absent wire field projects as the default, never undefined.
         "tone", qs (optStr "tone" k |> Option.defaultValue "Default") ]
@@ -2241,7 +2374,7 @@ and private tsDataGridNode (depth: int) (id: string) (k: JsonValue) (nodeV: Json
   let spec =
     tsInline (
       [ "columns", "[" + (cols |> List.map tsGridColumnErased |> String.concat ", ") + "]"
-        "source", tsBinding Opq.Collection (fieldD "source" k) ]
+        "source", tsBinding Opq.Collection (fieldReq "source" k) ]
       @ (if boolOf "editable" k then [ "editable", "true" ] else [])
       @ (if boolOf "reorderable" k then
            [ "reorderable", "true" ]
@@ -2317,7 +2450,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
   // role + layout to the ctor that emits the matching Box. (The legacy per-kind
   // arms below stay for pre-0.2.0 wire + the never-crash contract.)
   | "Box" ->
-    let layoutV = fieldD "layout" k
+    let layoutV = fieldReq "layout" k
     let layoutType = dollarType layoutV |> Option.defaultValue "Auto"
     let children = tsChildren depth k
 
@@ -2397,7 +2530,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       // longer fill and the encoder can no longer omit. It re-encodes as
       // `"activeIndex":{"$type":"Static"}` against a fixture that has no such
       // key. Same shape as `activeTag` below.
-      @ (match JsonValue.tryField "activeIndex" k with
+      @ (match fieldOpt "activeIndex" k with
          | Some ai -> [ "activeIndex", tsBinding Opq.Scalar ai ]
          | None -> [])
       @ (match JsonValue.tryField "onSelect" k with
@@ -2435,7 +2568,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "stepper"
       [ idF
-        "activeStep", tsBinding Opq.Scalar (fieldD "activeStep" k)
+        "activeStep", tsBinding Opq.Scalar (fieldReq "activeStep" k)
         "children", tsChildren depth k ]
   | "SummaryList" ->
     call
@@ -2449,8 +2582,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "disclosure"
       ([ idF
-         "heading", tsTextInput (fieldD "heading" k)
-         "open", tsBinding Opq.Scalar (fieldD "open" k)
+         "heading", tsTextInput (fieldReq "heading" k)
+         "open", tsBinding Opq.Scalar (fieldReq "open" k)
          "defaultOpen", boolLit (boolOf "defaultOpen" k) ]
        @ (match JsonValue.tryField "onToggle" k with
           | Some _ -> [ "onToggle", "() => action.chain([])" ]
@@ -2463,7 +2596,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match JsonValue.tryField "heading" k with
           | Some h -> [ "heading", tsTextInput h ]
           | None -> [])
-       @ [ "open", tsBinding Opq.Scalar (fieldD "open" k)
+       @ [ "open", tsBinding Opq.Scalar (fieldReq "open" k)
            "dismissable", boolLit (boolOf "dismissable" k) ]
        @ (match JsonValue.tryField "onDismiss" k with
           | Some d -> [ "onDismiss", tsAction d ]
@@ -2494,11 +2627,11 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "heading"
       [ idF
-        "text", tsTextInput (fieldD "text" k)
+        "text", tsTextInput (fieldReq "text" k)
         "level", numLit (numOf "level" k)
         "variant", qs (strOf "variant" k) ]
   | "Markdown" ->
-    let t = fieldD "text" k
+    let t = fieldReq "text" k
 
     (match t with
      | JString s -> Some("fuaran.markdown(" + qs id + ", " + qs s + ")")
@@ -2510,9 +2643,9 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "metric"
       ([ idF
-         "label", tsTextInput (fieldD "label" k)
+         "label", tsTextInput (fieldReq "label" k)
          "value", tsBinding Opq.Scalar (valueOrSource k)
-         "format", tsCellFormat (fieldD "format" k) ]
+         "format", tsCellFormat (fieldOrIdentity "format" k) ]
        @ (match optStr "tone" k with
           | Some t -> [ "tone", qs t ]
           | None -> [])
@@ -2541,16 +2674,16 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "badge"
       [ idF
-        "label", tsTextInput (fieldD "label" k)
+        "label", tsTextInput (fieldReq "label" k)
         "variant", qs (strOf "variant" k) ]
-  | "Sparkline" -> call "sparkline" [ idF; "source", tsBinding Opq.Collection (fieldD "source" k) ]
+  | "Sparkline" -> call "sparkline" [ idF; "source", tsBinding Opq.Collection (fieldReq "source" k) ]
   | "Spacer" -> call "spacer" [ idF; "size", qs (strOf "size" k) ]
   | "Skeleton" -> Some("fuaran.skeleton(" + qs id + ", " + numLit (numOf "rows" k) + ")")
   | "Callout" ->
     call
       "callout"
       ([ idF
-         "body", tsTextInput (fieldD "body" k)
+         "body", tsTextInput (fieldReq "body" k)
          "tone", qs (strOf "tone" k)
          "dismissable", boolLit (boolOf "dismissable" k) ]
        @ (match JsonValue.tryField "heading" k with
@@ -2563,7 +2696,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "progress"
       ([ idF
-         "fraction", tsBinding Opq.Scalar (fieldD "fraction" k)
+         "fraction", tsBinding Opq.Scalar (fieldReq "fraction" k)
          "indeterminate", boolLit (boolOf "indeterminate" k)
          "tone", qs (strOf "tone" k) ]
        @ (match JsonValue.tryField "label" k with
@@ -2576,9 +2709,9 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "labelValueRow"
       ([ idF
-         "label", tsTextInput (fieldD "label" k)
+         "label", tsTextInput (fieldReq "label" k)
          "value", tsBinding Opq.Scalar (valueOrSource k)
-         "format", tsCellFormat (fieldD "format" k)
+         "format", tsCellFormat (fieldOrIdentity "format" k)
          "emphasis", boolLit (boolOf "emphasis" k) ]
        @ (match JsonValue.tryField "help" k with
           | Some h -> [ "help", tsTextInput h ]
@@ -2587,8 +2720,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "link"
       ([ idF
-         "href", tsBinding Opq.Scalar (fieldD "href" k)
-         "label", tsTextInput (fieldD "label" k)
+         "href", tsBinding Opq.Scalar (fieldReq "href" k)
+         "label", tsTextInput (fieldReq "label" k)
          "download", boolLit (boolOf "download" k) ]
        @ (match optStr "rel" k with
           | Some r -> [ "rel", qs r ]
@@ -2603,8 +2736,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "image"
       ([ idF
-         "src", tsBinding Opq.Scalar (fieldD "src" k)
-         "alt", tsTextInput (fieldD "alt" k)
+         "src", tsBinding Opq.Scalar (fieldReq "src" k)
+         "alt", tsTextInput (fieldReq "alt" k)
          "variant", qs (strOf "variant" k) ]
        // The presentation slots (fit / aspectRatio / loading) and the figure
        // slots (caption / expandable) are each optional and omitted-when-absent.
@@ -2632,7 +2765,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
               + (entries
                  |> List.map (fun e ->
                    tsInline
-                     [ "src", tsBinding Opq.Scalar (fieldD "src" e)
+                     [ "src", tsBinding Opq.Scalar (fieldReq "src" e)
                        "width", numLit (numOf "width" e) ])
                  |> String.concat ", ")
               + "]" ]
@@ -2659,13 +2792,13 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
   // only `Video` carries `autoplay` / `poster`. `controls` and `loop` default
   // to true / false respectively and are omitted on the wire at their default.
   | "Media" ->
-    let inner = fieldD "kind" k
+    let inner = fieldReq "kind" k
     let isVideo = (dollarType inner |> Option.defaultValue "Video") = "Video"
 
     let common =
       [ idF
-        "src", tsBinding Opq.Scalar (fieldD "src" k)
-        "label", tsTextInput (fieldD "label" k) ]
+        "src", tsBinding Opq.Scalar (fieldReq "src" k)
+        "label", tsTextInput (fieldReq "label" k) ]
       @ (match JsonValue.tryField "controls" k with
          | Some(JBool b) -> [ "controls", boolLit b ]
          | _ -> [])
@@ -2701,8 +2834,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "embed"
       ([ idF
-         "src", tsBinding Opq.Scalar (fieldD "src" k)
-         "title", tsTextInput (fieldD "title" k) ]
+         "src", tsBinding Opq.Scalar (fieldReq "src" k)
+         "title", tsTextInput (fieldReq "title" k) ]
        @ (match optStr "aspectRatio" k with
           | Some a -> [ "aspectRatio", qs a ]
           | None -> [])
@@ -2744,9 +2877,9 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "toast"
       [ idF
-        "message", tsTextInput (fieldD "message" k)
+        "message", tsTextInput (fieldReq "message" k)
         "tone", qs (strOf "tone" k)
-        "open", tsBinding Opq.Scalar (fieldD "open" k)
+        "open", tsBinding Opq.Scalar (fieldReq "open" k)
         "dismissable",
         (match JsonValue.tryField "dismissable" k with
          | Some(JBool b) -> boolLit b
@@ -2766,8 +2899,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "button"
       ([ idF
-         "label", tsTextInput (fieldD "label" k)
-         "onClick", tsAction (fieldD "onClick" k)
+         "label", tsTextInput (fieldReq "label" k)
+         "onClick", tsAction (fieldReq "onClick" k)
          "variant", qs (strOf "variant" k) ]
        @ (match optStr "icon" k with
           | Some i -> [ "icon", qs i ]
@@ -2779,9 +2912,9 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "select"
       ([ idF
-         "label", tsTextInput (fieldD "label" k)
-         "source", tsOptionsBinding (fieldD "source" k)
-         "value", tsBinding Opq.Scalar (fieldD "value" k) ]
+         "label", tsTextInput (fieldReq "label" k)
+         "source", tsOptionsBinding (fieldReq "source" k)
+         "value", tsBinding Opq.Scalar (fieldReq "value" k) ]
        @ (match JsonValue.tryField "onChange" k with
           | Some _ -> [ "onChange", "() => action.chain([])" ]
           | None -> [])
@@ -2817,8 +2950,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "form"
       ([ idF
          "fields", fieldsArr
-         "onSubmit", tsAction (fieldD "onSubmit" k)
-         "submitLabel", tsTextInput (fieldD "submitLabel" k) ]
+         "onSubmit", tsAction (fieldReq "onSubmit" k)
+         "submitLabel", tsTextInput (fieldReq "submitLabel" k) ]
        @ (match JsonValue.tryField "disabled" k with
           | Some d -> [ "disabled", tsBinding Opq.Scalar d ]
           | None -> []))
@@ -2842,7 +2975,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "fileUpload"
       ([ idF
-         "label", tsTextInput (fieldD "label" k)
+         "label", tsTextInput (fieldReq "label" k)
          "accept", "[" + (arrOf "accept" k |> List.map strItem |> String.concat ", ") + "]"
          "multiple", boolLit (boolOf "multiple" k)
          "onSelect", "() => action.chain([])" ]
@@ -2873,7 +3006,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "fuaran.chart("
       + tsObjLit
           ([ idF
-             "source", tsBinding Opq.Collection (fieldD "source" k)
+             "source", tsBinding Opq.Collection (fieldReq "source" k)
              "xField", qs (strOf "xField" k)
              "yFields", "[" + (arrOf "yFields" k |> List.map strItem |> String.concat ", ") + "]"
              "kind", qs (strOf "kind" k)
@@ -2948,7 +3081,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "map"
       [ idF
-        "source", tsMarkerBinding (fieldD "source" k)
+        "source", tsMarkerBinding (fieldReq "source" k)
         "centreLatitude", numLit (numOf "centreLatitude" k)
         "centreLongitude", numLit (numOf "centreLongitude" k)
         "zoom", numLit (numOf "zoom" k) ]
@@ -2956,7 +3089,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "grid"
       ([ idF
-         "source", tsBinding Opq.Collection (fieldD "source" k)
+         "source", tsBinding Opq.Collection (fieldReq "source" k)
          "rowKey", "() => ''"
          "columns", "[" + (arrOf "columns" k |> List.map tsGridColumn |> String.concat ", ") + "]"
          "editable", boolLit (boolOf "editable" k) ]
@@ -2970,7 +3103,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       ([ idF
          "moduleId", qs (strOf "moduleId" k)
          "componentId", qs (strOf "componentId" k)
-         "props", tsJson (fieldD "props" k) ]
+         "props", tsJson (fieldReq "props" k) ]
        @ (match JsonValue.tryField "contentHash" k with
           | Some h ->
             [ "contentHash",
@@ -2992,14 +3125,14 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "errorBoundary"
       [ idF
-        "child", tsNodeExpr (depth + 1) (fieldD "child" k)
-        "fallback", tsNodeExpr (depth + 1) (fieldD "fallback" k) ]
+        "child", tsNodeExpr (depth + 1) (fieldReq "child" k)
+        "fallback", tsNodeExpr (depth + 1) (fieldReq "fallback" k) ]
   | "FragmentDecl" ->
     call
       "fragmentDecl"
       ([ idF
          "name", qs (strOf "name" k)
-         "body", tsNodeExpr (depth + 1) (fieldD "body" k) ]
+         "body", tsNodeExpr (depth + 1) (fieldReq "body" k) ]
        @ (let holes = arrOf "holes" k
 
           if List.isEmpty holes then
@@ -3044,7 +3177,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
          | Some w -> "{ when: " + tsBinding Opq.Scalar w + ", "
          | None -> "{ match: " + qs (strOf "match" c) + ", ")
         + "child: "
-        + tsNodeExpr (depth + 1) (fieldD "child" c)
+        + tsNodeExpr (depth + 1) (fieldReq "child" c)
         + " }")
       |> String.concat ", "
 
@@ -3070,7 +3203,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
         // The cases the ctor would drop are supplied by the post-edit instead of
         // being built twice — the child subtrees are projected once either way.
         "cases", (if hasPredicate then "[]" else "[" + cases + "]")
-        "default", tsNodeExpr (depth + 1) (fieldD "default" k) ]
+        "default", tsNodeExpr (depth + 1) (fieldReq "default" k) ]
       // Phase 1531 — the carousel's self-advance interval, optional and
       // omitted when absent (a switch with no interval never advances itself).
       @ (match optNum "autoAdvanceMs" k with
@@ -3160,7 +3293,7 @@ let private pyFloat (v: JsonValue) : string =
   | JNumber n -> pyNum n
   | _ -> "0"
 
-let private pyFloatOf (name: string) (v: JsonValue) : string = pyFloat (fieldD name v)
+let private pyFloatOf (name: string) (v: JsonValue) : string = pyFloat (fieldReq name v)
 
 /// A call with positional then keyword arguments; keyword names are snake_case.
 let private pyCall (ctor: string) (positional: string list) (kw: (string * string) list) : string =
@@ -3253,24 +3386,24 @@ let private pyCellLit (v: JsonValue) : string =
 
 let rec private pyColExpr (v: JsonValue) : string =
   match dollarType v with
-  | Some "lit" -> "cp.Lit(" + pyCellLit (fieldD "cell" v) + ")"
+  | Some "lit" -> "cp.Lit(" + pyCellLit (fieldReq "cell" v) + ")"
   | Some "binary" ->
     "cp.Binary("
     + pq (strOf "op" v)
     + ", "
-    + pyColExpr (fieldD "left" v)
+    + pyColExpr (fieldReq "left" v)
     + ", "
-    + pyColExpr (fieldD "right" v)
+    + pyColExpr (fieldReq "right" v)
     + ")"
-  | Some "not" -> "cp.Not(" + pyColExpr (fieldD "expr" v) + ")"
+  | Some "not" -> "cp.Not(" + pyColExpr (fieldReq "expr" v) + ")"
   | Some "coalesce" -> "cp.Coalesce(" + pyList (arrOf "exprs" v |> List.map pyColExpr) + ")"
   | Some "case" ->
     let cases =
       arrOf "cases" v
-      |> List.map (fun c -> "(" + pyColExpr (fieldD "when" c) + ", " + pyColExpr (fieldD "then" c) + ")")
+      |> List.map (fun c -> "(" + pyColExpr (fieldReq "when" c) + ", " + pyColExpr (fieldReq "then" c) + ")")
 
-    "cp.Case(" + pyList cases + ", " + pyColExpr (fieldD "else" v) + ")"
-  | Some "cast" -> "cp.Cast(" + pq (strOf "type" v) + ", " + pyColExpr (fieldD "expr" v) + ")"
+    "cp.Case(" + pyList cases + ", " + pyColExpr (fieldReq "else" v) + ")"
+  | Some "cast" -> "cp.Cast(" + pq (strOf "type" v) + ", " + pyColExpr (fieldReq "expr" v) + ")"
   | Some "apply" ->
     "cp.ApplyFn("
     + pq (strOf "fn" v)
@@ -3295,10 +3428,10 @@ let rec private pyColExpr (v: JsonValue) : string =
   // arm costs here.
   | Some "in" ->
     (match optStr "param" v with
-     | Some p -> "cp.InParam(" + pyColExpr (fieldD "expr" v) + ", " + pq p + ")"
+     | Some p -> "cp.InParam(" + pyColExpr (fieldReq "expr" v) + ", " + pq p + ")"
      | None ->
        "cp.InList("
-       + pyColExpr (fieldD "expr" v)
+       + pyColExpr (fieldReq "expr" v)
        + ", "
        + pyList (arrOf "items" v |> List.map pyColExpr)
        + ")")
@@ -3359,9 +3492,9 @@ let private pyTransformStep (v: JsonValue) : string =
     pyList (arrOf name v |> List.map pyStrItem)
 
   match dollarType v with
-  | Some "filter" -> "cp.Filter(" + pyColExpr (fieldD "pred" v) + ")"
+  | Some "filter" -> "cp.Filter(" + pyColExpr (fieldReq "pred" v) + ")"
   | Some "project" -> "cp.Project(" + pyList (arrOf "cols" v |> List.map pair) + ")"
-  | Some "derive" -> "cp.Derive(" + pq (strOf "name" v) + ", " + pyColExpr (fieldD "expr" v) + ")"
+  | Some "derive" -> "cp.Derive(" + pq (strOf "name" v) + ", " + pyColExpr (fieldReq "expr" v) + ")"
   | Some "groupBy" ->
     let aggs =
       arrOf "aggs" v
@@ -3377,7 +3510,7 @@ let private pyTransformStep (v: JsonValue) : string =
     "cp.GroupBy(" + strArr "keys" + ", " + pyList aggs + ")"
   | Some "join" ->
     "cp.Join("
-    + pyDataSource (fieldD "source" v)
+    + pyDataSource (fieldReq "source" v)
     + ", "
     + pyList (arrOf "on" v |> List.map pair)
     + ", "
@@ -3408,7 +3541,7 @@ let private pyTransformStep (v: JsonValue) : string =
   | Some "unpivot" -> "cp.Unpivot(" + strArr "idVars" + ", " + strArr "valueVars" + ")"
   | Some "sort" -> "cp.Sort(" + pyList (arrOf "by" v |> List.map sortKey) + ")"
   | Some "limit" -> "cp.Limit(" + numLit (numOf "n" v) + ", " + numLit (numOf "offset" v) + ")"
-  | Some "union" -> "cp.Union(" + pyDataSource (fieldD "source" v) + ")"
+  | Some "union" -> "cp.Union(" + pyDataSource (fieldReq "source" v) + ")"
   | _ -> "cp.Distinct()"
 
 // ── Bindings / actions / text / formats ──────────────────────────────────────
@@ -3508,10 +3641,14 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
 
     pyCall "binding.selection" [ pq (strOf "nodeId" v) ] kw
   | Some "State" ->
+    // absent-is-omit spelled as the identity default, for the same reason as the
+    // TS arm and a sharper one: `fuaran_py`'s `binding.state` takes
+    // `default_value` as a REQUIRED POSITIONAL, so omitting it is a TypeError
+    // rather than a shorter spelling.
     "binding.state("
     + pq (strOf "key" v)
     + ", "
-    + pyStaticValue (fieldD "defaultValue" v)
+    + pyStaticValue (fieldOrIdentity "defaultValue" v)
     + ")"
   // Phase 1533 — `grain` is the one thing a `Now` carries on the wire, and only
   // when it is not the `Second` default. `binding.now()` takes no argument, so a
@@ -3530,8 +3667,8 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
   | Some "Local" ->
     pyCall
       "binding.local"
-      [ pyBinding Opq.Scalar (fieldD "initialFrom" v)
-        pyFlushTrigger (fieldD "flushOn" v) ]
+      [ pyBinding Opq.Scalar (fieldReq "initialFrom" v)
+        pyFlushTrigger (fieldReq "flushOn" v) ]
       ((match optStr "commitTo" v with
         | Some c -> [ "commitTo", pq c ]
         | None -> [])
@@ -3540,11 +3677,11 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
           | None -> []))
   | Some "Format" ->
     "binding.format("
-    + pyBinding Opq.Scalar (fieldD "source" v)
+    + pyBinding Opq.Scalar (fieldReq "source" v)
     + ", "
-    + pyFormatIntent (fieldD "format" v)
+    + pyFormatIntent (fieldReq "format" v)
     + ", "
-    + pyLocaleSource (fieldD "locale" v)
+    + pyLocaleSource (fieldReq "locale" v)
     + ")"
   | Some "Transform" ->
     // `TransformBinding.source` is a bare `DataSource` rather than the wire's
@@ -3552,7 +3689,7 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
     // no spelling and stays quarantined. `params` does have one from 0.1.0 —
     // omitted from the wire when empty, so a param-free binding is unchanged.
     "cp.TransformBinding("
-    + pyDataSource (fieldD "source" v)
+    + pyDataSource (fieldReq "source" v)
     + ", "
     + pyList (arrOf "pipeline" v |> List.map pyTransformStep)
     + (match arrOf "params" v with
@@ -3565,7 +3702,7 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
              "cp.ParamDecl("
              + pq (strOf "name" p)
              + ", "
-             + pyBinding Opq.Scalar (fieldD "from" p)
+             + pyBinding Opq.Scalar (fieldReq "from" p)
              + ")")
          ))
     + ")"
@@ -3593,14 +3730,14 @@ let private pyTextSource (v: JsonValue) : string =
   | JString s -> "t.LiteralText(" + pq s + ")"
   | _ ->
     match dollarType v with
-    | Some "Bound" -> "t.Bound(" + pyBinding Opq.Scalar (fieldD "binding" v) + ")"
+    | Some "Bound" -> "t.Bound(" + pyBinding Opq.Scalar (fieldReq "binding" v) + ")"
     // Phase 1596 — the third `TextSource` case, modelled by fuaran-py from
     // 0.3.0. `args` is written unconditionally by the record, so an empty map
     // needs no argument: `t.I18n(key)` and `t.I18n(key, {})` are one document.
     | Some "I18n" ->
       (match membersOf "args" v with
        | [] -> "t.I18n(" + pq (strOf "key" v) + ")"
-       | _ -> "t.I18n(" + pq (strOf "key" v) + ", " + pyJson (fieldD "args" v) + ")")
+       | _ -> "t.I18n(" + pq (strOf "key" v) + ", " + pyJson (fieldReq "args" v) + ")")
     | _ -> "t.LiteralText(" + pq (strOf "text" v) + ")"
 
 /// A `TextInput` slot — the bare string the constructors coerce, or the explicit
@@ -3615,7 +3752,7 @@ let private pyTextInput (v: JsonValue) : string =
 
 let private pySelectOption (o: JsonValue) : string =
   "t.SelectOption("
-  + pyTextSource (fieldD "label" o)
+  + pyTextSource (fieldReq "label" o)
   + ", "
   + pq (strOf "value" o)
   + ")"
@@ -3631,7 +3768,7 @@ let private pyOptionsBinding (v: JsonValue) : string =
 
 let private pyMarker (m: JsonValue) : string =
   "t.MapMarker("
-  + pyTextSource (fieldD "label" m)
+  + pyTextSource (fieldReq "label" m)
   + ", "
   + numLit (numOf "latitude" m)
   + ", "
@@ -3665,7 +3802,7 @@ let rec private pyAction (v: JsonValue) : string =
     "action.notify("
     + pq (strOf "channel" v)
     + ", "
-    + pyJson (fieldD "payload" v)
+    + pyJson (fieldReq "payload" v)
     + ")"
   // Phase 1536 — the route is a `TextSource`, so a tree can name a destination
   // it computes from what the reader selected, and `target` names the browsing
@@ -3675,7 +3812,7 @@ let rec private pyAction (v: JsonValue) : string =
   // literal — see the leg's header note on why that distinction is the whole
   // meaning of the quarantine beside it.
   | Some "Navigate" ->
-    let route = fieldD "route" v
+    let route = fieldReq "route" v
 
     let routeArg =
       match route with
@@ -3697,13 +3834,13 @@ let rec private pyAction (v: JsonValue) : string =
        "action.set_state("
        + pq (strOf "key" v)
        + ", "
-       + pyJson (fieldD "value" v)
+       + pyJson (fieldReq "value" v)
        + ")")
   | Some "Chain" -> "action.chain(" + pyList (arrOf "ops" v |> List.map pyAction) + ")"
   // The clipboard payload is a `TextSource`: `Literal`'s canonical form is the
   // bare JSON string, but a `Bound` payload rides as the envelope and must
   // project as one (reading it with `strOf` erased it to '').
-  | Some "WriteToClipboard" -> "action.write_to_clipboard(" + pyTextInput (fieldD "text" v) + ")"
+  | Some "WriteToClipboard" -> "action.write_to_clipboard(" + pyTextInput (fieldReq "text" v) + ")"
   // Phase 1124 — the reader's own print dialogue; it takes nothing.
   | Some "Print" -> "action.print()"
   | Some "ReadFileBody" ->
@@ -3720,7 +3857,7 @@ let rec private pyAction (v: JsonValue) : string =
   | Some "Confirm" ->
     pyCall
       "t.Confirm"
-      [ pyTextInput (fieldD "prompt" v); pyAction (fieldD "onConfirm" v) ]
+      [ pyTextInput (fieldReq "prompt" v); pyAction (fieldReq "onConfirm" v) ]
       (match JsonValue.tryField "onCancel" v with
        | Some c -> [ "onCancel", pyAction c ]
        | None -> [])
@@ -3742,7 +3879,7 @@ let rec private pyAction (v: JsonValue) : string =
        @ (match JsonValue.tryField "onResult" v with
           | Some _ -> [ "onResult", "True" ]
           | None -> []))
-  | Some "AiTool" -> "t.AiTool(" + pq (strOf "toolName" v) + ", " + pyJson (fieldD "args" v) + ")"
+  | Some "AiTool" -> "t.AiTool(" + pq (strOf "toolName" v) + ", " + pyJson (fieldReq "args" v) + ")"
   | Some "Invoke" -> pyInvoke v
   | _ ->
     // CommitLocal — no typed case in `fuaran_py`.
@@ -3802,7 +3939,7 @@ let private pyFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
       ->
       // A State binding whose defaultValue is the wire's `{from,to}` pair —
       // carried through as the object it is, for the reason above.
-      let d = fieldD "defaultValue" valV
+      let d = fieldReq "defaultValue" valV
 
       "binding.state("
       + pq (strOf "key" valV)
@@ -3859,11 +3996,11 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
   | "Checkbox" -> pyCall "t.CheckboxField" [] (optValue @ pyHandler "onToggle" "on_toggle" v)
   | "Toggle" -> pyCall "t.ToggleField" [] (optValue @ pyHandler "onToggle" "on_toggle" v)
   | "Choice" ->
-    pyCall "t.ChoiceField" [ pyOptionsBinding (fieldD "options" v) ] (optValue @ pyHandler "onChange" "on_change" v)
+    pyCall "t.ChoiceField" [ pyOptionsBinding (fieldReq "options" v) ] (optValue @ pyHandler "onChange" "on_change" v)
   | "SegmentedChoice" ->
     pyCall
       "t.SegmentedChoice"
-      [ pyOptionsBinding (fieldD "options" v) ]
+      [ pyOptionsBinding (fieldReq "options" v) ]
       (optValue
        @ [ "orientation", pq (strOf "orientation" v) ]
        @ pyHandler "onChange" "on_change" v)
@@ -3914,7 +4051,7 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
   | "Combobox" ->
     pyCall
       "t.ComboboxField"
-      [ pyOptionsBinding (fieldD "options" v) ]
+      [ pyOptionsBinding (fieldReq "options" v) ]
       (optValue
        @ (if boolOf "allowFreeText" v then
             [ "allow_free_text", "True" ]
@@ -3951,12 +4088,12 @@ let private pyFilterKind (ab: AutoBind) (v: JsonValue) : string =
   | "Choice" ->
     pyCall
       "t.ChoiceFilter"
-      [ pyOptionsBinding (fieldD "options" v) ]
+      [ pyOptionsBinding (fieldReq "options" v) ]
       (optValue "Choice" @ pyHandler "onChange" "on_change" v)
   | "SegmentedChoice" ->
     pyCall
       "t.SegmentedFilter"
-      [ pyOptionsBinding (fieldD "options" v) ]
+      [ pyOptionsBinding (fieldReq "options" v) ]
       (optValue "SegmentedChoice"
        @ [ "orientation", pq (strOf "orientation" v) ]
        @ pyHandler "onChange" "on_change" v)
@@ -4000,7 +4137,7 @@ let private pyFieldRule (v: JsonValue) : string =
         | Some c ->
           [ "compare",
             "t.CompareRule("
-            + pyBinding Opq.Scalar (fieldD "against" c)
+            + pyBinding Opq.Scalar (fieldReq "against" c)
             + ", "
             + pq (strOf "op" c)
             + ")" ]
@@ -4015,8 +4152,8 @@ let private pyFormField (v: JsonValue) : string =
   pyCall
     "t.FormField"
     [ pq id
-      pyTextSource (fieldD "label" v)
-      pyFieldKind (AutoBind.Form id) (fieldD "kind" v) ]
+      pyTextSource (fieldReq "label" v)
+      pyFieldKind (AutoBind.Form id) (fieldReq "kind" v) ]
     ([ "required", pyBool (boolOf "required" v) ]
      @ (match JsonValue.tryField "help" v with
         | Some h -> [ "help", pyTextSource h ]
@@ -4031,9 +4168,9 @@ let private pyFilterSpec (v: JsonValue) : string =
   "t.FilterSpec("
   + pq name
   + ", "
-  + pyTextSource (fieldD "label" v)
+  + pyTextSource (fieldReq "label" v)
   + ", "
-  + pyFilterKind (AutoBind.Filter name) (fieldD "kind" v)
+  + pyFilterKind (AutoBind.Filter name) (fieldReq "kind" v)
   + ")"
 
 let private pyColumnWidth (v: JsonValue) : string =
@@ -4098,9 +4235,9 @@ let private pyAnnotationRange (v: JsonValue) : string =
   match dollarType v with
   | Some "XRange" ->
     "t.XRange("
-    + pyAnnotationX (fieldD "from" v)
+    + pyAnnotationX (fieldReq "from" v)
     + ", "
-    + pyAnnotationX (fieldD "to" v)
+    + pyAnnotationX (fieldReq "to" v)
     + ")"
   | _ -> "t.ValueRange(" + pyNum (numOf "from" v) + ", " + pyNum (numOf "to" v) + ")"
 
@@ -4117,11 +4254,11 @@ let private pyChartAnnotation (v: JsonValue) : string =
   match dollarType v with
   | Some "EventMarker" ->
     "t.EventMarker("
-    + String.concat ", " (pyAnnotationX (fieldD "at" v) :: label)
+    + String.concat ", " (pyAnnotationX (fieldReq "at" v) :: label)
     + ")"
   | Some "RangeBand" ->
     "t.RangeBand("
-    + String.concat ", " (pyAnnotationRange (fieldD "range" v) :: label)
+    + String.concat ", " (pyAnnotationRange (fieldReq "range" v) :: label)
     + ")"
   | _ -> "t.ReferenceLine(" + String.concat ", " (pyNum (numOf "value" v) :: label) + ")"
 
@@ -4129,9 +4266,9 @@ let private pyGridColumn (v: JsonValue) : string =
   pyCall
     "t.Column"
     [ pq (strOf "label" v) ]
-    ([ "format", pyCellFormat (fieldD "format" v)
-       "kind", pyColumnKind (fieldD "kind" v)
-       "width", pyColumnWidth (fieldD "width" v) ]
+    ([ "format", pyCellFormat (fieldOrIdentity "format" v)
+       "kind", pyColumnKind (fieldReq "kind" v)
+       "width", pyColumnWidth (fieldOrIdentity "width" v) ]
      // `field` (declarative) and `value` (closure) are sibling optional slots:
      // naming a `field_name` emits `field` and omits the erased `value`, which
      // is the record's own rule rather than something to arrange here.
@@ -4151,15 +4288,15 @@ let private pyMediaTrack (v: JsonValue) : string =
     "t.TrackEntry"
     []
     ([ "kind", pq (strOf "kind" v)
-       "label", pyTextSource (fieldD "label" v)
-       "src", pyBinding Opq.Scalar (fieldD "src" v)
+       "label", pyTextSource (fieldReq "label" v)
+       "src", pyBinding Opq.Scalar (fieldReq "src" v)
        "srcLang", pq (strOf "srcLang" v) ]
      @ (if boolOf "default" v then [ "default", "True" ] else []))
 
 let private pyTabHeader (v: JsonValue) : string =
   pyCall
     "t.TabHeader"
-    [ pyTextSource (fieldD "label" v) ]
+    [ pyTextSource (fieldReq "label" v) ]
     ((match optStr "icon" v with
       | Some i -> [ "icon", pq i ]
       | None -> [])
@@ -4202,12 +4339,12 @@ let private pyHoleDecl (v: JsonValue) : string =
     "t.RepeatHole("
     + pq (strOf "name" v)
     + ", "
-    + pyHoleSpace (fieldD "countSpace" v)
+    + pyHoleSpace (fieldReq "countSpace" v)
     + ")"
   | _ ->
     pyCall
       "t.ValueHole"
-      [ pq (strOf "name" v); pyHoleSpace (fieldD "space" v) ]
+      [ pq (strOf "name" v); pyHoleSpace (fieldReq "space" v) ]
       (match JsonValue.tryField "default" v with
        | Some d -> [ "default", pyFragScalar d ]
        | None -> [])
@@ -4274,21 +4411,21 @@ let private pyDrawPoint (v: JsonValue) : string =
 
 let private pyCurveCommand (v: JsonValue) : string =
   match dollarType v with
-  | Some "MoveTo" -> "t.MoveTo(" + pyDrawPoint (fieldD "to" v) + ")"
-  | Some "LineTo" -> "t.LineTo(" + pyDrawPoint (fieldD "to" v) + ")"
+  | Some "MoveTo" -> "t.MoveTo(" + pyDrawPoint (fieldReq "to" v) + ")"
+  | Some "LineTo" -> "t.LineTo(" + pyDrawPoint (fieldReq "to" v) + ")"
   | Some "CubicTo" ->
     "t.CubicTo("
-    + pyDrawPoint (fieldD "control1" v)
+    + pyDrawPoint (fieldReq "control1" v)
     + ", "
-    + pyDrawPoint (fieldD "control2" v)
+    + pyDrawPoint (fieldReq "control2" v)
     + ", "
-    + pyDrawPoint (fieldD "to" v)
+    + pyDrawPoint (fieldReq "to" v)
     + ")"
   | Some "QuadraticTo" ->
     "t.QuadraticTo("
-    + pyDrawPoint (fieldD "control" v)
+    + pyDrawPoint (fieldReq "control" v)
     + ", "
-    + pyDrawPoint (fieldD "to" v)
+    + pyDrawPoint (fieldReq "to" v)
     + ")"
   | _ -> "t.Close()"
 
@@ -4316,7 +4453,7 @@ let rec private pyShape (v: JsonValue) : string =
     pyCall "t.Ellipse" [ pyFloatOf "cx" v; pyFloatOf "cy" v; pyFloatOf "rx" v; pyFloatOf "ry" v ] style
   // `Label.text` is a raw `TextSource` rather than the coerced `TextInput`, so
   // the bare wire string takes the explicit `t.LiteralText` record.
-  | _ -> pyCall "t.Label" [ pyFloatOf "x" v; pyFloatOf "y" v; pyTextSource (fieldD "text" v) ] style
+  | _ -> pyCall "t.Label" [ pyFloatOf "x" v; pyFloatOf "y" v; pyTextSource (fieldReq "text" v) ] style
 
 let private pyViewBox (v: JsonValue) : string =
   "t.ViewBox("
@@ -4414,7 +4551,7 @@ let rec private pyNodeExpr (depth: int) (nodeV: JsonValue) : string =
 
 and private pyNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
   let id = optStr "id" nodeV |> Option.defaultValue ""
-  let kindObj = fieldD "kind" nodeV
+  let kindObj = fieldReq "kind" nodeV
   let kindType = dollarType kindObj |> Option.defaultValue ""
 
   if kindType = "Box" then
@@ -4498,7 +4635,7 @@ and private pyChildren (depth: int) (k: JsonValue) : string =
 /// `Dashboard` role, which `fuaran.dashboard` cannot, and building the node
 /// directly means no constructor ARIA default has to be unpicked.
 and private pyBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue) : string =
-  let layoutV = fieldD "layout" k
+  let layoutV = fieldReq "layout" k
 
   let gapKw =
     match optNum "gap" layoutV with
@@ -4611,7 +4748,7 @@ and private pyGenericValue (depth: int) (v: JsonValue) : string =
 
 and private pyFragArg (depth: int) (v: JsonValue) : string =
   match dollarType v with
-  | Some "SlotArg" -> "t.SlotArg(" + pyNodeExpr (depth + 1) (fieldD "tree" v) + ")"
+  | Some "SlotArg" -> "t.SlotArg(" + pyNodeExpr (depth + 1) (fieldReq "tree" v) + ")"
   | _ -> pyFragScalar v
 
 and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValue) : string option =
@@ -4628,7 +4765,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       // Omitted-when-absent — the same encoder omit-at-default the TS arm
       // documents; a defaulted `activeIndex` here re-encodes as an explicit
       // `Static` the canonical wire does not carry.
-      ((match JsonValue.tryField "activeIndex" k with
+      ((match fieldOpt "activeIndex" k with
         | Some ai -> [ "activeIndex", pyBinding Opq.Scalar ai ]
         | None -> [])
        @ (match optStr "orientation" k with
@@ -4650,7 +4787,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "stepper"
       []
-      ([ "activeStep", pyBinding Opq.Scalar (fieldD "activeStep" k) ]
+      ([ "activeStep", pyBinding Opq.Scalar (fieldReq "activeStep" k) ]
        @ pyHandler "onSelect" "on_select" k
        @ [ "children", pyChildren depth k ])
   | "SummaryList" ->
@@ -4665,8 +4802,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "disclosure"
       []
-      ([ "heading", pyTextInput (fieldD "heading" k)
-         "open", pyBinding Opq.Scalar (fieldD "open" k)
+      ([ "heading", pyTextInput (fieldReq "heading" k)
+         "open", pyBinding Opq.Scalar (fieldReq "open" k)
          "defaultOpen", pyBool (boolOf "defaultOpen" k) ]
        @ pyHandler "onToggle" "on_toggle" k
        @ [ "children", pyChildren depth k ])
@@ -4677,7 +4814,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       ((match JsonValue.tryField "heading" k with
         | Some h -> [ "heading", pyTextInput h ]
         | None -> [])
-       @ [ "open", pyBinding Opq.Scalar (fieldD "open" k)
+       @ [ "open", pyBinding Opq.Scalar (fieldReq "open" k)
            "dismissable", pyBool (boolOf "dismissable" k) ]
        // `on_dismiss` defaults to the no-op `Chain`, which the encoder writes
        // as a real `onDismiss` key — so a wire that omits the slot has to say
@@ -4713,16 +4850,16 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
   | "Heading" ->
     call
       "heading"
-      [ pyTextInput (fieldD "text" k) ]
+      [ pyTextInput (fieldReq "text" k) ]
       [ "level", numLit (numOf "level" k); "variant", pq (strOf "variant" k) ]
-  | "Markdown" -> call "markdown" [ pyTextInput (fieldD "text" k) ] []
+  | "Markdown" -> call "markdown" [ pyTextInput (fieldReq "text" k) ] []
   | "Metric" ->
     call
       "metric"
       []
-      ([ "label", pyTextInput (fieldD "label" k)
+      ([ "label", pyTextInput (fieldReq "label" k)
          "value", pyBinding Opq.Scalar (valueOrSource k)
-         "format", pyCellFormat (fieldD "format" k) ]
+         "format", pyCellFormat (fieldOrIdentity "format" k) ]
        @ (match optStr "tone" k with
           | Some tn -> [ "tone", pq tn ]
           | None -> [])
@@ -4747,14 +4884,14 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match JsonValue.tryField "subtext" k with
           | Some s -> [ "subtext", pyTextInput s ]
           | None -> []))
-  | "Badge" -> call "badge" [] [ "label", pyTextInput (fieldD "label" k); "variant", pq (strOf "variant" k) ]
-  | "Sparkline" -> call "sparkline" [] [ "source", pyBinding Opq.Collection (fieldD "source" k) ]
+  | "Badge" -> call "badge" [] [ "label", pyTextInput (fieldReq "label" k); "variant", pq (strOf "variant" k) ]
+  | "Sparkline" -> call "sparkline" [] [ "source", pyBinding Opq.Collection (fieldReq "source" k) ]
   | "Skeleton" -> call "skeleton" [ numLit (numOf "rows" k) ] []
   | "Callout" ->
     call
       "callout"
       []
-      ([ "body", pyTextInput (fieldD "body" k)
+      ([ "body", pyTextInput (fieldReq "body" k)
          "tone", pq (strOf "tone" k)
          "dismissable", pyBool (boolOf "dismissable" k) ]
        @ (match JsonValue.tryField "heading" k with
@@ -4767,7 +4904,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "progress"
       []
-      ([ "fraction", pyBinding Opq.Scalar (fieldD "fraction" k)
+      ([ "fraction", pyBinding Opq.Scalar (fieldReq "fraction" k)
          "indeterminate", pyBool (boolOf "indeterminate" k)
          "tone", pq (strOf "tone" k) ]
        @ (match JsonValue.tryField "label" k with
@@ -4780,9 +4917,9 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "label_value_row"
       []
-      ([ "label", pyTextInput (fieldD "label" k)
+      ([ "label", pyTextInput (fieldReq "label" k)
          "value", pyBinding Opq.Scalar (valueOrSource k)
-         "format", pyCellFormat (fieldD "format" k)
+         "format", pyCellFormat (fieldOrIdentity "format" k)
          "emphasis", pyBool (boolOf "emphasis" k) ]
        @ (match JsonValue.tryField "help" k with
           | Some h -> [ "help", pyTextInput h ]
@@ -4791,8 +4928,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "link"
       []
-      ([ "href", pyBinding Opq.Scalar (fieldD "href" k)
-         "label", pyTextInput (fieldD "label" k)
+      ([ "href", pyBinding Opq.Scalar (fieldReq "href" k)
+         "label", pyTextInput (fieldReq "label" k)
          "download", pyBool (boolOf "download" k) ]
        @ (match optStr "rel" k with
           | Some r -> [ "rel", pq r ]
@@ -4808,8 +4945,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "image"
       []
-      ([ "src", pyBinding Opq.Scalar (fieldD "src" k)
-         "alt", pyTextInput (fieldD "alt" k)
+      ([ "src", pyBinding Opq.Scalar (fieldReq "src" k)
+         "alt", pyTextInput (fieldReq "alt" k)
          "variant", pq (strOf "variant" k) ]
        @ (match optStr "fit" k with
           | Some f -> [ "fit", pq f ]
@@ -4833,7 +4970,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
                 entries
                 |> List.map (fun e ->
                   "("
-                  + pyBinding Opq.Scalar (fieldD "src" e)
+                  + pyBinding Opq.Scalar (fieldReq "src" e)
                   + ", "
                   + numLit (numOf "width" e)
                   + ")")
@@ -4849,12 +4986,12 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | Some l -> [ "label", pq l ]
           | None -> []))
   | "Media" ->
-    let inner = fieldD "kind" k
+    let inner = fieldReq "kind" k
     let isVideo = (dollarType inner |> Option.defaultValue "Video") = "Video"
 
     let common =
-      [ "src", pyBinding Opq.Scalar (fieldD "src" k)
-        "label", pyTextInput (fieldD "label" k) ]
+      [ "src", pyBinding Opq.Scalar (fieldReq "src" k)
+        "label", pyTextInput (fieldReq "label" k) ]
       @ (match JsonValue.tryField "controls" k with
          | Some(JBool b) -> [ "controls", pyBool b ]
          | _ -> [])
@@ -4893,9 +5030,9 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "toast"
       []
-      [ "message", pyTextInput (fieldD "message" k)
+      [ "message", pyTextInput (fieldReq "message" k)
         "tone", pq (strOf "tone" k)
-        "open", pyBinding Opq.Scalar (fieldD "open" k)
+        "open", pyBinding Opq.Scalar (fieldReq "open" k)
         "dismissable",
         (match JsonValue.tryField "dismissable" k with
          | Some(JBool b) -> pyBool b
@@ -4917,8 +5054,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "fact"
       []
-      ([ "label", pyTextInput (fieldD "label" k)
-         "value", pyTextInput (fieldD "value" k) ]
+      ([ "label", pyTextInput (fieldReq "label" k)
+         "value", pyTextInput (fieldReq "value" k) ]
        @ (match optStr "tone" k with
           | Some tone -> [ "tone", pq tone ]
           | None -> [])
@@ -4936,8 +5073,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "button"
       []
-      ([ "label", pyTextInput (fieldD "label" k)
-         "onClick", pyAction (fieldD "onClick" k)
+      ([ "label", pyTextInput (fieldReq "label" k)
+         "onClick", pyAction (fieldReq "onClick" k)
          "variant", pq (strOf "variant" k) ]
        @ (match optStr "icon" k with
           | Some i -> [ "icon", pq i ]
@@ -4949,9 +5086,9 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "select"
       []
-      ([ "label", pyTextInput (fieldD "label" k)
-         "source", pyOptionsBinding (fieldD "source" k)
-         "value", pyBinding Opq.Scalar (fieldD "value" k) ]
+      ([ "label", pyTextInput (fieldReq "label" k)
+         "source", pyOptionsBinding (fieldReq "source" k)
+         "value", pyBinding Opq.Scalar (fieldReq "value" k) ]
        @ (match JsonValue.tryField "placeholder" k with
           | Some p -> [ "placeholder", pyTextInput p ]
           | None -> [])
@@ -4981,8 +5118,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "form"
       []
       ([ "fields", fieldsArr
-         "onSubmit", pyAction (fieldD "onSubmit" k)
-         "submitLabel", pyTextInput (fieldD "submitLabel" k) ]
+         "onSubmit", pyAction (fieldReq "onSubmit" k)
+         "submitLabel", pyTextInput (fieldReq "submitLabel" k) ]
        @ (match JsonValue.tryField "disabled" k with
           | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
           | None -> []))
@@ -5006,7 +5143,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "file_upload"
       []
-      ([ "label", pyTextInput (fieldD "label" k)
+      ([ "label", pyTextInput (fieldReq "label" k)
          "accept", pyList (arrOf "accept" k |> List.map pyStrItem)
          "multiple", pyBool (boolOf "multiple" k) ]
        @ (match JsonValue.tryField "disabled" k with
@@ -5035,7 +5172,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "chart"
       []
-      ([ "source", pyBinding Opq.Collection (fieldD "source" k)
+      ([ "source", pyBinding Opq.Collection (fieldReq "source" k)
          "xField", pq (strOf "xField" k)
          "yFields", pyList (arrOf "yFields" k |> List.map pyStrItem)
          "kind", pq (strOf "kind" k)
@@ -5090,7 +5227,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "map"
       []
-      [ "source", pyMarkerBinding (fieldD "source" k)
+      [ "source", pyMarkerBinding (fieldReq "source" k)
         "centreLatitude", numLit (numOf "centreLatitude" k)
         "centreLongitude", numLit (numOf "centreLongitude" k)
         "zoom", numLit (numOf "zoom" k) ]
@@ -5123,7 +5260,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        call
          "grid"
          []
-         ([ "source", pyBinding Opq.Collection (fieldD "source" k)
+         ([ "source", pyBinding Opq.Collection (fieldReq "source" k)
             "columns", pyList (arrOf "columns" k |> List.map pyGridColumn)
             "editable", pyBool (boolOf "editable" k) ]
           // `rowKey` (closure) and `rowKeyField` (declarative) mirror the column
@@ -5181,7 +5318,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "drawing"
       []
-      ([ "viewBox", pyViewBox (fieldD "viewBox" k)
+      ([ "viewBox", pyViewBox (fieldReq "viewBox" k)
          "shapes", pyList (arrOf "shapes" k |> List.map pyShape) ]
        @ pyDrawStyleKw k
        @ (match JsonValue.tryField "title" k with
@@ -5197,7 +5334,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       []
       ([ "moduleId", pq (strOf "moduleId" k)
          "componentId", pq (strOf "componentId" k)
-         "props", pyJson (fieldD "props" k) ]
+         "props", pyJson (fieldReq "props" k) ]
        @ (match JsonValue.tryField "contentHash" k with
           | Some h ->
             [ "contentHash",
@@ -5219,14 +5356,14 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "error_boundary"
       []
-      [ "child", pyNodeExpr (depth + 1) (fieldD "child" k)
-        "fallback", pyNodeExpr (depth + 1) (fieldD "fallback" k) ]
+      [ "child", pyNodeExpr (depth + 1) (fieldReq "child" k)
+        "fallback", pyNodeExpr (depth + 1) (fieldReq "fallback" k) ]
   | "FragmentDecl" ->
     call
       "fragment_decl"
       []
       ([ "name", pq (strOf "name" k)
-         "body", pyNodeExpr (depth + 1) (fieldD "body" k) ]
+         "body", pyNodeExpr (depth + 1) (fieldReq "body" k) ]
        @ (let holes = arrOf "holes" k
 
           if List.isEmpty holes then
@@ -5269,7 +5406,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "mount"
       []
       ([ "scopeId", pq (strOf "scopeId" k)
-         "channel", pyGuestChannel (fieldD "channel" k)
+         "channel", pyGuestChannel (fieldReq "channel" k)
          "capabilities", pyList (arrOf "capabilities" k |> List.map pyStrItem) ]
        @ (match membersOf "inputs" k with
           | [] -> []
@@ -5307,14 +5444,14 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           "("
           + pq (strOf "match" c)
           + ", "
-          + pyNodeExpr (depth + 1) (fieldD "child" c)
+          + pyNodeExpr (depth + 1) (fieldReq "child" c)
           + ")")
 
       call
         "switch"
         []
         ([ "cases", pyList cases
-           "default", pyNodeExpr (depth + 1) (fieldD "default" k) ]
+           "default", pyNodeExpr (depth + 1) (fieldReq "default" k) ]
          @ (match JsonValue.tryField "on" k with
             | Some onV -> [ "on", pyBinding Opq.Scalar onV ]
             | None -> [ "stateKey", pq (strOf "stateKey" k) ]))
@@ -5332,7 +5469,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
              | Some w -> "when=" + pyBinding Opq.Scalar w
              | None -> "match=" + pq (strOf "match" c))
           + ", child="
-          + pyNodeExpr (depth + 1) (fieldD "child" c)
+          + pyNodeExpr (depth + 1) (fieldReq "child" c)
           + ")")
 
       Some(
@@ -5347,7 +5484,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
                 | Some _ -> "None"
                 | None -> pq (strOf "stateKey" k))
                "cases", pyList typedCases
-               "default", pyNodeExpr (depth + 1) (fieldD "default" k) ]
+               "default", pyNodeExpr (depth + 1) (fieldReq "default" k) ]
              @ (match JsonValue.tryField "on" k with
                 | Some onV -> [ "on", pyBinding Opq.Scalar onV ]
                 | None -> [])

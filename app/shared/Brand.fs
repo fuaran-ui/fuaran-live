@@ -43,10 +43,10 @@ let private lightInteraction: Interaction =
       { Default = tone "#fcfaf4" "#1a2026" "#62a5be"
         Subdued = tone "#eae3d3" "#55606b" "#62a5be"
         Brand = tone "#e2ecee" "#1e4754" "#62a5be"
-        Success = tone "#e2f0e8" "#2e7d5b" "#62a5be"
+        Success = tone "#e2f0e8" "#2a7253" "#62a5be"
         Warning = tone "#f7eed9" "#8a5f16" "#62a5be"
-        Critical = tone "#f4e4de" "#b8442f" "#62a5be"
-        Info = tone "#e4eff2" "#357588" "#62a5be" }
+        Critical = tone "#f4e4de" "#ac3f2c" "#62a5be"
+        Info = tone "#e4eff2" "#316c7d" "#62a5be" }
     Active =
       { Default = tone "#eae3d3" "#10151a" "#c4b89c"
         Subdued = tone "#d6cbb1" "#39424b" "#b9ab8b"
@@ -130,10 +130,10 @@ let lightTheme: Theme =
         { Default = tone "#fcfaf4" "#1a2026" "#dad2c0"
           Subdued = tone "#eae3d3" "#55606b" "#cfc5ae"
           Brand = tone "#e2ecee" "#1e4754" "#9dc0cc"
-          Success = tone "#e2f0e8" "#2e7d5b" "#93c9ae"
+          Success = tone "#e2f0e8" "#2a7253" "#93c9ae"
           Warning = tone "#f7eed9" "#8a5f16" "#ddbe6f"
-          Critical = tone "#f4e4de" "#b8442f" "#de9a87"
-          Info = tone "#e4eff2" "#357588" "#a3c8d2" }
+          Critical = tone "#f4e4de" "#ac3f2c" "#de9a87"
+          Info = tone "#e4eff2" "#316c7d" "#a3c8d2" }
       Interaction = lightInteraction }
 
 /// The theme to inject for the current dark flag – brand dark or brand light.

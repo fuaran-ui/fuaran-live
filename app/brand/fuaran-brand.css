@@ -68,6 +68,13 @@
      Working: elevated #FCFAF4 · panel #EAE3D3 · muted #55606B / #93A2AB
      line #DAD2C0 / #26333B · dark bg #0C1216 · dark ink #DCE3E5
      code surface #16232B (deep loch — code panes are dark in BOTH themes)
+   Contrast (2026-09-08): the success / info / critical tone foregrounds were one
+   step too light for WCAG AA at the 12–14px the badges, trends and callouts use —
+   4.16 / 4.43 / 4.35 against their own and the brand backgrounds. Each is darkened
+   by 0.03 lightness in HSL (hue and saturation untouched): success #2e7d5b→#2a7253,
+   info #357588→#316c7d, critical #b8442f→#ac3f2c — now ≥4.75:1 on every paired
+   background. Dark theme was already ≥6.6:1 and is unchanged. Brand.fs mirrors
+   these (test/brandThemeParity.test.ts locks the two together).
    The semantic layer below flips between modes; shells consume it, never raw
    hex. Names continue the --fuaran-color-* vocabulary the live surfaces
    already use. */
@@ -82,8 +89,8 @@
   --fuaran-color-brand: #1e4754; /* Loch deep — wordmark, accents   */
   --fuaran-color-accent: #1e4754;
   --fuaran-color-accent-ink: #fcfaf4; /* text ON the accent              */
-  --fuaran-color-critical: #b8442f;
-  --fuaran-color-success: #2e7d5b;
+  --fuaran-color-critical: #ac3f2c;
+  --fuaran-color-success: #2a7253;
   /* Theme-following inset code/wire panel surface (the shells' existing
      semantic). The ALWAYS-dark CodeBlock pane is the reference vocabulary:
      --fuaran-code-bg / --fuaran-code-fg (deep loch, both themes — §3.4). */
@@ -134,16 +141,16 @@
   --fuaran-tone-brand-fg: #1e4754;
   --fuaran-tone-brand-border: #9dc0cc;
   --fuaran-tone-success-bg: #e2f0e8;
-  --fuaran-tone-success-fg: #2e7d5b;
+  --fuaran-tone-success-fg: #2a7253;
   --fuaran-tone-success-border: #93c9ae;
   --fuaran-tone-warning-bg: #f7eed9;
   --fuaran-tone-warning-fg: #8a5f16;
   --fuaran-tone-warning-border: #ddbe6f;
   --fuaran-tone-critical-bg: #f4e4de;
-  --fuaran-tone-critical-fg: #b8442f;
+  --fuaran-tone-critical-fg: #ac3f2c;
   --fuaran-tone-critical-border: #de9a87;
   --fuaran-tone-info-bg: #e4eff2;
-  --fuaran-tone-info-fg: #357588;
+  --fuaran-tone-info-fg: #316c7d;
   --fuaran-tone-info-border: #a3c8d2;
 
   /* 3.2 Interaction matrix — hover (one step deeper into the tone) */
@@ -181,16 +188,16 @@
   --fuaran-tone-brand-focus-fg: #1e4754;
   --fuaran-tone-brand-focus-border: #62a5be;
   --fuaran-tone-success-focus-bg: #e2f0e8;
-  --fuaran-tone-success-focus-fg: #2e7d5b;
+  --fuaran-tone-success-focus-fg: #2a7253;
   --fuaran-tone-success-focus-border: #62a5be;
   --fuaran-tone-warning-focus-bg: #f7eed9;
   --fuaran-tone-warning-focus-fg: #8a5f16;
   --fuaran-tone-warning-focus-border: #62a5be;
   --fuaran-tone-critical-focus-bg: #f4e4de;
-  --fuaran-tone-critical-focus-fg: #b8442f;
+  --fuaran-tone-critical-focus-fg: #ac3f2c;
   --fuaran-tone-critical-focus-border: #62a5be;
   --fuaran-tone-info-focus-bg: #e4eff2;
-  --fuaran-tone-info-focus-fg: #357588;
+  --fuaran-tone-info-focus-fg: #316c7d;
   --fuaran-tone-info-focus-border: #62a5be;
 
   /* active — deeper than hover */

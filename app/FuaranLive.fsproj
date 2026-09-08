@@ -154,42 +154,47 @@
          reference-CSS contract), the Ops apply engine + canonical JSON codec, the
          op-record/hash-chain slice, and the structural tree diff.
 
-         AT 0.78.0. The family was held at 0.46.0 for one release cycle by a
-         ceiling this repo did not set: the bounded program loop below interpreted
-         `Action.WriteToClipboard` by handing its payload straight to the client
-         effect of the same name, and the tier had widened that payload to a
-         `TextSource` while the effect kept its plain string, so the two stopped
-         fitting — and the loop is a separate producer whose only published
-         version at the time predated the widening. That ceiling lifted at the
-         loop's 0.2.0, and 0.78.0 HAS RE-IMPOSED IT IN THE SAME SHAPE: the tier
-         widened `Action.Navigate` from a bare route string to a
-         (`TextSource`, `NavigateTarget`) pair, and the loop's published 0.2.0
-         still constructs and matches the one-argument form. The mismatch is a
-         compile error in the loop's own Fable-packed sources, so it is not
-         something this repo can spell around — it clears when the loop cuts a
-         release built against this tier. -->
-    <PackageReference Include="Fuaran.UI" Version="0.78.0" />
-    <PackageReference Include="Fuaran.UI.Renderer" Version="0.78.0" />
-    <PackageReference Include="Fuaran.UI.Ops" Version="0.78.0" />
-    <PackageReference Include="Fuaran.UI.OpStream.Abstractions" Version="0.78.0" />
-    <PackageReference Include="Fuaran.UI.OpStream.Replay" Version="0.78.0" />
+         AT 0.78.1. The family has twice been held BELOW the tier's head by a
+         ceiling this repo did not set, both times in the same shape: the tier
+         widens a member of `Action`, and the bounded program loop below — a
+         separate producer on its own version line — still constructs and
+         matches the narrower form in its own Fable-packed sources, which is a
+         compile error this repo cannot spell around. First over
+         `Action.WriteToClipboard` (held at 0.46.0 for a cycle, lifted at the
+         loop's 0.2.0), then over `Action.Navigate`, widened from a bare route
+         string to a (`TextSource`, `NavigateTarget`) pair at 0.78.0 and lifted
+         at the loop's 0.4.0. BOTH ARE CLEAR: nothing caps the family today.
+         0.78.1 itself is a tier fix rather than a widening — the renderer's
+         resume path named a wire type its Fable arm never opened, so the
+         package built for .NET and failed for every Fable consumer of it, this
+         one included. Read the two lifts as the standing shape rather than as
+         history: a lower bound is not a compatibility claim (see the loop's own
+         comment below), so a tier widening can cap this family again at any
+         release, and the remedy is always the other producer's, never a pin
+         here. -->
+    <PackageReference Include="Fuaran.UI" Version="0.78.1" />
+    <PackageReference Include="Fuaran.UI.Renderer" Version="0.78.1" />
+    <PackageReference Include="Fuaran.UI.Ops" Version="0.78.1" />
+    <PackageReference Include="Fuaran.UI.OpStream.Abstractions" Version="0.78.1" />
+    <PackageReference Include="Fuaran.UI.OpStream.Replay" Version="0.78.1" />
     <!-- Pinned EXPLICITLY even though nothing here opens it: the bounded program
          loop below declares it only as a LOWER bound, so without this line NuGet
          picks that floor and Fable extracts a tier-version-skewed copy of its
          sources into the same compile as the family above — which fails on the
          first member either side widened. It is a Fuaran.UI.* package and moves
          with the family. -->
-    <PackageReference Include="Fuaran.UI.ServerDriven" Version="0.78.0" />
+    <PackageReference Include="Fuaran.UI.ServerDriven" Version="0.78.1" />
     <!-- The bounded program loop: the client placement that runs a wire-decoded
          program tree interactively in the browser — no hand-authored update
          function, no message type, no server. A DIFFERENT producer on its own
-         version line: its 0.2.0 declares Fuaran.UI.* 0.70.0 as a LOWER bound,
-         which the family above sits at or above, so the consumption stays
-         NU1603-clean. A lower bound is not a compatibility claim, and 0.78.0 is
-         where that shows: the loop caps the family again, on the `Action.Navigate`
-         widening described above, until it cuts a release built against it.
-         Apache-2.0, published on the public tier. -->
-    <PackageReference Include="Fuaran.Program.Runtime" Version="0.2.0" />
+         version line: its 0.4.0 declares Fuaran.UI.* 0.78.1 as a LOWER bound,
+         which the family above sits at, so the consumption stays NU1603-clean.
+         A lower bound is not a compatibility claim, and 0.78.0 was where that
+         showed: the loop's then-published 0.2.0 declared a 0.70.0 floor and
+         capped the family anyway, on the `Action.Navigate` widening described
+         above, until 0.4.0 adopted it. Apache-2.0, published on the public
+         tier. -->
+    <PackageReference Include="Fuaran.Program.Runtime" Version="0.4.0" />
   </ItemGroup>
 
   <ItemGroup>

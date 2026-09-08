@@ -2389,7 +2389,17 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       @ (match optStr "orientation" k with
          | Some o -> [ "orientation", qs o ]
          | None -> [])
-      @ [ "activeIndex", tsBinding Opq.Scalar (fieldD "activeIndex" k) ]
+      // Omitted-when-absent, not defaulted. `activeIndex` is the one binding
+      // slot the encoder omits at its default (`Static 0`), so the canonical
+      // wire for an unset one carries no key at all — and passing the absent
+      // JNull through `tsBinding` yields `binding.static(undefined)`, which is
+      // an EXPLICIT `Static` the builder's own `?? Static 0` default can no
+      // longer fill and the encoder can no longer omit. It re-encodes as
+      // `"activeIndex":{"$type":"Static"}` against a fixture that has no such
+      // key. Same shape as `activeTag` below.
+      @ (match JsonValue.tryField "activeIndex" k with
+         | Some ai -> [ "activeIndex", tsBinding Opq.Scalar ai ]
+         | None -> [])
       @ (match JsonValue.tryField "onSelect" k with
          | Some _ -> [ "onSelect", "() => action.chain([])" ]
          | None -> [])
@@ -4615,7 +4625,12 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "tabs"
       []
-      ([ "activeIndex", pyBinding Opq.Scalar (fieldD "activeIndex" k) ]
+      // Omitted-when-absent — the same encoder omit-at-default the TS arm
+      // documents; a defaulted `activeIndex` here re-encodes as an explicit
+      // `Static` the canonical wire does not carry.
+      ((match JsonValue.tryField "activeIndex" k with
+        | Some ai -> [ "activeIndex", pyBinding Opq.Scalar ai ]
+        | None -> [])
        @ (match optStr "orientation" k with
           | Some o -> [ "orientation", pq o ]
           | None -> [])

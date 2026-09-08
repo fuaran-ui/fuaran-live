@@ -75,7 +75,7 @@ let private gridNode (fault: Fault) : Node<unit> =
 let private buttonAction (fault: Fault) : Action<unit> =
   match fault with
   | Fault.DeadButton -> Action.Chain [] // empty chain – clicking dispatches nothing
-  | _ -> Action.Navigate "orders/refresh"
+  | _ -> Action.navigate "orders/refresh"
 
 /// Does this action actually dispatch anything? An empty `Chain` (or a chain of
 /// only-empty chains) is a behavioural no-op – the `InteractionNoOp` shape the

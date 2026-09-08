@@ -97,7 +97,7 @@ let private artefact: Node<unit> =
             "sm-open"
             { Defaults.button with
                 Label = TextSource.Literal "Refresh data"
-                OnClick = Action.Navigate "dashboard/refresh"
+                OnClick = Action.navigate "dashboard/refresh"
                 Variant = ButtonVariant.Primary } ] }
 
 let private artefactJson = CJson.encodeNode artefact
@@ -245,7 +245,7 @@ type private Tab =
 // The write-back is a tree-originated State write rather than a dispatched
 // action, so it never meets the gate — the tabs work under a runtime that
 // refuses everything. The exemplar's one gated action is the "Refresh data"
-// button's `Action.Navigate "dashboard/refresh"`, and refusing it is the
+// button's `Action.navigate "dashboard/refresh"`, and refusing it is the
 // CORRECT outcome rather than a capability this page has lost: the exemplar is
 // an artefact on display, not a live dashboard, and the browser runtime routes
 // Navigate to `window.location.hash` — which this showcase also routes on, so
@@ -286,7 +286,13 @@ let private renderTree (n: Node<unit>) : ReactElement =
       // node, and only when a sink is wired - so `None` is the only
       // correct value at construction.
       ActionSink = None
-      CurrentNodeId = None }
+      CurrentNodeId = None
+      // Phase 1532 - this render declares no per-render Custom content-hash
+      // floor, so the process floor (`CustomHash.installCustomHashFloor`)
+      // decides. `None` is the renderer's own default at every convenience
+      // entry point, and the field is raise-only, so declaring nothing here
+      // can never weaken a floor the host installed.
+      CustomHashFloor = None }
     n
 
 [<ReactComponent>]

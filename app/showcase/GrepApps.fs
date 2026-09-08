@@ -147,7 +147,7 @@ let private corpus: App list =
           "a7-root"
           "Product"
           [ Fuaran.markdown "a7-hero" "The fastest way to ship an interface."
-            button "a7-cta" "Get started" (Action.Navigate "signup") ] }
+            button "a7-cta" "Get started" (Action.navigate "signup") ] }
     { Id = "kpiwall"
       Name = "KPI wall"
       Tree =

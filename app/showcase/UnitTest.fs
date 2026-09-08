@@ -118,7 +118,7 @@ let private appTree (b: Breaks) : Node<unit> =
                   (if b.DeadBtn then
                      Action.Chain []
                    else
-                     Action.Navigate "channels/refresh")
+                     Action.navigate "channels/refresh")
                 Variant = ButtonVariant.Primary } ] }
 
 // ─── Structural reads over the typed tree (the same tree that renders) ────────

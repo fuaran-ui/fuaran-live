@@ -204,7 +204,7 @@ module PatternBank =
       id
       { Defaults.button with
           Label = TextSource.Literal label
-          OnClick = Action.Navigate "cta"
+          OnClick = Action.navigate "cta"
           Variant = ButtonVariant.Primary }
 
   // ── the seed patterns (mirror the shipped Fuaran.UI.FastPath catalogue) ──

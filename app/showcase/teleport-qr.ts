@@ -41,7 +41,7 @@ export function qrDataUrl(text: string, cellSize: number): string {
 // site's own /receiver.html; in two-origin mode it is a genuinely different
 // host – the strongest staging of "the app isn't OF the place it lands".
 // Priority: a dev override in localStorage ("fuaran-receiver-origin", e.g.
-// http://localhost:14040 – the vite preview server, a different origin even
+// http://localhost:14070 – the vite preview server, a different origin even
 // locally), then the build-time VITE_RECEIVER_ORIGIN (the production second
 // domain), then this page's own origin.
 

@@ -3,5 +3,12 @@
   "app": "fuaran-live",
   "estate": "fuaran-ui",
   "class": "website",
-  "client": [24040, 24049]
+  "server": [
+    14070,
+    14079
+  ],
+  "client": [
+    24040,
+    24049
+  ]
 }

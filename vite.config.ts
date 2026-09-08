@@ -267,11 +267,18 @@ function showcaseIndexPlugin(): Plugin {
   };
 }
 
-// Port allocation: the Fuaran workspace CLAUDE.md "Port allocation" table
-// reserves the website Vite band 24040–24049 for fuaran-live. The app is static
-// (no server tier), so only the Vite dev port (24040) + preview (14040) are
-// wired. `base: './'` emits relative asset URLs so the build runs from a plain
-// static host AND directly from file://.
+// Port allocation, declared in this repo's own `ports.json` and validated by the
+// workspace port registry: Vite dev band 24040–24049, server band 14070–14079.
+// The app is static (no server tier), so only the dev port (24040) and preview
+// (14070) are wired.
+//
+// Preview moved 14040 → 14070 on 2026-09-08. 14040 is formally claimed by another
+// app in this band, and this repo's manifest declared no server band at all — so
+// the registry read green while the two overlapped, because an undeclared port
+// cannot clash with anything. Declaring the band is what makes the check real.
+//
+// `base: './'` emits relative asset URLs so the build runs from a plain static
+// host AND directly from file://.
 export default defineConfig({
   base: './',
   plugins: showcaseSite ? [react(), cspPlugin(), showcaseIndexPlugin()] : [react(), cspPlugin()],
@@ -338,7 +345,7 @@ export default defineConfig({
     },
   },
   preview: {
-    port: 14040,
+    port: 14070,
     strictPort: true,
   },
 });

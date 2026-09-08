@@ -51,10 +51,15 @@ jobs:
           # every released tag, so no tag could compile it, and the note here said
           # to return to a tag once the tier cut a release carrying them. v0.75.0
           # is that release.
-          # Raised to v0.77.0 on 2026-09-07: that release carries the Fable
-          # dynamic-Huffman inflate fix (fuaran-dotnet d903a58) the teleport receiver
-          # needs to accept a bundle any standard deflater produced. It carries those contracts and the print-break,
-          # node-tooltip and upload-sink members the showcase source now names.
+          # Raised to v0.78.0 on 2026-09-08, with the package pins in
+          # app/FuaranLive.fsproj and app/showcase/Showcase.fsproj: that release
+          # widens Action.Navigate to a (TextSource, NavigateTarget) pair, adds a
+          # required Node.visible, adds SwitchCase.when while making its match
+          # optional, and adds RenderContext.CustomHashFloor -- every one of which
+          # the showcase source now names. It also carries the Fable
+          # dynamic-Huffman inflate fix the teleport receiver needs to accept a
+          # bundle any standard deflater produced, and the print-break,
+          # node-tooltip and upload-sink members.
           #
           # A tag is immutable, so this is no less deliberate than the SHA it
           # replaces. Bumping it is a SOURCE-AFFECTING act rather than a
@@ -63,7 +68,7 @@ jobs:
           # move off the SHA cost here.
           #
           # To bump: raise the ref in all six workflows together (grep the ref).
-          ref: v0.77.0
+          ref: v0.78.0
           path: fuaran-dotnet
       - uses: actions/checkout@v4
         with:

@@ -16,3 +16,4 @@ public/rosetta/wasm_exec.js
 # emits it; the copy here must stay byte-faithful to the publisher's output, and
 # every future feed copy would otherwise re-trip the format gate).
 public/eval/results.json
+dist-measure

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--CSP-INJECTION-POINT-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>fuaran-live – render-latency measurement harness</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <!--
+      Phase 1628 — the render-latency measurement page. NOT part of the shipped
+      site: it is emitted only under `VITE_MEASURE=1`, into `dist-measure/`, and
+      the deploy workflows never set that flag.
+
+      Two mount points, and the split is load-bearing. The theme's CSS custom
+      properties are mounted once into #fuaran-measure-theme, outside every
+      timed region; the timed trees mount into fresh containers under
+      #fuaran-measure-root, which carries the `fuaran-root` class the reference
+      stylesheet keys its cascade off.
+    -->
+    <div id="fuaran-measure-theme"></div>
+    <div id="fuaran-measure-root" class="fuaran-root"></div>
+    <script type="module" src="/app/output/measure/Capture.js"></script>
+  </body>
+</html>

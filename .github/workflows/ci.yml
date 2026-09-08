@@ -198,3 +198,24 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # Phase 1628 — the render-latency harness, run in a real browser.
+      #
+      # It is a PROBE CHECK, not a latency gate. It asserts that the instrument
+      # works — every declared metric finite and positive, full-render never
+      # below time-to-commit, and the numbers scaling with tree size, so a
+      # harness that had started timing something other than the tree it was
+      # handed fails here. It asserts NO threshold in milliseconds: a wall-clock
+      # bound on a shared hosted runner fails for reasons that have nothing to
+      # do with the code, which is the same reason the two `render.*` latency
+      # axes are deliberately unbudgeted in the consuming performance gate (the
+      # measured run-to-run spread is in app/measure/README.md).
+      #
+      # `pnpm run measure` builds the measure page into its own dist-measure/
+      # under VITE_MEASURE=1 — the shipped artifact above is untouched by it —
+      # and then drives measure.html through Playwright.
+      - name: Install the Playwright browser (render-latency capture)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Render-latency harness (capture + probe)
+        run: pnpm run measure

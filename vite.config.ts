@@ -159,6 +159,15 @@ const dualHost = process.env.VITE_DUAL_HOST === '1' || process.env.VITE_DUAL_HOS
 // shipped files.
 const showcaseSite = process.env.VITE_SITE === 'showcase';
 
+// Phase 1628 — the render-latency measurement build. With VITE_MEASURE set the
+// build emits measure.html ALONE, into its own `dist-measure/`, and nothing
+// else: the harness page is a measuring instrument, not part of the site, and
+// no deploy workflow sets the flag. Its own outDir rather than a third entry in
+// `dist/` so the shipped artifact is byte-for-byte what it was before the
+// harness existed — a measurement page that shipped to visitors would be a
+// worse outcome than no measurement at all.
+const measureSite = process.env.VITE_MEASURE === '1' || process.env.VITE_MEASURE === 'true';
+
 // `index.html` is the entirely-F#/Fable app (it loads app/output/App.js, the
 // Fable-compiled Fuaran.Live.App). The optional VITE_DUAL_HOST flag additionally
 // emits the two wire-format parity render-host pages (ts-host.html + fable-host.html).
@@ -279,35 +288,42 @@ export default defineConfig({
     // fuaran-ts tier has been built (its dist/ exists). Scoping the scan to the
     // real entry keeps default dev/build from depending on a built fuaran-ts;
     // dual-host mode adds the host pages back explicitly.
-    entries: dualHost
-      ? [
-          'index.html',
-          'showcase.html',
-          'receiver.html',
-          'ts-receiver.html',
-          'ts-host.html',
-          'fable-host.html',
-        ]
-      : ['index.html', 'showcase.html', 'receiver.html', 'ts-receiver.html'],
+    entries: measureSite
+      ? ['measure.html']
+      : dualHost
+        ? [
+            'index.html',
+            'showcase.html',
+            'receiver.html',
+            'ts-receiver.html',
+            'ts-host.html',
+            'fable-host.html',
+          ]
+        : ['index.html', 'showcase.html', 'receiver.html', 'ts-receiver.html'],
   },
-  build: showcaseSite
+  build: measureSite
     ? {
-        outDir: 'dist-showcase',
-        rollupOptions: {
-          // Two documents: the showcase shell and the bare teleport receiver
-          // (HOST 2). The receiver is deliberately a separate, visibly vacant
-          // page, self-contained so it can be deployed to a second origin
-          // unchanged. The CSP plugin's transformIndexHtml applies to both.
-          input: {
-            main: 'showcase.html',
-            receiver: 'receiver.html',
-            tsReceiver: 'ts-receiver.html',
-          },
-        },
+        outDir: 'dist-measure',
+        rollupOptions: { input: { measure: 'measure.html' } },
       }
-    : dualHost
-      ? { rollupOptions: { input: buildInputs } }
-      : {},
+    : showcaseSite
+      ? {
+          outDir: 'dist-showcase',
+          rollupOptions: {
+            // Two documents: the showcase shell and the bare teleport receiver
+            // (HOST 2). The receiver is deliberately a separate, visibly vacant
+            // page, self-contained so it can be deployed to a second origin
+            // unchanged. The CSP plugin's transformIndexHtml applies to both.
+            input: {
+              main: 'showcase.html',
+              receiver: 'receiver.html',
+              tsReceiver: 'ts-receiver.html',
+            },
+          },
+        }
+      : dualHost
+        ? { rollupOptions: { input: buildInputs } }
+        : {},
   server: {
     port: 24040,
     strictPort: true,

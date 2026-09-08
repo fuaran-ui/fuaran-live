@@ -31,6 +31,8 @@
     "fable:app": "node scripts/fable-app.mjs",
     "fable:app:watch": "dotnet fable watch app --outDir app/output",
     "parity": "pnpm run fable:app && pnpm run build:dual && playwright test -c tests/parity/playwright.config.ts",
+    "build:measure": "pnpm run fable:app && cross-env VITE_MEASURE=1 vite build",
+    "measure": "pnpm run build:measure && playwright test -c tests/measure/playwright.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

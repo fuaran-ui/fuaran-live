@@ -136,6 +136,18 @@
          absence is the point — the module that builds a contribution and the
          module that holds the key stores are never in scope together. -->
     <Compile Include="Contribute.fs" />
+    <!-- Phase 1628 — the render-latency measurement harness. Compiled into this
+         project (rather than into a project of its own) because it renders
+         through exactly the tier this project pins, and a second project would
+         be a second pin able to drift from it. Nothing in the playground
+         references these modules, so the playground bundle does not carry them:
+         they are reached only by measure.html, an entry the shipped build does
+         not emit. Ordered before App.fs, which must stay last (it ends in
+         top-level Program.run expressions). -->
+    <Compile Include="measure\Corpus.fs" />
+    <Compile Include="measure\Timing.fs" />
+    <Compile Include="measure\Baseline.fs" />
+    <Compile Include="measure\Capture.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

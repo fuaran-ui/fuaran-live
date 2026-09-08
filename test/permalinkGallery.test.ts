@@ -38,20 +38,6 @@ import { exampleWires, exampleTags } from '../app/output/Gallery.js';
 // @ts-expect-error untyped Fable output
 import { projectByName } from '../app/output/Projection.js';
 
-// F# TIER LAG — declared, dated, self-clearing (the same shape the projection
-// conformance quarantine uses). The playground compiles the gallery from the
-// Fuaran.UI NuGet packages pinned in app/FuaranLive.fsproj (0.77.0), whose Chart
-// encoder still writes `"stacked":false`. The corpus made Chart.stacked
-// omit-at-default (wire-format-fixtures 211dbd5, 2026-09-07) and @fuaran-ui/ops
-// 0.23.0 follows it, so decode -> re-encode DROPS the member and one gallery entry
-// sits exactly one member away from canonical. fuaran-dotnet 874169c carries the
-// fix; this clears when the NuGet pin moves to a release past it. Until then the
-// canonical-form assertion accepts EXACTLY this divergence and nothing else.
-const FSHARP_TIER_LAG = {
-  member: '"stacked":false,',
-  clearsWith: 'Fuaran.UI > 0.77.0 (fuaran-dotnet 874169c, Phase 1585)',
-} as const;
-
 const metricNode =
   '{"id":"metric-1","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"label":"Revenue","tone":"Brand","value":{"$type":"Static","value":1234.5}}}';
 
@@ -139,28 +125,14 @@ describe('the gallery', () => {
         );
       }
       // decode -> re-encode is the identity: the entry is not merely decodable,
-      // it is already the canonical form of itself — EXCEPT for the one declared
-      // F# tier lag below, which is accepted byte-for-byte and nothing else.
-      const canonical = encodeNode(decoded.value);
-      if (canonical !== wire) {
-        expect(
-          wire.replaceAll(FSHARP_TIER_LAG.member, ''),
-          `gallery entry "${title}" is not canonical beyond the declared F# tier lag`,
-        ).toBe(canonical);
-      }
+      // it is already the canonical form of itself. The declared F# tier lag this
+      // assertion used to make room for (the Chart `"stacked":false` member the
+      // pinned tier emitted after the corpus made it omit-at-default) cleared when
+      // the pin moved to Fuaran.UI 0.78.0, so there is no accepted divergence left.
+      expect(encodeNode(decoded.value), `gallery entry "${title}" is not in canonical form`).toBe(
+        wire,
+      );
     }
-  });
-
-  // Self-clearing: the moment the pinned F# tier stops emitting the member, this
-  // fails and says so — the declaration cannot outlive its cause.
-  it('the declared F# tier lag is still real — REMOVE FSHARP_TIER_LAG once it is not', () => {
-    const stillLagging = galleryEntries().filter(({ wire }) =>
-      wire.includes(FSHARP_TIER_LAG.member),
-    );
-    expect(
-      stillLagging.length,
-      `no gallery entry carries ${FSHARP_TIER_LAG.member} any more: the F# tier moved past ${FSHARP_TIER_LAG.clearsWith} — delete FSHARP_TIER_LAG and the branch that consults it`,
-    ).toBeGreaterThan(0);
   });
 
   it('projects every entry into every language the Output box offers', () => {

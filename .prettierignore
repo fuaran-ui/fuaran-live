@@ -17,3 +17,8 @@ public/rosetta/wasm_exec.js
 # and every future feed copy would otherwise re-trip the format gate).
 public/eval/results.json
 dist-measure
+
+# The port-allocation manifest — a GENERATED artifact: the maintainers' workspace
+# tooling writes this file when it claims or moves this app's slot, so a hand
+# format is undone by the next claim and the format gate re-reddens with it.
+ports.json

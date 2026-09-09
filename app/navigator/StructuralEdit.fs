@@ -251,9 +251,24 @@ let private sentinel = "fuaran-new-node-"
       }
       return merged;
     }
-    if (Array.isArray(s.oneOf)) {
-      for (var b = 0; b < s.oneOf.length; b++) {
-        var branch = synth(s.oneOf[b], depth + 1, hint);
+    // `oneOf` and `anyOf` are synthesised identically here, and the reason is
+    // worth stating because they are not the same keyword. They differ in what
+    // they VALIDATE — exactly one branch versus at least one — and the walk is
+    // not validating: it is choosing the least value the shape admits, so the
+    // first branch that synthesises is the answer under either reading. A value
+    // satisfying one branch of an `anyOf` satisfies the `anyOf`.
+    //
+    // Reading only `oneOf` was the whole of the gap. The canonical schema spells
+    // a float as `anyOf [number, non-finite sentinel string]` (WIRE_FORMAT.md
+    // §7), so every kind with a REQUIRED float fell straight through to MISSING
+    // with no union to fall out of, and the palette silently declined to offer
+    // it: Drawing (via `ViewBox`), Map (via its centre latitude/longitude) and
+    // SplitPanel (via `weight`). The kinds were not unsynthesisable; the walker
+    // could not read the keyword their schema happened to use.
+    var union = Array.isArray(s.oneOf) ? s.oneOf : (Array.isArray(s.anyOf) ? s.anyOf : null);
+    if (union) {
+      for (var b = 0; b < union.length; b++) {
+        var branch = synth(union[b], depth + 1, hint);
         if (branch !== MISSING) { return branch; }
       }
       return MISSING;

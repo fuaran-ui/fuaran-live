@@ -101,6 +101,40 @@ For inner-loop iteration against unpublished sibling changes, a temporary `pnpm.
 
 Everything effectful is an injected F# interface (`app/Ports.fs`): `IAIProvider` (the LLM call) and `EffectPorts` (clipboard / download / notify / warn). The browser implementations live in `app/Byok.fs` (the Anthropic `fetch` provider + the memory key store + the browser effect ports). The Elmish `update` loop depends only on the interfaces, so a server host could drive the identical loop with a different provider impl.
 
+## Production security headers — what is set, and what is deliberately not
+
+The shipped policy is split across two files, by what each can enforce. The
+Content-Security-Policy that governs script, style, connect and font is a
+`<meta>` policy written by `vite.config.ts`; `frame-ancestors`, which is
+header-only by spec and silently ignored in a `<meta>` policy, plus the
+transport and sniffing headers, live in `public/staticwebapp.config.json`'s
+`globalHeaders`.
+
+Two absences are decisions rather than gaps, recorded here because both are
+obvious things to "fix" and each would make the posture worse:
+
+- **No `report-to` on the CSP.** A reporting directive names an endpoint that
+  receives violation reports. This site is static, serverless and
+  account-free — there is no collector to name, and nothing here may acquire
+  one casually, since a violation report carries the page URL and the blocked
+  resource. A `report-to` naming an endpoint that does not exist is inert
+  configuration that reads, to the next person auditing the file, as reporting
+  that is switched on. Add it in the same change as an endpoint, or not at all.
+- **No CDN in the DUAL-HOST production policy** (`prodCsp`), even though
+  `src/query-portal/duckdbSource.ts` would need jsDelivr. That module is
+  library code with tests and no shipped entry point wires it, so widening a
+  production policy today would buy a capability nothing uses at the cost of
+  the default-deny the policy exists for. The `showcaseCsp` DOES name jsDelivr,
+  for Pyodide, which is genuinely loaded — the difference between the two
+  policies is exactly the difference between a capability that ships and one
+  that does not. Wiring the DuckDB source into an entry means widening
+  `prodCsp` in the same change; `duckdbSource.ts` says so at the call.
+
+`Strict-Transport-Security` IS set (`max-age=31536000; includeSubDomains`), with
+no `preload`: preloading is a submission to a browser-maintained list that is
+slow and awkward to leave, and it is a decision about the DOMAIN rather than
+about this deployment.
+
 ## Formatting mandate
 
 Per the workspace mandate, every commit is preceded by a Prettier pass (`pnpm format` / `pnpm format:check`). TS-side commits run Prettier where F#-side commits run Fantomas; both are non-negotiable.

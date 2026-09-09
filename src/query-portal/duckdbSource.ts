@@ -133,6 +133,14 @@ export async function connectDuckDb(source: DuckDbDataSource): Promise<IDuckDbCo
         errorDetail(e),
     );
   }
+  // NOTE FOR WHOEVER FIRST WIRES THIS INTO A PAGE: this loads the DuckDB WASM
+  // bundle and its worker from the jsDelivr CDN, and the dual-host production
+  // CSP (`prodCsp` in `vite.config.ts`) names no CDN at all. Nothing ships this
+  // module today, so the policy is correctly narrow; the moment an entry point
+  // imports it, `script-src` / `connect-src` / `worker-src` must gain the CDN in
+  // the SAME change or the engine source fails at runtime with a console
+  // violation and no build-time signal. `showcaseCsp` already carries jsDelivr
+  // for Pyodide and is the shape to copy.
   const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
   const worker = new Worker(bundle.mainWorker!);
   const logger = new duckdb.ConsoleLogger();
@@ -140,13 +148,29 @@ export async function connectDuckDb(source: DuckDbDataSource): Promise<IDuckDbCo
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
   const connection = await db.connect();
 
-  const table = source.tableName ?? 'data';
+  // Both interpolations below are QUOTED, and by different rules because they
+  // sit in different syntactic positions. Neither value is the reader's — a
+  // source descriptor is configuration — but an unquoted interpolation is
+  // wrong whatever its provenance: a URL with an apostrophe in it produces a
+  // syntax error at best, and a descriptor that later becomes reachable from a
+  // shared link becomes an injection with no code change to notice.
+  //
+  // A string LITERAL escapes by doubling the single quote (SQL's own rule; a
+  // backslash is not an escape character in a standard SQL string).
+  const sqlString = (s: string): string => `'${s.replace(/'/g, "''")}'`;
+  // An IDENTIFIER is a different grammar and needs the other quote: double
+  // quotes, doubled to escape. Using the string rule here would produce a
+  // literal where a name belongs.
+  const sqlIdentifier = (s: string): string => `"${s.replace(/"/g, '""')}"`;
+
+  const table = sqlIdentifier(source.tableName ?? 'data');
+  const url = sqlString(source.url);
   const reader =
     source.kind === 'parquet'
-      ? `read_parquet('${source.url}')`
+      ? `read_parquet(${url})`
       : source.kind === 'csv'
-        ? `read_csv_auto('${source.url}')`
-        : `read_arrow('${source.url}')`;
+        ? `read_csv_auto(${url})`
+        : `read_arrow(${url})`;
   await connection.query(`CREATE OR REPLACE VIEW ${table} AS SELECT * FROM ${reader}`);
 
   return {

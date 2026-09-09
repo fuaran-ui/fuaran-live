@@ -33,90 +33,26 @@ jobs:
       # app project-references ../fuaran-dotnet; the conformance gate reads
       # ../wire-format-fixtures.
       #
-      # fuaran-dotnet is PINNED to an exact ref, and the two siblings are
-      # deliberately pinned differently:
+      # The two are deliberately pinned DIFFERENTLY, and that asymmetry is the
+      # point: the tier is consumed by project reference, so its source is part
+      # of this app's compile and floating it lets an upstream push redden this
+      # repo with no commit here (it did, on 2026-07-27); the corpus is the
+      # shared conformance gate every host certifies against, and pinning it
+      # would reintroduce exactly the drift that giving it one home bought out.
       #
-      #   - The F# tier is consumed by PROJECT REFERENCE, so its source is part
-      #     of this app's compile. Floating on its default branch meant any
-      #     upstream push could redden this repo with no commit here — which is
-      #     what happened on 2026-07-27, when Phase 330 added a required
-      #     RenderContext field and all six workflows failed on a CI-only
-      #     commit. An exact ref turns that into a deliberate bump: raise the
-      #     ref, fix what the new contract needs, land it in one reviewed
-      #     change.
-      #   - The corpus stays UNPINNED on purpose. It is the shared conformance
-      #     gate every host certifies against, and the whole point of giving it
-      #     one home is that all hosts see the same current spec. Pinning it
-      #     would reintroduce exactly the drift that split bought out.
-      #
-      # The ref is a RELEASE TAG again, which is where this pin was always
-      # meant to end up. The history is worth keeping, because it explains why
-      # a tag is not automatically the more rigorous choice:
-      #
-      #   Phases 692-694 flattened NodeKind and reshaped the authoring surface
-      #   (TextSource, NodeId, SemanticStyle, SelectOption). This repo adopted
-      #   that contract while no release tag carried it — v0.6.0 was the newest
-      #   and PREDATED the change — so a tag pin named a contract the source no
-      #   longer targeted, and every workflow compiled the migrated app against
-      #   the old types. The pin moved to a commit SHA, which is at least as
-      #   deliberate as a tag (a tag can be moved; a SHA cannot), on the stated
-      #   intent of returning to a tag once the tier cut a release carrying the
-      #   flattened NodeKind.
-      #
-      # That release exists, so this is that return. v0.12.0 post-dates the
-      # flattening and its tree is one test-only commit ahead of the SHA the
-      # pin previously named (which was the 0.12.0 version-bump commit, not the
-      # tagged one) — so the contract this repo compiles against is unchanged
-      # by the switch.
-      #
-      # To bump: raise the ref in all six workflows together (grep the ref).
+      # Full rationale, the bump procedure, and why a tag was NOT automatically
+      # the more rigorous choice here: docs/tier-pin.md.
       - uses: actions/checkout@v4
         with:
+          # The language-tier pin. Only the SHOWCASE project checks this tier out
+          # (the playground consumes published packages), so this ref decides which
+          # tier contracts app/showcase/ compiles against. Bumping it is a
+          # SOURCE-AFFECTING act, not housekeeping, and it moves in all six
+          # workflows together with the showcase migration in the same commit.
+          # Rationale, procedure and the per-release history: docs/tier-pin.md.
+          # The corpus checkout stays unpinned deliberately — it is the shared
+          # conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          # The PLAYGROUND project no longer project-references this repo at
-          # all: it consumes the language tier as published nuget.org packages at
-          # its own pin. So this checkout serves the SHOWCASE project alone, and
-          # this ref decides which tier contracts that project compiles against —
-          # a pin in every sense the package pins are, spelled as a git ref.
-          #
-          # It was a bare commit SHA from Phase 761 until this bump, for a reason
-          # that has now expired: the showcase had adopted contracts postdating
-          # every released tag, so no tag could compile it, and the note here said
-          # to return to a tag once the tier cut a release carrying them. v0.75.0
-          # is that release.
-          # Raised to v0.78.0 on 2026-09-08, with the package pins in
-          # app/FuaranLive.fsproj and app/showcase/Showcase.fsproj: that release
-          # widens Action.Navigate to a (TextSource, NavigateTarget) pair, adds a
-          # required Node.visible, adds SwitchCase.when while making its match
-          # optional, and adds RenderContext.CustomHashFloor -- every one of which
-          # the showcase source now names. It also carries the Fable
-          # dynamic-Huffman inflate fix the teleport receiver needs to accept a
-          # bundle any standard deflater produced, and the print-break,
-          # node-tooltip and upload-sink members.
-          # Raised again to v0.78.1 the same day, and that one is not a widening: the
-          # renderer's resume path named a wire type its Fable-only arm never opened,
-          # so v0.78.0 built for .NET and failed to Fable-compile for every consumer
-          # of it -- this repo among them, through both the packaged playground copy
-          # and the project-referenced showcase copy. The showcase checks THIS tier
-          # out, so the ref is what carries the fix here.
-          # Raised to v0.79.0 on 2026-09-09 (Phase 1627), the tier's first deliberately
-          # BREAKING release in some time: RenderContext gains a required Csp field, so
-          # every full-literal construction of it in app/showcase/ stops compiling. That
-          # is the source-affecting cost this comment warns about, arriving in full --
-          # which is why the four `Csp = Csp.Permissive` assignments land in the SAME
-          # commit as this ref. They cannot be split: the field assignment alone fails
-          # against a sibling checked out at v0.78.1, where RenderContext has no such
-          # field, and the ref alone fails once the field is required. Permissive is the
-          # tier's own canonical default and emits byte-identical output, so the
-          # showcase's rendered bytes do not move.
-          #
-          # A tag is immutable, so this is no less deliberate than the SHA it
-          # replaces. Bumping it is a SOURCE-AFFECTING act rather than a
-          # housekeeping one: a tier release that widens a record breaks every
-          # full-literal construction of it in app/showcase/, which is what the
-          # move off the SHA cost here.
-          #
-          # To bump: raise the ref in all six workflows together (grep the ref).
           ref: v0.79.0
           path: fuaran-dotnet
 

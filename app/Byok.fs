@@ -78,6 +78,20 @@ let browserEffectPorts: EffectPorts =
       member _.WriteToClipboard(text) =
         emitJsStatement text "navigator.clipboard && navigator.clipboard.writeText($0)"
 
+      // The revoke is DEFERRED to a later task, not called on the next line.
+      // `click()` on a detached anchor starts the download asynchronously, and
+      // Firefox has been observed to abort a download whose object URL was
+      // revoked in the same synchronous block — the browser has not finished
+      // reading the blob when the handle it is reading through disappears.
+      // Chromium tolerates it, which is why the synchronous form survives in a
+      // great deal of sample code and why this needs a comment rather than
+      // looking like an oversight.
+      //
+      // Revoking is still MANDATORY: the blob is held in memory for the life of
+      // the document otherwise, and this playground downloads repeatedly in one
+      // session. `setTimeout` rather than a microtask, because a microtask
+      // drains before the browser yields and would be no later than the current
+      // line in the only sense that matters here.
       member _.Download(filename, contents, mime) =
         emitJsStatement
           (contents, mime, filename)
@@ -85,7 +99,7 @@ let browserEffectPorts: EffectPorts =
                  const __url = URL.createObjectURL(__blob);
                  const __a = document.createElement('a');
                  __a.href = __url; __a.download = $2; __a.click();
-                 URL.revokeObjectURL(__url);"
+                 setTimeout(function(){ URL.revokeObjectURL(__url); }, 30000);"
 
       member _.Warn(message) =
         emitJsStatement message "console.warn('[fuaran-live]', $0)"
@@ -299,6 +313,25 @@ let browserHttpTransport: IHttpTransport =
 // loop holds. `objToJson` round-trips through the host JSON engine (the same
 // engine `JsonHost.parse` bridges to) so any obj re-enters the canonical model.
 
+/// Keys that must never be written through `createObj`.
+///
+/// `createObj` builds its object by ASSIGNING each key, so a member named
+/// `__proto__` does not become a property — it REPLACES the prototype of the
+/// object being built. The members here are model-supplied (they arrive as a
+/// tool call's `input`), so a model that emits `{"__proto__": {...}}` gets to
+/// choose the prototype of a value the dispatcher then reads properties off.
+/// That is prototype pollution scoped to one object rather than to
+/// `Object.prototype`, which is milder than the classic form and is still the
+/// model deciding what an absent property resolves to.
+///
+/// Skipping is the right answer rather than refusing the whole conversion: the
+/// wire model has no such member, so a document carrying one is not saying
+/// anything this bridge can honour, and dropping the pair leaves every other
+/// member of a legitimate tool call intact. `constructor` and `prototype` are
+/// ordinary assignable properties here and are deliberately NOT skipped — they
+/// shadow nothing on a fresh object literal.
+let private forbiddenObjKeys = set [ "__proto__" ]
+
 let rec private jsonToObj (v: JsonValue) : obj =
   match v with
   | JNull -> null
@@ -306,7 +339,11 @@ let rec private jsonToObj (v: JsonValue) : obj =
   | JNumber n -> box n
   | JString s -> box s
   | JArray items -> box (items |> List.map jsonToObj |> List.toArray)
-  | JObject members -> createObj [ for k, value in members -> k, jsonToObj value ]
+  | JObject members ->
+    createObj
+      [ for k, value in members do
+          if not (forbiddenObjKeys.Contains k) then
+            k, jsonToObj value ]
 
 let private objToJson (o: obj) : JsonValue =
   match JsonHost.parse (JS.JSON.stringify o) with

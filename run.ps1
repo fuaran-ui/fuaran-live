@@ -81,6 +81,13 @@ try {
     # restored. Cheap + idempotent once the manifest is in place.
     Write-Host "=== dotnet tool restore (Fable) ===" -ForegroundColor Cyan
     dotnet tool restore
+    # Checked, unlike every other step here — `dotnet` is invoked directly rather
+    # than through `Invoke-Pnpm`, which throws on a non-zero exit of its own. A
+    # failed restore leaves no Fable tool, so the next step fails several minutes
+    # later with a "command not found" that names the symptom and not the cause.
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet tool restore failed with exit code ${LASTEXITCODE} — the Fable tool is not available, so the app cannot compile."
+    }
 
     if (-not $SkipInstall) {
         Write-Host "=== pnpm install ===" -ForegroundColor Cyan

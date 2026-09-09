@@ -11,7 +11,8 @@
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Content-Security-Policy": "frame-ancestors 'self'",
-    "X-Frame-Options": "SAMEORIGIN"
+    "X-Frame-Options": "SAMEORIGIN",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
   },
   "mimeTypes": {
     ".json": "application/json"

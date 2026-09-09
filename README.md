@@ -10,7 +10,7 @@ It is the thirty-second, no-login companion to the language: the interactive pro
 
 Three panes, all in the browser:
 
-1. **Conversation** — you chat with the model using your own key (Claude day one). The key is held in the tab only.
+1. **Conversation** — you chat with the model using your own key (Claude, GPT, Gemini, Kimi or Grok). The key is held in the tab only.
 2. **Live preview** — the emitted `Fuaran.UI` tree, rendered via [`@fuaran-ui/renderer`](https://github.com/fuaran-ui/fuaran-ts).
 3. **Inspector** — a dropdown toggling the **canonical wire JSON** and the **TreeOp stream** that built the current tree, both live.
 
@@ -124,7 +124,7 @@ npx @azure/static-web-apps-cli deploy ./dist-showcase \
 
 - **Client-only interactivity.** Emitted UIs render and are explorable, but server-backed forms / data fetches are inert — closures don't cross the wire (by design; see the wire-format spec).
 - **Ephemeral session.** The tree, op stream, and conversation are held in browser memory and cleared on reload.
-- **Claude day one.** Other providers layer on later behind the same `IAIProvider` seam.
+- **No provider negotiation.** Five providers are wired behind the `IAIProvider` seam (Claude, GPT, Gemini, Kimi, Grok) and you pick one per session; the app does not fail over, retry against another, or compare them.
 
 ## License
 

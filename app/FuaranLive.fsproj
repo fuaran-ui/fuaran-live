@@ -76,7 +76,35 @@
          Apache-2.0 wire layer (Apache-2.0 §4(b)): the sources were renamed
          into this single namespace and reformatted to this repo's F# style.
          Treat them as a maintained fork, not upstream code — a fix made
-         here is a fix made to this copy alone. -->
+         here is a fix made to this copy alone.
+
+         FOUR OF THESE EIGHT HAVE NO CALLER, and it is a decision rather than
+         an oversight that they are still compiled. `Streaming.fs`,
+         `ErrorClassifier.fs`, `RetryPolicy.fs` and `RetryRunner.fs` are
+         referenced from nowhere outside this directory (the other four —
+         JsonValue, JsonHost, Contract, IHttpTransport — carry the provider
+         substrate `Byok.fs` is written against).
+
+         The question that reached this comment was whether to wire
+         `RetryRunner` through the BYOK transport instead, and the answer is
+         NO, for a reason about this app rather than about the code:
+
+           * The transport already classifies the case retry exists for —
+             `Byok.fs` maps a 429 to `RateLimit` itself — so the classification
+             is present in the shape the app actually uses.
+           * Retrying automatically spends the READER'S OWN KEY, and they are
+             the only party who can weigh that. Surfacing a rate limit to the
+             person holding the key is the deliberate behaviour, not a gap.
+           * `Streaming.fs` is the largest untrusted-input parser in this copy
+             (provider SSE framing), and carrying an unused parser means owning
+             prompt security ports for something nothing runs.
+
+         So these four are slated for REMOVAL, not adoption. They are still
+         here because deleting them is one coordinated change-set with the
+         drift procedure that enumerates this copy's file map — landing half of
+         it leaves that procedure checking files that do not exist, which is a
+         worse state than the one it replaces. Do not "fix" this by wiring
+         `RetryRunner` in; do not delete them without the other half. -->
     <Compile Include="vendor\aiwire\JsonValue.fs" />
     <Compile Include="vendor\aiwire\JsonHost.fs" />
     <Compile Include="vendor\aiwire\Contract.fs" />

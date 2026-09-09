@@ -39,11 +39,54 @@ module Fuaran.Live.A11yWalk
 //     `Exe`, and — unlike `Fuaran.UI` / `Fuaran.UI.Ops` / the renderer core —
 //     packs no `fable/` sources. It cannot run in a browser, and even if it
 //     could there is no F# source here to walk: the playground's trees arrive
-//     as wire JSON from a model. The Fable-safe RUNTIME validator
-//     (`Fuaran.UI.PreEmitValidate`, which the property panel already gates
-//     every edit on) carries no accessibility rules at all.
+//     as wire JSON from a model.
 //     So the three checks below are re-derived over the DECODED TREE, each
 //     grounded in a real surface, and each says which.
+//
+//  ── STALE CLAIM, CORRECTED (2026-09-09) ────────────────────────────────────
+//
+//  This block used to end by saying the Fable-safe RUNTIME validator
+//  (`Fuaran.UI.PreEmitValidate`, which the property panel already gates every
+//  edit on) "carries no accessibility rules at all". THAT IS NO LONGER TRUE.
+//  It carries three:
+//
+//    · `MissingAccessibleName`        — FUARAN109 (Warning)
+//    · `DanglingAccessibilityReference` — FUARAN110 (Warning)
+//    · `EmptyAccessibilityDeclaration`  — FUARAN111 (Warning)
+//
+//  A header that asserts a surface does not exist is worse than one that says
+//  nothing, because it is the thing a reader checks INSTEAD of looking — so it
+//  is corrected here even though the consuming swap has not landed.
+//
+//  ── The mapping, DECIDED (2026-09-09) ──────────────────────────────────────
+//
+//  Two of the three checks below map cleanly onto shipped rules and should be
+//  swapped onto them: `A11Y-NAME` -> FUARAN109, `A11Y-REF` -> FUARAN110. That
+//  swap also retires the hand `interactiveKinds` list and its source-lock test,
+//  since the validator reads `Defaults.Accessibility.*` directly rather than
+//  restating it.
+//
+//  `A11Y-TEXT` DOES NOT MAP, and it is KEPT. It looks like FUARAN111 and is a
+//  different check on a different subject:
+//
+//    · FUARAN111's subject is the ACCESSIBILITY TRAIT — a slot the node
+//      DECLARES and leaves empty (`accessibility.label` bound to a static
+//      empty string, or a `labelledBy` / `describedBy` naming one). Its whole
+//      argument is that a declared-and-empty slot SILENCES FUARAN109.
+//    · `A11Y-TEXT`'s subject is the KIND'S OWN CONTENT — a field the wire
+//      schema lists in that kind's `required` array, holding the empty string.
+//      A `Button` whose `label` is `""` renders blank; nothing about its
+//      accessibility trait is involved, and FUARAN111 is silent on it.
+//
+//  So the two do not overlap in subject, only in intent, and mapping one onto
+//  the other would DELETE the content check while appearing to preserve it.
+//
+//  The alternative the question posed — move `A11Y-TEXT` into the validator as
+//  a rule of its own — is also rejected, for a reason that will not change: the
+//  check is driven by the canonical JSON Schema's per-kind `required` array,
+//  read at runtime through `Agent.getKindSchema`. The validator has no schema
+//  document; this lens does. A rule cannot be moved to a place that cannot
+//  answer the question it asks.
 //   · WHICH kinds are interactive (`interactiveKinds`). The language states
 //     this — every smart constructor in `Fuaran.fs` passes a per-kind
 //     `Defaults.Accessibility.*` — but it states it as one value per call site,

@@ -484,16 +484,18 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
 //   * `Binding_float` at `LabelValueRow.value`, `Metric.value`,
 //     `Progress.fraction`. These emit `{"$type":"Query","name":"Name"}`, not a
 //     `Static` — and the same required-key edit is why. A float payload is
-//     encoded `anyOf [number, the non-finite sentinel enum]`, which this walker
-//     does not synthesise (it reads `allOf` and `oneOf` and stops there), so
-//     requiring `value` makes the whole `Static` branch unsynthesisable and the
-//     `oneOf` walk moves on to the next legal arm instead of emitting a shape
-//     the decoder refuses. A required key that is unfillable is worth more here
-//     than an optional one that is fillable wrongly.
+//     encoded `anyOf [number, the non-finite sentinel enum]`. Until Phase 1652
+//     the walker read `allOf` and `oneOf` and stopped, so requiring `value` made
+//     the whole `Static` branch unsynthesisable and the `oneOf` walk moved on to
+//     the next legal arm instead of emitting a shape the decoder refuses. The
+//     walker reads `anyOf` now, and these three still emit `Query`: the `oneOf`
+//     walk reaches `Query` first and takes it, which is the same behaviour by a
+//     different route. A required key that is unfillable is worth more here than
+//     an optional one that is fillable wrongly.
 //
-// The three kinds this walker still cannot shape AT ALL are pinned separately
-// below: they never reached this set, because a kind that yields no wire at all
-// is filtered out before the drop is measured.
+// The kinds this walker cannot shape AT ALL are pinned separately below: they
+// never reach this set, because a kind that yields no wire at all is filtered
+// out before the drop is measured. That set is empty too, since Phase 1652.
 const UNDECODABLE_SYNTHESIS = new Set<string>([]);
 
 // The kinds the walker cannot shape at all — `defaultWireFor` returns `''`, so
@@ -503,15 +505,23 @@ const UNDECODABLE_SYNTHESIS = new Set<string>([]);
 // both read as absent. With both sets pinned, a kind can only move between
 // offered / undecodable / unshapeable by a deliberate edit here.
 //
-// All three fail for ONE reason, and it is the `anyOf` named above: a float is
-// encoded `anyOf [number, the non-finite sentinel enum]`, and at a REQUIRED
-// position with no enclosing union there is no other branch to fall to.
-// `Drawing` reaches it through `ViewBox`'s four coordinates, `Map` through
-// `centreLatitude` / `centreLongitude`, `SplitPanel` through `weight`. Teaching
-// the walker `anyOf` would very likely empty this set too — it is a walker gap
-// rather than a schema one, which is the opposite of what emptied the set above,
-// and so is its own change with its own evidence.
-const UNSHAPEABLE_SYNTHESIS = new Set(['Drawing', 'Map', 'SplitPanel']);
+// EMPTY since Phase 1652, and the three that used to be here are worth naming
+// because of what emptied them. `Drawing` (through `ViewBox`'s four
+// coordinates), `Map` (through `centreLatitude` / `centreLongitude`) and
+// `SplitPanel` (through `weight`) all failed for ONE reason: a float is encoded
+// `anyOf [number, the non-finite sentinel enum]`, and at a REQUIRED position
+// with no enclosing union there was no other branch to fall to. The walker read
+// `allOf` and `oneOf` and stopped, so the keyword their schema happened to use
+// was simply invisible to it.
+//
+// A WALKER gap, then — the opposite class from the schema gap that emptied the
+// set above, and the distinction is the reusable part: the palette was declining
+// to offer three kinds that were perfectly shapeable, and nothing said so,
+// because "the walk returned nothing" and "this kind cannot be built" are the
+// same observation from outside. That is what this pin exists to tell apart, and
+// it now does the work in the other direction: with both sets empty, any kind
+// the walker stops shaping fails here by name.
+const UNSHAPEABLE_SYNTHESIS = new Set<string>([]);
 
 describe('the synthesised defaults are strictly decodable and normalisation-stable', () => {
   // The subject is what the palette OFFERS, not everything the walker can shape.

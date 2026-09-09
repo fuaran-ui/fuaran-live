@@ -92,12 +92,13 @@ paper's §5.2 study, roadmap Phase 27.B). Keeping the live demo and the controll
 eval on the _same_ baseline is load-bearing: a visitor sees the identical
 baseline the aggregate numbers were measured against, not a strawman authored to
 flatter Fuaran. If that baseline prompt changes, the copy in
-[`src/compare/conventionalPrompt.ts`](../src/compare/conventionalPrompt.ts) must
-be re-synced — the comparison is only honest while the two are identical.
+[`app/Compare.fs`](../app/Compare.fs)'s `conventionalPrompt` must be re-synced — the comparison is only honest while the two are identical.
 
 ## See also
 
 - The Fuaran paper (workspace `publications/`) — §5.2 for the aggregate
   Fuaran-vs-baseline numbers this pane is the anecdotal companion to.
-- [`src/compare/`](../src/compare/) — the dual-emission flow, token accounting,
-  and validity checks.
+- [`app/Compare.fs`](../app/Compare.fs) — the dual-emission flow, token
+  accounting, and validity checks. (It was `src/compare/*.ts` until the app moved
+  to F#/Fable; this document's own pointers outlived the move, which is why they
+  are named here rather than silently corrected.)

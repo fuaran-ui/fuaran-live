@@ -99,6 +99,16 @@ jobs:
           # of it -- this repo among them, through both the packaged playground copy
           # and the project-referenced showcase copy. The showcase checks THIS tier
           # out, so the ref is what carries the fix here.
+          # Raised to v0.79.0 on 2026-09-09 (Phase 1627), the tier's first deliberately
+          # BREAKING release in some time: RenderContext gains a required Csp field, so
+          # every full-literal construction of it in app/showcase/ stops compiling. That
+          # is the source-affecting cost this comment warns about, arriving in full --
+          # which is why the four `Csp = Csp.Permissive` assignments land in the SAME
+          # commit as this ref. They cannot be split: the field assignment alone fails
+          # against a sibling checked out at v0.78.1, where RenderContext has no such
+          # field, and the ref alone fails once the field is required. Permissive is the
+          # tier's own canonical default and emits byte-identical output, so the
+          # showcase's rendered bytes do not move.
           #
           # A tag is immutable, so this is no less deliberate than the SHA it
           # replaces. Bumping it is a SOURCE-AFFECTING act rather than a
@@ -107,7 +117,7 @@ jobs:
           # move off the SHA cost here.
           #
           # To bump: raise the ref in all six workflows together (grep the ref).
-          ref: v0.78.1
+          ref: v0.79.0
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4

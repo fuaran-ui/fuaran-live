@@ -13,12 +13,22 @@
 # the only honest place to resolve them — see `resolve_construct` below and the
 # construct-token grammar in `python.test.ts`.
 #
+# And it REPORTS THE HOST ITSELF (Phase 1582): its version, and its published
+# capability manifest when the installed release carries a generator for one
+# (WIRE_FORMAT.md §27). Both come from the interpreter that executes the corpus,
+# for the same reason the construct probes do — a manifest read from anywhere
+# else would describe a host this arm is not running. A release with no generator
+# reports `capabilityManifest: null` with the import error, which is a fact about
+# the pin and not a failure.
+#
 # stdin :  {"cases": [{"id": "...", "expr": "..."}, ...],
 #           "constructs": ["t.Drawing", "Column.field_name", ...]}
 # stdout:  {"results": [{"id": "...", "ok": true, "encoded": "..."} |
 #                       {"id": "...", "ok": false, "error": "..."}, ...],
 #           "constructs": {"t.Drawing": {"models": false, "detail": "..."} |
-#                          {"error": "..."}, ...}}
+#                          {"error": "..."}, ...},
+#           "host": "fuaran-py", "hostVersion": "0.4.0",
+#           "capabilityManifest": {...} | null, "capabilityError": "..." | null}
 #
 # Nothing here decides conformance — the comparison against the wire fixture, and
 # the verdict on a quarantine entry, are the vitest arm's job. This process only
@@ -129,6 +139,37 @@ def resolve_construct(token: str, modules: dict[str, object]) -> dict[str, objec
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
+def host_declaration() -> dict[str, object]:
+    """This interpreter's identity and its published capability manifest (WIRE_FORMAT §27).
+
+    The version is read from the imported package rather than from the installer's metadata, so
+    what is reported is the release whose code is about to author the corpus. A release that
+    predates the generator is reported as `capabilityManifest: null` with the import error in
+    `capabilityError` — the harness turns that into a named fallback, never into a failure.
+    """
+    declaration: dict[str, object] = {
+        "host": "fuaran-py",
+        "hostVersion": None,
+        "capabilityManifest": None,
+        "capabilityError": None,
+    }
+    try:
+        import fuaran_py
+
+        declaration["hostVersion"] = getattr(fuaran_py, "__version__", None)
+    except Exception as exc:  # pragma: no cover — the fatal import above already reported it
+        declaration["capabilityError"] = f"{type(exc).__name__}: {exc}"
+        return declaration
+
+    try:
+        from fuaran_py.conformance import host_capability
+
+        declaration["capabilityManifest"] = host_capability.build()
+    except Exception as exc:
+        declaration["capabilityError"] = f"{type(exc).__name__}: {exc}"
+    return declaration
+
+
 def main() -> int:
     # The corpus carries astral-plane text, and on Windows the default stdio
     # codec is the ANSI code page — which mangles it silently, in BOTH
@@ -152,7 +193,10 @@ def main() -> int:
         from fuaran_py.schema import types as t  # noqa: F401
         from fuaran_py.ui import compute as cp  # noqa: F401
     except Exception:  # pragma: no cover — reported to the harness, not raised
-        json.dump({"fatal": "fuaran_py is not importable:\n" + traceback.format_exc()}, sys.stdout)
+        json.dump(
+            {"fatal": "fuaran_py is not importable:\n" + traceback.format_exc(), **host_declaration()},
+            sys.stdout,
+        )
         return 0
 
     # The exact names the projector may emit. Kept explicit rather than
@@ -202,7 +246,7 @@ def main() -> int:
         token: resolve_construct(token, namespace) for token in batch.get("constructs", [])
     }
 
-    json.dump({"results": results, "constructs": constructs}, sys.stdout)
+    json.dump({"results": results, "constructs": constructs, **host_declaration()}, sys.stdout)
     return 0
 
 

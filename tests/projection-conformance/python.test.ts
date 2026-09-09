@@ -41,6 +41,16 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { projectPythonExpr } from '../../app/output/Projection.js';
 
 import { entriesFor, registerQuarantineChecks, type ConstructVerdict } from './quarantine';
+import {
+  computeExpectedUnmodelled,
+  deriveTokens,
+  resolveManifest,
+  staleResiduals,
+  type HostDeclaration,
+  type Idl,
+  type ManifestResolution,
+  type Residual,
+} from './host-capability';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '../..');
@@ -91,6 +101,85 @@ const resolvePython = (): string => {
 // `fuaran-py` the named construct and raising the pin; the falsifier below is what
 // stops an entry outliving the gap it names.
 const pyQuarantine = entriesFor('python');
+
+// -- The §27 capability manifest (Phase 1582) --------------------------------
+//
+// The membership question — "which fixtures can this host not be expected to
+// reproduce?" — is asked of the HOST rather than of a list, when the host answers.
+// Three steps, all at module scope because the answer decides which fixtures are
+// registered as required round-trips:
+//
+//   1. ask the executing interpreter what it is and what it publishes. A separate,
+//      cheap spawn from the corpus run below: that one evaluates 200-odd projected
+//      expressions, and this one must have finished before any `it` is registered.
+//   2. derive what each fixture exercises, by walking it against the corpus IDL.
+//   3. resolve the manifest against the version actually executing (§27.4 rule 5)
+//      and, when it binds, compute the expected set. Otherwise fall back to the
+//      shared table — the pre-manifest path, named rather than silent.
+//
+// The pinned release publishes no manifest today, so step 3 falls back and this
+// arm behaves exactly as it did. What the code buys now is that the day the pin
+// moves to a release that DOES publish one, the answer stops being a list.
+
+const probeHostDeclaration = (): HostDeclaration => {
+  try {
+    const proc = spawnSync(resolvePython(), [resolve(here, 'python_exec.py')], {
+      input: JSON.stringify({ cases: [], constructs: [] }),
+      encoding: 'utf8',
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    if (proc.error || proc.status !== 0) return {};
+    return JSON.parse(proc.stdout) as HostDeclaration;
+  } catch {
+    // A host this arm cannot even ask is reported by `the Python executor ran`,
+    // loudly. Here it is simply an absent answer, and the fallback covers it.
+    return {};
+  }
+};
+
+const idlPath = resolve(corpusDir, 'idl.json');
+const idl: Idl | undefined = existsSync(idlPath)
+  ? (JSON.parse(readFileSync(idlPath, 'utf8')) as Idl)
+  : undefined;
+
+const tokensByFixture = new Map<string, ReadonlySet<string>>(
+  idl === undefined
+    ? []
+    : nodeFixtures.map((f) => [
+        f.id,
+        deriveTokens(JSON.parse(readFileSync(resolve(corpusDir, f.inputFile), 'utf8')), idl),
+      ]),
+);
+
+const hostDeclaration = probeHostDeclaration();
+const manifestResolution: ManifestResolution =
+  idl === undefined
+    ? {
+        mode: 'fallback',
+        reason: `the corpus at ${corpusDir} carries no idl.json to derive against`,
+      }
+    : resolveManifest(hostDeclaration);
+
+/** The residuals this arm declares — entries standing on a claim no manifest makes. */
+const residuals: Residual[] = [...pyQuarantine]
+  .filter(([, entry]) => entry.residual !== undefined)
+  .map(([id, entry]) => ({ id, ...entry.residual! }));
+
+const computedUnmodelled =
+  manifestResolution.mode === 'computed'
+    ? computeExpectedUnmodelled(manifestResolution.manifest, tokensByFixture)
+    : undefined;
+
+/**
+ * The fixtures held aside — computed where a manifest speaks, and the shared
+ * table where none does. Under a manifest the declared residuals join the
+ * computed set, because §27.4 rule 2 leaves exactly that hole and rule 6 is how
+ * it is filled without re-growing a list.
+ */
+const heldAside: ReadonlySet<string> =
+  computedUnmodelled === undefined
+    ? new Set(pyQuarantine.keys())
+    : new Set([...computedUnmodelled.keys(), ...residuals.map((r) => r.id)]);
 
 interface ExecResult {
   readonly id: string;
@@ -165,9 +254,11 @@ describe('Python projection conformance (Node corpus)', () => {
   });
 
   for (const f of nodeFixtures) {
-    // A quarantined fixture's falsifier and self-clearing checks are registered
+    // A held-aside fixture's falsifier and self-clearing checks are registered
     // from the shared table below; only the required byte round-trip is left here.
-    if (pyQuarantine.has(f.id)) continue;
+    // Membership is the COMPUTED set when a manifest binds, and the shared table
+    // otherwise — see the §27 block at the top of this file.
+    if (heldAside.has(f.id)) continue;
 
     it(`${f.id} round-trips byte-identically`, () => {
       const result = executed.get(f.id);
@@ -207,4 +298,87 @@ registerQuarantineChecks({
     return result?.ok === true ? { ok: true, encoded: result.encoded } : { ok: false };
   },
   blocked: () => fatal,
+});
+
+// -- The capability manifest's own checks (Phase 1582, WIRE_FORMAT §27) ------
+//
+// Four, and the first runs on every path: it PRINTS which of the two answers this
+// run used and why, in the test name, so a reader never has to infer whether the
+// membership above was computed or listed. That is the same reasoning the census
+// test's generated name follows — a fact in a name is read; a fact in a comment
+// decays.
+
+/**
+ * Whether a fixture genuinely round-trips: EXECUTED and byte-identical.
+ *
+ * The distinction is not pedantic and was found by running this arm against a
+ * host that publishes a manifest. The projector degrades a construct it cannot
+ * spell to a well-formed stand-in — `binding.static(None)` where the fixture
+ * carries `Binding.Expr` — so the generated source executes perfectly and encodes
+ * to bytes that are not the fixture's. A check written on "did it execute" reads
+ * every one of those as a pass, which is precisely the silent-clearing the §27.4
+ * rules exist to make impossible.
+ */
+const roundTrips = (id: string): boolean => {
+  const result = executed.get(id);
+  if (result?.ok !== true) return false;
+  const fixture = pyFixtureById.get(id);
+  if (fixture === undefined) return false;
+  return result.encoded === readFileSync(resolve(corpusDir, fixture.inputFile), 'utf8').trim();
+};
+
+describe(`capability manifest — Python arm (${
+  manifestResolution.mode === 'computed'
+    ? `computed from ${manifestResolution.manifest.host} ${manifestResolution.manifest.hostVersion}`
+    : 'pre-manifest fallback'
+})`, () => {
+  it(`this run used the ${manifestResolution.mode} path${
+    manifestResolution.mode === 'fallback' ? ` — ${manifestResolution.reason}` : ''
+  }`, () => {
+    // Not an assertion about which path is right: the pinned release publishes no
+    // manifest, so the fallback IS the correct outcome today. What must hold is
+    // that the reason is a sentence a reader can act on, naming both versions
+    // where a mismatch is what refused it.
+    if (manifestResolution.mode === 'fallback') expect(manifestResolution.reason).not.toBe('');
+    else expect(manifestResolution.manifest.tokens.length).toBeGreaterThan(0);
+  });
+
+  it('every fixture that fails is one the manifest predicted, or a declared residual', () => {
+    // §27.4 rule 3 — the whole point of computing the set. A shortfall nobody
+    // declared is a failure of THIS repo's projector, not of the host, and it must
+    // fail rather than be absorbed.
+    if (computedUnmodelled === undefined || fatal !== undefined) return;
+    const unexplained = nodeFixtures
+      .filter((f) => !heldAside.has(f.id) && !roundTrips(f.id))
+      .map((f) => `${f.id}: ${executed.get(f.id)?.error ?? 'did not re-encode byte-identically'}`)
+      .sort();
+    expect(
+      unexplained,
+      `these fixtures failed on the Python arm, and ${manifestResolution.mode === 'computed' ? `${manifestResolution.manifest.host} ${manifestResolution.manifest.hostVersion}` : 'the host'} declares it CAN author every construct they exercise — that makes them app/Projection.fs lag, not host lag:\n  ${unexplained.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('every fixture the manifest predicts unmodelled in fact fails', () => {
+    // §27.4 rule 4 — the self-clearing half, computed. A predicted-unmodelled
+    // fixture that round-trips means the manifest under-declares (or the host grew
+    // the construct and the manifest is stale); either is worth a name, and a
+    // silently passing held-aside fixture is how the hand-written list decayed.
+    if (computedUnmodelled === undefined || fatal !== undefined) return;
+    const cleared = [...computedUnmodelled]
+      .filter(([id]) => roundTrips(id))
+      .map(([id, missing]) => `${id} (predicted unmodelled on ${missing.join(', ')})`)
+      .sort();
+    expect(
+      cleared,
+      `these fixtures round-trip although the manifest declares the constructs absent — the host grew them and the manifest is stale, or its generator under-declares:\n  ${cleared.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('no residual entry stands on a claim the manifest now makes', () => {
+    // §27.4 rule 6. The residual exists so an unclaimed family does not become a
+    // silent hole; this is what stops it becoming a hand-written list instead.
+    if (manifestResolution.mode !== 'computed') return;
+    const stale = staleResiduals(manifestResolution.manifest, residuals);
+    expect(stale, `stale residual declaration(s):\n  ${stale.join('\n  ')}`).toEqual([]);
+  });
 });

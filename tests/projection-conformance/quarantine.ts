@@ -122,7 +122,26 @@
 // preference, not an accident: a list is easier to append to than an emitter is to
 // extend, and the previous list decayed for eight days proving it.
 
+// ── WHAT PHASE 1582 CHANGED, AND WHAT IT DID NOT ─────────────────────────────
+//
+// A host that publishes a capability manifest (WIRE_FORMAT.md §27) lets the arm
+// COMPUTE its expected-unmodelled set as corpus-minus-manifest, and this table
+// stops being what decides membership. See `./host-capability.ts`.
+//
+// It is not deleted, for two reasons. The live Python arm executes a PINNED PyPI
+// release that publishes no manifest, so the computed path is dark until that pin
+// moves and this table is the whole answer until then. And even under a manifest,
+// §27.4 rule 2 means a host that declines to claim a family says NOTHING about
+// it — so a fixture whose only gap falls in an unclaimed family is neither
+// computed-unmodelled nor honestly failable, and an entry may stand in for it.
+//
+// Such an entry declares `residual`: the family (and scope key) it relies on
+// being unclaimed. `staleResiduals` fails it the moment the manifest DOES claim
+// that family, which is what stops the residual quietly becoming this table again.
+
 import { describe, expect, it } from 'vitest';
+
+import type { TokenFamily } from './host-capability';
 
 /** Which conformance arm quarantines the fixture. */
 export type Arm = 'typescript' | 'python';
@@ -148,6 +167,15 @@ export interface QuarantineEntry {
    * does not emit. Probed exactly as a `projector` entry's `construct` is.
    */
   readonly projectorConstruct?: string;
+  /**
+   * The §27 RESIDUAL declaration (Phase 1582): the token family — and, where the
+   * family has one, the scope key — this entry relies on a host manifest NOT
+   * claiming. An entry carrying it survives under a live manifest; one without it
+   * is expected to be covered by the computed set, and is reported as stale when
+   * it is not. Setting it is a claim about the MANIFEST's silence, not about the
+   * host, and `staleResiduals` falsifies it the moment that silence ends.
+   */
+  readonly residual?: { readonly family: TokenFamily; readonly scopeKey?: string };
 }
 
 /**
@@ -215,6 +243,12 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         class: 'host',
         reason:
           'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+        // The gap is INSIDE a slot the corpus IDL types as `hosted`, so it lives in
+        // the hostedCases family — which this host cannot derive at all (its compute
+        // layer lowers through an isinstance ladder rather than per-record to_wire).
+        // A manifest therefore says nothing here, and this entry is what stands in
+        // its place until one does.
+        residual: { family: 'hostedCases', scopeKey: 'Binding.Transform.source' },
       },
     ],
   ],
@@ -227,6 +261,12 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         class: 'host',
         reason:
           'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
+        // The gap is INSIDE a slot the corpus IDL types as `hosted`, so it lives in
+        // the hostedCases family — which this host cannot derive at all (its compute
+        // layer lowers through an isinstance ladder rather than per-record to_wire).
+        // A manifest therefore says nothing here, and this entry is what stands in
+        // its place until one does.
+        residual: { family: 'hostedCases', scopeKey: 'Binding.Transform.source' },
       },
     ],
   ],

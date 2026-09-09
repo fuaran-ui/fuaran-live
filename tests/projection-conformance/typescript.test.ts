@@ -340,9 +340,11 @@ describe("the TypeScript arm's construct resolver (Phase 1584)", () => {
   });
 
   it('REFUSES a token it cannot answer, rather than guessing', () => {
-    // An unknown namespace, and the Python arm's `optional:` — a token that
+    // An unknown namespace, and the RETIRED `optional:` prefix — a token that
     // resolved to a shrug would hold an entry vacuously, which is the whole
-    // failure Phase 1578's probes exist to make impossible.
+    // failure Phase 1578's probes exist to make impossible. The second case is
+    // what keeps the retirement enforced: a stale entry carrying the old grammar
+    // must refuse loudly, on this arm and on the Python one alike.
     expect(tsHostModels('noSuchNamespace.thing')).toHaveProperty('error');
     expect(tsHostModels('optional:fuaran.tree')).toHaveProperty('error');
   });

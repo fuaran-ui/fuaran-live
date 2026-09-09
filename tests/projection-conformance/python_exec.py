@@ -11,7 +11,7 @@
 # question the quarantine's reasons make: "does this host model construct X?"
 # The quarantine is a set of claims ABOUT this interpreter, so the interpreter is
 # the only honest place to resolve them — see `resolve_construct` below and the
-# construct-token grammar in `python.test.ts`.
+# construct-token grammar in `quarantine.ts`.
 #
 # And it REPORTS THE HOST ITSELF (Phase 1582): its version, and its published
 # capability manifest when the installed release carries a generator for one
@@ -37,18 +37,11 @@
 from __future__ import annotations
 
 import dataclasses
-import inspect
 import json
 import sys
 import traceback
 import types as pytypes
 import typing
-
-
-def _camel(snake: str) -> str:
-    """`on_change` → `onChange` — a record field's name in the WIRE."""
-    head, *rest = snake.split("_")
-    return head + "".join(p[:1].upper() + p[1:] for p in rest)
 
 
 def _union_cases(obj: object) -> list[str] | None:
@@ -65,29 +58,30 @@ def _union_cases(obj: object) -> list[str] | None:
     return None
 
 
-def _admits_none(owner: type, field: dataclasses.Field) -> bool:
-    hints = typing.get_type_hints(owner)
-    return type(None) in typing.get_args(hints.get(field.name, field.type))
-
-
 def resolve_construct(token: str, modules: dict[str, object]) -> dict[str, object]:
     """Resolve one construct token against the INSTALLED host.
 
     Returns `{"models": bool, "detail": str}` — whether this host carries the
     construct — or `{"error": str}` when the token names nothing resolvable,
     which the harness treats as a failure of the ENTRY rather than as a verdict.
-    The grammar is documented where it is authored, in `python.test.ts`.
+    The grammar is documented where it is authored, in `quarantine.ts`.
     """
     try:
-        optional = token.startswith("optional:")
-        parts = (token[len("optional:") :] if optional else token).split(".")
+        # `optional:` was RETIRED (see the token grammar in `quarantine.ts`): it
+        # asked whether a field admits `None`, which stops discriminating the
+        # moment a host turns a closure sentinel into a bool flag — the field then
+        # exists, cannot be `None`, and the flag omits the wire key perfectly
+        # well. Refused by name rather than parsed as a symbol, so a stale entry
+        # carrying it reads as the retired grammar it is.
+        if token.startswith("optional:"):
+            return {"error": "`optional:` is a retired token — name the construct itself"}
+
+        parts = token.split(".")
         module = modules["t"]
         if parts[0] in modules:
             module, parts = modules[parts[0]], parts[1:]
 
         if len(parts) == 1:
-            if optional:
-                return {"error": "`optional:` needs Owner.field, not a bare symbol"}
             return {"models": hasattr(module, parts[0]), "detail": "symbol"}
         if len(parts) != 2:
             return {"error": "expected Owner.member, got %d segments" % len(parts)}
@@ -95,38 +89,6 @@ def resolve_construct(token: str, modules: dict[str, object]) -> dict[str, objec
         owner = getattr(module, parts[0], None)
         if owner is None:
             return {"error": "no such symbol '%s'" % parts[0]}
-
-        if optional:
-            # "the host can OMIT this slot" — the falsifier a closure-sentinel or
-            # non-optional-default entry needs. Two shapes reach the same wire
-            # outcome and both are covered: a record with NO field for the key
-            # (`TextField`, whose `to_wire` writes `"onChange": CLOSURE`), and a
-            # record whose field is present but cannot be None (`Modal.on_dismiss`,
-            # defaulted to an empty `Chain`). Either way the key is unconditional.
-            if not dataclasses.is_dataclass(owner):
-                return {"error": "'%s' is not a record" % parts[0]}
-            fields = {f.name: f for f in dataclasses.fields(owner)}
-            if parts[1] in fields:
-                return {
-                    "models": _admits_none(owner, fields[parts[1]]),
-                    "detail": "field present; %s"
-                    % (
-                        "admits None"
-                        if _admits_none(owner, fields[parts[1]])
-                        else "cannot be None, so the key is always written"
-                    ),
-                }
-            # No field — so the slot must at least be REACHABLE in the wire, or
-            # the token is a typo rather than a claim. Refusing here is what
-            # stops a misspelled field name from holding an entry vacuously.
-            key = '"%s"' % _camel(parts[1])
-            source = inspect.getsource(owner.to_wire)
-            if key not in source:
-                return {
-                    "error": "'%s' has no field '%s' and its to_wire writes no %s"
-                    % (parts[0], parts[1], key)
-                }
-            return {"models": False, "detail": "no field; to_wire writes %s always" % key}
 
         cases = _union_cases(owner)
         if cases is not None:

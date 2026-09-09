@@ -32,19 +32,19 @@
 //                                  `cp`, `binding`, …); a bare name resolves in `t`.
 //     `Binding.Query`              a CASE of a union alias.
 //     `Chart.annotations`          a FIELD of a record.
-//     `optional:Modal.on_dismiss`  the record can OMIT this slot — the falsifier
-//                                  the closure-sentinel family needs.
 //
 //   TYPESCRIPT (resolved in-process against the pinned `@fuaran-ui/*` packages)
 //     `fuaran.embed`               a member of a factory namespace the evaluated
 //                                  source binds. A bare name resolves in `fuaran`.
 //     `ops.encodeNode`             the same, over the encoder module.
-//   `optional:` is REFUSED on this arm rather than guessed at: the TS tier has no
-//   closure-sentinel shape, because an in-memory object literal is always
-//   available where a constructor drops a slot. A token an arm cannot resolve is
-//   an `{ error }`, which the "every construct token resolves" check turns into a
-//   loud failure — never a silent hold. That refusal is the whole reason the
-//   fourth pass's probes work at all.
+//
+//   There was a third Python spelling, `optional:Owner.field` ("the record can
+//   OMIT this slot"), and it is RETIRED — see lesson 4 below. BOTH arms refuse a
+//   token carrying that prefix, by name, so a stale entry reads as the retired
+//   grammar it is. A token an arm cannot resolve is an `{ error }`, which the
+//   "every construct token resolves" check turns into a loud failure — never a
+//   silent hold. That refusal is the whole reason the fourth pass's probes work
+//   at all.
 //
 // ── WHAT THE MEASUREMENT PASSES ESTABLISHED ──────────────────────────────────
 //
@@ -80,16 +80,21 @@
 //      not carry: `mount-2` read the wire tag `Str` as a class name and reached
 //      for a `t.Str` that has never existed in any release.
 //
-//   4. A PROBE CAN OUTLIVE ITS CAUSE TOO. `optional:` asks whether a field admits
-//      `None`; the moment a host turns a closure sentinel into a BOOL FLAG the
-//      field exists and cannot be `None`, so the probe keeps answering "the host
-//      cannot omit this" while the flag omits the wire key perfectly well. Two
-//      entries held vacuously that way at 0.2.0 (`multiselect-chip-list-param`,
-//      `composite-tabs-panels`) and were caught by the round-trip half, exactly
-//      as the pre-1578 passes were. Teaching `optional:` to read a `bool`-typed
-//      handler field as omittable-by-flag is still open, and still worth doing:
-//      no entry standing today uses that token, so the trap is dormant rather
-//      than fixed.
+//   4. A PROBE CAN OUTLIVE ITS CAUSE TOO — AND THE FIX WAS TO RETIRE IT.
+//      `optional:` asked whether a field admits `None`; the moment a host turns a
+//      closure sentinel into a BOOL FLAG the field exists and cannot be `None`,
+//      so the probe kept answering "the host cannot omit this" while the flag
+//      omitted the wire key perfectly well. Two entries held vacuously that way
+//      at 0.2.0 (`multiselect-chip-list-param`, `composite-tabs-panels`) and were
+//      caught by the round-trip half, exactly as the pre-1578 passes were. The
+//      token is GONE as of 2026-09-09: the closure-sentinel family it served was
+//      emptied at 0.2.0 (family (iii) below), no entry has used it since, and
+//      teaching it to read a `bool`-typed handler field as omittable-by-flag
+//      would have been designing a falsifier for a case with no entry. An entry
+//      that needs this ground names the CONSTRUCT — the record, the field, the
+//      union case — which is what every standing entry already does and what the
+//      round-trip half falsifies directly. Both resolvers refuse the prefix by
+//      name, so the retirement is enforced rather than remembered.
 //
 //   5. AN ENTRY THAT NAMES ONLY THE HALF THAT IS SOMEONE ELSE'S IS HOW THE
 //      PROJECTOR'S OWN LAG GOES UNRECORDED. That is what `class: 'both'` exists
@@ -374,10 +379,7 @@ export type ConstructVerdict = { models: boolean; detail: string } | { error: st
  * id like `'drawing-1'` from reading as an emission of `t.Drawing`.
  */
 export const emissionPattern = (arm: Arm, construct: string): RegExp => {
-  const leaf = construct
-    .replace(/^optional:/, '')
-    .split('.')
-    .pop()!;
+  const leaf = construct.split('.').pop()!;
   const lowercase = /^[a-z]/.test(leaf);
   if (arm === 'python') {
     return lowercase
@@ -404,11 +406,13 @@ export const resolveTypeScriptConstruct = (
   token: string,
   namespaces: Readonly<Record<string, unknown>>,
 ): ConstructVerdict => {
+  // `optional:` was RETIRED from the grammar (see lesson 4 in the header): it
+  // stopped discriminating the moment a host turned a closure sentinel into a
+  // bool flag, and no entry has used it since. Refused by name on BOTH arms —
+  // its Python sibling refuses it identically — so a stale entry carrying the
+  // prefix reads as the retired grammar rather than as a missing symbol.
   if (token.startsWith('optional:'))
-    return {
-      error:
-        '`optional:` is a Python-arm token — the TS tier has no closure-sentinel shape, since an object literal is always available',
-    };
+    return { error: '`optional:` is a retired token — name the construct itself' };
   const parts = token.split('.');
   if (parts.length > 2)
     return { error: `expected [namespace.]symbol, got ${parts.length} segments` };

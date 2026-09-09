@@ -74,7 +74,9 @@ vite.config.ts.timestamp-*
 
 # The Python conformance arm's local interpreter (see
 # tests/projection-conformance/python.test.ts). Created with
-# `python -m venv .venv` then `pip install fuaran-py==0.3.0`.
+# `python -m venv .venv` then `pip install fuaran-py==0.4.0` — the pin the
+# workflows install and `docs/PROJECTION_FIDELITY.md` documents; keep the three
+# in step, since the arm executes against exactly that release.
 .venv/
 __pycache__/
 

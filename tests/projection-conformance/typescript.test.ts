@@ -24,15 +24,30 @@ import { dirname, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { encodeNode } from '@fuaran-ui/ops';
-// `filterKind` was imported here until 2026-08-30 and no longer exists in
-// `@fuaran-ui/ui`. Nothing broke, which is the hazard worth naming: vitest
-// transpiles via esbuild, so a missing named export resolves to `undefined`
-// and is passed into the evaluated source as a silently dead binding rather
-// than a load error. Only strict Node ESM refuses it. Keep this list to names
-// the projector actually emits.
-import { fuaran, binding, action, format, formFieldKind, nodeId, iconSource } from '@fuaran-ui/ui';
+// Namespace imports rather than named ones, since Phase 1584: the shared
+// quarantine's TypeScript construct resolver answers "does the pinned host model
+// X?" by looking a symbol up on these surfaces, and it can only do that honestly
+// if it holds the whole module rather than the handful of names destructured
+// below. `filterKind` was a named import here until 2026-08-30 and no longer
+// exists in `@fuaran-ui/ui` — nothing broke, which is the hazard worth naming:
+// vitest transpiles via esbuild, so a missing export resolves to `undefined` and
+// is passed into the evaluated source as a silently dead binding rather than a
+// load error. Only strict Node ESM refuses it. Keep the destructured list to
+// names the projector actually emits.
+import * as ops from '@fuaran-ui/ops';
+import * as ui from '@fuaran-ui/ui';
 import type { Node } from '@fuaran-ui/schema';
+
+import {
+  emissionPattern,
+  entriesFor,
+  registerQuarantineChecks,
+  resolveTypeScriptConstruct,
+  type ConstructVerdict,
+} from './quarantine';
+
+const { encodeNode } = ops;
+const { fuaran, binding, action, format, formFieldKind, nodeId, iconSource } = ui;
 
 // Fable-generated JS — no .d.ts; vitest runs it via esbuild (no typecheck).
 // @ts-expect-error untyped Fable output
@@ -80,82 +95,21 @@ const evalExpr = (expr: string): Node<unknown> => {
   ) as Node<unknown>;
 };
 
-// Quarantine — EMPTY as of 2026-08-30, and the empty set is the assertion.
-// Every node-round-trip fixture in the corpus is now required to re-encode
-// byte-identically, so a projector that falls behind the corpus fails here by
-// name rather than being absorbed into a list.
-//
-// It held 47 ids the day before, under two stated causes. Both are closed, and
-// the split between them is worth keeping because it was not knowable until the
-// pins moved — the previous note said so explicitly, and separating them was
-// the first thing this pass did:
-//
-//   1. PACKAGE DRIFT — 2 ids. package.json pinned every @fuaran-ui/*
-//      dependency at ^0.9.0 while the registry served eight to ten minor
-//      versions newer. Raising the pins alone fixed `drawing-nonfinite-
-//      sentinels` and `spark-nonfinite-sentinel` and nothing else, which is a
-//      far smaller share than the note's masonry example implied.
-//   2. PROJECTOR VOCABULARY LAG — the other 45, taught in app/Projection.fs.
-//      The largest single cause was not a missing slot but a MOVED contract:
-//      `Binding.Transform.source` became a `TransformSource` DU (Data | Live),
-//      and the projector still emitted a bare `DataSource`, which crashed the
-//      encoder rather than merely dropping a key — 13 ids at once.
-//
-// The pins were current as of 2026-08-30: ops 0.19.0, schema 0.18.0, ui 0.17.0,
-// renderer 0.17.0, charts 0.11.0, ai-tools 0.11.0 — each the newest version its
-// own package line publishes, verified against registry.npmjs.org. They are NOT
-// one uniform number, and reading the v0.19.0 release tag as one is how this
-// repo would have re-pinned five of the six packages to a version that does not
-// exist. They have since moved (ops 0.22.0, schema 0.20.0, ui 0.19.0, renderer
-// 0.21.0, charts 0.14.0, ai-tools 0.12.0) — still six independent lines.
-//
-// 2026-09-07 — the corpus had grown past the projector again, 48 ids' worth,
-// and the set is STILL empty because every one of them was taught rather than
-// listed. Two of the sixteen families were not missing slots but missing KINDS
-// (`Embed`, `Tree`): the projector fell through to the illustrative generic
-// sketch, which emits `fuaran.embed('id', {…})` — a two-argument call no ctor
-// in this tier takes — so those failed as a TypeError rather than as a byte
-// difference. Worth knowing, because a `Cannot read properties of undefined`
-// from this arm reads like a harness fault and is not one: it is the fallback
-// telling you a kind has no arm.
-//
-// Nothing here was package lag. Each of the 48 was checked against the pinned
-// `@fuaran-ui/ops` encoder before it was taught, and every field the corpus
-// asked for was already there to be emitted.
-//
-// 2026-09-07, second pass — the corpus moved 27 commits under that measurement
-// and brought eleven more, taught the same way and again with nothing left to
-// list: node-level `visible`, predicate (`when`) switch cases, `Binding.Expr`
-// with its `params`, the declarative `Local` buffer (`codec` + `commitTo`),
-// `Navigate` over a `TextSource` with a `target`, and `Action.Confirm` /
-// `Action.Focus`.
-//
-// Two of those are worth knowing about, because both fail SILENTLY rather than
-// loudly:
-//
-//   • A CTOR THAT DROPS WHAT IT DOES NOT RECOGNISE. `fuaran.switch` maps every
-//     case through `{ match: c.match, child: c.child }`, so a `when` case
-//     reaches the encoder carrying NEITHER key — and an absent `match` is
-//     simply omitted, so nothing throws and the bytes are merely wrong. The
-//     projection post-edits `spec.cases`, which is the same escape the Phase
-//     768 `on` selector already takes.
-//   • A SLOT WITH TWO MUTUALLY EXCLUSIVE SPELLINGS. `binding.local` REQUIRES an
-//     `onCommit` closure, and a document carrying both `onCommit` and
-//     `commitTo` is a decode refusal — so the declarative buffer is not
-//     reachable through the ctor at all, and takes the literal form.
-//
-// Package lag again empty: `Binding.Expr`, `SwitchCase.when`, `Node.visible`,
-// `LocalBinding.codec` / `.commitTo`, `NavigateTarget` and the `Confirm` /
-// `Focus` action cases are all in the pinned `@fuaran-ui/schema` 0.20.0 and are
-// all encoded by the pinned `ops` 0.22.0 — checked in the dist before each was
-// taught, not assumed from the version number.
+// The quarantine is the SHARED table (Phase 1584) — `./quarantine.ts`, one row
+// per fixture with a cell per arm, so a fixture quarantined here and not on the
+// Python arm is readable in the row rather than by diffing two files. This arm's
+// slice is EMPTY as of 2026-08-30 and its emptiness is the assertion: every
+// node-round-trip fixture is required to re-encode byte-identically, so a
+// projector that falls behind the corpus fails by name rather than being
+// absorbed into a list. Why it is empty, and the two failure shapes this arm's
+// shortfalls take, are recorded in that file's header beside the Python arm's.
 //
 // If a future corpus addition lands here as a failure, the choice is to teach
-// the projector or — where a slot genuinely has no reachable ctor and no
-// literal form — to reinstate this set with the id and a DATED reason. Prefer
-// teaching it: the previous list decayed for eight days precisely because a
-// list is easier to append to than an emitter is to extend.
-const PROJECTOR_LAGGING = new Set<string>([]);
+// the projector or — where a slot genuinely has no reachable ctor and no literal
+// form — to add a `{ arm: 'typescript', … }` entry with its construct token and
+// reason. Prefer teaching it: the previous list decayed for eight days precisely
+// because a list is easier to append to than an emitter is to extend.
+const tsQuarantine = entriesFor('typescript');
 
 // -- Omit-at-default cover (Phase 1603) --------------------------------------
 //
@@ -233,7 +187,7 @@ describe('omit-at-default members (Phase 1603)', () => {
     });
 
     it(`${carrier}.${slot}: no fixture carrying it is quarantined`, () => {
-      const quarantined = carrying.map((x) => x.f.id).filter((id) => PROJECTOR_LAGGING.has(id));
+      const quarantined = carrying.map((x) => x.f.id).filter((id) => tsQuarantine.has(id));
       expect(
         quarantined,
         `quarantining a ${carrier} fixture drops '${slot}' out of the byte cover`,
@@ -310,48 +264,128 @@ describe('absent-is-error sites (Phase 1603)', () => {
   });
 });
 
+// -- The shared quarantine's TypeScript arm (Phase 1584) ---------------------
+//
+// The surfaces the resolver answers against. `fuaran` … `iconSource` are exactly
+// the bindings `evalExpr` hands the generated source, so a claim about what "the
+// pinned host models" is a claim about the very surface the round trip executes
+// against; `ui` and `ops` are the whole modules, for a token naming something the
+// projector reaches for without it being one of the seven.
+const TS_NAMESPACES: Readonly<Record<string, unknown>> = {
+  fuaran,
+  binding,
+  action,
+  format,
+  formFieldKind,
+  nodeId,
+  iconSource,
+  ui,
+  ops,
+};
+
+const tsHostModels = (token: string): ConstructVerdict =>
+  resolveTypeScriptConstruct(token, TS_NAMESPACES);
+
+const tsFixtureById = new Map(nodeFixtures.map((f) => [f.id, f]));
+const tsWireOf = (id: string): string => wireOfFixture(tsFixtureById.get(id)!);
+
+const tsProjected = (id: string): string | undefined => {
+  const f = tsFixtureById.get(id);
+  if (f === undefined) return undefined;
+  try {
+    return projectTypeScriptExpr(wireOfFixture(f)) as string;
+  } catch {
+    return undefined; // un-projectable — the quarantine's own outcome check says so
+  }
+};
+
+const tsRoundTrip = (id: string): { ok: boolean; encoded?: string } => {
+  const expr = tsProjected(id);
+  if (expr === undefined) return { ok: false };
+  try {
+    return { ok: true, encoded: encodeNode(evalExpr(expr)) };
+  } catch {
+    return { ok: false };
+  }
+};
+
+registerQuarantineChecks({
+  arm: 'typescript',
+  fixtureIds: nodeFixtures.map((f) => f.id),
+  wireOf: tsWireOf,
+  projectedSource: tsProjected,
+  hostModels: tsHostModels,
+  roundTrip: tsRoundTrip,
+});
+
+// The resolver above has NO live entries to exercise it — this arm's quarantine
+// is empty and is meant to stay that way — so it is proved here instead. A probe
+// nothing runs is worth less than no probe, because it reads as coverage; the
+// Python arm's equivalent resolver is exercised by six standing entries and needs
+// no self-test. Both directions and the refusal, so a resolver that answered
+// "models" (or "error") unconditionally fails one of these three.
+describe("the TypeScript arm's construct resolver (Phase 1584)", () => {
+  it('reports a symbol the pinned surface HAS', () => {
+    const verdict = tsHostModels('fuaran.tree');
+    expect(verdict, `'fuaran.tree' must resolve: ${JSON.stringify(verdict)}`).not.toHaveProperty(
+      'error',
+    );
+    expect((verdict as { models: boolean }).models).toBe(true);
+  });
+
+  it('reports a symbol the pinned surface LACKS', () => {
+    const verdict = tsHostModels('fuaran.noSuchConstructorExists');
+    expect(verdict).not.toHaveProperty('error');
+    expect((verdict as { models: boolean }).models).toBe(false);
+  });
+
+  it('REFUSES a token it cannot answer, rather than guessing', () => {
+    // An unknown namespace, and the Python arm's `optional:` — a token that
+    // resolved to a shrug would hold an entry vacuously, which is the whole
+    // failure Phase 1578's probes exist to make impossible.
+    expect(tsHostModels('noSuchNamespace.thing')).toHaveProperty('error');
+    expect(tsHostModels('optional:fuaran.tree')).toHaveProperty('error');
+  });
+
+  it('the emission pattern reads a real projected source, both ways', () => {
+    // The projector probe is a TEXT probe over generated source, so the two
+    // shapes it anchors on — a factory call and an object property — are checked
+    // against source this arm actually produces, in both directions.
+    const sample = tsProjected(nodeFixtures[0]!.id);
+    expect(sample, 'the first node fixture must project').toBeDefined();
+    expect(emissionPattern('typescript', 'fuaran.noSuchConstructorExists').test(sample!)).toBe(
+      false,
+    );
+    expect(
+      emissionPattern('typescript', 'fuaran.tree').test('fuaran.tree({ id: nodeId(1) })'),
+    ).toBe(true);
+    expect(emissionPattern('typescript', 'Navigate.target').test('{ target: "Blank" }')).toBe(true);
+    // The anchoring is what stops a fixture id from reading as an emission —
+    // `tree-1` inside a node id is not a `fuaran.tree(` call.
+    expect(
+      emissionPattern('typescript', 'fuaran.tree').test("fuaran.card({ id: nodeId('tree-1') })"),
+    ).toBe(false);
+  });
+});
+
 describe('TS projection conformance (Node corpus)', () => {
   it('the corpus is present and non-trivial', () => {
     expect(nodeFixtures.length).toBeGreaterThanOrEqual(70);
   });
 
-  it('every quarantined id names a real fixture', () => {
-    const ids = new Set(nodeFixtures.map((f) => f.id));
-    for (const q of PROJECTOR_LAGGING) {
-      expect(ids.has(q), `quarantined '${q}' is not in the corpus — remove it`).toBe(true);
-    }
-  });
-
   for (const f of nodeFixtures) {
-    const wireOf = () => readFileSync(resolve(corpusDir, f.inputFile), 'utf8').trim();
-    const roundTrip = (wire: string) => {
-      const expr = projectTypeScriptExpr(wire) as string;
-      const reconstructed = evalExpr(expr);
-      return encodeNode(reconstructed);
-    };
+    // A quarantined fixture's self-clearing check is registered from the shared
+    // table (`registerQuarantineChecks` above), so only the required byte
+    // round-trip is left here.
+    if (tsQuarantine.has(f.id)) continue;
 
-    if (PROJECTOR_LAGGING.has(f.id)) {
-      it(`${f.id} is quarantined (projector lag — see PROJECTOR_LAGGING)`, () => {
-        const wire = wireOf();
-        let reEncoded: string | undefined;
-        try {
-          reEncoded = roundTrip(wire);
-        } catch {
-          return; // still un-projectable — quarantine holds
-        }
-        expect(
-          reEncoded,
-          `'${f.id}' now round-trips — the pins moved or the projector learned it; REMOVE it from PROJECTOR_LAGGING`,
-        ).not.toBe(wire);
-      });
-    } else {
-      it(`${f.id} round-trips byte-identically`, () => {
-        const wire = wireOf();
-        const reEncoded = roundTrip(wire);
-        expect(reEncoded, `projected TS source for ${f.id} must re-encode byte-identically`).toBe(
-          wire,
-        );
-      });
-    }
+    it(`${f.id} round-trips byte-identically`, () => {
+      const wire = wireOfFixture(f);
+      const expr = projectTypeScriptExpr(wire) as string;
+      const reEncoded = encodeNode(evalExpr(expr));
+      expect(reEncoded, `projected TS source for ${f.id} must re-encode byte-identically`).toBe(
+        wire,
+      );
+    });
   }
 });

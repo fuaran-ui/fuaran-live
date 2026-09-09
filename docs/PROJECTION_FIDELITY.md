@@ -67,7 +67,7 @@ the shared corpus it projects the wire JSON to Python source, **executes** the
 generated source against the real host (every fixture in ONE CPython process),
 re-encodes via `fuaran_py.ui.encode`, and asserts byte-identity with the fixture.
 Run it with `pnpm conformance`; the arm needs a CPython carrying `fuaran-py`
-(`python -m venv .venv` then `pip install fuaran-py==0.3.0`, or point
+(`python -m venv .venv` then `pip install fuaran-py==0.4.0`, or point
 `FUARAN_PY_PYTHON` at an interpreter that already has it). It **fails** rather
 than skips when the host is absent: an arm that goes green without its oracle is
 worse than no arm.
@@ -77,8 +77,8 @@ the TypeScript leg can always fall back to a typed in-memory object literal,
 Python has **no such escape hatch**: `encode` calls `.to_wire()` on the root, and
 the structural `fuaran_py.model.Obj` has no such method, so a construct the typed
 authoring model does not carry has no spelling at all. Measured against
-`fuaran-py` 0.3.0 — the release the three workflows pin — the remaining set falls
-in two families:
+`fuaran-py` 0.4.0 — the release the three workflows pin, and the one the standing
+entries were last re-run against — the remaining set falls in two families:
 
 - **No typed binding case** — `Binding.Expr`. The union runs Static, State,
   Filter, Selection, Now, FormatBinding, Local, Query, Invoke — and no further, so
@@ -96,22 +96,28 @@ emptied at 0.3.0, which grew `Drawing`, `Fact` and `Mount` — along with the
 `Query` and `Invoke` bindings, `TextSource.I18n` and the `Call` / `AiTool` /
 `Invoke` actions, which between them emptied most of the second family too.
 
-The set's size is deliberately not quoted here. It is computed by arm and printed
-by the census test in `python.test.ts`, which is the only place it cannot go stale
-— a count in prose is a claim nobody re-runs, and three of this file's earlier
-counts had outlived their cause by the time anyone checked.
+The set's size is deliberately not quoted here. It is computed and printed by the
+census test both arms register from the shared table, which is the only place it
+cannot go stale — a count in prose is a claim nobody re-runs, and three of this
+file's earlier counts had outlived their cause by the time anyone checked.
 
-None of that is projector lag and none of it is fixable in this repo. Every entry
-is listed in the arm's `PY_UNMODELLED` map **with the construct it needs as a
-machine-readable token** and an `arm` naming which repository owns the cause, and
-two probes keep both honest: the arm fails if a quarantined fixture starts
+None of that is projector lag and none of it is fixable in this repo. Since Phase
+1584 BOTH arms read ONE quarantine table
+([`tests/projection-conformance/quarantine.ts`](../tests/projection-conformance/quarantine.ts)),
+keyed by fixture id, each entry naming the `arm` it belongs to (`typescript` |
+`python`), the `construct` it needs **as a machine-readable token**, and a `class`
+saying which repository owns the cause (`host` | `projector` | `both`). So a
+fixture quarantined on one arm and not the other is a row with one empty cell
+rather than two files to compare. Two probes keep every entry honest, and both now
+run per arm from that table: the arm fails if a quarantined fixture starts
 round-tripping while still listed, and it fails again if the pinned host turns out
 to MODEL the construct an entry blames it for — in which case the failure says
 whether that is a stale entry to remove or projector lag to teach
 `app/Projection.fs`. The set's size is not quoted here or anywhere else in prose;
-it is computed by arm and printed by the census test in that file. Closing the set
-is a matter of teaching `fuaran-py`, one named construct at a time. For those
-fixtures the projection
+it is computed by arm, and the whole cross-arm summary is rendered into the census
+test's name, so either arm's output states it. Closing the set is a matter of
+teaching `fuaran-py`, one named construct at a time. For those fixtures the
+projection
 still emits the shape the typed model _would_ take, so pasting it raises an
 `AttributeError` naming the absent class rather than silently producing something
 that looks authored and is not.
@@ -152,4 +158,4 @@ recorded as the roadmap TIDY-UP residue. `C#` / `VB` follow once their authoring
 surfaces (`Fuaran.UI.CSharp` / `Fuaran.UI.VisualBasic`) are executable in a
 harness. The `Python` leg is done, with the scope its section above states: the
 remaining work there is not in this repo but in `fuaran-py`, one named construct
-at a time, and the arm's `PY_UNMODELLED` map is the list.
+at a time, and the shared quarantine table's `python`-arm entries are the list.

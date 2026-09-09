@@ -2999,6 +2999,17 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | None -> [])
        @ (match optStr "destination" k with
           | Some d -> [ "destination", qs d ]
+          | None -> [])
+       // Phase 1548 — the declared upload ceilings. Ordinary optional numeric
+       // slots on the same terms as `capture` / `destination`: absent declares
+       // no ceiling, so the shortest call is unchanged and re-encodes to the
+       // bytes it always did. Both are positive integers on the wire, which is
+       // what `numLit` prints for an integral value.
+       @ (match optNum "maxBytes" k with
+          | Some n -> [ "maxBytes", numLit n ]
+          | None -> [])
+       @ (match optNum "maxFiles" k with
+          | Some n -> [ "maxFiles", numLit n ]
           | None -> []))
   // ── Visualisation ─────────────────────────────────────────────────────────
   | "Chart" ->
@@ -5166,7 +5177,16 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match optStr "destination" k with
           | Some d -> [ "destination", pq d ]
           | None -> [])
-       @ pyHandler "onSelect" "on_select" k)
+       @ pyHandler "onSelect" "on_select" k
+       // Phase 1548 — the declared upload ceilings, last in the ctor's own
+       // signature order. Ordinary optionals: absent declares no ceiling. The
+       // keyword names snake-case themselves, so the wire key is what is passed.
+       @ (match optNum "maxBytes" k with
+          | Some n -> [ "maxBytes", numLit n ]
+          | None -> [])
+       @ (match optNum "maxFiles" k with
+          | Some n -> [ "maxFiles", numLit n ]
+          | None -> []))
   // ── Visualisation ─────────────────────────────────────────────────────────
   | "Chart" ->
     call

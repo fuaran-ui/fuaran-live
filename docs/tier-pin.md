@@ -93,3 +93,20 @@ the contract compiled against did not move at the switch.
   is why the four `Csp = Csp.Permissive` assignments landed in the SAME commit
   as the ref. `Permissive` is the tier's own canonical default and emits
   byte-identical output, so the showcase's rendered bytes did not move.
+- **v0.80.0** (2026-09-10, Phase 1669) — **the cheapest raise this document
+  records, and worth writing down for that reason.** Against v0.79.0 the tier's
+  whole `src/` delta is one file: `ProviderCallTelemetry` gains an optional
+  `Subject` member. Nothing under `app/showcase/` constructs that record — the
+  grep is empty across `app/` and `test/` — so the record widening cannot reach
+  this repo at all, and the raise cost ZERO source migration. That is the
+  exception rather than the rule: a raise is a source-affecting act by default
+  (v0.79.0 is the worked example), and the way to know which kind you have is to
+  diff the tier's `src/` between the two tags and check whether the showcase
+  names what moved. Do that BEFORE budgeting the raise, not after.
+
+  It rides with the package-pin raise the showcase's conformance needed —
+  `@fuaran-ui/ui` 0.20.0, `renderer` 0.22.0, `ops` 0.25.0, `schema` 0.21.0, and
+  `fuaran-py` 0.5.0 — which is what carries the declared FileUpload upload
+  ceilings into both conformance arms. The playground's packaged `Fuaran.UI.*`
+  pin in `app/FuaranLive.fsproj` is a separate slot on its own rhythm and did
+  not move here.

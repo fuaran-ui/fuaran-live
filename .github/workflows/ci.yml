@@ -53,13 +53,19 @@ jobs:
           # The corpus checkout stays unpinned deliberately — it is the shared
           # conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: v0.79.0
+          ref: v0.80.0
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
+          # Full history, because the host-pin drift step below measures the DISTANCE
+          # between each pinned host's publish date and the corpus fixture commits that
+          # followed it. The default depth of 1 holds HEAD and nothing else, under which
+          # that distance is unmeasurable — the check would report "unknown" on every run
+          # and the number it exists to give would never appear.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -68,6 +74,42 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      # ── The corpus-drift sentinel (Phase 1669, on Phase 1583's pattern) ─────
+      #
+      # Non-blocking, on every push: which pinned host predates a corpus fixture
+      # commit. This repo bundles no corpus snapshot — what it pins is HOSTS, while
+      # the conformance gate reads the corpus UNPINNED at whatever HEAD is, so the
+      # drift that bites here is a pinned host that cannot know about a corpus move.
+      # It bit twice on 2026-09-07 (`Chart.stacked`, then `Tabs.activeIndex`) and both
+      # times the first symptom was a HALTED DEPLOY, because the showcase deploy stops
+      # on a red conformance gate by design. This step is so the next one arrives as a
+      # named warning on an ordinary push instead.
+      #
+      # It is a WARN and not a gate for the reason 1583's sentinel is: the measure is a
+      # sound UPPER BOUND (a corpus commit newer than a release cannot be reflected in
+      # it) and not a verdict, since most corpus commits move no encoding a given host
+      # emits. Reddening `main` for a corpus typo would train people to ignore it. What
+      # decides is the conformance arms, which run further down this same job.
+      #
+      # Runs BEFORE the install, build and Fable legs, so the warning is on the log
+      # before ten minutes of work rather than after. Needs no install: node's stdlib
+      # plus two registry lookups, and a network fault reports UNVERIFIED rather than a
+      # clean bill.
+      - name: Host-pin corpus drift (reported, non-blocking)
+        continue-on-error: true
+        run: |
+          set +e
+          node scripts/host-pin-drift.mjs 2>&1 | tee host-pin-drift.log
+          status=${PIPESTATUS[0]}
+          {
+            echo "### Pinned hosts vs the corpus"
+            echo
+            echo '```'
+            cat host-pin-drift.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
       # The projection-conformance gate compiles the F#/Fable projector, so the
       # .NET SDK is required (the rest of the repo is F#/Fable-built too).
@@ -93,7 +135,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install the Python host (fuaran-py)
-        run: python -m pip install --disable-pip-version-check fuaran-py==0.4.0
+        run: python -m pip install --disable-pip-version-check fuaran-py==0.5.0
 
       # The F# tier's nuget.config declares a local folder feed at a fixed
       # relative depth; NuGet hard-errors (NU1301) on a missing folder source,

@@ -2,11 +2,13 @@ dist
 node_modules
 pnpm-lock.yaml
 
-# Projection-conformance build + generated artefacts (Phase 84)
+# Projection-conformance build + generated artefacts. The Phase 84 paths are
+# retired with the TS shell that produced them; what stands here is the F# arm's
+# generated scratch projects (fuaran#1657), which hold machine-written F# and a
+# machine-written .fsproj and are re-created on every run.
 tests/projection-conformance/.gen-ts
-tests/projection-conformance/fsharp-harness/bin
-tests/projection-conformance/fsharp-harness/obj
-tests/projection-conformance/fsharp-harness/Generated.fs
+tests/projection-conformance/.fsharp-exec
+tests/projection-conformance/.fsharp-probe
 
 # Vendored Go-toolchain glue — kept byte-verbatim (rosettaParity.test.ts evals it
 # as the committed toolchain output; do not reformat).

@@ -1,9 +1,9 @@
 // Phase 329 – the multi-language source-projection output box, exercised
 // headlessly over the Fable output. Projection.fs walks the canonical wire tree
 // (the vendored FuaranLive.AiWire JsonValue model) and emits builder source per
-// language; `projectByName` is the flat surface. The TypeScript leg is a
-// verified byte-round-trip (see tests/projection-conformance/ + the fidelity
-// doc); the Python / F# / C# / VB legs are illustrative. The projector must
+// language; `projectByName` is the flat surface. The TypeScript, Python and F#
+// legs are verified byte-round-trips (see tests/projection-conformance/ + the
+// fidelity doc); the C# / VB legs are illustrative. The projector must
 // never crash on any decodable tree (generic fallback for uncovered kinds) and
 // produce recognizably per-language output.
 //
@@ -15,10 +15,17 @@ import { describe, it, expect } from 'vitest';
 // @ts-expect-error untyped Fable output
 import { projectByName } from '../app/output/Projection.js';
 
-// wire-format-fixtures/nodes/metric-1 – the canonical flat shape with a Literal
-// text source, a Static binding, and a nested $type-tagged format object.
+// wire-format-fixtures/nodes/metric-1, VERBATIM – a bare-string text source
+// (§3.6), Static bindings, and nested $type-tagged format objects.
+//
+// It was a hand-written near-copy until fuaran#1657, and had drifted from the
+// fixture it names in two ways that mattered: a `{"$type":"Literal"}` object
+// where the canonical form is the bare string, and a `source` key where
+// `MetricSpec`'s is `value`. Both were §16 shorthands the older generic legs
+// absorbed, so nothing failed — which is exactly why a projector test should
+// read the corpus's own bytes rather than a paraphrase of them.
 const metricNode =
-  '{"id":"metric-1","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":{"$type":"Literal","text":"Revenue"},"source":{"$type":"Static","value":1234.5}}}';
+  '{"id":"metric-1","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":"Revenue","subtext":"vs last month","tone":"Brand","trend":{"$type":"Static","value":0.07},"trendFormat":{"$type":"Percent","decimals":1},"value":{"$type":"Static","value":1234.5}}}';
 
 // A small tree with a nested child, to exercise recursion.
 const dashboardTree =
@@ -54,8 +61,13 @@ describe('source projection – per-language builder source', () => {
     const out = projectByName('fsharp', metricNode);
     expect(out).toContain('Fuaran.metric "metric-1"');
     expect(out).toContain('TextSource.Literal "Revenue"');
-    expect(out).toContain('Binding.Static(1234.5)');
-    expect(out).toContain('Defaults.metric');
+    // `Some(…)`, and the whole spec record rather than `{ Defaults.metric with … }`:
+    // since fuaran#1657 the F# leg emits per-kind against the pinned `Fuaran.UI`
+    // model, so `Binding.Static` carries its declared `'T option` and every field
+    // is spelled from the wire's own presence rules instead of inherited from a
+    // default the emitter cannot see.
+    expect(out).toContain('Binding.Static(Some(1234.5))');
+    expect(out).toContain('Label = TextSource.Literal "Revenue"');
   });
 
   it('C# projects the static-factory + options-object shape', () => {
@@ -63,7 +75,9 @@ describe('source projection – per-language builder source', () => {
     expect(out).toContain('Metric(new() {'); // static factory + options object
     expect(out).toContain('Id = "metric-1"'); // id folded into the initializer
     expect(out).toContain('Label = "Revenue"'); // Literal → bare string, PascalCase member
-    expect(out).toContain('Source = Binding.Static(1234.5)');
+    // `Value`, the wire's own key: the C# leg rides the generic walker, so it
+    // spells whatever member the canonical emission carries.
+    expect(out).toContain('Value = Binding.Static(1234.5)');
   });
 
   it('VB projects the XML-literal shape (attributes, format-*, $-bound elided)', () => {
@@ -71,7 +85,7 @@ describe('source projection – per-language builder source', () => {
     expect(out).toContain('<Metric id="metric-1"'); // element = kind, id attribute
     expect(out).toContain('label="Revenue"'); // Literal → attribute value
     expect(out).toContain('format-currency="GBP"'); // CellFormat → format-* attribute
-    expect(out).toContain('source="1234.5"'); // Static binding → flattened scalar attr
+    expect(out).toContain('value="1234.5"'); // Static binding → flattened scalar attr
   });
 
   it('recurses into children (Dashboard → Heading)', () => {

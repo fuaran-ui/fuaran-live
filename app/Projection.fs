@@ -387,56 +387,6 @@ let private tsSpec: LangSpec =
     StaticBinding = fun inner -> "binding.static(" + inner + ")"
     TextLiteral = fun t -> "'" + escape '\'' t + "'" }
 
-// ─── F# (Fuaran.UI smart constructors) ────────────────────────────────────────
-
-let private fsSpec: LangSpec =
-  { Node =
-      fun kind id fields depth ->
-        let ctor = "Fuaran." + lowerFirst kind
-        let idLit = "\"" + escape '"' id + "\""
-
-        if List.isEmpty fields then
-          ctor + " " + idLit + " Defaults." + lowerFirst kind
-        else
-          let body =
-            fields
-            |> List.map (fun (k, v) -> pad (depth + 1) + upperFirst k + " = " + v)
-            |> String.concat "\n"
-
-          ctor
-          + " "
-          + idLit
-          + "\n"
-          + pad depth
-          + "  { Defaults."
-          + lowerFirst kind
-          + " with\n"
-          + body
-          + " }"
-    Obj =
-      fun members depth ->
-        if List.isEmpty members then
-          "{| |}"
-        else
-          let body =
-            members
-            |> List.map (fun (k, v) -> pad (depth + 1) + upperFirst k + " = " + v)
-            |> String.concat "\n"
-
-          "{|\n" + body + " |}"
-    Arr =
-      fun items depth ->
-        if List.isEmpty items then
-          "[]"
-        else
-          let body = items |> List.map (fun it -> pad (depth + 1) + it) |> String.concat "\n"
-          "[\n" + body + " ]"
-    Str = fun s -> "\"" + escape '"' s + "\""
-    Bool = fun b -> if b then "true" else "false"
-    Null = "null"
-    StaticBinding = fun inner -> "Binding.Static(" + inner + ")"
-    TextLiteral = fun t -> "TextSource.Literal \"" + escape '"' t + "\"" }
-
 // ─── C# (Fuaran.UI.CSharp) ────────────────────────────────────────────────────
 //
 // The C# authoring veneer (Wave 45) is static-factory + options-object – the same
@@ -5515,6 +5465,1889 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       )
   | _ -> None
 
+// ─── F# (Fuaran.UI) – the verified per-kind emitter (Phase 1657) ──────────────
+//
+// The F# leg differs from every other leg in the one way that decides its
+// design: **its authoring surface IS the wire model.** The published
+// `Fuaran.UI.Generated` declares `Node<'Msg>`, `NodeKind<'Msg>`, every `*Spec`
+// record, `Binding`, `Action` and the format / spec unions — and the canonical
+// encoders over them; `CanonicalJson.encodeNode` is
+// `Generated.encodeNode (Introspect.canonicalForm n)`. So the wire↔type map is
+// mechanical and total:
+//
+//   * a wire member key is `lowerFirst` of the record field / union-case
+//     argument name, with no exception anywhere in the model;
+//   * a union position is a `$type`-tagged object whose tag is the case name;
+//   * a spec's `$type` is its `NodeKind` case name, and its record is
+//     `<Case>Spec`;
+//   * an omitted member is either an `option` at `None`, or a non-option at the
+//     one value the encoder omits it at.
+//
+// The TypeScript and Python legs are ~2,000 lines of per-kind string building
+// because their target surfaces are a DIFFERENT shape from the wire — helper
+// vocabularies, keyword arguments, erased columns, positional constructors. Here
+// the exactness lives in the SCHEMA, so the emitter is a type-directed walk over
+// three tables transcribed from that published `Generated.fs`. Every kind is
+// still emitted exactly — its own field list, its own presence rule, its own
+// closure placeholders, its own smart constructor — but what the wire contract
+// shares between kinds, this emitter shares too. A per-kind transcription of the
+// same facts would be the same table written 43 times, and would drift 43 ways.
+//
+// **What keeps the tables honest.** They are committed source and the pinned
+// `Fuaran.UI` can move under them. That is exactly what
+// `tests/projection-conformance/fsharp.test.ts` is for: it emits every node
+// fixture in the corpus, writes ONE generated F# file, compiles it ONCE against
+// the pinned package, executes it, and requires the re-encode to be
+// byte-identical to the fixture. A schema drift is a red gate on the next run,
+// never a silently wrong Output box — which is the whole difference between this
+// leg and the illustrative ones.
+//
+// **Emission style.** Record fields and list items are separated by explicit
+// `;` and constructor arguments by `,`, with cosmetic indentation on top. The
+// separators are load-bearing rather than decorative: the generated file is
+// ~220 nested expressions deep in aggregate and a bottom-up string builder
+// cannot know its own absolute column, so an offside-sensitive layout would
+// compile or not depending on where a nested record happened to land. With the
+// separators explicit the parse never depends on the indentation being right.
+
+/// A slot's type, as the emitter needs to know it — the descriptor language the
+/// three tables below are written in. It is the encoder vocabulary of
+/// `Generated.fs` read backwards: `B<f>` is the `(encBinding encFloat)` slot,
+/// `L<R:SelectOption>` the `JArr(List.map encSelectOption …)` slot, and so on.
+[<RequireQualifiedAccess>]
+type private Fd =
+  /// `string`
+  | Str
+  /// `int`
+  | Int
+  /// `float`
+  | Flt
+  /// `bool`
+  | Bool
+  /// `Fuaran.Core.JVal` — a verbatim JSON payload
+  | Jv
+  /// `Node<'Msg>`
+  | NodeT
+  /// `Action<'Msg>`
+  | Act
+  /// A function-typed slot: unobservable on the wire, so a placeholder lambda.
+  | Clo
+  /// `AriaRole` — a bare lower-case string with a `Custom` passthrough.
+  | Aria
+  /// `SwitchSpec.On`, the one dual-key shorthand in the model.
+  | SwitchOn
+  /// `Binding<'T>` over the given payload.
+  | Bind of Fd
+  /// `Binding<'T>` at a slot whose encoder writes a BARE `'T` for a
+  /// `Static` — the `FormFieldKind.Range` / `.DateRange` shorthand.
+  | BindStatic of Fd
+  | Lst of Fd
+  | MapOf of Fd
+  /// A nullary-case DU encoded as its bare case name.
+  | Enum of string
+  /// A record in `fsRecordTable`.
+  | Rec of string
+  /// A `$type`-tagged union in `fsUnionTable` (or one of the three
+  /// hand-written ones).
+  | Uni of string
+  /// `Fuaran.Core.Row seq` — the typed row feed.
+  | CoreRows
+  /// `Fuaran.Core.DataSource`
+  | CoreDs
+  /// One `Fuaran.Core.Transform` pipeline step.
+  | CoreTf
+  /// `Fuaran.Core.ColExpr`
+  | CoreEx
+  /// A literal F# expression: a declared member the encoder never writes.
+  | Verbatim of string
+
+let rec private parseFd (s: string) : Fd =
+  let inner (prefixLen: int) =
+    s.Substring(prefixLen, s.Length - prefixLen - 1)
+
+  if s.StartsWith "BS<" then
+    Fd.BindStatic(parseFd (inner 3))
+  elif s.StartsWith "B<" then
+    Fd.Bind(parseFd (inner 2))
+  elif s.StartsWith "L<" then
+    Fd.Lst(parseFd (inner 2))
+  elif s.StartsWith "M<" then
+    Fd.MapOf(parseFd (inner 2))
+  elif s.StartsWith "E:" then
+    Fd.Enum(s.Substring 2)
+  elif s.StartsWith "R:" then
+    Fd.Rec(s.Substring 2)
+  elif s.StartsWith "U:" then
+    Fd.Uni(s.Substring 2)
+  elif s.StartsWith "X:" then
+    Fd.Verbatim(s.Substring 2)
+  else
+    match s with
+    | "s" -> Fd.Str
+    | "i" -> Fd.Int
+    | "f" -> Fd.Flt
+    | "b" -> Fd.Bool
+    | "j" -> Fd.Jv
+    | "n" -> Fd.NodeT
+    | "a" -> Fd.Act
+    | "C" -> Fd.Clo
+    | "aria" -> Fd.Aria
+    | "switchOn" -> Fd.SwitchOn
+    | "core:rows" -> Fd.CoreRows
+    | "core:ds" -> Fd.CoreDs
+    | "core:tf" -> Fd.CoreTf
+    | "core:ex" -> Fd.CoreEx
+    | other -> Fd.Verbatim("Unchecked.defaultof<_> (* unmodelled slot: " + other + " *)")
+
+// ─── the schema tables ────────────────────────────────────────────────────────
+//
+// Transcribed from the published `Fuaran.UI.Generated` (the version the app's
+// `Fuaran.UI.*` pins name). Each row is `<Field>|<wireKey>|<presence>|<descriptor>`;
+// a record's fields are its whole declared set and a union case's arguments are
+// in DECLARED order, so a literal names every field and a case is constructed
+// positionally. `Binding` / `TextSource` / `TransformSource` are hand-written
+// below: the first is parameterised over its payload and the other two have a
+// non-object canonical form.
+
+let private fsRecordTable: (string * string * string list) list =
+  [ ("Accessibility",
+     "",
+     [ "DescribedBy|describedBy|?|s"
+       "Hidden|hidden|?|B<b>"
+       "Label|label|?|B<s>"
+       "LabelledBy|labelledBy|?|s"
+       "LiveRegion|liveRegion|?|E:LiveRegionKind"
+       "Role|role|?|aria" ])
+    ("BadgeSpec", "Badge", [ "Label|label|!|U:TextSource"; "Variant|variant|!|E:BadgeVariant" ])
+    ("BoxSpec",
+     "Box",
+     [ "Children|children|!|L<n>"
+       "Heading|heading|?|U:TextSource"
+       "Layout|layout|!|U:BoxLayout"
+       "Role|role|!|E:BoxRole"
+       "KeepTogether|keepTogether|=false|b"
+       "BreakBefore|breakBefore|=false|b" ])
+    ("ButtonGroupItem", "", [ "Label|label|!|U:TextSource"; "OnClick|onClick|?|C" ])
+    ("ButtonSpec",
+     "Button",
+     [ "Label|label|!|U:TextSource"
+       "OnClick|onClick|!|a"
+       "Variant|variant|!|E:ButtonVariant"
+       "Icon|icon|?|s"
+       "Tooltip|-|-|X:Option.None"
+       "Disabled|disabled|?|B<b>" ])
+    ("CalloutSpec",
+     "Callout",
+     [ "Body|body|!|U:TextSource"
+       "Dismissable|dismissable|=false|b"
+       "Tone|tone|=ToneVariant.Default|E:ToneVariant"
+       "Heading|heading|?|U:TextSource"
+       "Icon|icon|?|s" ])
+    ("ChartSpec",
+     "Chart",
+     [ "Kind|kind|!|E:ChartKind"
+       "Source|source|!|B<core:rows>"
+       "Stacked|stacked|=false|b"
+       "XField|xField|!|s"
+       "YFields|yFields|!|L<s>"
+       "Title|title|?|U:TextSource"
+       "ValueFormat|valueFormat|?|U:Format"
+       "XTitle|xTitle|?|U:TextSource"
+       "YTitle|yTitle|?|U:TextSource"
+       "Subtitle|subtitle|?|U:TextSource"
+       "LegendPosition|legendPosition|?|E:ChartLegendPosition"
+       "DataLabels|dataLabels|?|E:ChartDataLabels"
+       "XScale|xScale|?|E:ChartXScale"
+       "Annotations|annotations|?|L<U:ChartAnnotation>"
+       "OnPointClick|onPointClick|?|C" ])
+    ("CodeBlockSpec",
+     "CodeBlock",
+     [ "Code|code|!|s"
+       "Copyable|copyable|!|b"
+       "HighlightLines|highlightLines|!|L<i>"
+       "Language|language|!|s"
+       "LineNumbers|lineNumbers|!|b" ])
+    ("ColumnErased",
+     "",
+     [ "Field|field|?|s"
+       "Sortable|sortable|?|b"
+       "Editable|editable|?|b"
+       "Format|format|=CellFormat.None|U:CellFormat"
+       "Kind|kind|!|U:CellKindErased"
+       "Label|label|!|s"
+       "Value|value|?|C"
+       "Width|width|=ColumnWidth.Auto|U:ColumnWidth" ])
+    ("CompareRule", "", [ "Against|against|!|B<j>"; "Op|op|!|E:CompareOp" ])
+    ("ContentHash",
+     "",
+     [ "Algorithm|algorithm|!|s"
+       "Hash|hash|!|s"
+       "Strictness|strictness|!|E:HashStrictness" ])
+    ("CustomSpec",
+     "Custom",
+     [ "ModuleId|moduleId|!|s"
+       "ComponentId|componentId|!|s"
+       "Props|props|!|M<j>"
+       "ContentHash|contentHash|?|R:ContentHash"
+       "ExposedNodeIds|exposedNodeIds|?|L<s>" ])
+    ("DataGridSpec",
+     "DataGrid",
+     [ "Columns|columns|!|L<R:ColumnErased>"
+       "Editable|editable|=false|b"
+       "RowKey|rowKey|?|C"
+       "RowKeyField|rowKeyField|?|s"
+       "SortStateKey|sortStateKey|?|s"
+       "PageSize|pageSize|?|i"
+       "PageStateKey|pageStateKey|?|s"
+       "DefaultSort|defaultSort|?|R:DefaultSort"
+       "EditStateKey|editStateKey|?|s"
+       "Reorderable|reorderable|=false|b"
+       "TransferInKey|transferInKey|?|s"
+       "TransferOutKey|transferOutKey|?|s"
+       "KeepRowsTogether|keepRowsTogether|=false|b"
+       "RepeatHeader|repeatHeader|=false|b"
+       "Exportable|exportable|=false|b"
+       "Source|source|!|B<core:rows>"
+       "StaticRows|staticRows|?|R:StaticRows"
+       "OnRowClick|onRowClick|?|C" ])
+    ("DateRangePair", "", [ "From|from|!|s"; "To|to|!|s" ])
+    ("DefaultSort", "", [ "Column|column|!|i"; "Direction|direction|!|E:SortDirection" ])
+    ("DisclosureSpec",
+     "Disclosure",
+     [ "Children|children|!|L<n>"
+       "DefaultOpen|defaultOpen|!|b"
+       "Heading|heading|!|U:TextSource"
+       "OnToggle|onToggle|?|C"
+       "Open|open|!|B<b>" ])
+    ("DrawPoint", "", [ "X|x|!|f"; "Y|y|!|f" ])
+    ("DrawStyle",
+     "",
+     [ "Emphasis|emphasis|?|E:Emphasis"
+       "Fill|fill|?|B<s>"
+       "FontFamily|fontFamily|?|s"
+       "FontSize|fontSize|?|f"
+       "MarkId|markId|?|s"
+       "Opacity|opacity|?|B<f>"
+       "Rotation|rotation|?|f"
+       "Stroke|stroke|?|B<s>"
+       "StrokeWidth|strokeWidth|?|B<f>"
+       "TextAnchor|textAnchor|?|E:TextAnchor"
+       "Tip|tip|?|U:TextSource" ])
+    ("DrawingSpec",
+     "Drawing",
+     [ "Description|description|?|U:TextSource"
+       "Shapes|shapes|!|L<U:Shape>"
+       "Style|style|!|R:DrawStyle"
+       "Title|title|?|U:TextSource"
+       "ViewBox|viewBox|!|R:ViewBox" ])
+    ("EffectClass",
+     "",
+     [ "Determinism|determinism|!|E:DeterminismSource"
+       "HostEffect|hostEffect|!|E:HostEffect" ])
+    ("EmbedSpec",
+     "Embed",
+     [ "AspectRatio|aspectRatio|=ImageAspect.Natural|E:ImageAspect"
+       "Permissions|permissions|=[]|L<E:EmbedPermission>"
+       "Src|src|!|B<s>"
+       "Title|title|!|U:TextSource" ])
+    ("ErrorBoundarySpec", "ErrorBoundary", [ "Child|child|!|n"; "Fallback|fallback|!|n" ])
+    ("FactSpec",
+     "Fact",
+     [ "Emphasis|emphasis|=false|b"
+       "Help|help|?|U:TextSource"
+       "Icon|icon|?|s"
+       "Label|label|!|U:TextSource"
+       "Tone|tone|=ToneVariant.Default|E:ToneVariant"
+       "Value|value|!|U:TextSource" ])
+    ("FieldRule",
+     "",
+     [ "Compare|compare|?|R:CompareRule"
+       "Format|format|?|E:TextFormat"
+       "MaxLength|maxLength|?|i"
+       "Message|message|?|U:TextSource"
+       "MinLength|minLength|?|i"
+       "Pattern|pattern|?|s" ])
+    ("FileUploadSpec",
+     "FileUpload",
+     [ "Accept|accept|!|L<s>"
+       "Label|label|!|U:TextSource"
+       "Multiple|multiple|!|b"
+       "OnSelect|onSelect|?|C"
+       "Disabled|disabled|?|B<b>"
+       "AcceptPaste|acceptPaste|=false|b"
+       "DropTarget|dropTarget|=false|b"
+       "Capture|capture|?|E:CaptureSource"
+       "Destination|destination|?|s"
+       "MaxBytes|maxBytes|?|i"
+       "MaxFiles|maxFiles|?|i" ])
+    ("FilterSpec", "", [ "Kind|kind|!|U:FormFieldKind"; "Label|label|!|U:TextSource"; "Name|name|!|s" ])
+    ("FiltersSpec", "Filters", [ "Items|items|!|L<R:FilterSpec>" ])
+    ("FormField",
+     "",
+     [ "Id|id|!|s"
+       "Kind|kind|!|U:FormFieldKind"
+       "Label|label|!|U:TextSource"
+       "Required|required|!|b"
+       "Help|help|?|U:TextSource"
+       "Rule|rule|?|R:FieldRule" ])
+    ("FormSpec",
+     "Form",
+     [ "Fields|fields|!|L<R:FormField>"
+       "OnSubmit|onSubmit|!|a"
+       "SubmitLabel|submitLabel|!|U:TextSource"
+       "Disabled|disabled|?|B<b>" ])
+    ("FragmentDeclSpec",
+     "FragmentDecl",
+     [ "Body|body|!|n"
+       "Name|name|!|s"
+       "Holes|holes|?|L<U:HoleDecl>"
+       "Effect|effect|?|R:EffectClass" ])
+    ("FragmentRefSpec", "FragmentRef", [ "Name|name|!|s"; "Args|args|?|M<U:FragmentArg>" ])
+    ("GuestChannel", "", [ "Direction|direction|!|E:ChannelDirection"; "MessageShape|messageShape|?|s" ])
+    ("HeadingSpec",
+     "Heading",
+     [ "Level|level|!|i"
+       "Text|text|!|U:TextSource"
+       "Variant|variant|!|E:HeadingVariant" ])
+    ("IconSpec",
+     "Icon",
+     [ "Icon|icon|!|s"
+       "Size|size|=IconSize.Medium|E:IconSize"
+       "Tone|tone|=ToneVariant.Default|E:ToneVariant"
+       "Label|label|?|s" ])
+    ("ImageSpec",
+     "Image",
+     [ "Alt|alt|!|U:TextSource"
+       "Src|src|!|B<s>"
+       "Variant|variant|!|E:ImageVariant"
+       "Fit|fit|=ImageFit.Natural|E:ImageFit"
+       "AspectRatio|aspectRatio|=ImageAspect.Natural|E:ImageAspect"
+       "Loading|loading|=ImageLoading.Eager|E:ImageLoading"
+       "SrcSet|srcSet|=[]|L<R:SrcSetEntry>"
+       "Expandable|expandable|=false|b"
+       "Caption|caption|?|U:TextSource" ])
+    ("InvokeArg", "", [ "Addr|addr|!|s"; "Value|value|!|s" ])
+    ("LabelValueRowSpec",
+     "LabelValueRow",
+     [ "Emphasis|emphasis|=false|b"
+       "Format|format|=CellFormat.None|U:CellFormat"
+       "Label|label|!|U:TextSource"
+       "Value|value|!|B<f>"
+       "Help|help|?|U:TextSource" ])
+    ("LinkSpec",
+     "Link",
+     [ "Href|href|!|B<s>"
+       "Label|label|!|U:TextSource"
+       "Download|download|!|b"
+       "Rel|rel|?|s"
+       "Target|target|?|s"
+       "Protection|protection|?|E:LinkProtection" ])
+    ("ListSpec", "List", [ "Items|items|!|L<U:TextSource>"; "Ordered|ordered|!|b" ])
+    ("MapMarker", "", [ "Label|label|!|s"; "Latitude|latitude|!|f"; "Longitude|longitude|!|f" ])
+    ("MapSpec",
+     "Map",
+     [ "CentreLatitude|centreLatitude|!|f"
+       "CentreLongitude|centreLongitude|!|f"
+       "Source|source|!|B<L<R:MapMarker>>"
+       "Zoom|zoom|!|i"
+       "OnMarkerClick|onMarkerClick|?|C" ])
+    ("MarkdownSpec", "Markdown", [ "Text|text|!|U:TextSource" ])
+    ("MathSpec", "Math", [ "Source|source|!|s"; "Display|display|!|E:MathDisplay" ])
+    ("MediaSpec",
+     "Media",
+     [ "Controls|controls|=true|b"
+       "Kind|kind|!|U:MediaKind"
+       "Label|label|!|U:TextSource"
+       "Loop|loop|=false|b"
+       "Src|src|!|B<s>"
+       "Tracks|tracks|=[]|L<R:TrackEntry>"
+       "Transcript|transcript|?|U:TextSource" ])
+    ("MetricSpec",
+     "Metric",
+     [ "Label|label|!|U:TextSource"
+       "Value|value|!|B<f>"
+       "Format|format|=CellFormat.None|U:CellFormat"
+       "Tone|tone|=ToneVariant.Default|E:ToneVariant"
+       "Weight|weight|=StyleWeight.Standard|E:StyleWeight"
+       "Emphasis|emphasis|=Emphasis.Normal|E:Emphasis"
+       "Trend|trend|?|B<f>"
+       "TrendFormat|trendFormat|?|U:CellFormat"
+       "TrendPolarity|trendPolarity|=TrendPolarity.HigherIsBetter|E:TrendPolarity"
+       "Icon|icon|?|s"
+       "Subtext|subtext|?|U:TextSource" ])
+    ("ModalSpec",
+     "Modal",
+     [ "Children|children|!|L<n>"
+       "Dismissable|dismissable|!|b"
+       "OnDismiss|onDismiss|?|a"
+       "Open|open|!|B<b>"
+       "Heading|heading|?|U:TextSource"
+       "Modality|modality|=ModalityKind.Modal|E:ModalityKind"
+       "Anchor|anchor|?|s" ])
+    ("MountSpec",
+     "Mount",
+     [ "Capabilities|capabilities|!|L<s>"
+       "Channel|channel|!|R:GuestChannel"
+       "Inputs|inputs|?|M<U:FragmentArg>"
+       "OnBubble|onBubble|?|C"
+       "ScopeId|scopeId|!|s" ])
+    ("ProgressSpec",
+     "Progress",
+     [ "Fraction|fraction|!|B<f>"
+       "Indeterminate|indeterminate|=false|b"
+       "Tone|tone|=ToneVariant.Default|E:ToneVariant"
+       "Label|label|?|U:TextSource"
+       "Caveat|caveat|?|U:TextSource" ])
+    ("RangePair", "", [ "Max|max|!|f"; "Min|min|!|f" ])
+    ("ScrollAreaSpec",
+     "ScrollArea",
+     [ "Children|children|!|L<n>"
+       "Orientation|orientation|!|E:ScrollOrientation"
+       "MaxHeight|maxHeight|?|i"
+       "MaxWidth|maxWidth|?|i" ])
+    ("SelectOption", "", [ "Label|label|!|s"; "Value|value|!|s" ])
+    ("SelectSpec",
+     "Select",
+     [ "Label|label|!|U:TextSource"
+       "OnChange|onChange|?|C"
+       "OnChangeMulti|onChangeMulti|?|C"
+       "Source|source|!|B<L<R:SelectOption>>"
+       "Value|value|!|B<s>"
+       "Placeholder|placeholder|?|U:TextSource"
+       "Disabled|disabled|?|B<b>"
+       "Multiple|multiple|?|b"
+       "Values|values|?|B<L<s>>" ])
+    ("SemanticStyle",
+     "",
+     [ "Direction|direction|=TextDirection.Auto|E:TextDirection"
+       "Emphasis|emphasis|=Emphasis.Normal|E:Emphasis"
+       "Role|role|=StyleRole.None|E:StyleRole"
+       "Tone|tone|=ToneVariant.Default|E:ToneVariant"
+       "Voice|voice|=FontVoice.Default|E:FontVoice"
+       "Weight|weight|=StyleWeight.Standard|E:StyleWeight" ])
+    ("SkeletonSpec", "Skeleton", [ "Rows|rows|!|i" ])
+    ("SparklineSpec", "Sparkline", [ "Source|source|!|B<L<f>>" ])
+    ("SplitPanelSpec", "SplitPanel", [ "Children|children|!|L<n>"; "Weight|weight|!|f" ])
+    ("SrcSetEntry", "", [ "Src|src|!|B<s>"; "Width|width|!|i" ])
+    ("StateBehaviour", "", [ "OnEmpty|onEmpty|?|n"; "OnError|onError|?|C"; "OnLoading|onLoading|?|n" ])
+    ("StaticRows",
+     "",
+     [ "DefaultSort|defaultSort|?|R:DefaultSort"
+       "Headers|headers|!|L<U:TextSource>"
+       "Rows|rows|!|L<L<U:TextSource>>"
+       "Sortable|sortable|?|b" ])
+    ("StepperSpec",
+     "Stepper",
+     [ "ActiveStep|activeStep|!|B<i>"
+       "Children|children|!|L<n>"
+       "OnSelect|onSelect|?|C" ])
+    ("SummaryListSpec", "SummaryList", [ "Children|children|!|L<n>"; "Heading|heading|?|U:TextSource" ])
+    ("SwitchCase", "", [ "Child|child|!|n"; "Match|match|?|s"; "When|when|?|B<b>" ])
+    ("SwitchSpec",
+     "Switch",
+     [ "Cases|cases|!|L<R:SwitchCase>"
+       "Default|default|!|n"
+       "On|on|!|switchOn"
+       "AutoAdvanceMs|autoAdvanceMs|?|i" ])
+    ("TabHeader", "", [ "Label|label|!|U:TextSource"; "Icon|icon|?|s"; "Disabled|disabled|?|B<b>" ])
+    ("TabsSpec",
+     "Tabs",
+     [ "ActiveIndex|activeIndex|=Binding.Static(Some(0))|B<i>"
+       "Children|children|!|L<n>"
+       "Orientation|orientation|=Orientation.Horizontal|E:Orientation"
+       "OnSelect|onSelect|?|C"
+       "OnSelectTag|onSelectTag|?|C"
+       "TabHeaders|tabHeaders|?|L<R:TabHeader>"
+       "TabTags|tabTags|?|L<s>"
+       "ActiveTag|activeTag|?|B<s>" ])
+    ("ToastSpec",
+     "Toast",
+     [ "Dismissable|dismissable|=true|b"
+       "Message|message|!|U:TextSource"
+       "Open|open|!|B<b>"
+       "Tone|tone|=ToneVariant.Default|E:ToneVariant" ])
+    ("TrackEntry",
+     "",
+     [ "Default|default|=false|b"
+       "Kind|kind|!|E:TrackKind"
+       "Label|label|!|U:TextSource"
+       "Src|src|!|B<s>"
+       "SrcLang|srcLang|!|s" ])
+    ("TransformParam", "", [ "From|from|!|B<j>"; "Name|name|!|s" ])
+    ("TreeItem",
+     "",
+     [ "Children|children|=[]|L<R:TreeItem>"
+       "Icon|icon|?|s"
+       "Id|id|!|s"
+       "Label|label|!|U:TextSource" ])
+    ("TreeSpec",
+     "Tree",
+     [ "ExpandedStateKey|expandedStateKey|?|s"
+       "Items|items|!|L<R:TreeItem>"
+       "OnSelect|onSelect|?|C"
+       "SelectionStateKey|selectionStateKey|?|s" ])
+    ("ViewBox", "", [ "Height|height|!|f"; "MinX|minX|!|f"; "MinY|minY|!|f"; "Width|width|!|f" ]) ]
+
+let private fsUnionTable: (string * string * string list) list =
+  [ ("Action", "Chain", [ "ops|ops|!|L<a>" ])
+    ("Action", "WriteToClipboard", [ "text|text|!|U:TextSource" ])
+    ("Action", "Dispatch", [ "msg|-|-|X:(box ())" ])
+    ("Action", "Invoke", [ "capabilityId|capabilityId|!|s"; "args|args|!|L<R:InvokeArg>" ])
+    ("Action",
+     "ReadFileBody",
+     [ "fileRef|fileRef|!|s"
+       "fileHandle|-|-|X:Option.None"
+       "encoding|encoding|!|E:FileReadEncoding"
+       "onRead|onRead|?|C" ])
+    ("Action",
+     "Call",
+     [ "endpoint|endpoint|!|s"
+       "onResult|onResult|?|C"
+       "into|into|?|U:CallResultTarget" ])
+    ("Action",
+     "Navigate",
+     [ "route|route|!|U:TextSource"
+       "target|target|=NavigateTarget.Self|E:NavigateTarget" ])
+    ("Action", "CommitLocal", [ "nodeId|nodeId|!|s" ])
+    ("Action", "Notify", [ "channel|channel|!|s"; "payload|payload|!|j" ])
+    ("Action", "SetState", [ "key|key|!|s"; "value|value|?|j"; "valueFrom|valueFrom|?|B<j>" ])
+    ("Action", "AiTool", [ "toolName|toolName|!|s"; "args|args|!|j" ])
+    ("Action", "Print", [])
+    ("Action",
+     "Confirm",
+     [ "prompt|prompt|!|U:TextSource"
+       "onConfirm|onConfirm|!|a"
+       "onCancel|onCancel|?|a" ])
+    ("Action", "Focus", [ "nodeId|nodeId|!|s" ])
+    ("BoxLayout", "Auto", [])
+    ("BoxLayout", "Flex", [ "direction|direction|!|E:Orientation"; "wrap|wrap|!|b"; "gap|gap|?|i" ])
+    ("BoxLayout", "Grid", [ "cols|cols|!|i"; "templateColumns|templateColumns|?|s"; "gap|gap|?|i" ])
+    ("BoxLayout", "Masonry", [ "cols|cols|!|i"; "gap|gap|?|i" ])
+    ("CallResultTarget", "State", [ "key|key|!|s" ])
+    ("CallResultTarget", "Query", [ "name|name|!|s" ])
+    ("CellFormat", "None", [])
+    ("CellFormat", "Number", [ "decimals|decimals|?|i" ])
+    ("CellFormat", "Currency", [ "code|code|!|s" ])
+    ("CellFormat", "Percent", [ "decimals|decimals|?|i" ])
+    ("CellFormat", "SignificantDigits", [ "digits|digits|!|i" ])
+    ("CellFormat", "Date", [ "format|format|!|s" ])
+    ("CellFormat", "Duration", [ "unit|unit|!|E:DurationUnit"; "style|style|!|E:DurationStyle" ])
+    ("CellFormat", "RelativeTime", [ "unit|unit|!|E:RelativeTimeUnit" ])
+    ("CellFormat", "Custom", [ "fn|fn|!|C" ])
+    ("CellKindErased", "Text", [])
+    ("CellKindErased", "Numeric", [])
+    ("CellKindErased", "Date", [])
+    ("CellKindErased", "Editable", [ "onEdit|onEdit|?|C" ])
+    ("CellKindErased", "Checkbox", [ "get|get|!|C"; "onToggle|onToggle|?|C" ])
+    ("CellKindErased", "Button", [ "label|label|!|U:TextSource"; "onClick|onClick|?|C" ])
+    ("CellKindErased", "ButtonGroup", [ "buttons|buttons|!|L<R:ButtonGroupItem>" ])
+    ("CellKindErased", "Link", [ "hrefFn|hrefFn|!|C"; "labelFn|labelFn|!|C" ])
+    ("CellKindErased", "Pill", [ "labelFn|labelFn|!|C"; "toneFn|toneFn|!|C" ])
+    ("CellKindErased",
+     "TonedPill",
+     [ "field|field|!|s"
+       "map|map|!|M<E:ToneVariant>"
+       "default|default|=ToneVariant.Default|E:ToneVariant" ])
+    ("CellKindErased", "Progress", [ "fractionFn|fractionFn|!|C"; "labelFn|labelFn|?|C" ])
+    ("CellKindErased", "Custom", [ "fn|fn|!|C" ])
+    ("ChartAnnotation", "ReferenceLine", [ "value|value|!|f"; "label|label|?|U:TextSource" ])
+    ("ChartAnnotation", "EventMarker", [ "at|at|!|U:ChartAnnotationX"; "label|label|?|U:TextSource" ])
+    ("ChartAnnotation", "RangeBand", [ "range|range|!|U:ChartAnnotationRange"; "label|label|?|U:TextSource" ])
+    ("ChartAnnotationRange", "ValueRange", [ "from|from|!|f"; "to|to|!|f" ])
+    ("ChartAnnotationRange", "XRange", [ "from|from|!|U:ChartAnnotationX"; "to|to|!|U:ChartAnnotationX" ])
+    ("ChartAnnotationX", "Category", [ "key|key|!|s" ])
+    ("ChartAnnotationX", "Date", [ "iso|iso|!|s" ])
+    ("ColumnWidth", "Auto", [])
+    ("ColumnWidth", "Fixed", [ "pixels|pixels|!|i" ])
+    ("ColumnWidth", "Flex", [ "weight|weight|!|f" ])
+    ("CurveCommand", "MoveTo", [ "to|to|!|R:DrawPoint" ])
+    ("CurveCommand", "LineTo", [ "to|to|!|R:DrawPoint" ])
+    ("CurveCommand",
+     "CubicTo",
+     [ "control1|control1|!|R:DrawPoint"
+       "control2|control2|!|R:DrawPoint"
+       "to|to|!|R:DrawPoint" ])
+    ("CurveCommand", "QuadraticTo", [ "control|control|!|R:DrawPoint"; "to|to|!|R:DrawPoint" ])
+    ("CurveCommand", "Close", [])
+    ("FormFieldKind", "Text", [ "value|value|?|B<s>"; "onChange|onChange|?|C" ])
+    ("FormFieldKind", "Number", [ "value|value|?|B<f>"; "onChange|onChange|?|C" ])
+    ("FormFieldKind", "Checkbox", [ "value|value|?|B<b>"; "onToggle|onToggle|?|C" ])
+    ("FormFieldKind", "Toggle", [ "value|value|?|B<b>"; "onToggle|onToggle|?|C" ])
+    ("FormFieldKind",
+     "Choice",
+     [ "options|options|!|B<L<R:SelectOption>>"
+       "value|value|?|B<s>"
+       "onChange|onChange|?|C" ])
+    ("FormFieldKind", "TextArea", [ "value|value|?|B<s>"; "onChange|onChange|?|C"; "rows|rows|!|i" ])
+    ("FormFieldKind",
+     "RangedNumber",
+     [ "value|value|?|B<f>"
+       "onChange|onChange|?|C"
+       "min|min|?|f"
+       "max|max|?|f"
+       "step|step|?|f" ])
+    ("FormFieldKind",
+     "Range",
+     [ "value|value|?|BS<R:RangePair>"
+       "onChange|onChange|?|C"
+       "min|min|?|f"
+       "max|max|?|f"
+       "step|step|?|f" ])
+    ("FormFieldKind",
+     "SegmentedChoice",
+     [ "options|options|!|B<L<R:SelectOption>>"
+       "value|value|?|B<s>"
+       "onChange|onChange|?|C"
+       "orientation|orientation|!|E:Orientation" ])
+    ("FormFieldKind",
+     "Date",
+     [ "value|value|?|B<s>"
+       "onChange|onChange|?|C"
+       "variant|variant|!|E:DateVariant"
+       "min|min|?|s"
+       "max|max|?|s"
+       "step|step|?|f" ])
+    ("FormFieldKind",
+     "DateRange",
+     [ "value|value|?|BS<R:DateRangePair>"
+       "onChange|onChange|?|C"
+       "variant|variant|!|E:DateVariant"
+       "min|min|?|s"
+       "max|max|?|s"
+       "step|step|?|f" ])
+    ("FormFieldKind",
+     "Combobox",
+     [ "allowFreeText|allowFreeText|=false|b"
+       "onChange|onChange|?|C"
+       "options|options|!|B<L<R:SelectOption>>"
+       "value|value|?|B<s>" ])
+    ("FormFieldKind",
+     "Rating",
+     [ "allowHalf|allowHalf|=false|b"
+       "max|max|!|i"
+       "onChange|onChange|?|C"
+       "value|value|?|B<f>" ])
+    ("FormFieldKind", "Color", [ "onChange|onChange|?|C"; "value|value|?|B<s>" ])
+    ("FormFieldKind",
+     "Tokens",
+     [ "allowFreeText|allowFreeText|=true|b"
+       "onChange|onChange|?|C"
+       "suggestions|suggestions|?|B<L<R:SelectOption>>"
+       "value|value|?|B<L<s>>" ])
+    ("Format", "Number", [ "decimals|decimals|?|i" ])
+    ("Format", "Currency", [ "isoCode|isoCode|!|s" ])
+    ("Format", "Percent", [ "decimals|decimals|?|i" ])
+    ("Format", "Date", [ "dateStyle|dateStyle|!|E:DateStyle" ])
+    ("Format", "RelativeTime", [ "unit|unit|!|E:RelativeTimeUnit" ])
+    ("Format", "Duration", [ "unit|unit|!|E:DurationUnit"; "style|style|!|E:DurationStyle" ])
+    ("Format", "Since", [ "unit|unit|?|E:RelativeTimeUnit" ])
+    ("FragmentArg", "Int", [ "value|value|!|i" ])
+    ("FragmentArg", "Float", [ "value|value|!|f" ])
+    ("FragmentArg", "Bool", [ "value|value|!|b" ])
+    ("FragmentArg", "Str", [ "value|value|!|s" ])
+    ("FragmentArg", "SlotArg", [ "tree|tree|!|n" ])
+    ("HoleDecl",
+     "Value",
+     [ "name|name|!|s"
+       "space|space|!|U:HoleValueSpace"
+       "default|default|?|U:Scalar" ])
+    ("HoleDecl", "Slot", [ "name|name|!|s"; "kindConstraint|kindConstraint|?|s" ])
+    ("HoleDecl", "Repeat", [ "name|name|!|s"; "countSpace|countSpace|!|U:HoleValueSpace" ])
+    ("HoleValueSpace", "IntRange", [ "min|min|!|i"; "max|max|!|i" ])
+    ("HoleValueSpace", "FloatRange", [ "min|min|!|f"; "max|max|!|f" ])
+    ("HoleValueSpace", "StringLen", [ "minLen|minLen|!|i"; "maxLen|maxLen|!|i" ])
+    ("HoleValueSpace", "Enum", [ "choices|choices|!|L<s>" ])
+    ("HoleValueSpace", "AnyString", [])
+    ("LocalFlushTrigger", "OnBlur", [])
+    ("LocalFlushTrigger", "OnSubmit", [])
+    ("LocalFlushTrigger", "OnDebounce", [ "milliseconds|milliseconds|!|i" ])
+    ("LocalFlushTrigger", "OnCommitAction", [])
+    ("LocaleSource", "Ambient", [])
+    ("LocaleSource", "Explicit", [ "tag|tag|!|s" ])
+    ("MediaKind", "Video", [ "autoplay|autoplay|=false|b"; "poster|poster|?|B<s>" ])
+    ("MediaKind", "Audio", [])
+    ("Scalar", "Int", [ "value|value|!|i" ])
+    ("Scalar", "Float", [ "value|value|!|f" ])
+    ("Scalar", "Bool", [ "value|value|!|b" ])
+    ("Scalar", "Str", [ "value|value|!|s" ])
+    ("Shape", "Group", [ "children|children|!|L<U:Shape>"; "style|style|!|R:DrawStyle" ])
+    ("Shape",
+     "Rectangle",
+     [ "x|x|!|f"
+       "y|y|!|f"
+       "width|width|!|f"
+       "height|height|!|f"
+       "cornerRadius|cornerRadius|?|f"
+       "style|style|!|R:DrawStyle" ])
+    ("Shape",
+     "Line",
+     [ "x1|x1|!|f"
+       "y1|y1|!|f"
+       "x2|x2|!|f"
+       "y2|y2|!|f"
+       "style|style|!|R:DrawStyle" ])
+    ("Shape", "Polyline", [ "points|points|!|L<R:DrawPoint>"; "style|style|!|R:DrawStyle" ])
+    ("Shape", "Polygon", [ "points|points|!|L<R:DrawPoint>"; "style|style|!|R:DrawStyle" ])
+    ("Shape", "Curve", [ "commands|commands|!|L<U:CurveCommand>"; "style|style|!|R:DrawStyle" ])
+    ("Shape", "Circle", [ "cx|cx|!|f"; "cy|cy|!|f"; "r|r|!|f"; "style|style|!|R:DrawStyle" ])
+    ("Shape",
+     "Ellipse",
+     [ "cx|cx|!|f"
+       "cy|cy|!|f"
+       "rx|rx|!|f"
+       "ry|ry|!|f"
+       "style|style|!|R:DrawStyle" ])
+    ("Shape",
+     "Label",
+     [ "x|x|!|f"
+       "y|y|!|f"
+       "text|text|!|U:TextSource"
+       "style|style|!|R:DrawStyle" ]) ]
+
+let private fsEnumTable: string list =
+  [ "BadgeVariant|Neutral,Brand,Success,Warning,Critical,Info"
+    "BoxRole|Dashboard,Card,Group,Separator"
+    "ButtonVariant|Primary,Secondary,Tertiary,Destructive"
+    "CaptureSource|Camera,Microphone"
+    "ChannelDirection|OutOnly,TwoWay"
+    "ChartDataLabels|Off,Ends"
+    "ChartKind|Line,Bar,Area,Pie,Scatter,Heatmap"
+    "ChartLegendPosition|Top,Right,Bottom,None"
+    "ChartXScale|Category,Temporal"
+    "CompareOp|Eq=eq,Neq=neq,Lt=lt,Lte=lte,Gt=gt,Gte=gte"
+    "DateStyle|Short,Medium,Long,Full"
+    "DateVariant|Date,Time,DateTime"
+    "DeterminismSource|Deterministic,Clock,Random,Network"
+    "DurationStyle|Compact,Clock,Long"
+    "DurationUnit|Seconds,Minutes,Hours"
+    "EmbedPermission|AllowScripts,AllowSameOrigin,AllowForms,AllowFullscreen"
+    "Emphasis|Quiet,Normal,Loud"
+    "FileReadEncoding|Text,Base64,DataUrl"
+    "FontVoice|Default,Display,Structural"
+    "HashStrictness|StrictReplay,AdvisoryWarning,Enforced"
+    "HeadingVariant|Standard,Eyebrow,Caption,Lead"
+    "HostEffect|Pure,ReadsHost,WritesHost"
+    "IconSize|Small,Medium,Large"
+    "ImageAspect|Natural,Square,FourThree,ThreeTwo,SixteenNine"
+    "ImageFit|Natural,Cover,Contain"
+    "ImageLoading|Eager,Lazy"
+    "ImageVariant|Default,Avatar,Rounded"
+    "LinkProtection|Email=email"
+    "LiveRegionKind|Polite=polite,Assertive=assertive,Off=off"
+    "MathDisplay|Inline,Block"
+    "ModalityKind|Modal,Popover"
+    "Motion|None,PulseDuringLoad,FadeInOnMount,SlideInFromBelow,ShakeOnError,RotateOnRefresh,SlideInFromRight,ExpandCollapse,CrossFade,SlideBetween"
+    "NavigateTarget|Self,Blank"
+    "Orientation|Vertical,Horizontal"
+    "RelativeTimeUnit|Second,Minute,Hour,Day,Week,Month,Year"
+    "ScrollOrientation|Vertical,Horizontal,Both"
+    "SortDirection|Asc=asc,Desc=desc"
+    "StyleRole|None,Eyebrow,Data,Lede,Caption"
+    "StyleWeight|Compact,Standard,Spacious"
+    "TextAnchor|Start,Middle,End"
+    "TextDirection|Auto=auto,Ltr=ltr,Rtl=rtl"
+    "TextFormat|Email=email,Url=url,Tel=tel"
+    "TimeGrain|Second,Minute,Hour,Day"
+    "ToneVariant|Default,Subdued,Brand,Success,Warning,Critical,Info"
+    "TrackKind|Subtitles,Captions,Descriptions,Chapters"
+    "TrendPolarity|HigherIsBetter,LowerIsBetter" ]
+
+/// The per-kind authoring entry point: `<kind $type>|<Fuaran ctor>|<a11y>|<shape>`.
+///
+/// `a11y` is `1` when the smart constructor INJECTS a non-`None`
+/// `Defaults.Accessibility.*` of its own — a `Metric` gets `LiveRegion = Polite`,
+/// a `Button` gets `Role = Button` — which the wire may not carry, so the
+/// emission overrides it explicitly. The table records only WHETHER a default is
+/// injected, never which one: overriding with the wire's own value is correct
+/// whatever the default is, and a table that also transcribed the defaults would
+/// be a second copy of them to go stale.
+///
+/// `shape` is how the constructor takes the kind's payload: `spec` is the spec
+/// record, `rows` the `Skeleton` row count, `items` the `Filters` item list. A
+/// kind ABSENT from this table has no `(id, spec)`-shaped constructor —
+/// `DataGrid` is reached through `table` / `grid` / `sortableTable`, which build
+/// its spec rather than take it, and `Custom` / `FragmentRef` likewise — so
+/// those are emitted as a `Node` record literal over `NodeKind.<Case>`, which is
+/// the same published surface one level down.
+let private fsCtorTable: string list =
+  [ "Badge|badge|0|spec"
+    "Box|box|0|spec"
+    "Button|button|1|spec"
+    "Callout|callout|1|spec"
+    "Chart|chart|1|spec"
+    "CodeBlock|codeBlockSpec|0|spec"
+    "Disclosure|disclosure|1|spec"
+    "Drawing|drawingSpec|0|spec"
+    "Embed|embedSpec|0|spec"
+    "ErrorBoundary|errorBoundary|0|spec"
+    "Fact|factSpec|0|spec"
+    "FileUpload|fileUpload|1|spec"
+    "Filters|filters|0|items"
+    "Form|form|1|spec"
+    "FragmentDecl|fragmentDecl|0|spec"
+    "Heading|heading|0|spec"
+    "Icon|iconSpec|0|spec"
+    "Image|imageSpec|0|spec"
+    "LabelValueRow|labelValueRow|0|spec"
+    "Link|linkSpec|0|spec"
+    "List|listSpec|0|spec"
+    "Map|map|1|spec"
+    "Markdown|markdownSpec|0|spec"
+    "Math|mathSpec|0|spec"
+    "Media|mediaSpec|0|spec"
+    "Metric|metric|1|spec"
+    "Modal|modal|1|spec"
+    "Mount|mount|0|spec"
+    "Progress|progress|1|spec"
+    "ScrollArea|scrollArea|1|spec"
+    "Select|select|1|spec"
+    "Skeleton|skeleton|0|rows"
+    "Sparkline|sparkline|0|spec"
+    "SplitPanel|splitPanel|0|spec"
+    "Stepper|stepper|0|spec"
+    "SummaryList|summaryList|1|spec"
+    "Switch|switch|0|spec"
+    "Tabs|tabs|1|spec"
+    "Toast|toast|1|spec"
+    "Tree|treeSpec|0|spec" ]
+
+// ─── table lookups ────────────────────────────────────────────────────────────
+
+let private fsRecords: Map<string, string list> =
+  fsRecordTable |> List.map (fun (n, _, fields) -> n, fields) |> Map.ofList
+
+let private fsUnions: Map<string, (string * string list) list> =
+  fsUnionTable
+  |> List.fold
+    (fun (m: Map<string, (string * string list) list>) (u, c, args) ->
+      let existing = m |> Map.tryFind u |> Option.defaultValue []
+      Map.add u (existing @ [ c, args ]) m)
+    Map.empty
+
+/// `<enum>` → its declared cases, each with the wire token it encodes as. Six of
+/// the model's enums do NOT encode as their bare case name — `LiveRegionKind`,
+/// `TextDirection`, `SortDirection`, `TextFormat`, `CompareOp` and
+/// `LinkProtection` all emit lower-case tokens — so the token is carried per
+/// case rather than derived. Deriving it would have been silently wrong on
+/// exactly those six, and wrong in the direction that still compiles.
+let private fsEnums: Map<string, (string * string) list> =
+  fsEnumTable
+  |> List.map (fun row ->
+    let parts = row.Split '|'
+
+    let cases =
+      parts[1].Split ','
+      |> Array.map (fun entry ->
+        match entry.Split '=' with
+        | [| case |] -> case, case
+        | pair -> pair[0], pair[1])
+      |> List.ofArray
+
+    parts[0], cases)
+  |> Map.ofList
+
+/// `<kind>` → (constructor, injects-an-accessibility-default, payload shape).
+let private fsCtors: Map<string, string * bool * string> =
+  fsCtorTable
+  |> List.map (fun row ->
+    let p = row.Split '|'
+    p[0], (p[1], p[2] = "1", p[3]))
+  |> Map.ofList
+
+// ─── literal helpers ──────────────────────────────────────────────────────────
+
+let private hexDigit (n: int) : string =
+  let digits = "0123456789abcdef"
+  string digits[((n % 16) + 16) % 16]
+
+let private hex4 (n: int) : string =
+  hexDigit (n / 4096) + hexDigit (n / 256) + hexDigit (n / 16) + hexDigit n
+
+/// An F# string literal. The two structural escapes, and every C0 control as
+/// `\uXXXX` — the corpus carries a literal U+0001 inside a payload string
+/// (`btn-json-payloads`, which pins control-character escaping), and a raw copy
+/// of that byte would not compile.
+let private fsStr (s: string) : string =
+  let esc (ch: char) =
+    let code = int ch
+
+    if ch = '"' then "\\\""
+    elif ch = '\\' then "\\\\"
+    elif code < 32 || code = 127 then "\\u" + hex4 code
+    else string ch
+
+  "\"" + (s |> Seq.map esc |> String.concat "") + "\""
+
+let private fsBoolLit (b: bool) : string = if b then "true" else "false"
+
+/// An F# `float` literal that parses back to exactly this double. The wire
+/// carries the shortest round-trip decimal (WIRE_FORMAT §2 rule 5) and every
+/// host's parser is IEEE-754-nearest, so the host's own shortest rendering is
+/// exact; the trailing `.0` only stops an integral value reading as an `int`
+/// literal. The three non-finite values ride the wire as STRINGS, so they arrive
+/// at the `Flt` arm below rather than here.
+let private fsFloatLit (n: float) : string =
+  let s = string n
+
+  if s.Contains "." || s.Contains "e" || s.Contains "E" then
+    s
+  else
+    s + ".0"
+
+let private fsIntLit (n: float) : string = string (int64 n)
+
+/// A `float`-typed slot's value. `NaN` / `±Infinity` are carried as strings by
+/// the canonical encoder, so both spellings reach here.
+let private fsFloatOf (v: JsonValue) : string =
+  match v with
+  | JNumber n -> fsFloatLit n
+  | JString "NaN" -> "nan"
+  | JString "Infinity" -> "infinity"
+  | JString "-Infinity" -> "-infinity"
+  | _ -> "0.0"
+
+let private fsIntOf (v: JsonValue) : string =
+  match v with
+  | JNumber n -> fsIntLit n
+  | _ -> "0"
+
+let private fsStrOf (v: JsonValue) : string =
+  match v with
+  | JString s -> fsStr s
+  | _ -> fsStr ""
+
+let private fsBoolOf (v: JsonValue) : string =
+  match v with
+  | JBool b -> fsBoolLit b
+  | _ -> "false"
+
+/// The placeholder for a function-typed slot. Never invoked: the encoder writes
+/// the `"<closure>"` sentinel for a present one and omits an absent one, so what
+/// the wire records is that a handler was THERE, never what it did (§4). One
+/// shape covers every arity, because a lambda returning a null function is
+/// itself a function of the next argument.
+let private fsClosure = "(fun _ -> Unchecked.defaultof<_>)"
+
+/// `AriaRole` — a closed lower-case vocabulary plus verbatim `Custom`.
+let private fsAria (v: JsonValue) : string =
+  match v with
+  | JString s ->
+    match s with
+    | "button" -> "AriaRole.Button"
+    | "link" -> "AriaRole.Link"
+    | "dialog" -> "AriaRole.Dialog"
+    | "alert" -> "AriaRole.Alert"
+    | "status" -> "AriaRole.Status"
+    | "banner" -> "AriaRole.Banner"
+    | "navigation" -> "AriaRole.Navigation"
+    | "main" -> "AriaRole.Main"
+    | "form" -> "AriaRole.Form"
+    | "region" -> "AriaRole.Region"
+    | "heading" -> "AriaRole.Heading"
+    | "progressbar" -> "AriaRole.Progressbar"
+    | "tab" -> "AriaRole.Tab"
+    | "tablist" -> "AriaRole.Tablist"
+    | "tabpanel" -> "AriaRole.Tabpanel"
+    | other -> "AriaRole.Custom " + fsStr other
+  | _ -> "AriaRole.Custom \"\""
+
+/// An enum slot. An unmodelled token falls back to the first declared case; the
+/// conformance arm's byte comparison is what reports it, by fixture.
+let private fsEnumOf (name: string) (v: JsonValue) : string =
+  let cases = fsEnums |> Map.tryFind name |> Option.defaultValue []
+
+  let byToken =
+    match v with
+    | JString s -> cases |> List.tryFind (fun (_, token) -> token = s)
+    | _ -> None
+
+  match byToken with
+  | Some(case, _) -> name + "." + case
+  | None ->
+    match cases with
+    | (first, _) :: _ -> name + "." + first
+    | [] -> "Unchecked.defaultof<_>"
+
+/// A `Fuaran.Core.JVal` literal. `JInt` for an integral number and `JFloat`
+/// otherwise: both render the same bytes for an integral value (rule 5's
+/// shortest round-trip is the integer form), so the choice is free and the
+/// integer spelling reads better.
+let rec private fsJVal (v: JsonValue) : string =
+  match v with
+  | JNull -> "JStr \"\""
+  | JBool b -> "JBool " + fsBoolLit b
+  | JNumber n ->
+    if n = floor n && abs n <= 2147483647.0 then
+      "JInt " + fsIntLit n
+    else
+      "JFloat " + fsFloatLit n
+  | JString s -> "JStr " + fsStr s
+  | JArray [] -> "JArr []"
+  | JArray xs -> "JArr [ " + (xs |> List.map fsJVal |> String.concat "; ") + " ]"
+  | JObject [] -> "JObj []"
+  | JObject ms ->
+    "JObj [ "
+    + (ms |> List.map (fun (k, x) -> fsStr k + ", " + fsJVal x) |> String.concat "; ")
+    + " ]"
+
+// ─── the `Fuaran.Core` columnar / compute layer ───────────────────────────────
+//
+// `Binding.Transform` / `.Expr` and every row-fed slot splice Core's OWN
+// canonical renderings into the emission (`ColumnCodec.encode`,
+// `DataFrameCodec.encodePipeline` / `encodeExpr`), so these four emitters read
+// those codecs backwards exactly as the tables above read the UI encoders
+// backwards. They are hand-written rather than tabled because Core's codecs are
+// bespoke — a column is split across a `values` / `validity` pair, a `lit` cell
+// is `$type`-tagged, an `in` step is two different constructors under one tag.
+
+let private fsColumnType (tag: string) : string =
+  match tag with
+  | "int" -> "Fuaran.Core.ColumnType.IntType"
+  | "float" -> "Fuaran.Core.ColumnType.FloatType"
+  | "bool" -> "Fuaran.Core.ColumnType.BoolType"
+  | "date" -> "Fuaran.Core.ColumnType.DateType"
+  | "timestamp" -> "Fuaran.Core.ColumnType.TimestampType"
+  | _ -> "Fuaran.Core.ColumnType.StringType"
+
+/// One realised cell, given its column's declared type. A `validity` slot that
+/// is `false` is the absent marker and takes the `Null` case whatever the
+/// co-indexed `values` entry holds (the encoder writes the type's default
+/// placeholder there).
+let private fsCellOfColumn (tag: string) (valid: bool) (v: JsonValue) : string =
+  if not valid then
+    "Fuaran.Core.Cell.Null"
+  else
+    match tag with
+    | "int" -> "Fuaran.Core.Cell.Int(" + fsIntOf v + ")"
+    | "float" -> "Fuaran.Core.Cell.Float(" + fsFloatOf v + ")"
+    | "bool" -> "Fuaran.Core.Cell.Bool(" + fsBoolOf v + ")"
+    | "date" -> "Fuaran.Core.Cell.Date(" + fsStrOf v + ")"
+    | "timestamp" -> "Fuaran.Core.Cell.Timestamp(" + fsStrOf v + ")"
+    | _ -> "Fuaran.Core.Cell.Str(" + fsStrOf v + ")"
+
+/// A `lit` cell: `$type`-tagged, so it carries its own scalar type.
+let private fsCellLiteral (v: JsonValue) : string =
+  let value = JsonValue.tryField "value" v |> Option.defaultValue JNull
+
+  match dollarType v with
+  | Some "Int" -> "Fuaran.Core.Cell.Int(" + fsIntOf value + ")"
+  | Some "Float" -> "Fuaran.Core.Cell.Float(" + fsFloatOf value + ")"
+  | Some "Bool" -> "Fuaran.Core.Cell.Bool(" + fsBoolOf value + ")"
+  | Some "Str" -> "Fuaran.Core.Cell.Str(" + fsStrOf value + ")"
+  | Some "Date" -> "Fuaran.Core.Cell.Date(" + fsStrOf value + ")"
+  | Some "Timestamp" -> "Fuaran.Core.Cell.Timestamp(" + fsStrOf value + ")"
+  | _ -> "Fuaran.Core.Cell.Null"
+
+let private fsDataSource (v: JsonValue) : string =
+  match optStr "ref" v with
+  | Some r -> "Fuaran.Core.DataSource.Ref(" + fsStr r + ")"
+  | None ->
+    let schema =
+      arrOf "schema" v
+      |> List.map (fun e -> strOf "name" e, (optStr "type" e |> Option.defaultValue "string"))
+
+    let columns = membersOf "columns" v
+
+    let schemaLit =
+      schema
+      |> List.map (fun (n, t) -> "(" + fsStr n + ", " + fsColumnType t + ")")
+      |> String.concat "; "
+
+    let columnLit =
+      schema
+      |> List.map (fun (n, t) ->
+        let col =
+          columns
+          |> List.tryFind (fun (k, _) -> k = n)
+          |> Option.map snd
+          |> Option.defaultValue JNull
+
+        let values =
+          match col with
+          | JNull -> []
+          | c -> arrOf "values" c
+
+        let validity =
+          match col with
+          | JNull -> []
+          | c -> arrOf "validity" c
+
+        let cells =
+          values
+          |> List.mapi (fun i value ->
+            let valid =
+              match List.tryItem i validity with
+              | Some(JBool b) -> b
+              | _ -> true
+
+            fsCellOfColumn t valid value)
+
+        "{ Name = "
+        + fsStr n
+        + "; Type = "
+        + fsColumnType t
+        + "; Cells = [ "
+        + String.concat "; " cells
+        + " ] }")
+      |> String.concat "; "
+
+    "Fuaran.Core.DataSource.Embedded { Schema = [ "
+    + schemaLit
+    + " ]; Columns = [ "
+    + columnLit
+    + " ] }"
+
+let private fsBinOp (tag: string) : string =
+  let case =
+    match tag with
+    | "add" -> "Add"
+    | "sub" -> "Sub"
+    | "mul" -> "Mul"
+    | "div" -> "Div"
+    | "mod" -> "Mod"
+    | "eq" -> "Eq"
+    | "ne" -> "Ne"
+    | "lt" -> "Lt"
+    | "le" -> "Le"
+    | "gt" -> "Gt"
+    | "ge" -> "Ge"
+    | "and" -> "And"
+    | "or" -> "Or"
+    | "contains" -> "Contains"
+    | "startsWith" -> "StartsWith"
+    | _ -> "EndsWith"
+
+  "Fuaran.Core.BinOp." + case
+
+let private fsScalarFn (tag: string) : string =
+  let case =
+    match tag with
+    | "abs" -> "Abs"
+    | "round" -> "Round"
+    | "floor" -> "Floor"
+    | "ceil" -> "Ceil"
+    | "length" -> "Length"
+    | "lower" -> "Lower"
+    | "upper" -> "Upper"
+    | "substr" -> "Substr"
+    | "datePart" -> "DatePart"
+    | "concat" -> "Concat"
+    | "trim" -> "Trim"
+    | "replace" -> "Replace"
+    | "dateDiffDays" -> "DateDiffDays"
+    | "sqrt" -> "Sqrt"
+    | "least" -> "Least"
+    | "greatest" -> "Greatest"
+    | _ -> "IndexOf"
+
+  "Fuaran.Core.ScalarFn." + case
+
+let private fsAggFn (tag: string) : string =
+  let case =
+    match tag with
+    | "sum" -> "Sum"
+    | "mean"
+    | "avg" -> "Mean"
+    | "min" -> "Min"
+    | "max" -> "Max"
+    | "count" -> "Count"
+    | "median" -> "Median"
+    | "stddev" -> "StdDev"
+    | "first" -> "First"
+    | "last" -> "Last"
+    | _ -> "CountDistinct"
+
+  "Fuaran.Core.AggFn." + case
+
+let private fsJoinKind (tag: string) : string =
+  let case =
+    match tag with
+    | "left" -> "Left"
+    | "right" -> "Right"
+    | "outer" -> "Outer"
+    | "semi" -> "Semi"
+    | "anti" -> "Anti"
+    | _ -> "Inner"
+
+  "Fuaran.Core.JoinKind." + case
+
+let private fsSortDir (tag: string) : string =
+  if tag = "desc" then
+    "Fuaran.Core.SortDir.Desc"
+  else
+    "Fuaran.Core.SortDir.Asc"
+
+let private fsWindowFn (tag: string) (n: int option) : string =
+  match tag with
+  | "ntile" -> "Fuaran.Core.WindowFn.NTile(" + string (n |> Option.defaultValue 0) + ")"
+  | _ ->
+    let case =
+      match tag with
+      | "rank" -> "Rank"
+      | "lag" -> "Lag"
+      | "lead" -> "Lead"
+      | "cumulSum"
+      | "cumSum" -> "CumulSum"
+      | "rollingMean" -> "RollingMean"
+      | "denseRank" -> "DenseRank"
+      | "competitionRank" -> "CompetitionRank"
+      | "cumulMax" -> "CumulMax"
+      | "cumulMin" -> "CumulMin"
+      | "rollingSum" -> "RollingSum"
+      | _ -> "RowNumber"
+
+    "Fuaran.Core.WindowFn." + case
+
+let rec private fsColExpr (v: JsonValue) : string =
+  match dollarType v with
+  | Some "col" -> "Fuaran.Core.ColExpr.Col(" + fsStr (strOf "name" v) + ")"
+  | Some "lit" -> "Fuaran.Core.ColExpr.Lit(" + fsCellLiteral (fieldReq "cell" v) + ")"
+  | Some "param" -> "Fuaran.Core.ColExpr.Param(" + fsStr (strOf "name" v) + ")"
+  | Some "binary" ->
+    "Fuaran.Core.ColExpr.Binary("
+    + fsBinOp (strOf "op" v)
+    + ", "
+    + fsColExpr (fieldReq "left" v)
+    + ", "
+    + fsColExpr (fieldReq "right" v)
+    + ")"
+  | Some "not" -> "Fuaran.Core.ColExpr.Not(" + fsColExpr (fieldReq "expr" v) + ")"
+  | Some "coalesce" ->
+    "Fuaran.Core.ColExpr.Coalesce([ "
+    + (arrOf "exprs" v |> List.map fsColExpr |> String.concat "; ")
+    + " ])"
+  | Some "case" ->
+    let arms =
+      arrOf "cases" v
+      |> List.map (fun arm ->
+        "("
+        + fsColExpr (fieldReq "when" arm)
+        + ", "
+        + fsColExpr (fieldReq "then" arm)
+        + ")")
+      |> String.concat "; "
+
+    "Fuaran.Core.ColExpr.Case([ "
+    + arms
+    + " ], "
+    + fsColExpr (fieldReq "else" v)
+    + ")"
+  | Some "cast" ->
+    "Fuaran.Core.ColExpr.Cast("
+    + fsColumnType (strOf "type" v)
+    + ", "
+    + fsColExpr (fieldReq "expr" v)
+    + ")"
+  | Some "apply" ->
+    "Fuaran.Core.ColExpr.ApplyFn("
+    + fsScalarFn (strOf "fn" v)
+    + ", [ "
+    + (arrOf "args" v |> List.map fsColExpr |> String.concat "; ")
+    + " ])"
+  | Some "in" ->
+    // One tag, two constructors: a literal item list, or a named parameter.
+    match optStr "param" v with
+    | Some p ->
+      "Fuaran.Core.ColExpr.InParam("
+      + fsColExpr (fieldReq "expr" v)
+      + ", "
+      + fsStr p
+      + ")"
+    | None ->
+      "Fuaran.Core.ColExpr.InList("
+      + fsColExpr (fieldReq "expr" v)
+      + ", [ "
+      + (arrOf "items" v |> List.map fsColExpr |> String.concat "; ")
+      + " ])"
+  | Some "isNull" -> "Fuaran.Core.ColExpr.IsNull(" + fsColExpr (fieldReq "expr" v) + ")"
+  | _ -> "Fuaran.Core.ColExpr.Lit(Fuaran.Core.Cell.Null)"
+
+let private fsStrList (items: JsonValue list) : string =
+  "[ " + (items |> List.map fsStrOf |> String.concat "; ") + " ]"
+
+let private fsPairList (items: JsonValue list) : string =
+  "[ "
+  + (items
+     |> List.map (fun p -> "(" + fsStr (strOf "a" p) + ", " + fsStr (strOf "b" p) + ")")
+     |> String.concat "; ")
+  + " ]"
+
+let private fsOrderList (items: JsonValue list) : string =
+  "[ "
+  + (items
+     |> List.map (fun o -> "(" + fsStr (strOf "col" o) + ", " + fsSortDir (strOf "dir" o) + ")")
+     |> String.concat "; ")
+  + " ]"
+
+let private fsTransformStep (v: JsonValue) : string =
+  match dollarType v with
+  | Some "filter" -> "Fuaran.Core.Transform.Filter(" + fsColExpr (fieldReq "pred" v) + ")"
+  | Some "project" -> "Fuaran.Core.Transform.Project(" + fsPairList (arrOf "cols" v) + ")"
+  | Some "derive" ->
+    "Fuaran.Core.Transform.Derive("
+    + fsStr (strOf "name" v)
+    + ", "
+    + fsColExpr (fieldReq "expr" v)
+    + ")"
+  | Some "groupBy" ->
+    let aggs =
+      arrOf "aggs" v
+      |> List.map (fun a ->
+        "{ Name = "
+        + fsStr (strOf "name" a)
+        + "; Fn = "
+        + fsAggFn (strOf "fn" a)
+        + "; Of = "
+        + fsStr (strOf "of" a)
+        + " }")
+      |> String.concat "; "
+
+    "Fuaran.Core.Transform.GroupBy("
+    + fsStrList (arrOf "keys" v)
+    + ", [ "
+    + aggs
+    + " ])"
+  | Some "join" ->
+    "Fuaran.Core.Transform.Join("
+    + fsDataSource (fieldReq "source" v)
+    + ", "
+    + fsPairList (arrOf "on" v)
+    + ", "
+    + fsJoinKind (strOf "how" v)
+    + ")"
+  | Some "window" ->
+    "Fuaran.Core.Transform.Window { PartitionBy = "
+    + fsStrList (arrOf "partitionBy" v)
+    + "; OrderBy = "
+    + fsOrderList (arrOf "orderBy" v)
+    + "; Fn = "
+    + fsWindowFn (strOf "fn" v) (optNum "n" v |> Option.map int)
+    + "; Of = "
+    + fsStr (strOf "of" v)
+    + "; As = "
+    + fsStr (strOf "as" v)
+    + " }"
+  | Some "pivot" ->
+    "Fuaran.Core.Transform.Pivot { Index = "
+    + fsStrList (arrOf "index" v)
+    + "; On = "
+    + fsStr (strOf "on" v)
+    + "; Values = "
+    + fsStr (strOf "values" v)
+    + "; Agg = "
+    + fsAggFn (strOf "agg" v)
+    + " }"
+  | Some "unpivot" ->
+    "Fuaran.Core.Transform.Unpivot("
+    + fsStrList (arrOf "idVars" v)
+    + ", "
+    + fsStrList (arrOf "valueVars" v)
+    + ")"
+  | Some "sort" -> "Fuaran.Core.Transform.Sort(" + fsOrderList (arrOf "by" v) + ")"
+  | Some "distinct" -> "Fuaran.Core.Transform.Distinct"
+  | Some "limit" ->
+    "Fuaran.Core.Transform.Limit("
+    + fsIntOf (fieldReq "n" v)
+    + ", "
+    + fsIntOf (fieldReq "offset" v)
+    + ")"
+  | Some "union" -> "Fuaran.Core.Transform.Union(" + fsDataSource (fieldReq "source" v) + ")"
+  | Some "intersect" -> "Fuaran.Core.Transform.Intersect(" + fsDataSource (fieldReq "source" v) + ")"
+  | Some "except" -> "Fuaran.Core.Transform.Except(" + fsDataSource (fieldReq "source" v) + ")"
+  | _ -> "Fuaran.Core.Transform.Distinct"
+
+/// A `Fuaran.Core.Row seq` — the typed row feed. Cells are boxed scalars; the
+/// codec's own `float`-first arm order means an integral float and a boxed int
+/// emit the same bytes, so numbers take the `float` spelling throughout.
+let private fsRows (v: JsonValue) : string =
+  let rows =
+    match v with
+    | JArray xs -> xs
+    | _ -> []
+
+  if List.isEmpty rows then
+    "Seq.empty"
+  else
+    let cell (x: JsonValue) : string option =
+      match x with
+      | JNull -> None
+      | JString s -> Some("box " + fsStr s)
+      | JBool b -> Some("box " + fsBoolLit b)
+      | JNumber n -> Some("box (" + fsFloatLit n + ": float)")
+      | _ -> Some("box " + fsStr "<opaque>")
+
+    let one (r: JsonValue) : string =
+      let members =
+        match r with
+        | JObject ms -> ms
+        | _ -> []
+
+      let pairs =
+        members
+        |> List.choose (fun (k, x) -> cell x |> Option.map (fun c -> "(" + fsStr k + ", " + c + ")"))
+
+      if List.isEmpty pairs then
+        "Map.empty"
+      else
+        "Map.ofList [ " + String.concat "; " pairs + " ]"
+
+    "(Seq.ofList [ " + (rows |> List.map one |> String.concat "; ") + " ])"
+
+// ─── the type-directed walk ───────────────────────────────────────────────────
+
+/// A record / anonymous-record body. Fields carry an explicit `;` so the parse
+/// never depends on the emitter having guessed its own absolute column.
+let private fsBraces (depth: int) (parts: string list) : string =
+  match parts with
+  | [] -> "Unchecked.defaultof<_>"
+  | [ one ] -> "{ " + one + " }"
+  | _ -> "{ " + String.concat (";\n" + pad (depth + 1) + "  ") parts + " }"
+
+// ─── the node envelope ────────────────────────────────────────────────────────
+//
+// A smart constructor sets `Id` + `Kind` and injects its kind's
+// `Defaults.Accessibility.*`; every other envelope trait is reached through the
+// published `Node.*` postfix modifiers. So a node's traits are applied as the
+// pipeline an author would write — `withAccessibility` / `withTooltip` /
+// `withTone` and friends — rather than by reaching past the constructor into a
+// record update. `Visible` is the one trait with no modifier of its own, and it
+// is the one place a record update appears.
+
+/// The style trait, one member per published modifier.
+let private fsStyleModifiers: (string * string * string) list =
+  [ "tone", "withTone", "ToneVariant"
+    "weight", "withWeight", "StyleWeight"
+    "emphasis", "withEmphasis", "Emphasis"
+    "role", "withRole", "StyleRole"
+    "voice", "withVoice", "FontVoice"
+    "direction", "withDirection", "TextDirection" ]
+
+let rec private fsVal (d: Fd) (depth: int) (v: JsonValue) : string =
+  match d with
+  | Fd.Str -> fsStrOf v
+  | Fd.Int -> fsIntOf v
+  | Fd.Flt -> fsFloatOf v
+  | Fd.Bool -> fsBoolOf v
+  | Fd.Jv -> fsJVal v
+  | Fd.NodeT -> fsNodeExpr (depth + 1) v
+  | Fd.Act -> fsUnionVal "Action" depth v
+  | Fd.Clo -> fsClosure
+  | Fd.Aria -> fsAria v
+  | Fd.Bind elem -> fsBinding elem depth v
+  | Fd.BindStatic elem ->
+    // The slot's encoder writes a BARE payload for a `Static` and a
+    // `$type`-tagged object for every other case, so the wire's own shape says
+    // which it is.
+    if (dollarType v).IsSome then
+      fsBinding elem depth v
+    else
+      "Binding.Static(Some(" + fsVal elem (depth + 1) v + "))"
+  | Fd.Lst elem ->
+    match v with
+    | JArray [] -> "[]"
+    | JArray [ one ] -> "[ " + fsVal elem (depth + 1) one + " ]"
+    | JArray xs ->
+      "[ "
+      + (xs
+         |> List.map (fsVal elem (depth + 1))
+         |> String.concat (";\n" + pad (depth + 1) + "  "))
+      + " ]"
+    | _ -> "[]"
+  | Fd.MapOf elem ->
+    match v with
+    | JObject [] -> "Map.empty"
+    | JObject ms ->
+      "Map.ofList [ "
+      + (ms
+         |> List.map (fun (k, x) -> "(" + fsStr k + ", " + fsVal elem (depth + 1) x + ")")
+         |> String.concat "; ")
+      + " ]"
+    | _ -> "Map.empty"
+  | Fd.Enum name -> fsEnumOf name v
+  | Fd.Rec name -> fsRecordLit name depth v
+  | Fd.Uni name -> fsUnionVal name depth v
+  | Fd.CoreRows -> fsRows v
+  | Fd.CoreDs -> fsDataSource v
+  | Fd.CoreTf -> fsTransformStep v
+  | Fd.CoreEx -> fsColExpr v
+  | Fd.SwitchOn -> fsSwitchOn depth v
+  | Fd.Verbatim lit -> lit
+
+/// One table row — `Name|wireKey|presence|descriptor` — read against the object
+/// that OWNS the slot. The presence column is the whole of the absence
+/// semantics: `!` a member a canonical emission always carries, `?` an `option`,
+/// `=<expr>` the one value the encoder omits the member at, `-` a declared
+/// member the wire never carries at all.
+and private fsSlot (spec: string) (depth: int) (owner: JsonValue) : string * string =
+  let parts = spec.Split '|'
+  let name = parts[0]
+  let key = parts[1]
+  let presence = parts[2]
+  let d = parseFd (parts[3..] |> String.concat "|")
+
+  let expr =
+    match d with
+    | Fd.SwitchOn -> fsSwitchOn depth owner
+    | Fd.Verbatim lit when key = "-" -> lit
+    | _ ->
+      match presence with
+      | "!" -> fsVal d depth (fieldReq key owner)
+      | "?" ->
+        match fieldOpt key owner with
+        | Some x -> "Some(" + fsVal d (depth + 1) x + ")"
+        | None -> "Option.None"
+      | omitAt ->
+        match fieldOpt key owner with
+        | Some x -> fsVal d depth x
+        | None -> omitAt.Substring 1
+
+  name, expr
+
+and private fsRecordLit (name: string) (depth: int) (v: JsonValue) : string =
+  match Map.tryFind name fsRecords with
+  | None -> "Unchecked.defaultof<_> (* unmodelled record: " + name + " *)"
+  | Some specs ->
+    specs
+    |> List.map (fun spec ->
+      let field, expr = fsSlot spec depth v
+      field + " = " + expr)
+    |> fsBraces depth
+
+and private fsUnionVal (name: string) (depth: int) (v: JsonValue) : string =
+  match name with
+  | "TextSource" -> fsTextSource depth v
+  | "TransformSource" -> fsTransformSource depth v
+  | _ ->
+    let tag = dollarType v |> Option.defaultValue ""
+    let cases = fsUnions |> Map.tryFind name |> Option.defaultValue []
+
+    match cases |> List.tryFind (fun (c, _) -> c = tag) with
+    | Some(caseName, []) -> name + "." + caseName
+    | Some(caseName, args) ->
+      name
+      + "."
+      + caseName
+      + "("
+      + (args
+         |> List.map (fun spec -> snd (fsSlot spec (depth + 1) v))
+         |> String.concat ", ")
+      + ")"
+    | None ->
+      // An unmodelled tag. Total, per this module's never-crash guarantee, and
+      // it must still yield a CONSTRUCTED value — a null one takes the
+      // canonical-form walk down with an NRE long before any byte comparison
+      // could name the fixture. Any payload-free case of the same union does.
+      match cases |> List.tryFind (fun (_, args) -> List.isEmpty args) with
+      | Some(caseName, _) -> name + "." + caseName
+      | None -> "Unchecked.defaultof<_> (* unmodelled " + name + " case: " + tag + " *)"
+
+/// `SwitchSpec.On` — the one dual-key shorthand in the model: `stateKey` is the
+/// sugar the encoder writes for a defaultless `Binding.State`, `on` the general
+/// binding. Reading the OWNER rather than a member is why this slot cannot ride
+/// the generic path.
+and private fsSwitchOn (depth: int) (owner: JsonValue) : string =
+  match optStr "stateKey" owner with
+  | Some key -> "Binding.State(" + fsStr key + ", Option.None)"
+  | None ->
+    match fieldOpt "on" owner with
+    | Some b -> fsBinding Fd.Str (depth + 1) b
+    | None -> "Binding.State(\"\", Option.None)"
+
+and private fsTextSource (depth: int) (v: JsonValue) : string =
+  match v with
+  // §3.6 — a literal text source's canonical form is the bare JSON string.
+  | JString s -> "TextSource.Literal " + fsStr s
+  | _ ->
+    match dollarType v with
+    | Some "Bound" -> "TextSource.Bound(" + fsBinding Fd.Str (depth + 1) (fieldReq "binding" v) + ")"
+    | Some "I18n" ->
+      let args =
+        match fieldReq "args" v with
+        | JObject [] -> "Map.empty"
+        | JObject ms ->
+          "Map.ofList [ "
+          + (ms
+             |> List.map (fun (k, x) -> "(" + fsStr k + ", " + fsJVal x + ")")
+             |> String.concat "; ")
+          + " ]"
+        | _ -> "Map.empty"
+
+      "TextSource.I18n(" + fsStr (strOf "key" v) + ", " + args + ")"
+    | _ -> "TextSource.Literal \"\""
+
+and private fsTransformSource (depth: int) (v: JsonValue) : string =
+  match dollarType v with
+  // A binding-shaped source is PRESERVED verbatim for live re-evaluation; the
+  // decode-time snapshot it derives is never encoded, so any well-typed value
+  // stands in for it.
+  | Some _ ->
+    "TransformSource.Live("
+    + fsBinding Fd.Jv (depth + 1) v
+    + ", Fuaran.Core.DataSource.Ref(\"\"))"
+  | None -> "TransformSource.Data(" + fsDataSource v + ")"
+
+and private fsTransformParams (depth: int) (v: JsonValue) : string =
+  match fieldOpt "params" v with
+  | Some(JArray ps) ->
+    "Some [ "
+    + (ps
+       |> List.map (fun p -> fsRecordLit "TransformParam" (depth + 1) p)
+       |> String.concat "; ")
+    + " ]"
+  | _ -> "Option.None"
+
+/// `Binding<'T>`, parameterised by the slot's own payload descriptor — the
+/// emitter's mirror of `encBinding`'s `encT` parameter. It is hand-written for
+/// that reason: no static table entry can carry a type the CALL SITE supplies.
+and private fsBinding (elem: Fd) (depth: int) (v: JsonValue) : string =
+  /// `Static.value` and `State.defaultValue` are the two positions a decoder
+  /// accepts an explicit `null` at as §16 shorthand for absence, so both read
+  /// as absent here rather than being refused.
+  let optTolerant (key: string) =
+    match JsonValue.tryField key v with
+    | None
+    | Some JNull -> None
+    | Some x -> Some x
+
+  let optPayload (key: string) =
+    match optTolerant key with
+    | Some x -> "Some(" + fsVal elem (depth + 1) x + ")"
+    | None -> "Option.None"
+
+  match dollarType v with
+  | Some "Static" -> "Binding.Static(" + optPayload "value" + ")"
+  | Some "Query" ->
+    let dependsOn =
+      match fieldOpt "dependsOn" v with
+      | Some(JArray xs) -> "Some " + fsStrList xs
+      | _ -> "Option.None"
+
+    "Binding.Query("
+    + fsStr (strOf "name" v)
+    + ", "
+    + fsClosure
+    + ", "
+    + dependsOn
+    + ")"
+  | Some "Filter" ->
+    "Binding.Filter("
+    + fsStr (strOf "name" v)
+    + ", "
+    + optPayload "defaultValue"
+    + ")"
+  | Some "Selection" ->
+    let field =
+      match optStr "field" v with
+      | Some f -> "Some " + fsStr f
+      | None -> "Option.None"
+
+    "Binding.Selection("
+    + fsStr (strOf "nodeId" v)
+    + ", "
+    + fsClosure
+    + ", "
+    + optPayload "defaultValue"
+    + ", "
+    + field
+    + ")"
+  | Some "State" ->
+    "Binding.State("
+    + fsStr (strOf "key" v)
+    + ", "
+    + optPayload "defaultValue"
+    + ")"
+  | Some "Now" ->
+    let grain =
+      match fieldOpt "grain" v with
+      | Some g -> "Some(" + fsEnumOf "TimeGrain" g + ")"
+      | None -> "Option.None"
+
+    "Binding.Now(" + fsClosure + ", " + grain + ")"
+  | Some "Computed" -> "Binding.Computed " + fsClosure
+  | Some "Local" ->
+    let onCommit =
+      match fieldOpt "onCommit" v with
+      | Some _ -> "Some " + fsClosure
+      | None -> "Option.None"
+
+    let codec =
+      match fieldOpt "codec" v with
+      | Some c -> "Some(" + fsUnionVal "Format" (depth + 1) c + ")"
+      | None -> "Option.None"
+
+    let commitTo =
+      match optStr "commitTo" v with
+      | Some s -> "Some " + fsStr s
+      | None -> "Option.None"
+
+    "Binding.Local("
+    + fsUnionVal "LocalFlushTrigger" (depth + 1) (fieldReq "flushOn" v)
+    + ", "
+    + fsClosure
+    + ", "
+    + fsBinding elem (depth + 1) (fieldReq "initialFrom" v)
+    + ", "
+    + onCommit
+    + ", "
+    + fsClosure
+    + ", "
+    + codec
+    + ", "
+    + commitTo
+    + ")"
+  | Some "Format" ->
+    "Binding.Format("
+    + fsBinding Fd.Flt (depth + 1) (fieldReq "source" v)
+    + ", "
+    + fsUnionVal "Format" (depth + 1) (fieldReq "format" v)
+    + ", "
+    + fsUnionVal "LocaleSource" (depth + 1) (fieldReq "locale" v)
+    + ")"
+  | Some "I18n" ->
+    let args =
+      match fieldOpt "args" v with
+      | Some(JObject ms) when not (List.isEmpty ms) ->
+        "Some(Map.ofList [ "
+        + (ms
+           |> List.map (fun (k, x) -> "(" + fsStr k + ", " + fsBinding Fd.Jv (depth + 1) x + ")")
+           |> String.concat "; ")
+        + " ])"
+      | Some(JObject _) -> "Some Map.empty"
+      | _ -> "Option.None"
+
+    "Binding.I18n(" + fsStr (strOf "key" v) + ", " + args + ")"
+  | Some "Transform" ->
+    "Binding.Transform("
+    + fsTransformSource (depth + 1) (fieldReq "source" v)
+    + ", [ "
+    + (arrOf "pipeline" v |> List.map fsTransformStep |> String.concat "; ")
+    + " ], "
+    + fsTransformParams depth v
+    + ")"
+  | Some "Expr" ->
+    "Binding.Expr("
+    + fsColExpr (fieldReq "expr" v)
+    + ", "
+    + fsTransformParams depth v
+    + ")"
+  | Some "Invoke" ->
+    "Binding.Invoke("
+    + fsStr (strOf "capabilityId" v)
+    + ", [ "
+    + (arrOf "args" v
+       |> List.map (fun a -> fsRecordLit "InvokeArg" (depth + 1) a)
+       |> String.concat "; ")
+    + " ])"
+  | _ -> "Binding.Static(Option.None)"
+
+and private fsNodeExpr (depth: int) (nodeV: JsonValue) : string =
+  markNode nodeV (fsNodeExprRaw depth nodeV)
+
+and private fsEnvelopeModifiers (depth: int) (injectsA11y: bool) (nodeV: JsonValue) : string list =
+  let accessibility =
+    match fieldOpt "accessibility" nodeV with
+    | Some a ->
+      [ "Node.withAccessibility (Some "
+        + fsRecordLit "Accessibility" (depth + 1) a
+        + ")" ]
+    // The constructor's own default is not this node's trait, so it is cleared
+    // explicitly. Correct whatever the default is — which is why the ctor table
+    // records only that there IS one.
+    | None ->
+      if injectsA11y then
+        [ "Node.withAccessibility Option.None" ]
+      else
+        []
+
+  let tooltip =
+    match fieldOpt "tooltip" nodeV with
+    | Some t -> [ "Node.withTooltip (" + fsTextSource (depth + 1) t + ")" ]
+    | None -> []
+
+  let style =
+    match fieldOpt "style" nodeV with
+    | Some st ->
+      fsStyleModifiers
+      |> List.choose (fun (key, fn, enumName) ->
+        fieldOpt key st
+        |> Option.map (fun value -> "Node." + fn + " " + fsEnumOf enumName value))
+    | None -> []
+
+  let state =
+    match fieldOpt "state" nodeV with
+    | Some s ->
+      [ fieldOpt "onLoading" s
+        |> Option.map (fun n -> "Node.onLoading (" + fsNodeExpr (depth + 1) n + ")")
+        fieldOpt "onEmpty" s
+        |> Option.map (fun n -> "Node.onEmpty (" + fsNodeExpr (depth + 1) n + ")")
+        fieldOpt "onError" s |> Option.map (fun _ -> "Node.onError " + fsClosure) ]
+      |> List.choose id
+    | None -> []
+
+  accessibility @ tooltip @ style @ state
+
+and private fsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
+  let id = strOf "id" nodeV
+  let kindObj = fieldReq "kind" nodeV
+  let kindType = dollarType kindObj |> Option.defaultValue ""
+
+  let specExpr (shape: string) =
+    match shape with
+    | "rows" -> "(" + fsIntOf (fieldReq "rows" kindObj) + ")"
+    | "items" -> fsVal (Fd.Lst(Fd.Rec "FilterSpec")) (depth + 1) (fieldReq "items" kindObj)
+    | _ -> fsRecordLit (kindType + "Spec") (depth + 1) kindObj
+
+  // `Visible` is the one envelope trait with no published `Node.*` modifier, so
+  // a node carrying it takes the record-literal path below rather than reaching
+  // past its own constructor with a `{ (…) with … }` update. Same surface, and
+  // it keeps every emission a single unambiguous shape.
+  let hasVisible = (fieldOpt "visible" nodeV).IsSome
+
+  match (if hasVisible then None else Map.tryFind kindType fsCtors) with
+  | Some(ctor, injectsA11y, shape) ->
+    let core = "Fuaran." + ctor + " " + fsStr id + " " + specExpr shape
+
+    match fsEnvelopeModifiers depth injectsA11y nodeV with
+    | [] -> core
+    | mods ->
+      core
+      + (mods
+         |> List.map (fun m -> "\n" + pad (depth + 1) + "|> " + m)
+         |> String.concat "")
+  | None ->
+    // No `(id, spec)`-shaped smart constructor for this kind: the `Node` record
+    // literal over `NodeKind.<Case>`, which is the same published surface one
+    // level down. `DataGrid` is reached through `table` / `grid` /
+    // `sortableTable` — each of which BUILDS its spec from a different shape
+    // rather than taking it — and `Custom` / `FragmentRef` likewise.
+    let opt (key: string) (render: JsonValue -> string) =
+      match fieldOpt key nodeV with
+      | Some x -> "Some(" + render x + ")"
+      | None -> "Option.None"
+
+    fsBraces
+      depth
+      [ "Id = " + fsStr id
+        "Kind = NodeKind." + kindType + "(" + specExpr "spec" + ")"
+        "Accessibility = "
+        + opt "accessibility" (fsRecordLit "Accessibility" (depth + 1))
+        "State = " + opt "state" (fsRecordLit "StateBehaviour" (depth + 1))
+        "Style = " + opt "style" (fsRecordLit "SemanticStyle" (depth + 1))
+        "Tooltip = " + opt "tooltip" (fsTextSource (depth + 1))
+        "Visible = " + opt "visible" (fsBinding Fd.Bool (depth + 1))
+        "Motion = Option.None"
+        "ExtraAttributes = Option.None" ]
+
+/// The bare projected F# expression (no header) – the input of the
+/// `tests/projection-conformance/` F# arm, which compiles it against the pinned
+/// `Fuaran.UI` package, executes it, and asserts a byte-identical canonical
+/// re-encode.
+let private fsExprWalk (wireJson: string) : string =
+  match JsonHost.parse wireJson with
+  | Some tree when isNode tree -> fsNodeExpr 0 tree
+  | Some tree -> fsJVal tree
+  | None -> "// no decodable node tree yet"
+
 // ─── the modern-host Box vocabulary (Go / Kotlin / Rust / Swift) ──────────────
 //
 // These four hosts model layout with a single `Box` kind carrying `role` +
@@ -5953,7 +7786,16 @@ let private walkFor (target: Target) (wireJson: string) : string =
     + "#     from fuaran_py.ui import compute as cp\n"
     + "#     from fuaran_py.schema import types as t\n\n"
     + pyExprWalk wireJson
-  | Target.FSharp -> header "F# (Fuaran.UI)" + project fsSpec wireJson
+  | Target.FSharp ->
+    "// The current tree as F# (Fuaran.UI) smart-constructor source.\n"
+    + "// Verified projection: compiling and executing this source re-encodes byte-identically to\n"
+    + "// the canonical wire JSON for every corpus-covered kind (closures/handlers are structural\n"
+    + "// placeholders).\n"
+    + "//\n"
+    + "//     open Fuaran.UI\n"
+    + "//     open Fuaran.UI.Types\n"
+    + "//     open Fuaran.Core\n\n"
+    + fsExprWalk wireJson
   | Target.CSharp -> header "C# (Fuaran.UI.CSharp)" + project csSpec wireJson
   | Target.VisualBasic -> vbWalk wireJson
   | Target.Go -> goWalk wireJson
@@ -5970,6 +7812,12 @@ let projectTypeScriptExpr (wireJson: string) : string = tsExprWalk wireJson
 /// `tests/projection-conformance/` Python arm, which executes it against the
 /// real `fuaran_py.ui` surface and asserts a byte-identical canonical re-encode.
 let projectPythonExpr (wireJson: string) : string = pyExprWalk wireJson
+
+/// The bare projected F# expression (no header) – the input of the
+/// `tests/projection-conformance/` F# arm, which emits every node fixture into
+/// ONE generated file, compiles it ONCE against the pinned `Fuaran.UI` package,
+/// executes it, and asserts a byte-identical canonical re-encode.
+let projectFSharpExpr (wireJson: string) : string = fsExprWalk wireJson
 
 let toTypeScript (wireJson: string) : string = walkFor Target.TypeScript wireJson
 

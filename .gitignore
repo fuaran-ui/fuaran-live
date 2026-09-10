@@ -82,3 +82,12 @@ __pycache__/
 
 # Phase 1628 measurement build (VITE_MEASURE=1) — never deployed
 dist-measure/
+
+# The F# projection-conformance arm's scratch projects (fuaran#1657). The arm
+# GENERATES one .fsproj + one Program.fs per run, compiles them once and reads
+# the process output; nothing here is source. Gitignored rather than written to a
+# temp path so the relative `nuget.config` walk still finds this repo's feed
+# configuration — and so a gate run leaves the tree clean, which is what lets a
+# later fold reuse the run instead of paying for a second one.
+tests/projection-conformance/.fsharp-exec/
+tests/projection-conformance/.fsharp-probe/

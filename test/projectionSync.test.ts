@@ -135,6 +135,20 @@ describe('the projection side map', () => {
 
     for (const lang of LANGS) {
       if (lang === 'json') continue;
+      if (lang === 'fsharp') {
+        // The one leg whose emission is COMPILED by a toolchain rather than
+        // evaluated in-process (fuaran#1657) escapes the character at source
+        // level: a raw C0 byte in a generated `.fs` is a hazard for everything
+        // that reads it — the compiler's own error rendering, a diff, an editor
+        // — and `` decodes to the same character, which that arm proves by
+        // re-encoding this payload's corpus sibling byte-identically.
+        expect(P.projectByName(lang, hostile), lang).toContain('before\\u0001after');
+        // So its emission carries no marker byte, the strip pass has nothing to
+        // trip over, and the span it reports is a REAL one over byte-exact text.
+        // The guard below stands down for the legs that need it, not for this one.
+        expect(Array.from(P.spanIdsByName(lang, hostile)), lang).toEqual(['root']);
+        continue;
+      }
       // The content survives the projection untouched…
       expect(P.projectByName(lang, hostile), lang).toContain(marker);
       // …and no span is claimed over it.
@@ -181,11 +195,12 @@ describe('the projection side map', () => {
 
 describe('nearest-enclosing resolution', () => {
   it('resolves to the focused node where the language projects it', () => {
-    // `python` joined this group at fuaran#1142: its per-kind emitter projects a
-    // state-slot placeholder as a nested constructor call with a span of its own,
-    // exactly as the TypeScript leg does, where the generic walker folded it into
-    // the parent construct.
-    for (const lang of ['json', 'typescript', 'python']) {
+    // `python` joined this group at fuaran#1142 and `fsharp` at fuaran#1657: each
+    // per-kind emitter projects a state-slot placeholder as a nested construct
+    // with a span of its own — the F# leg through `Node.onLoading`, the published
+    // modifier for that trait — exactly as the TypeScript leg does, where the
+    // generic walker folded it into the parent construct.
+    for (const lang of ['json', 'typescript', 'python', 'fsharp']) {
       expect(P.spanPathIdByName(lang, stateSlotTree, ['root', 'spinner']), lang).toBe('spinner');
       expect(P.spanPathTextByName(lang, stateSlotTree, ['root', 'spinner']), lang).toContain(
         'Loading',
@@ -194,7 +209,11 @@ describe('nearest-enclosing resolution', () => {
   });
 
   it('falls back to the closest projected ancestor where it does not', () => {
-    for (const lang of ['fsharp']) {
+    // The legs still on the generic `LangSpec` walk (and the two with their own
+    // structural walkers) read a node's `kind` members and nothing else, so the
+    // whole state trait is folded away here. That is the set this check is about,
+    // and it shrinks by one every time a leg is taught per-kind emission.
+    for (const lang of ['csharp', 'vb', 'go', 'kotlin', 'rust', 'swift']) {
       // The state slot is folded into the parent construct, so `spinner` has no
       // span of its own here…
       expect(Array.from(P.spanIdsByName(lang, stateSlotTree)), lang).toEqual(['root']);

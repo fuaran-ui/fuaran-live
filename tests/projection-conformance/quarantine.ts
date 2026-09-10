@@ -1,4 +1,5 @@
-// The projection-conformance QUARANTINE — one table for both arms (Phase 1584).
+// The projection-conformance QUARANTINE — one table for every arm (Phase 1584;
+// the F# arm joined it at fuaran#1657).
 //
 // Until this phase the two arms kept two tables in two files, and the fields did
 // not even mean the same thing: `typescript.test.ts` held a bare `Set` of ids,
@@ -8,7 +9,8 @@
 // diffing two files, and the word `arm` answered it differently in each.
 //
 // One table, keyed by fixture id, resolves both. `arm` now names the CONFORMANCE
-// ARM (`typescript` | `python`); `class` names which repository owns the cause
+// ARM (`typescript` | `python` | `fsharp` — the third joined at fuaran#1657);
+// `class` names which repository owns the cause
 // (`host` | `projector` | `both`) — the field the Python arm used to call `arm`.
 // A fixture is a ROW, and a row carries one entry per arm that quarantines it, so
 // a per-arm mismatch is visible in the row rather than in a diff.
@@ -22,9 +24,11 @@
 // ── THE TOKEN GRAMMAR ────────────────────────────────────────────────────────
 //
 // A `construct` is a path into the arm's own pinned HOST, resolved by that arm's
-// resolver — `resolve_construct` in `python_exec.py` for the Python arm, and
-// `resolveTypeScriptConstruct` below for the TypeScript one. The two hosts are
-// different surfaces, so the two grammars are near-siblings rather than one:
+// resolver — `resolve_construct` in `python_exec.py` for the Python arm,
+// `resolveTypeScriptConstruct` below for the TypeScript one, and
+// `resolveFSharpConstructs` in `fsharp.test.ts` for the F# one. The three hosts
+// are different surfaces, so the three grammars are near-siblings rather than
+// one:
 //
 //   PYTHON (resolved against the installed interpreter)
 //     `t.Drawing`                  a symbol the module must export. A module
@@ -37,6 +41,20 @@
 //     `fuaran.embed`               a member of a factory namespace the evaluated
 //                                  source binds. A bare name resolves in `fuaran`.
 //     `ops.encodeNode`             the same, over the encoder module.
+//
+//   F# (resolved by the F# COMPILER against the pinned `Fuaran.UI` package)
+//     `Binding.Expr`               a CASE of a union.
+//     `MetricSpec.Trend`           a FIELD of a record.
+//     `Fuaran.metric`              a smart constructor.
+//                                  There is no in-process surface to look a symbol
+//                                  up on here — the arm's host is a compiled
+//                                  assembly — so the resolver COMPILES a probe that
+//                                  mentions each token and reads which mentions the
+//                                  compiler refused. That is a stronger answer than
+//                                  the other two arms get, and it is the only
+//                                  honest one available: the arm's claim is about
+//                                  what the package's contract admits, and the
+//                                  compiler is that contract.
 //
 //   There was a third Python spelling, `optional:Owner.field` ("the record can
 //   OMIT this slot"), and it is RETIRED — see lesson 4 below. BOTH arms refuse a
@@ -149,12 +167,12 @@ import { describe, expect, it } from 'vitest';
 import type { TokenFamily } from './host-capability';
 
 /** Which conformance arm quarantines the fixture. */
-export type Arm = 'typescript' | 'python';
+export type Arm = 'typescript' | 'python' | 'fsharp';
 
 /** Which repository owns the cause. `both` additionally names a projector construct. */
 export type CauseClass = 'host' | 'projector' | 'both';
 
-export const ARMS: readonly Arm[] = ['typescript', 'python'];
+export const ARMS: readonly Arm[] = ['typescript', 'python', 'fsharp'];
 
 const CLASSES: readonly CauseClass[] = ['host', 'projector', 'both'];
 
@@ -190,9 +208,12 @@ export interface QuarantineEntry {
  *
  * The state, as re-measured 2026-09-07 against fuaran-py 0.3.0 and re-run
  * unchanged 2026-09-09 against the pinned 0.4.0: six ids, two constructs, both
- * host lag with the probe agreeing, all on the Python arm. The TypeScript arm
- * holds none, and its emptiness is an assertion — every node fixture is required
- * to re-encode byte-identically there.
+ * host lag with the probe agreeing, all on the Python arm. The TypeScript and F#
+ * arms hold none, and in both cases the emptiness is an assertion — every node
+ * fixture is required to re-encode byte-identically there. The F# arm was EMPTY
+ * FROM ITS FIRST RUN (fuaran#1657): its host is the pinned `Fuaran.UI` package,
+ * whose model IS the wire model, so a construct the corpus carries is a
+ * construct the package declares and every shortfall was the projector's own.
  */
 export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new Map<
   string,
@@ -292,7 +313,7 @@ export type ArmTally = Record<CauseClass, number>;
 
 /** The table's own tally, by arm and by cause class. */
 export const tally = (): Record<Arm, ArmTally> => {
-  const out = { typescript: emptyTally(), python: emptyTally() };
+  const out = { typescript: emptyTally(), python: emptyTally(), fsharp: emptyTally() };
   for (const entries of QUARANTINE.values()) for (const e of entries) out[e.arm][e.class] += 1;
   return out;
 };
@@ -308,6 +329,10 @@ const emptyTally = (): ArmTally => ({ host: 0, projector: 0, both: 0 });
 export const QUARANTINE_CENSUS: Readonly<Record<Arm, ArmTally>> = {
   typescript: { host: 0, projector: 0, both: 0 },
   python: { host: 6, projector: 0, both: 0 },
+  // The F# arm holds NONE, and its emptiness is an assertion of its own
+  // (fuaran#1657) — every node fixture is required to compile, execute and
+  // re-encode byte-identically there. See `fsharp.test.ts`.
+  fsharp: { host: 0, projector: 0, both: 0 },
 };
 
 /**
@@ -352,12 +377,14 @@ export const quarantineRows = (): string => {
     const e = entries.find((x) => x.arm === arm);
     return e === undefined ? '—' : `${e.class}: ${e.construct}`;
   };
-  const header = `${'fixture'.padEnd(width)}  typescript                python`;
+  // One column per arm, generated from ARMS rather than spelled out: a third arm
+  // joined in fuaran#1657 and a hand-written header would have gone on rendering
+  // two columns over three cells.
+  const header = `${'fixture'.padEnd(width)}  ${ARMS.map((a) => a.padEnd(24)).join('')}`.trimEnd();
   const rows = [...QUARANTINE]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(
-      ([id, entries]) =>
-        `${id.padEnd(width)}  ${cell(entries, 'typescript').padEnd(24)}  ${cell(entries, 'python')}`,
+    .map(([id, entries]) =>
+      `${id.padEnd(width)}  ${ARMS.map((a) => cell(entries, a).padEnd(24)).join('')}`.trimEnd(),
     );
   return [header, ...rows].join('\n');
 };
@@ -385,6 +412,16 @@ export const emissionPattern = (arm: Arm, construct: string): RegExp => {
     return lowercase
       ? new RegExp(String.raw`\b${leaf}\s*=`)
       : new RegExp(String.raw`\b[a-z]+\.${leaf}\b`);
+  }
+  if (arm === 'fsharp') {
+    // The F# leg spells a smart constructor as `Fuaran.metric "` (a lower-case
+    // leaf under a qualifying module), and everything else PascalCase: a union
+    // case as `Binding.Expr(`, a record field as `Trend = `. The `=` anchor is
+    // what keeps a field's name from matching its own value's spelling, and the
+    // qualifier is what keeps a fixture id from reading as an emission.
+    return lowercase
+      ? new RegExp(String.raw`\b[A-Za-z]+\.${leaf}\s`)
+      : new RegExp(String.raw`(\b[A-Za-z]+\.${leaf}\b|\b${leaf}\s*=)`);
   }
   return lowercase
     ? new RegExp(String.raw`(\b[A-Za-z]+\.${leaf}\s*\(|\b${leaf}\s*:)`)

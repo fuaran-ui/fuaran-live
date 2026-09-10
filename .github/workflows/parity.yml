@@ -51,7 +51,7 @@ jobs:
           # The corpus checkout stays unpinned deliberately — it is the shared
           # conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: v0.79.0
+          ref: v0.80.0
           path: workspace/fuaran-dotnet
 
       - name: Checkout fuaran-live (this repo)

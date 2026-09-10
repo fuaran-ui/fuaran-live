@@ -58,7 +58,7 @@ jobs:
           # The corpus checkout stays unpinned deliberately — it is the shared
           # conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: v0.79.0
+          ref: v0.80.0
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4
@@ -108,7 +108,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install the Python host (fuaran-py)
-        run: python -m pip install --disable-pip-version-check fuaran-py==0.4.0
+        run: python -m pip install --disable-pip-version-check fuaran-py==0.5.0
 
       - name: Publish the conformance report
         env:

@@ -245,11 +245,11 @@ module AIProviderCapabilities =
 /// the user as a failed AITask.
 type AIProviderError =
   /// Transport-level transient failure: connection refused, TCP reset,
-  /// DNS resolution failure, or a timeout from the HTTP client. Retry-
-  /// worthy within the provider's RetryPolicy budget.
+  /// DNS resolution failure, or a timeout from the HTTP client.
+  /// Retry-worthy — see the note on `isRetryable` about WHO retries.
   | TransientNetwork of message: string
   /// HTTP 429 (rate-limited) or 5xx server error. Retry-worthy with
-  /// exponential backoff derived from `RetryPolicy.InitialBackoff`.
+  /// exponential backoff, where a host chooses to retry at all.
   | TransientServer of statusCode: int * message: string
   /// HTTP 4xx other than 429 — authentication failure, bad request,
   /// model not found, content policy violation. Same request would
@@ -264,9 +264,11 @@ type AIProviderError =
   /// output so the caller cannot retry safely — partial text is
   /// preserved for diagnostics and the error must surface to the user.
   | StreamingAborted of partialText: string * detail: string
-  /// The provider's internal retry loop exhausted its RetryPolicy budget
-  /// without a successful response. Wraps the last inner error so
-  /// callers can still distinguish root cause.
+  /// A host's retry loop exhausted its budget without a successful
+  /// response. Wraps the last inner error so callers can still
+  /// distinguish root cause. No host in THIS app raises it — see the note
+  /// on `isRetryable` — but it stays in the vocabulary because the shape
+  /// is the provider contract's, not one implementation's.
   | RetriesExhausted of attempts: int * lastError: AIProviderError
   /// The caller asked for a feature the active model
   /// doesn't support (currently: vision input against a
@@ -305,9 +307,14 @@ module AIProviderError =
     | UnsupportedCapability(feature, detail) -> $"Unsupported capability '{feature}': {detail}"
     | SchemaUnsupported(feature, detail) -> $"Schema feature '{feature}' not honoured by provider: {detail}"
 
-  /// Whether a single attempt's error justifies another retry inside
-  /// the provider's loop. Callers (e.g. the agent loop) use different
-  /// rules — StreamingAborted is always terminal at the agent level.
+  /// Whether a single attempt's error justifies another retry.
+  ///
+  /// A CLASSIFICATION, not a retry loop, and this copy carries no loop to run
+  /// it (Phase 1676 dropped the four modules that had none): retrying a
+  /// rate-limited request automatically spends the reader's own key, and they
+  /// are the only party who can weigh that, so this app surfaces the limit
+  /// instead. Callers use different rules at different levels — StreamingAborted
+  /// is always terminal at the agent level.
   let isRetryable (err: AIProviderError) =
     match err with
     | TransientNetwork _

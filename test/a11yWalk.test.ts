@@ -18,15 +18,14 @@
 //      flagged for an empty structural label; a well-formed node is silent.
 //      An audit that cries wolf is worse than no audit, so this is asserted as
 //      hard as the true-positive cases.
-//   4. The re-derived interactive-kind set is PINNED against the language's own
-//      source — every kind the lens calls interactive really carries a
-//      non-`none` per-kind accessibility default upstream.
+//   4. The two checks the lens no longer owns — `A11Y-NAME` and `A11Y-REF` —
+//      are the shipped runtime validator's FUARAN109 / FUARAN110 verdicts under
+//      a local label (Phase 1676), so they are asserted through behaviour on
+//      real decoded trees rather than against a re-derived table.
 //
 // Requires `pnpm run fable:app` (or `dotnet fable app --outDir app/output`).
 
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 import {
@@ -45,7 +44,6 @@ import {
   nextFlagText,
   prevFlagText,
   quickFixAt,
-  interactiveKindNames,
   // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/A11yWalk.js';
 import {
@@ -282,47 +280,24 @@ describe('the quick-fix is an ordinary edit', () => {
   });
 });
 
-describe('the one re-derived table is pinned to the language', () => {
-  // The lens re-derives which kinds are interactive because the language states
-  // it one smart-constructor call site at a time rather than as a queryable
-  // surface. The pin is ONE-DIRECTIONAL on purpose: every kind the lens calls
-  // interactive must really carry a non-`none` default upstream (so the audit
-  // cannot accuse a node of a defect the language does not recognise), but the
-  // lens is NOT required to cover every such kind — an un-audited kind is a gap,
-  // whereas a falsely-flagged one is a wrong answer.
-  const languageSource = fileURLToPath(
-    new URL('../../fuaran-dotnet/src/Fuaran.UI/Fuaran.fs', import.meta.url),
-  );
-
-  it('names only kinds the language gives a non-none accessibility default', () => {
-    if (!existsSync(languageSource)) {
-      // The sibling checkout is a build input, so this should not happen; skip
-      // rather than fail, so a missing checkout never masquerades as drift.
-      return;
-    }
-    const source = readFileSync(languageSource, 'utf8');
-
-    for (const kind of interactiveKindNames as string[]) {
-      const pairing = new RegExp(
-        `NodeKind\\.${kind}\\([^)]*\\)\\)?\\s*\\n?\\s*Defaults\\.Accessibility\\.(\\w+)`,
-      );
-      const found = source.match(pairing);
-      expect(found, `no Defaults.Accessibility pairing found for NodeKind.${kind}`).not.toBeNull();
-      expect(found![1], `NodeKind.${kind} is paired with Defaults.Accessibility.none`).not.toBe(
-        'none',
-      );
-    }
-  });
-
-  it('covers the four interactive kinds the lens claims', () => {
-    expect(Array.from(interactiveKindNames).sort()).toEqual([
-      'Button',
-      'FileUpload',
-      'Form',
-      'Select',
-    ]);
-  });
-});
+// The interactive-kind pin that stood here is RETIRED with the swap that made it
+// redundant (Phase 1676). It existed because the lens re-derived which kinds are
+// interactive, from a hand-maintained list of kind-name strings that could drift
+// from the language in silence; the pin read the language's F# source back and
+// checked the list against it, one-directionally.
+//
+// There is no list any more. `A11Y-NAME` is FUARAN109 read off the shipped
+// runtime validator, and the one thing still asked per kind — which required
+// field is the naming slot — references `Defaults.Accessibility.*` VALUES
+// directly, so a language change that used to drift silently is now a compile
+// error at the reference. A test that re-reads the source to confirm a value the
+// code already holds asserts nothing.
+//
+// What did NOT retire with it is the coverage the pin's second case gave: that
+// the four interactive kinds are actually audited. The suite above asserts that
+// through behaviour instead — `btn-bad` is flagged, `btn-ok` and `btn-aria` are
+// not — which is the stronger statement, because it goes through the same path a
+// reader's tree does.
 
 // The flat surfaces are addressed by node id, so tests never need to hold a
 // decoded `Node` — except `declaredTrait`, which takes one. Reach it the same

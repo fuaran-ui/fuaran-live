@@ -40,8 +40,11 @@ module Fuaran.Live.A11yWalk
 //     packs no `fable/` sources. It cannot run in a browser, and even if it
 //     could there is no F# source here to walk: the playground's trees arrive
 //     as wire JSON from a model.
-//     So the three checks below are re-derived over the DECODED TREE, each
-//     grounded in a real surface, and each says which.
+//     But the Fable-safe RUNTIME validator (`Fuaran.UI.PreEmitValidate`) DOES
+//     run in a browser, over a decoded tree, and since Phase 727 it carries the
+//     accessibility family. Two of the three checks below are therefore its
+//     verdict, not a re-derivation (see "The mapping, PERFORMED"); the third is
+//     re-derived over the DECODED TREE, grounded in a real surface, and says so.
 //
 //  ── STALE CLAIM, CORRECTED (2026-09-09) ────────────────────────────────────
 //
@@ -55,16 +58,31 @@ module Fuaran.Live.A11yWalk
 //    · `EmptyAccessibilityDeclaration`  — FUARAN111 (Warning)
 //
 //  A header that asserts a surface does not exist is worse than one that says
-//  nothing, because it is the thing a reader checks INSTEAD of looking — so it
-//  is corrected here even though the consuming swap has not landed.
+//  nothing, because it is the thing a reader checks INSTEAD of looking. It was
+//  corrected before the consuming swap landed; the swap has since landed, and
+//  the block below says what it did.
 //
-//  ── The mapping, DECIDED (2026-09-09) ──────────────────────────────────────
+//  ── The mapping, PERFORMED (Phase 1676) ────────────────────────────────────
 //
-//  Two of the three checks below map cleanly onto shipped rules and should be
-//  swapped onto them: `A11Y-NAME` -> FUARAN109, `A11Y-REF` -> FUARAN110. That
-//  swap also retires the hand `interactiveKinds` list and its source-lock test,
-//  since the validator reads `Defaults.Accessibility.*` directly rather than
-//  restating it.
+//  Two of the three checks below no longer re-derive anything: `A11Y-NAME` IS
+//  FUARAN109 and `A11Y-REF` IS FUARAN110, read off `PreEmitValidate.validate`
+//  over the same tree, with the validator's own message and its own severity.
+//  The local codes survive as the lens's UI vocabulary (a quick-fix is keyed by
+//  them, and the flag card reads the same way it always did), but they are now
+//  a LABEL on somebody else's verdict rather than a verdict of their own — so a
+//  rule the language tightens tightens here in the same package bump, with no
+//  edit in this file.
+//
+//  That also retired the hand `interactiveKinds` list and its source-lock test.
+//  The list existed because this lens had to decide interactivity for itself;
+//  it does not any more. What remains is the naming SLOT — which required field
+//  of an interactive kind is the one FUARAN109 speaks for — and that is read
+//  from the language's own `Defaults.Accessibility.*` VALUES rather than from a
+//  table of kind names (`interactiveNamingSlot`, below). A pin test is
+//  redundant against a reference to the value itself: if the language stopped
+//  pairing a kind with an interactive default, this would return `None` and the
+//  audit would go quiet about that kind, which is the direction it is allowed
+//  to be wrong in.
 //
 //  `A11Y-TEXT` DOES NOT MAP, and it is KEPT. It looks like FUARAN111 and is a
 //  different check on a different subject:
@@ -87,17 +105,6 @@ module Fuaran.Live.A11yWalk
 //  read at runtime through `Agent.getKindSchema`. The validator has no schema
 //  document; this lens does. A rule cannot be moved to a place that cannot
 //  answer the question it asks.
-//   · WHICH kinds are interactive (`interactiveKinds`). The language states
-//     this — every smart constructor in `Fuaran.fs` passes a per-kind
-//     `Defaults.Accessibility.*` — but it states it as one value per call site,
-//     not as a queryable `NodeKind -> Accessibility` surface. The set below is
-//     the four kinds paired with an INTERACTIVE role default. A source-lock
-//     test pins it against that language source, in the safe direction only:
-//     every kind named here must really carry a non-`none` default, so the
-//     audit can never accuse a node of a defect the language does not
-//     recognise. It deliberately does NOT assert completeness — a newly
-//     interactive kind is then un-audited rather than falsely flagged, and
-//     un-audited is the failure this lens can afford.
 //
 //  ── One correction the substrate's own comments get wrong ──────────────────
 //
@@ -140,6 +147,8 @@ module Introspect = Fuaran.UI.Ops.Introspect
 module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 module Aria = Fuaran.UI.Renderer.Accessibility
 module Resolver = Fuaran.UI.Renderer.BindingResolver
+module Validate = Fuaran.UI.PreEmitValidate
+module Defaults = Fuaran.UI.Defaults
 
 // ─── the flag model (pure — no DOM, no React) ────────────────────────────────
 
@@ -234,21 +243,67 @@ let private kindSchema (disc: string) : obj =
     schemaCache[disc] <- resolved
     resolved
 
-// ─── the one re-derived table ────────────────────────────────────────────────
+// ─── the naming slot, read off the language's own defaults ───────────────────
 
-/// The kinds whose rendered element is INTERACTIVE and so must reach a screen
-/// reader with a name. Each is a kind the language pairs with an interactive
-/// `Defaults.Accessibility.*` in `Fuaran.fs` — `button` and `fileUpload` take
-/// `Role = Button`, `select` takes `Role = Custom "combobox"`, `form` takes
-/// `Role = Form`. Pinned by the source-lock test; see the header for why the
-/// pin is one-directional.
-let interactiveKinds = [ "Button"; "Select"; "Form"; "FileUpload" ]
+/// Which of an interactive kind's required fields is the one whose text NAMES
+/// the element — `label` on Button / Select / FileUpload, `submitLabel` on Form
+/// (its submit button) — or `None` for a kind the language does not pair with an
+/// interactive accessibility default.
+///
+/// The VERDICT it carries is interactivity, and the verdict comes from the
+/// language's own per-kind default VALUE rather than from a table of kind names
+/// restating it: if `Defaults.Accessibility.button` stopped declaring a role,
+/// this returns `None` and the audit goes quiet about buttons, which is the
+/// direction it is allowed to be wrong in. That is why the hand list this
+/// replaced needed a source-lock test and this does not.
+///
+/// It reads the same input `PreEmitValidate`'s own FUARAN109 gate reads, so the
+/// two agree by construction — which is what the one remaining consumer needs:
+/// `A11Y-TEXT` must exclude this slot OUTRIGHT, including on the nodes where
+/// FUARAN109 is silent because the trait names the element another way.
+let private interactiveNamingSlot (kind: NodeKind<obj>) : string option =
+  let named (dflt: Accessibility option) (slot: string) =
+    match dflt with
+    | Some a when a.Role.IsSome -> Some slot
+    | _ -> None
 
-/// The wire names of the fields whose text content NAMES an interactive
-/// element — `label` on Button / Select / FileUpload, `submitLabel` on Form.
-/// Both are required fields of their kinds, so the schema surfaces them; this
-/// list only says which of a kind's required fields is the naming one.
-let private nameFieldWireNames = [ "label"; "submitLabel" ]
+  match kind with
+  | NodeKind.Button _ -> named Defaults.Accessibility.button "label"
+  | NodeKind.Select _ -> named Defaults.Accessibility.select "label"
+  | NodeKind.Form _ -> named Defaults.Accessibility.form "submitLabel"
+  | NodeKind.FileUpload _ -> named Defaults.Accessibility.fileUpload "label"
+  | _ -> None
+
+/// The accessibility half of `PreEmitValidate`'s verdict on a whole tree —
+/// FUARAN109 and FUARAN110, the two rules this lens consumes rather than
+/// re-derives. Computed once per walk: FUARAN110 needs the whole tree (a
+/// reference is dangling only relative to every id in it), and re-validating per
+/// node would be quadratic for an identical answer.
+///
+/// Total: a validator that throws on some shape must not take the audit down
+/// with it, so a failure reads as "no accessibility findings" — under-reporting,
+/// which is this lens's standing direction of error.
+let private validatorA11yDefects (root: Node<obj>) : Validate.PreEmitDefect list =
+  try
+    match Validate.validate root with
+    | Ok() -> []
+    | Error defects ->
+      defects
+      |> List.filter (fun d ->
+        match d with
+        | Validate.PreEmitDefect.InteractiveWithoutAccessibleName _
+        | Validate.PreEmitDefect.DanglingAccessibilityReference _ -> true
+        | _ -> false)
+  with _ ->
+    []
+
+/// The validator's severity in this lens's vocabulary. The two mirror
+/// `Fuaran.UI.Validator.Findings.Severity` between them, so this is a spelling
+/// change and not a judgement.
+let private severityOf (s: Validate.DefectSeverity) : Severity =
+  match s with
+  | Validate.DefectSeverity.Error -> Severity.Error
+  | Validate.DefectSeverity.Warning -> Severity.Warning
 
 // ─── derivation ──────────────────────────────────────────────────────────────
 
@@ -301,9 +356,9 @@ let private requiredRows (node: Node<obj>) (disc: string) : (string * PropertyEd
 let private isTextRow (field: PropertyEditor.Field) : bool =
   field.Editor = PropertyEditor.Editor.Text
 
-/// Every accessibility finding against one node, in a stable order.
-/// `root` is needed only to resolve `labelledBy` / `describedBy` references.
-let nodeFlags (root: Node<obj>) (node: Node<obj>) : Flag list =
+/// Every accessibility finding against one node, in a stable order, given the
+/// validator's verdict over the whole tree (which `treeFlags` computes once).
+let private nodeFlagsWith (defects: Validate.PreEmitDefect list) (root: Node<obj>) (node: Node<obj>) : Flag list =
   let json = nodeJson node
 
   if json = "" then
@@ -313,40 +368,45 @@ let nodeFlags (root: Node<obj>) (node: Node<obj>) : Flag list =
     let disc = displayOf (valueAt json "kind.$type")
     let required = requiredRows node disc
 
-    // A node HAS a declared name when the trait names it directly or points at
-    // a labelling node. Tested on the declaration, not the emission — see the
-    // header: a bound label resolves to nothing here and is still a name.
-    let declaresName =
-      isPresent (valueAt json "accessibility.label")
-      || isPresent (valueAt json "accessibility.labelledBy")
+    /// The derived editor row reaching one wire field of this node's kind, when
+    /// the property panel publishes one. A flag's fix target is always one of
+    /// these, so a fix can never name a field no op addresses.
+    let rowFor (wireName: string) =
+      required
+      |> List.tryFind (fun (name, field) -> name = wireName && isTextRow field)
 
-    let isInteractive = List.contains disc interactiveKinds
+    // The slot FUARAN109 speaks for on this kind, if any. Read here rather than
+    // inside the two consumers below so both agree by construction.
+    let namingSlot = interactiveNamingSlot node.Kind
+    let nameRow = namingSlot |> Option.bind rowFor
 
-    let nameRow =
-      if not isInteractive then
-        None
-      else
-        required
-        |> List.tryFind (fun (wireName, field) -> List.contains wireName nameFieldWireNames && isTextRow field)
-
-    // ── A11Y-NAME — an interactive element that reaches nobody by name ──
+    // ── A11Y-NAME — FUARAN109, verbatim ──
+    //
+    // The message is the validator's own. Re-writing it here would be a second
+    // opinion about a rule this lens no longer owns, and the two would drift the
+    // first time the rule's wording was sharpened.
     let nameFlags =
-      if not isInteractive then
-        []
-      else
-        match nameRow with
-        | Some(_, field) when not declaresName && field.Current = "" ->
-          [ { NodeId = id
+      defects
+      |> List.choose (fun d ->
+        match d with
+        | Validate.PreEmitDefect.InteractiveWithoutAccessibleName(nodeId, _, slot) when nodeId = id ->
+          let _, severity, message = Validate.describe d
+
+          Some
+            { NodeId = id
               Code = "A11Y-NAME"
-              Severity = Severity.Error
-              Message =
-                sprintf
-                  "%s reaches a screen reader with no name: '%s' is empty and the node declares neither accessibility.label nor accessibility.labelledBy. Its accessible name would come from its text content, and there is none."
-                  disc
-                  field.Path
-              Fix = Some field.Path
-              Unfixable = "" } ]
-        | _ -> []
+              Severity = severityOf severity
+              Message = message
+              // The slot the rule names, resolved to the row that edits it. A
+              // slot the property panel does not publish leaves the finding
+              // standing and unfixable rather than dropping it: the defect is
+              // real either way, and only the quick-fix is unavailable.
+              Fix = rowFor slot |> Option.map (fun (_, field) -> field.Path)
+              Unfixable =
+                match rowFor slot with
+                | Some _ -> ""
+                | None -> "no editable field reaches '" + slot + "' on this node" }
+        | _ -> None)
 
     // ── A11Y-TEXT — a required text field left blank (renders empty) ──
     //
@@ -375,40 +435,36 @@ let nodeFlags (root: Node<obj>) (node: Node<obj>) : Flag list =
           Fix = Some field.Path
           Unfixable = "" })
 
-    // ── A11Y-REF — an accessibility reference pointing at nothing ──
-    // No op in the vocabulary reaches the `accessibility` trait: `UpdateProp`
-    // paths are rooted INSIDE the kind spec, and `Introspect.availableFields`
-    // publishes no accessibility field precisely because none is reachable.
-    // So this one is reported honestly and left unfixable rather than given a
-    // fix path that would not work.
+    // ── A11Y-REF — FUARAN110, verbatim ──
+    //
+    // Reported honestly and left unfixable: no op in the vocabulary reaches the
+    // `accessibility` trait — `UpdateProp` paths are rooted INSIDE the kind
+    // spec, and `Introspect.availableFields` publishes no accessibility field
+    // precisely because none is reachable. A fix path here would not work.
     let refFlags =
-      [ "labelledBy", "aria-labelledby"; "describedBy", "aria-describedby" ]
-      |> List.choose (fun (key, attr) ->
-        let target = valueAt json ("accessibility." + key)
+      defects
+      |> List.choose (fun d ->
+        match d with
+        | Validate.PreEmitDefect.DanglingAccessibilityReference(nodeId, _, _) when nodeId = id ->
+          let _, severity, message = Validate.describe d
 
-        if not (isPresent target) then
-          None
-        else
-          let wanted = displayOf target
-
-          match Introspect.findNode (NodeId wanted) root with
-          | Some _ -> None
-          | None ->
-            Some
-              { NodeId = id
-                Code = "A11Y-REF"
-                Severity = Severity.Error
-                Message =
-                  sprintf
-                    "accessibility.%s names '%s', which is not a node in this tree — the emitted %s points at nothing and the reference is silently ignored."
-                    key
-                    wanted
-                    attr
-                Fix = None
-                Unfixable =
-                  "no op reaches the accessibility trait — UpdateProp paths are rooted inside the kind spec. Fix it at the source of the emission." })
+          Some
+            { NodeId = id
+              Code = "A11Y-REF"
+              Severity = severityOf severity
+              Message = message
+              Fix = None
+              Unfixable =
+                "no op reaches the accessibility trait — UpdateProp paths are rooted inside the kind spec. Fix it at the source of the emission." }
+        | _ -> None)
 
     nameFlags @ textFlags @ refFlags
+
+/// Every accessibility finding against one node, in a stable order.
+/// `root` is needed to resolve `labelledBy` / `describedBy` references and to
+/// give the validator the whole tree its cross-node rule judges over.
+let nodeFlags (root: Node<obj>) (node: Node<obj>) : Flag list =
+  nodeFlagsWith (validatorA11yDefects root) root node
 
 // ─── the walk ────────────────────────────────────────────────────────────────
 
@@ -420,7 +476,8 @@ let rec private walk (node: Node<obj>) : Node<obj> list =
 
 /// Every flag in the tree, in walk order.
 let treeFlags (root: Node<obj>) : Flag list =
-  walk root |> List.collect (nodeFlags root)
+  let defects = validatorA11yDefects root
+  walk root |> List.collect (nodeFlagsWith defects root)
 
 /// The ids of every flagged node, in walk order, without repeats — a node with
 /// three findings is one stop on the flags-only walk, not three.
@@ -465,11 +522,6 @@ let prevFlaggedId (root: Node<obj>) (fromId: string) : string option =
 // so — exactly as the Phase 710 cursor helpers and `PropertyEditor`'s flat
 // surface do — the same values are projected to plain strings and arrays. These
 // are the headless test surface AND a host-agnostic description of the audit.
-
-/// The re-derived interactive-kind set as plain strings — an F# list is a
-/// linked structure across the Fable boundary, so the source-lock test needs
-/// the projection rather than the list itself.
-let interactiveKindNames: string array = Array.ofList interactiveKinds
 
 /// Every finding as `"<nodeId>|<code>|<severity>|<fixPath>"`, walk order.
 /// `fixPath` is empty for an unfixable finding.

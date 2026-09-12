@@ -1,6 +1,6 @@
 // Phase 327 – the multi-provider connector wire mapping, exercised headlessly
 // over the Fable output. Byok.fs re-expresses the providers (Claude / GPT /
-// Gemini / Kimi) over the vendored `FuaranLive.AiWire` portable `JsonValue` model + the
+// Gemini / Kimi) over the `Fuaran.UI.AiWire` portable `JsonValue` model + the
 // `IHttpTransport` egress seam, and every provider now implements `SendAgentic`
 // (tool-use). The pure request-build + response-parse halves (no `fetch`) are
 // the smoke surface: `agenticRequestBodyFlat` / `parseAgenticResponseFlat`

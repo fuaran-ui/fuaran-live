@@ -200,7 +200,7 @@ Per operator direction these columns are **illustrative** — "how it would look
 written in C# / VB" — **not** a verified byte-round-trip:
 
 - The tabs are an illustrative structural sketch: the projector walks the
-  canonical wire tree (over the vendored `FuaranLive.AiWire` `JsonValue` model) and
+  canonical wire tree (over the `Fuaran.UI.AiWire` `JsonValue` model) and
   emits idiomatic builder source, covering the kinds the playground produces
   with a **generic fallback** for any uncovered kind (so it **never crashes**
   on a decodable tree). Closure-valued fields (handlers, query/selection

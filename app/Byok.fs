@@ -2,11 +2,12 @@ module Fuaran.Live.Byok
 
 // ============================================================================
 //  BYOK providers + effect ports – Phase 327: the portable AI-connector
-//  wire layer, vendored in-repo as `FuaranLive.AiWire` (Phase 576).
+//  wire layer, consumed as the public `Fuaran.UI.AiWire` package (vendored
+//  in-repo from Phase 576; published and adopted at Phase 1698).
 //
 //  The providers no longer hand-roll their request/response JSON via raw
 //  `createObj` / dynamic `?` interop. Every request body is built as a
-//  `FuaranLive.AiWire` `JsonValue` and serialized by the canonical byte-stable
+//  `Fuaran.UI.AiWire` `JsonValue` and serialized by the canonical byte-stable
 //  `JsonHost.serialize`; every response is parsed by the host-bridged
 //  `JsonHost.parse` and navigated with the total (never-throwing) `JsonValue`
 //  accessors – the SAME portable model a .NET server host runs over. The
@@ -27,7 +28,7 @@ module Fuaran.Live.Byok
 
 open Fable.Core
 open Fable.Core.JsInterop
-open FuaranLive.AiWire
+open Fuaran.UI.AiWire
 open Fuaran.Live.Ports
 
 // ─── memory-only key store (port of byok/keyStore.ts) ────────────────────────
@@ -1149,7 +1150,7 @@ let createGeminiProvider (getKey: unit -> string option) : IAgenticProvider =
 /// One selectable provider: its id, the label the picker shows, its default
 /// model, a factory that builds the adapter against a per-provider key reader,
 /// and the agentic factory. As of Phase 327 ALL providers are agentic
-/// (tool-use via the shared `FuaranLive.AiWire` mappers), so each carries
+/// (tool-use via the shared `Fuaran.UI.AiWire` mappers), so each carries
 /// `CreateAgentic = Some _` and can drive the self-debug loop.
 /// A selectable model for a provider – the single evaluation-chosen default
 /// today; a list so a future picker could offer measured alternates.

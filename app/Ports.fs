@@ -156,10 +156,10 @@ type IContributionSink =
 // preserves that order. The per-provider block↔wire translation (Anthropic
 // content blocks; OpenAI `tool_calls`; Gemini name-keyed `functionCall`) lives
 // in `Byok.fs` and runs over the shared `JsonValue` / `JsonHost` model + the
-// shared `IHttpTransport` egress – so the wire substrate is the same source of
-// truth the forge server host uses, even though the loop keeps the richer shape.
-// (Collapsing onto the shared contract once it grows an ordered-block form is a
-// deferred follow-on – see TIDY-UP.)
+// shared `IHttpTransport` egress – so the wire substrate stays one source of
+// truth, even though the loop keeps the richer shape. (Collapsing onto the
+// shared contract, should it ever grow an ordered-block form, is a deferred
+// follow-on rather than a plan.)
 
 /// A tool the model may call. `InputSchema` is a JSON Schema object (a raw JS
 /// value) passed verbatim to the provider.

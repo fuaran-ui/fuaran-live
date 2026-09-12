@@ -86,8 +86,21 @@ Fable-compiled projector's generated source against the real `@fuaran-ui/*` pack
 byte-identical re-encode over every Node fixture in the sibling `../wire-format-fixtures` corpus).
 The split exists because a projection change can break the byte round-trip while the entire unit
 suite stays green — the conformance leg is the only local check that catches it, so it rides the
-default `pnpm test` rather than being a separate opt-in run. Both legs consume Fable output, so
-`pnpm run fable:app` must have run first. CI runs the same two suites (`ci.yml` runs the unit leg
+default `pnpm test` rather than being a separate opt-in run. **There are TWO Fable outputs, and naming only one of them is the commonest way to run a smaller
+suite than you think you ran.** Run BOTH before `pnpm test`:
+
+```
+pnpm run fable:app   # the playground + showcase apps  -> app/output, app/showcase/output
+pnpm run fable       # the fable-host bridge            -> fable-host/output
+```
+
+`src/query-portal/core.ts` imports `fable-host/output/QueryPortalBridge.js`, so four suites
+(`emission`, `queryPortal`, `refine`, `retrieval`) reach it transitively. Compile only the apps and
+those four arrive as **Failed Suites** with `Failed to load url ../../fable-host/output/…` — loud,
+not silent, but easy to read as an environment problem and skip past, and the passing count beside
+them is then a count over 37 files rather than 41 (measured 2026-09-12: 471 passing without the
+bridge, 504 passing + 1 skipped with it). Read the FILE count, not just the test count: `41 passed
+(41)` is the shape of a complete unit run. CI runs the same two suites (`ci.yml` runs the unit leg
 plus the conformance publisher; `conformance.yml` is the dedicated corpus gate).
 
 ## Dependencies

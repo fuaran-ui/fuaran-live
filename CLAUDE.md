@@ -178,6 +178,20 @@ encoder is its own oracle). Adversarial reject fixtures (assert-reject, not asse
 and scripted-provider fixtures emulating an LLM's lenient-accept emissions are excluded with
 their reasons named in the inventory.
 
+## Promotion captures - a build product, not a committed asset
+
+`scripts/capture-exhibits.mjs` drives every showcase exhibit in a real browser and writes one
+full-page PNG each into gitignored `dist-showcase/captures/`. **They are never committed**, and that
+is settled rather than open: a screenshot in git is wrong the first moment anybody edits the page it
+depicts, and nothing says so. What is reviewable is the `--manifest` the same run writes - base URL,
+viewport, browser build, and a sha256 per file - which is text, diffs, and says which exhibits
+actually changed. The manifest is a build product too, for the same reason; what is committed is the
+rule.
+
+The decision, the per-exhibit DOM claims a capture is worth nothing without, the 375px overflow
+sweep, and `PLAYWRIGHT_CHANNEL` (drive an installed Chrome/Edge on a machine where the Playwright
+binaries cannot be downloaded) are in [`docs/promotion-captures.md`](docs/promotion-captures.md).
+
 ## Port allocation
 
 Vite dev `24040`, preview `14040` — the website band reserved for `fuaran-live` in the workspace `CLAUDE.md` "Port allocation" table. The app is static; **no server port** is allocated.

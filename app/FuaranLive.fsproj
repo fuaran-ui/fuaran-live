@@ -64,45 +64,6 @@
 
          So the whole Fuaran.UI.* consumption is packaged, at ONE version, and the
          sibling checkout is no longer part of this project's compile graph. -->
-    <!-- The vendored AI-connector wire layer (Phase 576) – a self-contained
-         Apache-2.0 copy under the FuaranLive.AiWire namespace: the JsonValue /
-         JsonHost canonical-JSON model, the provider contract types, and the
-         IHttpTransport egress seam. Byok.fs expresses the three providers over
-         this substrate and drives them through a browser fetch IHttpTransport.
-         Compile order = dependency order (mirrors the original project).
-
-         Vendored 2026-07-15 as a MODIFIED copy of the author's own
-         Apache-2.0 wire layer (Apache-2.0 §4(b)): the sources were renamed
-         into this single namespace and reformatted to this repo's F# style.
-         Treat them as a maintained fork, not upstream code — a fix made
-         here is a fix made to this copy alone.
-
-         FOUR MODULES WERE DROPPED (Phase 1676), and the drop is the decision
-         rather than an oversight. `RetryPolicy.fs`, `ErrorClassifier.fs`,
-         `RetryRunner.fs` and `Streaming.fs` were compiled here with no caller
-         anywhere outside this directory. The question that reached this comment
-         was whether to wire `RetryRunner` through the BYOK transport instead,
-         and the answer was NO, for reasons about this app rather than about the
-         code:
-
-           * The transport already classifies the case retry exists for —
-             `Byok.fs` maps a 429 to `RateLimit` itself — so the classification
-             is present in the shape the app actually uses.
-           * Retrying automatically spends the READER'S OWN KEY, and they are
-             the only party who can weigh that. Surfacing a rate limit to the
-             person holding the key is the deliberate behaviour, not a gap.
-           * `Streaming.fs` was the largest untrusted-input parser in this copy
-             (provider SSE framing), and carrying an unused parser means owning
-             prompt security ports for something nothing runs.
-
-         What remains is the substrate `Byok.fs` is written against, and only
-         that. Re-introducing any of the four means re-introducing a maintained
-         fork of it AND its share of the upstream drift procedure — so do not
-         vendor one back in for a single call site. -->
-    <Compile Include="vendor\aiwire\JsonValue.fs" />
-    <Compile Include="vendor\aiwire\JsonHost.fs" />
-    <Compile Include="vendor\aiwire\Contract.fs" />
-    <Compile Include="vendor\aiwire\IHttpTransport.fs" />
     <!-- The shared brand module (palette theme + persisted light/dark
          preference) – one definition for both entries of the site (the showcase
          project links the same file). -->
@@ -205,6 +166,39 @@
          compatibility claim (see the loop's own comment below), so a tier
          widening can cap this family again at any release, and the remedy is
          always the other producer's, never a pin here. -->
+    <!-- The portable AI-connector wire substrate (Phase 1698): the JsonValue /
+         JsonHost canonical-JSON model, the provider contract types, and the
+         IHttpTransport egress seam. `Byok.fs` expresses the three providers
+         over this substrate and drives them through a browser `fetch`
+         implementation of the seam.
+
+         A PACKAGE since Phase 1698, where it was four vendored files under a
+         repo-local namespace from Phase 576 until then. The fork did not go
+         away - it moved to where it can be PUBLISHED, so this repo consumes the
+         one public copy instead of carrying a second. The consequences for a
+         reader here are the good ones: a fix to the JSON parser (the only
+         untrusted-input surface in the set) arrives as a version bump rather
+         than as a hand-port, and nothing in this repo has to be kept in step
+         with anything by discipline.
+
+         FOUR MODULES ARE STILL ABSENT, and the reasoning is the reasoning
+         Phase 1676 recorded when it dropped them here: the transport already
+         classifies a rate limit itself; retrying automatically spends the
+         READER'S OWN key, and they are the only party who can weigh that; and
+         an unused SSE parser means owning prompt security ports for something
+         nothing runs. The published package carries the same four files this
+         project did, for the same reasons, so adopting it re-introduces
+         nothing.
+
+         It moves on the PRODUCER's version line, not on the `Fuaran.UI` family
+         pin below, and nothing forces the two together: this package
+         references no other `Fuaran.UI.*` package and none references it. The
+         number here is higher than the family's for that reason alone.
+
+         Its dependency set is FSharp.Core plus Fable.Core, and Fable.Core is
+         reached only from the parser's `#if FABLE_COMPILER` arm - which is the
+         arm this project compiles. -->
+    <PackageReference Include="Fuaran.UI.AiWire" Version="0.81.0" />
     <PackageReference Include="Fuaran.UI" Version="0.79.0" />
     <PackageReference Include="Fuaran.UI.Renderer" Version="0.79.0" />
     <PackageReference Include="Fuaran.UI.Ops" Version="0.79.0" />

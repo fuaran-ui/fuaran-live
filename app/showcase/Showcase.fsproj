@@ -53,17 +53,20 @@
     <Compile Include="..\shared\Brand.fs">
       <Link>shared\Brand.fs</Link>
     </Compile>
-    <!-- The multi-language source projector (Attesor's engine) + the PURE JSON
-         model it walks. JsonValue/JsonHost are model+serialisation only – no
-         transport, no provider, no key machinery – so the showcase's
-         no-key-egress guarantee holds; nothing else from the vendored module
-         is compiled into this entry. -->
-    <Compile Include="..\vendor\aiwire\JsonValue.fs">
-      <Link>vendor\JsonValue.fs</Link>
-    </Compile>
-    <Compile Include="..\vendor\aiwire\JsonHost.fs">
-      <Link>vendor\JsonHost.fs</Link>
-    </Compile>
+    <!-- The multi-language source projector (Attesor's engine). The PURE JSON
+         model it walks arrives as a package now (see the PackageReference
+         below) rather than as two linked files from a repo-local vendor
+         directory - Phase 1698 published that substrate.
+
+         The no-key-egress guarantee is UNAFFECTED, and it is worth saying why
+         rather than asserting it, because the mechanism changed. It used to
+         rest on which two of four vendored files this entry chose to compile.
+         It now rests on something stronger: the package contains no egress
+         code AT ALL. Its transport member is an interface with no
+         implementation - a seam a host fills, and this entry fills nothing -
+         and its provider contract is value types. The only code in this repo
+         that opens a connection is the playground's browser `fetch`
+         implementation, which this project does not compile. -->
     <Compile Include="..\Projection.fs">
       <Link>Projection.fs</Link>
     </Compile>
@@ -169,6 +172,11 @@
     <!-- Explicit versions (matched to fuaran-dotnet/Directory.Packages.props + the
          playground app project), since this sits outside central package
          management. -->
+    <!-- The portable AI-connector wire substrate (Phase 1698) - the JsonValue /
+         JsonHost model the source projector walks. See the note above the
+         projector's Compile entry for why referencing the whole package leaves
+         this entry's no-key-egress guarantee intact. -->
+    <PackageReference Include="Fuaran.UI.AiWire" Version="0.81.0" />
     <PackageReference Include="Fable.Core" Version="5.0" />
     <PackageReference Include="Fable.Elmish" Version="5.0.2" />
     <PackageReference Include="Fable.Elmish.React" Version="5.6" />

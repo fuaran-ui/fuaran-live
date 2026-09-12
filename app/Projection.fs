@@ -22,7 +22,7 @@ module Fuaran.Live.Projection
 //  illustrative – "how it would look written in" each language, per operator
 //  direction – until their conformance arms are re-authored. The projector
 //  walks the **canonical wire tree** – the same `Node<obj>` the app already
-//  holds, encoded to its canonical JSON – using the vendored `FuaranLive.AiWire`
+//  holds, encoded to its canonical JSON – using the `Fuaran.UI.AiWire`
 //  `JsonValue` model the connectors already pulled in (Phase 327). It is pure
 //  string generation, never touches the unbuilt `@fuaran-ui/*` runtime, and
 //  **never crashes on a tree it does not understand**: any value it does not
@@ -41,7 +41,7 @@ module Fuaran.Live.Projection
 // ============================================================================
 
 open Fable.Core.JsInterop
-open FuaranLive.AiWire
+open Fuaran.UI.AiWire
 
 // ─── the target languages ─────────────────────────────────────────────────────
 

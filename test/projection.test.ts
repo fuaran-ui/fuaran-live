@@ -1,6 +1,6 @@
 // Phase 329 – the multi-language source-projection output box, exercised
 // headlessly over the Fable output. Projection.fs walks the canonical wire tree
-// (the vendored FuaranLive.AiWire JsonValue model) and emits builder source per
+// (the Fuaran.UI.AiWire JsonValue model) and emits builder source per
 // language; `projectByName` is the flat surface. The TypeScript, Python and F#
 // legs are verified byte-round-trips (see tests/projection-conformance/ + the
 // fidelity doc); the C# / VB legs are illustrative. The projector must

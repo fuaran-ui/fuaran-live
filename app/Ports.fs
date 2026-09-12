@@ -140,7 +140,7 @@ type IContributionSink =
   abstract member Endpoint: string
   abstract member Post: ContributionBundle -> Async<ContributionOutcome>
 
-// ─── The agentic (tool-use) seam (Phase 327 – over `FuaranLive.AiWire`) ─────
+// ─── The agentic (tool-use) seam (Phase 327 – over `Fuaran.UI.AiWire`) ─────
 //
 // Agent mode (the self-debug loop) needs a richer call than `Send`: the model
 // must be able to *call introspection tools* and receive their results over
@@ -149,7 +149,7 @@ type IContributionSink =
 // extension of `IAIProvider`. As of Phase 327 ALL THREE providers implement it.
 //
 // These types are fuaran-live's **ordered** projection over the shared portable
-// connector contract in `FuaranLive.AiWire`. The shared
+// connector contract in `Fuaran.UI.AiWire`. The shared
 // `AIProviderResponse` is deliberately flat (`Content: string` + a separate
 // `ToolCalls` list), which cannot represent the interleaving of model text and
 // `tool_use` blocks a multi-turn agent turn carries; `AgentContentBlock list`

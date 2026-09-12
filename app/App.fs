@@ -11,7 +11,7 @@ module Fuaran.Live.App
 //
 //  As of Phase 328 there is ONE interaction model. Every prompt runs the
 //  emit → observe → repair self-debug loop (multi-provider via Phase 327's
-//  shared `FuaranLive.AiWire` connectors), streaming model text + tool calls +
+//  shared `Fuaran.UI.AiWire` connectors), streaming model text + tool calls +
 //  emissions + halts inline as a single transcript. A live token counter, a live
 //  elapsed timer, and a Stop button are the surfaced controls; a halted/stopped
 //  run is **resumable** (a follow-up prompt continues with the accumulated agent
@@ -352,7 +352,7 @@ let private providersById: Map<string, IAIProvider> =
   |> Map.ofList
 
 // The agentic (tool-use) providers. As of Phase 327 ALL THREE are agentic (each
-// descriptor carries a `CreateAgentic` factory over the shared `FuaranLive.AiWire`
+// descriptor carries a `CreateAgentic` factory over the shared `Fuaran.UI.AiWire`
 // connectors), so the unified loop runs on any selected provider. Each reads its
 // own key store per call, exactly like the single-shot adapters.
 let private agenticById: Map<string, IAgenticProvider> =

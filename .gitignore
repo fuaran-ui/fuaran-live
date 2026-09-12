@@ -91,3 +91,4 @@ dist-measure/
 # later fold reuse the run instead of paying for a second one.
 tests/projection-conformance/.fsharp-exec/
 tests/projection-conformance/.fsharp-probe/
+tests/projection-conformance/.fsharp-i18n-probe/

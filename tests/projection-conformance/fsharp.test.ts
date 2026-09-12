@@ -270,6 +270,144 @@ let main _ =
 
 const fsQuarantine = entriesFor('fsharp');
 
+// ── the Phase 1661 i18n-argument slot, against the PINNED tier ───────────────
+//
+// `TextSource.I18n.args` widened from `Map<string, JVal>` to
+// `Map<string, Binding<JVal>>`. The pin this arm restores decides which
+// spelling `app/Projection.fs` must emit, and the two are mutually exclusive —
+// so when the pin moves past that change the generated program stops compiling,
+// with an FS0001 attributed to whichever fixture happens to carry an i18n text
+// source. The cover below turns that into a named failure carrying the remedy.
+
+/** Every i18n argument bag a node fixture carries, as it rides the WIRE. */
+const wireI18nBags = (v: unknown): Record<string, unknown>[] => {
+  const found: Record<string, unknown>[] = [];
+  const walk = (x: unknown): void => {
+    if (Array.isArray(x)) {
+      for (const e of x) walk(e);
+      return;
+    }
+    if (x === null || typeof x !== 'object') return;
+    const o = x as Record<string, unknown>;
+    if (o['$type'] === 'I18n' && o['args'] !== null && typeof o['args'] === 'object') {
+      const bag = o['args'] as Record<string, unknown>;
+      if (Object.keys(bag).length > 0) found.push(bag);
+    }
+    for (const e of Object.values(o)) walk(e);
+  };
+  walk(v);
+  return found;
+};
+
+/** An argument is the BINDING arm iff it is an object carrying `$type` (§5). */
+const isWireBoundArg = (a: unknown): boolean =>
+  a !== null && typeof a === 'object' && !Array.isArray(a) && '$type' in (a as object);
+
+const i18nCarriers = nodeFixtures
+  .map((f) => {
+    const bags = wireI18nBags(JSON.parse(wireOfFixture(f)));
+    const args = bags.flatMap((b) => Object.values(b));
+    return {
+      id: f.id,
+      bare: args.some((a) => !isWireBoundArg(a)),
+      bound: args.some(isWireBoundArg),
+      any: args.length > 0,
+    };
+  })
+  .filter((c) => c.any);
+
+interface I18nArmVerdict {
+  readonly spelling?: 'bare' | 'bound';
+  readonly error?: string;
+}
+
+let i18nArmVerdict: I18nArmVerdict | undefined;
+
+/**
+ * Which argument spelling the PINNED `Fuaran.UI` accepts, asked of the compiler
+ * rather than inferred from a version string. Two one-line alternatives in their
+ * own modules, attributed by line exactly as `resolveFSharpConstructs` does;
+ * exactly one must compile, and "both" or "neither" is a broken probe reported
+ * as such rather than resolved into a verdict.
+ */
+const pinnedI18nArgumentArm = (): I18nArmVerdict => {
+  if (i18nArmVerdict !== undefined) return i18nArmVerdict;
+  if (!dotnetAvailable()) {
+    i18nArmVerdict = { error: 'no `dotnet` on PATH' };
+    return i18nArmVerdict;
+  }
+
+  const prelude = PRELUDE.replace('module FsProjectionConformance', 'module FsI18nArgProbe');
+  const preludeLines = prelude.split('\n').length;
+  const alternatives: { readonly spelling: 'bare' | 'bound'; readonly expr: string }[] = [
+    { spelling: 'bare', expr: 'TextSource.I18n("k", Map.ofList [ ("n", JInt 1) ])' },
+    {
+      spelling: 'bound',
+      // `Binding.Static of value: 'T option` — the option is the slot's own
+      // structural absence, not part of what is being probed here.
+      expr: 'TextSource.I18n("k", Map.ofList [ ("n", Binding.Static(Some(JInt 1))) ])',
+    },
+  ];
+
+  const lines: string[] = [];
+  const ranges: { spelling: 'bare' | 'bound'; line: number }[] = [];
+  alternatives.forEach((a, i) => {
+    lines.push(`module I18nProbe_${i} =`);
+    lines.push(`  let _v: TextSource = ${a.expr}`);
+    lines.push('');
+    ranges.push({ spelling: a.spelling, line: preludeLines + lines.length - 1 });
+  });
+
+  const dir = resolve(here, '.fsharp-i18n-probe');
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, 'Probe.fs'), `${prelude}\n${lines.join('\n')}\n`, 'utf8');
+  writeFileSync(
+    resolve(dir, 'FsI18nProbe.fsproj'),
+    projectFile('Probe.fs').replace(
+      '<OutputType>Exe</OutputType>',
+      '<OutputType>Library</OutputType>',
+    ),
+    'utf8',
+  );
+
+  const r = spawnSync(
+    'dotnet',
+    ['build', resolve(dir, 'FsI18nProbe.fsproj'), '-v', 'q', '--nologo'],
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+  );
+  const errorLines = `${r.stdout ?? ''}\n${r.stderr ?? ''}`
+    .split('\n')
+    .filter((l) => /: error /.test(l))
+    .map((l) => l.trim());
+
+  // A diagnostic pointing outside both probes is a fault of the project — a
+  // restore failure, say — and must not read as "neither spelling compiles".
+  const probeLines = new Set(ranges.map((g) => g.line));
+  const outside = errorLines.filter((l) => {
+    const line = lineOfDiagnostic(l);
+    return line === undefined || !probeLines.has(line);
+  });
+  if (outside.length > 0) {
+    i18nArmVerdict = { error: `the probe project itself failed: ${outside[0]}` };
+    return i18nArmVerdict;
+  }
+
+  const refusedLines = new Set(
+    errorLines.map(lineOfDiagnostic).filter((n): n is number => n !== undefined),
+  );
+  const accepted = ranges.filter((g) => !refusedLines.has(g.line)).map((g) => g.spelling);
+  i18nArmVerdict =
+    accepted.length === 1
+      ? { spelling: accepted[0]! }
+      : {
+          error:
+            `${accepted.length} of the two i18n argument spellings compiled against ` +
+            `Fuaran.UI ${pinnedTierVersion} (expected exactly one): ${accepted.join(', ') || 'none'}`,
+        };
+  return i18nArmVerdict;
+};
+
 describe('F# projection conformance (Node corpus)', () => {
   it('the corpus is present and non-trivial', () => {
     expect(nodeFixtures.length).toBeGreaterThanOrEqual(70);
@@ -323,6 +461,69 @@ describe('F# projection conformance (Node corpus)', () => {
       );
     });
   }
+
+  it('I18n arguments: the corpus exercises BOTH arms', () => {
+    // The non-vacuity half of the cover below. `TextSource.I18n.args` widened in
+    // Phase 1661 (`Map<string, JVal>` -> `Map<string, Binding<JVal>>`), and the
+    // wire carries no tag saying which arm an argument is: an object with
+    // `$type` is the binding arm, any other JSON value is the literal, and a
+    // `Static` argument carrying a value encodes BARE (WIRE_FORMAT.md §5). That
+    // bare spelling is what let the TypeScript arm's raw-JSON reading round-trip
+    // by accident for a whole release, so a corpus reaching only one arm would
+    // make the byte comparison here prove less than it looks.
+    expect(
+      i18nCarriers.filter((c) => c.bare).map((c) => c.id),
+      'no node fixture carries a BARE i18n argument — the literal arm is unexercised',
+    ).not.toHaveLength(0);
+    expect(
+      i18nCarriers.filter((c) => c.bound).map((c) => c.id),
+      'no node fixture carries a `$type` i18n argument — the binding arm is unexercised',
+    ).not.toHaveLength(0);
+    expect(
+      i18nCarriers.map((c) => c.id).filter((id) => fsQuarantine.has(id)),
+      'quarantining an i18n carrier drops this slot out of the byte cover',
+    ).toEqual([]);
+  });
+
+  it('I18n arguments: the projector emits the spelling the PINNED tier takes', () => {
+    if (blockedReason !== undefined) return;
+
+    // The arm's own claim is that the projection executes against the surface
+    // the app compiles against, so "which spelling is right" is a question about
+    // the PIN and not about the current corpus. It is asked of the compiler
+    // rather than of a version string: exactly one of the two argument
+    // spellings type-checks against `Fuaran.UI` at the pinned version, and a
+    // probe that answers "both" or "neither" is a broken probe, reported as an
+    // error rather than resolved into a verdict.
+    const arm = pinnedI18nArgumentArm();
+    expect(
+      arm.error,
+      `the pinned-tier i18n probe could not answer: ${arm.error ?? ''}`,
+    ).toBeUndefined();
+
+    // The projector agrees with that answer or the generated program does not
+    // compile, and a type error is what the pin move actually produces. This
+    // turns that FS0001 into the sentence a session needs.
+    const named = new Set(fixturesInErrors(run!.errors));
+    const broken = i18nCarriers.map((c) => c.id).filter((id) => named.has(id));
+    expect(
+      broken,
+      arm.spelling === 'bound'
+        ? `Fuaran.UI ${pinnedTierVersion} takes a Binding<JVal> i18n argument (Phase 1661), and ` +
+            "these fixtures' emissions do not compile against it. `fsTextSource` in " +
+            'app/Projection.fs still emits the bare `Map.ofList [ (name, JVal) ]` form; each ' +
+            'argument must be wrapped as a binding — the same change the TypeScript arm took, ' +
+            'where a `$type`-carrying argument projects as a binding and any other JSON value ' +
+            'as `binding.static(...)`, whose `Static` arm the encoder puts back on the wire bare.'
+        : `Fuaran.UI ${pinnedTierVersion} takes a bare JVal i18n argument (the pre-1661 shape), ` +
+            "and these fixtures' emissions do not compile against it.",
+    ).toEqual([]);
+
+    // Said out loud, so a reader of a green run knows WHICH world it was green
+    // in. The pin predates Phase 1661 as of fuaran#1695; when it moves, the
+    // assertion above is what names the work.
+    expect(['bare', 'bound']).toContain(arm.spelling);
+  }, 600_000);
 
   it('the F# arm holds NO quarantine entries, and that is the assertion', () => {
     // The same posture as the TypeScript arm's, and reached for the same reason:

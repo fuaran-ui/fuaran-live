@@ -14,6 +14,21 @@ name: Deploy showcase to Azure Static Web Apps
 # token from the SHOWCASE Static Web App resource (Portal → the resource →
 # Manage deployment token, or `az staticwebapp secrets list`). Distinct from
 # the playground resource's token.
+#
+# ── DEPLOY-CREDENTIAL POSTURE (Phase 1678) ───────────────────────────────────
+#
+# Same posture, same recommendation, same pending-confirmation status as the
+# playground workflow: one long-lived stored deployment token, used by PR
+# previews as well as by production, kept and rotated on a schedule rather than
+# scoped (Azure SWA issues no preview-scoped token). The full account of the
+# trade — what a fork PR can and cannot reach, why previews earn their keep on a
+# CSP-strict client-only app, why LIFETIME rather than blast radius is the thing
+# to bound, and the OIDC alternative — is written once, in
+# `azure-static-web-apps.yml`, rather than twice here.
+#
+# One difference worth naming: this resource has its OWN token, so the two
+# origins share no credential and rotating one does not touch the other. Rotate
+# both.
 
 on:
   push:

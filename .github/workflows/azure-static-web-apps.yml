@@ -11,6 +11,52 @@ name: Deploy to Azure Static Web Apps
 # REQUIRED SECRET: AZURE_STATIC_WEB_APPS_API_TOKEN — the deployment token from
 # the Azure Static Web App resource (Portal → the resource → Manage deployment
 # token, or `az staticwebapp secrets list`).
+#
+# ── DEPLOY-CREDENTIAL POSTURE (Phase 1678) ───────────────────────────────────
+#
+# RECOMMENDED: keep the single stored token, and rotate it on a schedule.
+# **Pending operator confirmation** — this is a deploy-surface decision, not a
+# code fix, so it is recorded here with its trade stated rather than settled by
+# whoever next edits the file.
+#
+# What is true today. Deployment authenticates with a long-lived deployment
+# token held as a repository secret. There is ONE such token, and PR previews
+# use it: the `build_and_deploy` job runs on `pull_request` and passes the same
+# AZURE_STATIC_WEB_APPS_API_TOKEN that deploys production. That token is a
+# bearer credential for the whole Static Web App resource — Azure SWA issues no
+# preview-scoped token, so "give previews a scoped token" is not a setting to
+# flip.
+#
+# What that does and does not expose. GitHub does not give secrets to a workflow
+# run from a FORK, so an outside pull request cannot reach this token; the
+# preview path is open to people who can already push a branch here, which is
+# the same set who can push to main. The exposure the arrangement adds over
+# production-only deploys is therefore narrow: a branch-pushing collaborator can
+# read the token out of a run they trigger, and a compromised action in the
+# build job would see it on a PR as well as on a push. The SHA pin on the deploy
+# action and the read-only `permissions:` block are the mitigations already
+# here.
+#
+# Why the recommendation is to keep previews rather than remove them. A preview
+# environment per PR is what makes a client-only, CSP-strict app reviewable at
+# all: the strict-CSP plugin means "it built" and "it loads" are different
+# claims, and the preview is where the second is checked. Dropping previews to
+# narrow an exposure that fork PRs already cannot reach would trade a real daily
+# verification for very little.
+#
+# What rotation buys, and why it is the actual remedy. The token's weakness is
+# its LIFETIME, not its blast radius: it stays the same string until somebody
+# regenerates it, so a leak out of any historical run stays live indefinitely.
+# Rotating it (Portal -> Manage deployment token -> Reset, then update the
+# secret) bounds that window, and is one operator act rather than a workflow
+# redesign.
+#
+# The alternative, recorded so it need not be rediscovered: replace the stored
+# token with Azure OIDC federated credentials (`azure/login` plus a federated
+# identity scoped to the resource), removing the long-lived secret entirely. The
+# SWA deploy action's token input is not OIDC-aware, so that means deploying by
+# CLI instead of by this action, and re-establishing the PR preview-URL comment
+# path by hand. Real work, and worth pricing on its own.
 
 on:
   push:

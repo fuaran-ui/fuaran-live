@@ -214,6 +214,100 @@ describe('omit-at-default members (Phase 1603)', () => {
   }
 });
 
+// -- I18n arguments are BINDINGS, not bare values (Phase 1661) ---------------
+//
+// `TextSource.I18n.args` widened from a bare-value bag to
+// `Record<string, Binding<JsonValue>>`. The wire carries no tag saying which
+// arm an argument is -- an object with `$type` is the binding arm, any other
+// JSON value the literal arm -- and a `Static` argument carrying a value
+// re-encodes BARE (WIRE_FORMAT.md §5).
+//
+// That bare spelling is exactly why the projector's pre-widening reading (pass
+// the whole bag through as raw JSON) ROUND-TRIPPED BY ACCIDENT for as long as
+// the encoder spelled the slot with a plain JSON map: the map re-emitted
+// whatever object it was handed, so neither arm was ever a `Binding` and the
+// byte comparison below could not tell. The bytes only started disagreeing when
+// the encoder began reaching each argument through the binding encoder -- which
+// is to say the byte comparison caught this a release late, and caught it as a
+// throw from inside the encoder rather than as a projector defect.
+//
+// So this is the check that does NOT depend on an encoder objecting: the
+// projected source is executed and every reconstructed argument is required to
+// be a binding. It fails on a projector that emits the raw bag whether or not
+// any encoder minds, and it fails on the literal arm -- the one whose bare
+// re-encode hid the defect -- as readily as on the bound one.
+
+/** Every non-empty `I18n` argument bag in an IN-MEMORY tree (`kind`-tagged). */
+const memoryI18nBags = (v: unknown): Record<string, unknown>[] => {
+  const found: Record<string, unknown>[] = [];
+  const walk = (x: unknown): void => {
+    if (Array.isArray(x)) {
+      for (const e of x) walk(e);
+      return;
+    }
+    if (x === null || typeof x !== 'object') return;
+    const o = x as Record<string, unknown>;
+    if (o.kind === 'I18n' && o.args !== null && typeof o.args === 'object') {
+      const bag = o.args as Record<string, unknown>;
+      if (Object.keys(bag).length > 0) found.push(bag);
+    }
+    for (const e of Object.values(o)) walk(e);
+  };
+  walk(v);
+  return found;
+};
+
+/** The same bags as they ride the WIRE, where `$type` is the discriminator. */
+const wireI18nBags = (v: unknown): Record<string, unknown>[] =>
+  objectsOfType(v, 'I18n')
+    .map((o) => o.args)
+    .filter((a): a is Record<string, unknown> => a !== null && typeof a === 'object')
+    .filter((a) => Object.keys(a).length > 0);
+
+/** An argument as it rides the wire: an object carrying `$type` is the binding arm. */
+const isWireBoundArg = (a: unknown): boolean =>
+  a !== null && typeof a === 'object' && !Array.isArray(a) && '$type' in (a as object);
+
+describe('I18n arguments are bindings (Phase 1661)', () => {
+  const carrying = nodeFixtures
+    .map((f) => ({ f, bags: wireI18nBags(JSON.parse(wireOfFixture(f))) }))
+    .filter((x) => x.bags.length > 0);
+
+  const anyArg = (
+    x: { readonly bags: Record<string, unknown>[] },
+    p: (a: unknown) => boolean,
+  ): boolean => x.bags.some((b) => Object.values(b).some(p));
+
+  it('the corpus exercises BOTH the literal and the bound argument arm', () => {
+    expect(
+      carrying.filter((x) => anyArg(x, (a) => !isWireBoundArg(a))).map((x) => x.f.id),
+      'no fixture carries a BARE i18n argument - the literal arm is unexercised, and its bare re-encode is what let a raw-JSON projection round-trip by accident',
+    ).not.toHaveLength(0);
+    expect(
+      carrying.filter((x) => anyArg(x, isWireBoundArg)).map((x) => x.f.id),
+      'no fixture carries a `$type` i18n argument - the binding arm is unexercised',
+    ).not.toHaveLength(0);
+  });
+
+  it('every projected argument reconstructs as a Binding, not a bare value', () => {
+    for (const { f, bags } of carrying) {
+      const projected = memoryI18nBags(evalExpr(projectTypeScriptExpr(wireOfFixture(f)) as string));
+      expect(
+        projected.length,
+        `${f.id}: the wire carries ${bags.length} non-empty i18n bag(s); the projected tree must carry them too`,
+      ).toBe(bags.length);
+      for (const bag of projected) {
+        for (const [name, arg] of Object.entries(bag)) {
+          expect(
+            typeof (arg as { kind?: unknown } | null)?.kind,
+            `${f.id}: argument '${name}' projected as ${JSON.stringify(arg)} - an i18n argument is a Binding<JsonValue>, so a literal one is spelled binding.static(...)`,
+          ).toBe('string');
+        }
+      }
+    }
+  });
+});
+
 // -- The absent-is-error classification, checked (Phase 1603) ----------------
 //
 // `app/Projection.fs` reads every wire member through one of three accessors,

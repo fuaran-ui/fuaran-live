@@ -1222,9 +1222,34 @@ let private tsTextSourceLit (v: JsonValue) : string =
       + tsBinding Opq.Scalar (fieldReq "binding" v)
       + " }"
     | Some "I18n" ->
+      // Phase 1661 — a `TextSource.I18n` ARGUMENT is a `Binding<JsonValue>` in
+      // memory, not a bare value, and the wire carries no tag saying which of
+      // the two arms it is: an object carrying `$type` is the binding arm, any
+      // other JSON value the literal arm, and a `Static` argument carrying a
+      // value re-encodes BARE (WIRE_FORMAT.md §5). So BOTH arms project as
+      // bindings — the literal one wrapped in `binding.static`, which is what
+      // puts the bare value back on the wire.
+      //
+      // This site read the whole bag as raw JSON (`tsJson`) until the widening,
+      // and round-tripped by ACCIDENT: the pre-widening encoder spelled the slot
+      // with `jsonMap`, which re-emitted whatever object it was handed, so a raw
+      // `{"$type":"State",…}` and a raw `1908` both came back byte-identical
+      // while neither was ever a `Binding`. The widened encoder reaches every
+      // argument through the binding encoder, so the raw bag is now an
+      // `unreachable case` throw — on the literal arm as much as the bound one.
+      //
+      // `Binding.I18n`'s own bag (see `tsBinding`) is NOT this shape: every
+      // argument there is a case object, with no bare spelling, so it stays a
+      // plain `tsBinding` map. The two slots carry the same argument type and
+      // differ only in presence and in this one canonical spelling.
       let args =
         membersOf "args" v
-        |> List.map (fun (k, x) -> jsKey k + ": " + tsJson x)
+        |> List.map (fun (k, x) ->
+          jsKey k
+          + ": "
+          + (match dollarType x with
+             | Some _ -> tsBinding Opq.Scalar x
+             | None -> "binding.static(" + tsStaticValue x + ")"))
         |> String.concat ", "
 
       "{ kind: 'I18n', key: " + qs (strOf "key" v) + ", args: { " + args + " } }"

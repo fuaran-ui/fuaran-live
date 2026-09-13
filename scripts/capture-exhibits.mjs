@@ -26,10 +26,10 @@
 //
 //  Usage — the site must already be served somewhere:
 //
-//    pnpm run fable:app && pnpm exec vite --port 24041      # in one terminal
+//    pnpm run fable:app && pnpm exec vite --port 24071      # in one terminal
 //    node scripts/capture-exhibits.mjs                       # in another
 //
-//    node scripts/capture-exhibits.mjs --base http://localhost:24041 \
+//    node scripts/capture-exhibits.mjs --base http://localhost:24071 \
 //        --out dist-showcase/captures --width 1440 --scale 2
 //    node scripts/capture-exhibits.mjs --mobile               # 390x844, touch
 //    node scripts/capture-exhibits.mjs --dark                 # dark scheme
@@ -88,7 +88,7 @@ function arg(name, fallback) {
 }
 const flag = (name) => process.argv.includes(`--${name}`);
 
-const base = arg('base', 'http://localhost:24041');
+const base = arg('base', 'http://localhost:24071');
 const outDir = join(repoRoot, arg('out', join('dist-showcase', 'captures')));
 const mobile = flag('mobile');
 const width = Number(arg('width', mobile ? 390 : 1440));

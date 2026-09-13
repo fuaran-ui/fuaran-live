@@ -14,7 +14,7 @@
          fable-host/output`) as a background process; Vite reads the emitted JS.
       4. Wait for fable-host/output/Host.js so Vite doesn't load the F# host
          page before Fable's first compile finishes.
-      5. Serve the Vite dev server on port 24040 with VITE_DUAL_HOST=1.
+      5. Serve the Vite dev server on port 24070 with VITE_DUAL_HOST=1.
 
     Per the workspace ../CLAUDE.md "Sibling launcher conventions", every pnpm
     invocation routes through the Invoke-Pnpm named-helper wrapper. The Fable
@@ -85,7 +85,7 @@ try {
         throw "Fable did not produce $expectedJs within $TimeoutSeconds seconds; see $fableLog"
     }
 
-    $url = 'http://localhost:24040/'
+    $url = 'http://localhost:24070/'
     if (-not $NoBrowser) {
         Write-Host "Opening $url" -ForegroundColor Green
         Start-Process $url | Out-Null

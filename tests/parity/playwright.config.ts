@@ -9,10 +9,16 @@ import { defineConfig } from '@playwright/test';
 // the same canonical wire JSON to each and asserting their rendered DOM is
 // structurally identical with the same CSS class vocabulary + ARIA contract.
 //
-// The preview server uses fuaran-live's allocated preview port (14040). base
-// is './', so the host pages are served at /ts-host.html + /fable-host.html.
+// The preview server uses 14071 — this repo's own server band (14070-14079), one
+// above the `vite.config.ts` preview port, so a preview and a parity run can
+// coexist. It said 14040 until roadmap-engine Phase 423: the preview moved
+// 14040 → 14070 on 2026-09-08 because 14040-14049 is another app's claimed slot,
+// and this constant was left behind — squatting that app's band from a test
+// harness, where no `RM-PORT-*` check can see it, since a playwright config is not
+// a `ports.json`. base is './', so the host pages are served at /ts-host.html +
+// /fable-host.html.
 
-const PORT = 14040;
+const PORT = 14071;
 
 export default defineConfig({
   testDir: '.',

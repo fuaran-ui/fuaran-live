@@ -25,7 +25,7 @@ fuaran-live/
 ├── index.html              # the PLAYGROUND entry; loads /app/output/App.js, mounts #fuaran-live-fs-root
 ├── showcase.html           # the SHOWCASE entry; loads /app/showcase/output/App.js, mounts #fuaran-showcase-root
 ├── receiver.html           # the bare teleport receiver (HOST 2); loads /app/showcase/output/Receiver.js
-├── vite.config.ts          # port 24040, base './', per-entry CSP plugin; VITE_SITE=showcase builds the
+├── vite.config.ts          # port 24070, base './', per-entry CSP plugin; VITE_SITE=showcase builds the
 │                           #   showcase artifact (dist-showcase/, entry renamed index.html); VITE_DUAL_HOST parity pages
 ├── app/                    # the playground Fable project (compiled to app/output/, gitignored)
 │   ├── FuaranLive.fsproj   #   ProjectRefs Fuaran.UI + Renderer; LINKS the Fable-safe Ops apply engine
@@ -64,7 +64,7 @@ origin: the default `pnpm build` emits the playground (`dist/`, index.html only)
 emits the showcase (`dist-showcase/`, showcase.html renamed to index.html + receiver.html). Each entry
 carries its own CSP: the playground allows `connect-src` to the BYOK provider origins; the showcase
 allows `'self'` plus only the pinned Pyodide CDN (the opt-in in-browser Python host). In dev, one Vite
-server (24040) serves all entries; the playground door on the showcase landing targets
+server (24070) serves all entries; the playground door on the showcase landing targets
 `VITE_PLAYGROUND_ORIGIN` in production and falls back to this origin's index page in dev.
 `VITE_DUAL_HOST=1` additionally emits the `ts-host.html` / `fable-host.html` parity pages.
 
@@ -194,4 +194,4 @@ binaries cannot be downloaded) are in [`docs/promotion-captures.md`](docs/promot
 
 ## Port allocation
 
-Vite dev `24040`, preview `14040` — the website band reserved for `fuaran-live` in the workspace `CLAUDE.md` "Port allocation" table. The app is static; **no server port** is allocated.
+Vite dev `24070`, preview `14070` — the `1407x` / `2407x` slot this repo's own [`ports.json`](ports.json) declares, validated by `roadmapctl ports <workspace-root>` against every other claim in the estate. The app is static; **no server port** is allocated — the "server" half of the slot is the Vite preview port. The two halves are INDEX-PAIRED (roadmap-engine Phase 423, which moved the dev band `24040`–`24049` → `24070`–`24079`); the gate preview ports sit one above each (`14071` parity, `24071` measure), inside this repo's own bands.

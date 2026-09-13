@@ -26,7 +26,7 @@ The model emits canonical wire JSON; the app decodes it via `@fuaran-ui/schema`,
 ## Run it
 
 ```powershell
-.\run.ps1                 # install + serve the playground on http://localhost:24040 + open a browser
+.\run.ps1                 # install + serve the playground on http://localhost:24070 + open a browser
 .\run.ps1 -Build          # produce a static dist/ (no server)
 .\run.ps1 -NoBrowser      # serve without opening a browser
 ```
@@ -35,7 +35,7 @@ Or drive the package manager directly:
 
 ```bash
 pnpm install
-pnpm dev        # serve on 24040
+pnpm dev        # serve on 24070
 pnpm build      # static dist/
 pnpm test       # the full test gate: unit suite + wire-format conformance suite
 ```

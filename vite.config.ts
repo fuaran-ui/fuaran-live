@@ -268,14 +268,23 @@ function showcaseIndexPlugin(): Plugin {
 }
 
 // Port allocation, declared in this repo's own `ports.json` and validated by the
-// workspace port registry: Vite dev band 24040–24049, server band 14070–14079.
-// The app is static (no server tier), so only the dev port (24040) and preview
+// workspace port registry: Vite dev band 24070–24079, server band 14070–14079.
+// The app is static (no server tier), so only the dev port (24070) and preview
 // (14070) are wired.
 //
 // Preview moved 14040 → 14070 on 2026-09-08. 14040 is formally claimed by another
 // app in this band, and this repo's manifest declared no server band at all — so
 // the registry read green while the two overlapped, because an undeclared port
 // cannot clash with anything. Declaring the band is what makes the check real.
+//
+// The DEV band then moved 24040–24049 → 24070–24079 (roadmap-engine Phase 423), so
+// the two halves share one slot INDEX: `1407x` with `2407x`. That phase made paired
+// allocation the default in `roadmapctl ports claim` and added RM-PORT-UNPAIRED
+// (Info), which named this claim — the 2026-09-08 move had left the server half at
+// index 7 against a client half at index 4, two numbers to remember where a paired
+// slot is one. Four claims in this band sat on a four-CYCLE of such pairs, so all
+// four had to move together: no single one of them could be paired on its own,
+// because each one's target was held by the next.
 //
 // `base: './'` emits relative asset URLs so the build runs from a plain static
 // host AND directly from file://.
@@ -332,7 +341,7 @@ export default defineConfig({
         ? { rollupOptions: { input: buildInputs } }
         : {},
   server: {
-    port: 24040,
+    port: 24070,
     strictPort: true,
     fs: {
       // The parity pane inlines wire-format-fixtures corpus files via `?raw`

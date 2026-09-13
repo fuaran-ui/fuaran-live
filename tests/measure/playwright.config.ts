@@ -16,14 +16,15 @@ import { defineConfig } from '@playwright/test';
 //   * a retry would silently re-run a capture that failed its own sanity check,
 //     which is the one failure a timing harness must never paper over.
 //
-// The preview port is 24041 — inside the client band this repo's own
-// `ports.json` declares (24040-24049), one above the dev server's 24040, so a
-// dev server and a measure run can coexist on a machine. Deliberately NOT the
-// 14041 that would sit beside the parity gate's preview port: 14040-14049 is
-// claimed in the workspace port registry by a different app, and this repo
-// declares no server band at all.
+// The preview port is 24071 — inside the client band this repo's own
+// `ports.json` declares (24070-24079 since roadmap-engine Phase 423 paired the two
+// halves of the slot; 24040-24049 before it), one above the dev server's 24070, so
+// a dev server and a measure run can coexist on a machine. 14040-14049 remains
+// claimed in the workspace port registry by a different app, which is why the
+// number here lives in this repo's own client band and not beside the parity
+// gate's preview port.
 
-const PORT = 24041;
+const PORT = 24071;
 
 export default defineConfig({
   testDir: '.',

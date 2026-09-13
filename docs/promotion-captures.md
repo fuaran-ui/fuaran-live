@@ -34,7 +34,7 @@ changed. **A manifest does**, and it is text, so it diffs:
 
 ```
 PLAYWRIGHT_CHANNEL=msedge node scripts/capture-exhibits.mjs \
-    --base http://localhost:24041 \
+    --base http://localhost:24071 \
     --manifest dist-showcase/captures/manifest.json
 ```
 
@@ -65,12 +65,12 @@ rather than left to be inferred from who ran it.
 ```
 pnpm install --frozen-lockfile
 pnpm run fable:app
-pnpm exec vite --port 24041 --strictPort          # one terminal
+pnpm exec vite --port 24071 --strictPort          # one terminal
 
-node scripts/capture-exhibits.mjs --base http://localhost:24041 \
+node scripts/capture-exhibits.mjs --base http://localhost:24071 \
      --manifest dist-showcase/captures/manifest.json   # another
-node scripts/capture-exhibits.mjs --mobile --base http://localhost:24041   # 390x844, touch
-node scripts/capture-exhibits.mjs --dark   --base http://localhost:24041
+node scripts/capture-exhibits.mjs --mobile --base http://localhost:24071   # 390x844, touch
+node scripts/capture-exhibits.mjs --dark   --base http://localhost:24071
 ```
 
 ## Verify before you promote

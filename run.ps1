@@ -4,8 +4,8 @@
 .DESCRIPTION
     fuaran-live is a serverless, client-only BYOK browser playground for the
     Fuaran UI language. This launcher installs dependencies and serves the Vite
-    dev server on the workspace-reserved port 24040 (per the workspace CLAUDE.md
-    "Port allocation" table: fuaran-live -> Vite 24040–24049, no server port —
+    dev server on the workspace-reserved port 24070 (per the repo's own ports.json,
+    projected into the generated PORTS.md: fuaran-live -> Vite 24070–24079, no server port —
     the app is static).
 
     Per the workspace "Sibling launcher conventions" in ../CLAUDE.md, every pnpm
@@ -112,10 +112,10 @@ try {
     Write-Host "=== compiling Fuaran app (dotnet fable) ===" -ForegroundColor Cyan
     Invoke-Pnpm run fable:app
 
-    $url = 'http://localhost:24040/'
+    $url = 'http://localhost:24070/'
     if (-not $NoBrowser) {
         # Fable is done; Vite binds within ~1s and then blocks, so open the browser
-        # just before launch. strictPort means the server holds 24040 or fails loudly.
+        # just before launch. strictPort means the server holds 24070 or fails loudly.
         Write-Host ""
         Write-Host "Opening $url" -ForegroundColor Green
         Start-Process $url

@@ -110,6 +110,42 @@ The `@fuaran-ui/*` packages resolve from the public npm registry (`^0.1.0`). The
 For inner-loop iteration against unpublished sibling changes, a temporary `pnpm.overrides`
 `link:` bridge to a local `fuaran-ts` checkout works, but must never be committed.
 
+**The NuGet half, and the one rule that governs it.** The F# projects pin the public `Fuaran.UI.*`,
+`Fuaran.Core.*`, `Fuaran.Program.*` and `Fable.*` / `Feliz` families, all restored from the public
+registry — `nuget.config` declares it FIRST, ahead of the local folder feed, and says why beside the
+order: this repo's whole posture is that a maintainer's build resolves what a stranger's build
+resolves. **So every id pinned here must be obtainable from the public registry, and a `Fuaran.`
+prefix is not evidence that one is** — publication is a property of the registry, never of the name,
+and the failure mode is silent in exactly the wrong direction: a pin only a maintainer's local feed
+can serve builds perfectly here and makes the repo unbuildable for everyone else, with the first
+person to hit it being a stranger who cannot fix it.
+
+`test/restoreGraphPublic.test.ts` is the standing lock, on the same convention as the in-page
+emitter locks below. It is an **exact id set** rather than a prefix pattern, precisely because the
+prefix proves nothing: a new id reddens the unit suite until someone adds it deliberately, and that
+act is where the registry gets checked. The lock is offline, so it does not claim a version is
+served _today_ — `ci.yml` restores with no local feed and is what proves that on every push.
+Raising a pin stays a separate deliberate act: the six CI workflows pin the language-tier sibling
+checkout at a tier ref and must move together with it, per [`docs/tier-pin.md`](docs/tier-pin.md).
+
+**The shared wire core.** `Fuaran.UI.AiWire` is the portable AI-connector wire substrate that
+`app/Byok.fs` and `app/Projection.fs` are built on — the insertion-ordered `JsonValue` model with
+its byte-stable canonical writer, the host-bridged parser, the provider contract records and the
+one-method `IHttpTransport` egress seam. It was four vendored files in this repo until Phase 1698
+published it and deleted the copy. **`app/vendor/` must stay gone** (the lock asserts it): the
+parser reads untrusted provider responses, so carrying a copy means owning security fixes for it,
+which makes re-vendoring a decision rather than a convenience.
+
+**What is NOT shared, and would not become shared by adopting a package: `app/Agent.fs`'s loop.**
+The emit→observe→repair loop in this repo is its own — 1,963 lines of Fable over JS interop and
+browser DOM reading, built around the browser rather than ported to it. **No published package
+provides that loop.** Phase 1753 checked the public registry directly and found none, and its
+finding is recorded here because the opposite assumption is the natural one to make: publishing the
+wire substrate removed an obstacle to sharing a loop built on it, and removing an obstacle is not
+the same act as sharing. Two consequences for anyone working here: there is nothing to adopt, and
+an id that merely _looks_ as though it would provide one must not be pinned unless the public
+registry serves it — which is the rule above, and the reason the lock is written the way it is.
+
 ## Effect / provider portability (§4l)
 
 Everything effectful is an injected F# interface (`app/Ports.fs`): `IAIProvider` (the LLM call) and `EffectPorts` (clipboard / download / notify / warn). The browser implementations live in `app/Byok.fs` (the Anthropic `fetch` provider + the memory key store + the browser effect ports). The Elmish `update` loop depends only on the interfaces, so a server host could drive the identical loop with a different provider impl.

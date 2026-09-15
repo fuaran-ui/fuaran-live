@@ -146,6 +146,18 @@ the same act as sharing. Two consequences for anyone working here: there is noth
 an id that merely _looks_ as though it would provide one must not be pinned unless the public
 registry serves it — which is the rule above, and the reason the lock is written the way it is.
 
+**The agent-mode prompt in `app/Agent.fs` is a reference prompt, and
+`test/agentPromptReference.test.ts` keeps it one.** It names the six tools the loop registers and the
+emit→observe→repair procedure, and teaches by procedure rather than by example: the wire teaching,
+with its corpus-generated examples, is the language repo's published prompt pack inlined by
+`app/SystemPrompt.fs`, and the agent suffix adds no fenced example of its own. The lock asserts
+exactly that shape — no fenced block in the suffix, a tool list that matches the registered tool
+table by name in both directions, and a size ceiling. The ceiling is deliberately a number rather
+than a judgement: a new paragraph reddens the suite until someone raises it, and that act is where
+"does this belong in a public reference prompt?" gets asked instead of assumed. Content that tunes
+a loop — few-shot exemplar trees, provider-specific routing, convergence heuristics — is not a fit
+for this repo's prompt and does not become one by improving the demo.
+
 ## Effect / provider portability (§4l)
 
 Everything effectful is an injected F# interface (`app/Ports.fs`): `IAIProvider` (the LLM call) and `EffectPorts` (clipboard / download / notify / warn). The browser implementations live in `app/Byok.fs` (the Anthropic `fetch` provider + the memory key store + the browser effect ports). The Elmish `update` loop depends only on the interfaces, so a server host could drive the identical loop with a different provider impl.

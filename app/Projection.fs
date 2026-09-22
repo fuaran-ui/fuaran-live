@@ -749,6 +749,37 @@ let private membersOf (name: string) (v: JsonValue) : (string * JsonValue) list 
   | Some(JObject ms) -> ms
   | _ -> []
 
+/// **The transform algebra's two renamed members (Phase 1821).** A `project`
+/// step's rename list is spelled `columns`; a sort key — on a `sort` step and on
+/// a `window` spec's frame-ordering entry — names its column `column`. The
+/// former spellings (`cols`, `col`) stay DECODE ALIASES that no conformant host
+/// emits, so a tree saved or pasted before the rename still projects rather than
+/// projecting an empty list. Reading only one spelling is silent: the emitters
+/// below produce source that parses and runs and describes a different tree.
+///
+/// Canonical wins where a value carries both. That is the substrate's own alias
+/// rule, and it is never exercised in practice: a conformant decoder REFUSES a
+/// project step or sort key carrying both spellings as ambiguous, so a tree that
+/// reached this projector never carries the pair.
+///
+/// Note this is the DATAFRAME algebra only. A Box layout's grid/masonry `cols`
+/// is an integer column COUNT outside that algebra and did not move, and neither
+/// did the `col` expression's `$type` tag.
+let private aliasedName (canonical: string) (alias: string) (v: JsonValue) : string =
+  match JsonValue.tryField canonical v with
+  | Some _ -> canonical
+  | None -> alias
+
+/// A `project` step's rename list — `columns` since Phase 1821, `cols` before it.
+/// Shared by all three emitters.
+let private projectColumns (v: JsonValue) : JsonValue list =
+  arrOf (aliasedName "columns" "cols" v) v
+
+/// A sort key's column name — `column` since Phase 1821, `col` before it. Shared
+/// by all three emitters, and within each by the `sort` step and the `window`
+/// spec's `orderBy` entries.
+let private sortKeyColumn (v: JsonValue) : string = strOf (aliasedName "column" "col" v) v
+
 let private strItem (v: JsonValue) : string =
   match v with
   | JString s -> qs s
@@ -909,12 +940,20 @@ let private tsDataSource (v: JsonValue) : string =
           [ "schema", "[" + String.concat ", " schemaLits + "]"
             "columns", "[" + String.concat ", " columnLits + "]" ] ]
 
+/// The READ side takes Phase 1821's rename (`projectColumns` / `sortKeyColumn`);
+/// the EMITTED side deliberately does not. `@fuaran-ui/ops` renamed the WIRE
+/// members and kept its in-memory `Transform.cols` and `SortKey.col` — that tier
+/// renames an in-memory field only where leaving it would mislead — and what
+/// these literals must type-check against is the in-memory surface. So `cols:` /
+/// `col:` below are correct and are not a leftover; the encoder puts the
+/// canonical spelling on the wire. `compute.project` takes the same positional
+/// pairs it always did, as do the Python and F# authoring calls.
 let private tsTransformStep (v: JsonValue) : string =
   let pair (p: JsonValue) =
     tsInline [ "a", qs (strOf "a" p); "b", qs (strOf "b" p) ]
 
   let sortKey (s: JsonValue) =
-    tsInline [ "col", qs (strOf "col" s); "dir", qs (strOf "dir" s) ]
+    tsInline [ "col", qs (sortKeyColumn s); "dir", qs (strOf "dir" s) ]
 
   let strArr (name: string) =
     "[" + (arrOf name v |> List.map strItem |> String.concat ", ") + "]"
@@ -924,7 +963,7 @@ let private tsTransformStep (v: JsonValue) : string =
   | Some "project" ->
     tsInline
       [ "kind", qs "project"
-        "cols", "[" + (arrOf "cols" v |> List.map pair |> String.concat ", ") + "]" ]
+        "cols", "[" + (projectColumns v |> List.map pair |> String.concat ", ") + "]" ]
   | Some "derive" ->
     tsInline
       [ "kind", qs "derive"
@@ -3472,14 +3511,14 @@ let private pyTransformStep (v: JsonValue) : string =
     "(" + pq (strOf "a" p) + ", " + pq (strOf "b" p) + ")"
 
   let sortKey (s: JsonValue) =
-    "(" + pq (strOf "col" s) + ", " + pq (strOf "dir" s) + ")"
+    "(" + pq (sortKeyColumn s) + ", " + pq (strOf "dir" s) + ")"
 
   let strArr (name: string) =
     pyList (arrOf name v |> List.map pyStrItem)
 
   match dollarType v with
   | Some "filter" -> "cp.Filter(" + pyColExpr (fieldReq "pred" v) + ")"
-  | Some "project" -> "cp.Project(" + pyList (arrOf "cols" v |> List.map pair) + ")"
+  | Some "project" -> "cp.Project(" + pyList (projectColumns v |> List.map pair) + ")"
   | Some "derive" -> "cp.Derive(" + pq (strOf "name" v) + ", " + pyColExpr (fieldReq "expr" v) + ")"
   | Some "groupBy" ->
     let aggs =
@@ -6800,14 +6839,14 @@ let private fsPairList (items: JsonValue list) : string =
 let private fsOrderList (items: JsonValue list) : string =
   "[ "
   + (items
-     |> List.map (fun o -> "(" + fsStr (strOf "col" o) + ", " + fsSortDir (strOf "dir" o) + ")")
+     |> List.map (fun o -> "(" + fsStr (sortKeyColumn o) + ", " + fsSortDir (strOf "dir" o) + ")")
      |> String.concat "; ")
   + " ]"
 
 let private fsTransformStep (v: JsonValue) : string =
   match dollarType v with
   | Some "filter" -> "Fuaran.Core.Transform.Filter(" + fsColExpr (fieldReq "pred" v) + ")"
-  | Some "project" -> "Fuaran.Core.Transform.Project(" + fsPairList (arrOf "cols" v) + ")"
+  | Some "project" -> "Fuaran.Core.Transform.Project(" + fsPairList (projectColumns v) + ")"
   | Some "derive" ->
     "Fuaran.Core.Transform.Derive("
     + fsStr (strOf "name" v)

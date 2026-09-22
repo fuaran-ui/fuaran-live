@@ -1,7 +1,7 @@
 # Codegen-conformance — the Python arm's executor.
 #
 # Reads one JSON batch of projected expressions on stdin, evaluates each against
-# the real `fuaran_py` authoring surface IN THIS SINGLE PROCESS, re-encodes the
+# the real `fuaran_ui` authoring surface IN THIS SINGLE PROCESS, re-encodes the
 # reconstructed node with the canonical encoder, and writes one JSON result per
 # fixture on stdout. One interpreter for the whole corpus rather than one spawn
 # per fixture: the import cost is paid once, and the harness stays fast enough to
@@ -27,7 +27,7 @@
 #                       {"id": "...", "ok": false, "error": "..."}, ...],
 #           "constructs": {"t.Drawing": {"models": false, "detail": "..."} |
 #                          {"error": "..."}, ...},
-#           "host": "fuaran-py", "hostVersion": "0.4.0",
+#           "host": "fuaran-py", "hostVersion": "0.7.0",
 #           "capabilityManifest": {...} | null, "capabilityError": "..." | null}
 #
 # Nothing here decides conformance — the comparison against the wire fixture, and
@@ -48,7 +48,7 @@ def _union_cases(obj: object) -> list[str] | None:
     """The case-class names of a union alias, or None when `obj` is not one.
 
     Both spellings must be admitted: `typing.Union[...]` and PEP 604 `A | B`
-    (whose `get_origin` is `types.UnionType`, NOT `typing.Union`). `fuaran_py`
+    (whose `get_origin` is `types.UnionType`, NOT `typing.Union`). `fuaran_ui`
     writes the second, and checking only the first silently reports every union
     as "neither union nor record" — a resolver error, not a verdict, so it fails
     loudly rather than passing an entry vacuously.
@@ -110,21 +110,28 @@ def host_declaration() -> dict[str, object]:
     `capabilityError` — the harness turns that into a named fallback, never into a failure.
     """
     declaration: dict[str, object] = {
+        # The HOST id, deliberately NOT the distribution name. Phase 1694 renamed the
+        # PyPI distribution to `fuaran-ui` and the import package to `fuaran_ui`, but
+        # the host still identifies itself as `fuaran-py` — that is the literal
+        # `HOST_ID` its own `conformance.host_capability` stamps into the manifest, and
+        # §27.4 rule 5 binds a manifest by VERSION, so the two must keep agreeing here.
+        # Renaming this to match the pip line would make this arm's declaration
+        # disagree with the manifest the very same interpreter publishes.
         "host": "fuaran-py",
         "hostVersion": None,
         "capabilityManifest": None,
         "capabilityError": None,
     }
     try:
-        import fuaran_py
+        import fuaran_ui
 
-        declaration["hostVersion"] = getattr(fuaran_py, "__version__", None)
+        declaration["hostVersion"] = getattr(fuaran_ui, "__version__", None)
     except Exception as exc:  # pragma: no cover — the fatal import above already reported it
         declaration["capabilityError"] = f"{type(exc).__name__}: {exc}"
         return declaration
 
     try:
-        from fuaran_py.conformance import host_capability
+        from fuaran_ui.conformance import host_capability
 
         declaration["capabilityManifest"] = host_capability.build()
     except Exception as exc:
@@ -141,7 +148,7 @@ def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
 
     try:
-        from fuaran_py.ui import (  # noqa: F401 — bound into the eval namespace
+        from fuaran_ui.ui import (  # noqa: F401 — bound into the eval namespace
             accessibility,
             action,
             binding,
@@ -152,11 +159,11 @@ def main() -> int:
             node,
             rule,
         )
-        from fuaran_py.schema import types as t  # noqa: F401
-        from fuaran_py.ui import compute as cp  # noqa: F401
+        from fuaran_ui.schema import types as t  # noqa: F401
+        from fuaran_ui.ui import compute as cp  # noqa: F401
     except Exception:  # pragma: no cover — reported to the harness, not raised
         json.dump(
-            {"fatal": "fuaran_py is not importable:\n" + traceback.format_exc(), **host_declaration()},
+            {"fatal": "fuaran_ui is not importable:\n" + traceback.format_exc(), **host_declaration()},
             sys.stdout,
         )
         return 0

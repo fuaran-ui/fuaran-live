@@ -9,7 +9,7 @@ _**F# verified by `fuaran#1657`**)._
 The Output box renders the live Fuaran UI tree in several notations. The `JSON`
 tab is the exact canonical wire form; the `TypeScript`, `Python`, `F#`, `C#`, and
 `VB` tabs are **generated source projections** — the canonical wire tree walked
-and emitted as `@fuaran-ui/ui`, `fuaran_py.ui`, `Fuaran.UI` smart-constructor,
+and emitted as `@fuaran-ui/ui`, `fuaran_ui.ui`, `Fuaran.UI` smart-constructor,
 `Fuaran.UI.CSharp` static-factory, and `Fuaran.UI.VisualBasic` XML-literal source.
 Fidelity is **per-leg**: the `TypeScript`, `Python` and `F#` columns are
 **verified byte-round-trips** (below); the `C#` / `VB` columns remain demo-grade /
@@ -59,16 +59,16 @@ executes.
 
 ## Python leg — VERIFIED byte-round-trip over the modelled set (`fuaran#1142`)
 
-The `Python` column is emitted **per-kind against the real `fuaran_py` authoring
+The `Python` column is emitted **per-kind against the real `fuaran_ui` authoring
 surface** — `fuaran.*` smart constructors, the `binding.*` / `action.*` /
-`format.*` namespaces, and the typed model `fuaran_py.schema.types` (`t`) with
+`format.*` namespaces, and the typed model `fuaran_ui.schema.types` (`t`) with
 its compute layer (`cp`) for the records those namespaces do not reach — and a
 second arm beside the TypeScript one keeps it honest: for every Node fixture in
 the shared corpus it projects the wire JSON to Python source, **executes** the
 generated source against the real host (every fixture in ONE CPython process),
-re-encodes via `fuaran_py.ui.encode`, and asserts byte-identity with the fixture.
-Run it with `pnpm conformance`; the arm needs a CPython carrying `fuaran-py`
-(`python -m venv .venv` then `pip install fuaran-py==0.4.0`, or point
+re-encodes via `fuaran_ui.ui.encode`, and asserts byte-identity with the fixture.
+Run it with `pnpm conformance`; the arm needs a CPython carrying the Python host
+(`python -m venv .venv` then `pip install fuaran-ui==0.7.0`, or point
 `FUARAN_PY_PYTHON` at an interpreter that already has it). It **fails** rather
 than skips when the host is absent: an arm that goes green without its oracle is
 worse than no arm.
@@ -76,10 +76,13 @@ worse than no arm.
 The claim is deliberately scoped, and the scope is the interesting part. Where
 the TypeScript leg can always fall back to a typed in-memory object literal,
 Python has **no such escape hatch**: `encode` calls `.to_wire()` on the root, and
-the structural `fuaran_py.model.Obj` has no such method, so a construct the typed
+the structural `fuaran_ui.model.Obj` has no such method, so a construct the typed
 authoring model does not carry has no spelling at all. Measured against
-`fuaran-py` 0.4.0 — the release the three workflows pin, and the one the standing
+`fuaran-ui` 0.7.0 — the release the three workflows pin, and the one the standing
 entries were last re-run against — the remaining set falls in two families:
+(the distribution was `fuaran-py` up to 0.5.0; Phase 1694 renamed it, and the
+import package with it, so older notes here and elsewhere cite the old name for
+releases that genuinely carried it)
 
 - **No typed binding case** — `Binding.Expr`. The union runs Static, State,
   Filter, Selection, Now, FormatBinding, Local, Query, Invoke — and no further, so
@@ -118,7 +121,7 @@ whether that is a stale entry to remove or projector lag to teach
 `app/Projection.fs`. The set's size is not quoted here or anywhere else in prose;
 it is computed by arm, and the whole cross-arm summary is rendered into the census
 test's name, so either arm's output states it. Closing the set is a matter of
-teaching `fuaran-py`, one named construct at a time. For those fixtures the
+teaching the Python host, one named construct at a time. For those fixtures the
 projection
 still emits the shape the typed model _would_ take, so pasting it raises an
 `AttributeError` naming the absent class rather than silently producing something
@@ -224,7 +227,7 @@ VB spelling at all (the estate's own note on the veneer gaps). Neither is
 projector lag.
 
 The `Python` leg is done, with the scope its section above states: the remaining
-work there is not in this repo but in `fuaran-py`, one named construct at a time,
+work there is not in this repo but in the `fuaran-ui` host, one named construct at a time,
 and the shared quarantine table's `python`-arm entries are the list. The `F#`
 leg is done outright — its host is the `Fuaran.UI` package, and there is no
 second repository for its remaining work to be in.

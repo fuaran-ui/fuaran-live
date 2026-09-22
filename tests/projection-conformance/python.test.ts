@@ -1,16 +1,16 @@
 // Codegen-conformance — Python arm (single-process CPython executor).
 //
 // For every Node fixture in the workspace wire-format-fixtures/ corpus:
-//   1. project the canonical wire JSON to `fuaran_py.ui` authoring source via
+//   1. project the canonical wire JSON to `fuaran_ui.ui` authoring source via
 //      the F#/Fable projector (app/Projection.fs, Fable-compiled to
 //      app/output/Projection.js);
-//   2. EXECUTE the generated source against the real `fuaran_py` surface —
+//   2. EXECUTE the generated source against the real `fuaran_ui` surface —
 //      every fixture in ONE CPython process, not one spawn each;
-//   3. re-encode via `fuaran_py.ui.encode` and assert the JSON is
+//   3. re-encode via `fuaran_ui.ui.encode` and assert the JSON is
 //      byte-identical to the fixture.
 //
 // The sibling TypeScript arm's shape, with one structural difference forced by
-// the host: `fuaran_py`'s `encode` calls `.to_wire()` on the root, and its
+// the host: `fuaran_ui`'s `encode` calls `.to_wire()` on the root, and its
 // structural `Obj` has no such method, so there is no escape hatch a construct
 // outside the typed model can take. Where the TS leg can always emit a typed
 // in-memory literal, the Python leg cannot — which is why this arm carries every
@@ -27,7 +27,7 @@
 // keeps measuring what it claims to measure.
 //
 // Requires `pnpm run fable:app` (the app build) to have produced app/output/,
-// and a CPython with `fuaran-py` installed (see resolvePython).
+// and a CPython with the `fuaran-ui` host installed (see resolvePython).
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -71,7 +71,7 @@ const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip
 /**
  * The interpreter to run the executor with. A repo-local `.venv` wins (the
  * documented local setup: `python -m venv .venv` then
- * `pip install fuaran-py==0.4.0`); FUARAN_PY_PYTHON overrides it for CI, where
+ * `pip install fuaran-ui==0.7.0`); FUARAN_PY_PYTHON overrides it for CI, where
  * the interpreter is whatever actions/setup-python provisioned.
  */
 const resolvePython = (): string => {
@@ -98,7 +98,7 @@ const resolvePython = (): string => {
 // this repo. `encode` requires a `.to_wire()` root, so a kind or a binding the
 // typed model omits has NO spelling at all — where the TS leg can always fall back
 // to an in-memory object literal. Closing an entry is a matter of teaching
-// `fuaran-py` the named construct and raising the pin; the falsifier below is what
+// the host the named construct and raising the pin; the falsifier below is what
 // stops an entry outliving the gap it names.
 const pyQuarantine = entriesFor('python');
 
@@ -117,9 +117,10 @@ const pyQuarantine = entriesFor('python');
 //      and, when it binds, compute the expected set. Otherwise fall back to the
 //      shared table — the pre-manifest path, named rather than silent.
 //
-// The pinned release publishes no manifest today, so step 3 falls back and this
-// arm behaves exactly as it did. What the code buys now is that the day the pin
-// moves to a release that DOES publish one, the answer stops being a list.
+// Whether step 3 binds depends on the pinned release: one that publishes no
+// manifest falls back to the shared table, named rather than silent, and the arm
+// behaves as it did before §27. The census test below states which path the run
+// actually took, so this comment never has to be the record of it.
 
 const probeHostDeclaration = (): HostDeclaration => {
   try {
@@ -244,7 +245,7 @@ describe('Python projection conformance (Node corpus)', () => {
   it('the Python executor ran', () => {
     // A hard failure, never a skip: a conformance arm that goes green without
     // its oracle is worse than no arm at all. Install the host with
-    // `python -m venv .venv && .venv/…/pip install fuaran-py==0.4.0`, or point
+    // `python -m venv .venv && .venv/…/pip install fuaran-ui==0.7.0`, or point
     // FUARAN_PY_PYTHON at an interpreter that already has it.
     expect(fatal, fatal ?? '').toBeUndefined();
   });

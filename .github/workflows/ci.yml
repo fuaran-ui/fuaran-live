@@ -118,9 +118,17 @@ jobs:
           dotnet-version: '10.0.x'
 
       # The conformance gate's PYTHON arm executes its projected source against
-      # the real fuaran-py host. Pinned to an exact published version: the arm's
+      # the real Python host. Pinned to an exact published version: the arm's
       # quarantine names the constructs that release does not model, so a
       # floating version would move the set it describes with no commit here.
+      # The DISTRIBUTION is `fuaran-ui` and the import package is `fuaran_ui`
+      # from 0.6.0 — Phase 1694 renamed both, so the registry name carries the
+      # domain and drops the language like every other tier. The `fuaran-py`
+      # project on PyPI stops at 0.5.0 and is never published to again, so a pin
+      # naming it can only ever resolve to a release that predates Phase 1821's
+      # `project.columns` / `column` wire rename. The HOST ID the capability
+      # manifest reports is still `fuaran-py` (it names the host, not the
+      # distribution); do not "fix" it to match this line.
       # The pin and the runner must agree on requires-python: 0.0.1 declares
       # >=3.13 and so was UNSATISFIABLE on this 3.12 runner — pip failed at
       # install, which failed the whole job before any test ran. 0.0.3 and every
@@ -134,8 +142,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install the Python host (fuaran-py)
-        run: python -m pip install --disable-pip-version-check fuaran-py==0.5.0
+      - name: Install the Python host (fuaran-ui)
+        run: python -m pip install --disable-pip-version-check fuaran-ui==0.7.0
 
       # The F# tier's nuget.config declares a local folder feed at a fixed
       # relative depth; NuGet hard-errors (NU1301) on a missing folder source,

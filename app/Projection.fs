@@ -7,7 +7,7 @@ module Fuaran.Live.Projection
 //  `src/inspector/projections/*` source projectors that Phase 281 shipped. This
 //  restores the **Output box**: the current Fuaran tree rendered as JSON plus
 //  idiomatic builder source in TypeScript (`@fuaran-ui/ui`), Python
-//  (`fuaran_py.ui`), F# (`Fuaran.UI` smart constructors), C# (`Fuaran.UI.CSharp`
+//  (`fuaran_ui.ui`), F# (`Fuaran.UI` smart constructors), C# (`Fuaran.UI.CSharp`
 //  static-factory + options-object, Phase 362), and VB (`Fuaran.UI.VisualBasic`
 //  XML literals, Phase 363). The first four ride one generic per-language
 //  `LangSpec` walker; VB has its own walker (its XML-literal shape has no object-
@@ -687,7 +687,7 @@ let private fieldOpt (name: string) (v: JsonValue) : JsonValue option =
 /// slot the wire omits at its default. A grid column's `format` / `width` are
 /// the worked example — `@fuaran-ui/ops` dereferences `c.format.kind` and
 /// `c.width.kind` unconditionally and then drops the value when it is the
-/// identity, and `fuaran_py`'s `binding.state` takes `default_value` as a
+/// identity, and `fuaran_ui`'s `binding.state` takes `default_value` as a
 /// REQUIRED positional — so at those sites the projection of an absent member is
 /// the identity (`{ kind: 'None' }`, `{ kind: 'Auto' }`, `None`), which every
 /// slot projector already yields for `JNull`, and the re-encode drops it.
@@ -3247,16 +3247,25 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       )
   | _ -> None
 
-// ─── Python (fuaran_py.ui) — per-kind exact emission (Phase 1142) ─────────────
+// ─── Python (fuaran_ui.ui) — per-kind exact emission (Phase 1142) ─────────────
 //
 // The 27.F/281 shape, transposed. Every corpus-reachable construct is emitted
-// against the real `fuaran_py` authoring surface — `fuaran.*` smart constructors
+// against the real `fuaran_ui` authoring surface — `fuaran.*` smart constructors
 // for nodes, `binding.*` / `action.*` / `format.*` for the cross-cutting
-// vocabulary, and the typed model `fuaran_py.schema.types` (imported as `t`,
+// vocabulary, and the typed model `fuaran_ui.schema.types` (imported as `t`,
 // with the compute layer as `cp`) for the records those namespaces do not reach.
-// Executing the emitted expression and passing the result to `fuaran_py.ui.encode`
+// Executing the emitted expression and passing the result to `fuaran_ui.ui.encode`
 // re-encodes byte-identically to the wire fixture; the Python arm under
 // `tests/projection-conformance/` is the gate.
+//
+// ON THE TWO NAMES BELOW. The import package is `fuaran_ui` and the PyPI
+// distribution is `fuaran-ui` from 0.6.0 — Phase 1694 renamed both. The
+// per-construct notes further down still cite `fuaran-py` releases ("modelled by
+// fuaran-py from 0.3.0"), and that is deliberate rather than missed: those name
+// the release that first carried a construct, and at 0.1.0-0.5.0 the project WAS
+// `fuaran-py`. Rewriting them would make this file claim a history that never
+// happened. The host's own `HOST_ID` is likewise still `fuaran-py` — it names the
+// host, not the distribution.
 //
 // Two differences from the TypeScript leg shape every function below.
 //
@@ -3264,7 +3273,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
 //    so a constructor call is `fuaran.stack('id', children=[…])`, and a nested
 //    record is a typed dataclass call rather than a re-spelling of the wire.
 //  • There is NO structural escape hatch that composes with the typed layer:
-//    `encode` calls `.to_wire()` on the root and `fuaran_py.model.Obj` has no
+//    `encode` calls `.to_wire()` on the root and `fuaran_ui.model.Obj` has no
 //    such method, so a construct the typed model does not carry cannot be
 //    projected exactly at all. Those are named — with the missing construct — in
 //    the arm's quarantine and in docs/PROJECTION_FIDELITY.md rather than being
@@ -3389,7 +3398,7 @@ let private pyStaticValue (v: JsonValue) : string = pyJson v
 
 // ── Compute layer (Binding.Transform) ────────────────────────────────────────
 //
-// The compute vocabulary lives in `fuaran_py.ui.compute` (imported as `cp`), a
+// The compute vocabulary lives in `fuaran_ui.ui.compute` (imported as `cp`), a
 // module separate from the typed schema because several of its names collide
 // with binding cases — `Filter` is both a binding and a transform step.
 
@@ -3667,7 +3676,7 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
     pyCall "binding.selection" [ pq (strOf "nodeId" v) ] kw
   | Some "State" ->
     // absent-is-omit spelled as the identity default, for the same reason as the
-    // TS arm and a sharper one: `fuaran_py`'s `binding.state` takes
+    // TS arm and a sharper one: `fuaran_ui`'s `binding.state` takes
     // `default_value` as a REQUIRED POSITIONAL, so omitting it is a TypeError
     // rather than a shorter spelling.
     "binding.state("
@@ -3745,7 +3754,7 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
        + ")")
   | Some "Invoke" -> pyInvoke v
   | _ ->
-    // Expr / Computed — no typed case in `fuaran_py`.
+    // Expr / Computed — no typed case in `fuaran_ui`.
     "binding.static(None)"
 
 /// The explicit `TextSource` record — for slots typed as raw `TextSource`, which
@@ -3907,7 +3916,7 @@ let rec private pyAction (v: JsonValue) : string =
   | Some "AiTool" -> "t.AiTool(" + pq (strOf "toolName" v) + ", " + pyJson (fieldReq "args" v) + ")"
   | Some "Invoke" -> pyInvoke v
   | _ ->
-    // CommitLocal — no typed case in `fuaran_py`.
+    // CommitLocal — no typed case in `fuaran_ui`.
     "action.chain([])"
 
 // ── Form fields / filters / grid columns / tab headers ───────────────────────
@@ -4207,7 +4216,7 @@ let private pyColumnWidth (v: JsonValue) : string =
 /// A column's cell kind. Every kind but one carries a `(row) -> …` closure that
 /// erases to `"<closure>"`, so the bare discriminator is the whole of it; Phase
 /// 750's toned pill holds no closure at all and therefore survives the wire with
-/// its `field` / `map` / `default` intact, and `fuaran_py` models it as its own
+/// its `field` / `map` / `default` intact, and `fuaran_ui` models it as its own
 /// record. `default` is omitted at `Default`, so an absent wire field
 /// reconstructs as the record's own default rather than being spelled out.
 let private pyColumnKind (v: JsonValue) : string =
@@ -4554,7 +4563,7 @@ let private pyAccessibilityLit (v: JsonValue) : string =
 /// typed binding is handed over already lowered by its own `to_wire`. That is
 /// deliberately not the same thing as writing the wire out by hand: it can spell
 /// exactly what the typed model carries and nothing else, so a `Binding` case
-/// `fuaran_py` does not model still cannot be projected here — see the leg's
+/// `fuaran_ui` does not model still cannot be projected here — see the leg's
 /// header note.
 let private pyVisible (v: JsonValue) : string = pyBinding Opq.Scalar v + ".to_wire()"
 
@@ -4729,7 +4738,7 @@ and private pyBaseTraits (depth: int) (nodeV: JsonValue) : (string * string) lis
 /// The fallback for a kind with no constructor arm: the typed record named by
 /// the wire discriminator, with each field snake-cased. This replaces the
 /// generic walker's `$type`-keeping object literal — it is the shape the kind
-/// WOULD take, so a kind `fuaran_py` does not model fails by name (an
+/// WOULD take, so a kind `fuaran_ui` does not model fails by name (an
 /// `AttributeError` naming the absent class) rather than passing as a sketch.
 and private pyGenericNode (depth: int) (id: string) (k: JsonValue) : string =
   let kindType = dollarType k |> Option.defaultValue "Node"
@@ -7842,13 +7851,13 @@ let private walkFor (target: Target) (wireJson: string) : string =
     + "// wire JSON for every corpus-covered kind (closures/handlers are structural placeholders).\n\n"
     + tsExprWalk wireJson
   | Target.Python ->
-    "# The current tree as Python (fuaran_py.ui) authoring source.\n"
+    "# The current tree as Python (fuaran_ui.ui) authoring source.\n"
     + "# Verified projection: executing this source re-encodes byte-identically to the canonical\n"
     + "# wire JSON for every corpus-covered construct (closures/handlers are structural placeholders).\n"
     + "#\n"
-    + "#     from fuaran_py.ui import fuaran, binding, action, format, encode\n"
-    + "#     from fuaran_py.ui import compute as cp\n"
-    + "#     from fuaran_py.schema import types as t\n\n"
+    + "#     from fuaran_ui.ui import fuaran, binding, action, format, encode\n"
+    + "#     from fuaran_ui.ui import compute as cp\n"
+    + "#     from fuaran_ui.schema import types as t\n\n"
     + pyExprWalk wireJson
   | Target.FSharp ->
     "// The current tree as F# (Fuaran.UI) smart-constructor source.\n"
@@ -7874,7 +7883,7 @@ let projectTypeScriptExpr (wireJson: string) : string = tsExprWalk wireJson
 
 /// The bare projected Python expression (no header) – the input of the
 /// `tests/projection-conformance/` Python arm, which executes it against the
-/// real `fuaran_py.ui` surface and asserts a byte-identical canonical re-encode.
+/// real `fuaran_ui.ui` surface and asserts a byte-identical canonical re-encode.
 let projectPythonExpr (wireJson: string) : string = pyExprWalk wireJson
 
 /// The bare projected F# expression (no header) – the input of the

@@ -1,9 +1,9 @@
 // The corpus-drift sentinel for THIS repo's host pins (Phase 1669).
 //
-// Phase 1583 put a sentinel on fuaran-py: how far its committed corpus snapshot has
+// Phase 1583 put a sentinel on the Python host: how far its committed corpus snapshot has
 // fallen behind the authority. This is the same idea aimed at the thing fuaran-live
 // actually holds. It bundles no snapshot; what it pins is HOSTS — `@fuaran-ui/*` at
-// exact-ish ranges in package.json, and `fuaran-py==X` in the workflows — while its
+// exact-ish ranges in package.json, and `fuaran-ui==X` in the workflows — while its
 // conformance gate reads the corpus UNPINNED, at whatever HEAD is. So the drift that
 // bites here is not a stale copy of the spec; it is a pinned host that predates a
 // corpus move, which no amount of reading this repo can reveal.
@@ -108,7 +108,7 @@ const npmSubjects = () => {
 };
 
 /**
- * The `fuaran-py` pin, read from the workflows — where it lives. There is no
+ * The `fuaran-ui` pin, read from the workflows — where it lives. There is no
  * requirements file here: the Python host is installed by an exact `pip install`
  * line, so the workflow IS the declaration, and reading it is what keeps this
  * check measuring the pin CI uses rather than a second copy of it.
@@ -126,7 +126,7 @@ const pyPins = () => {
   const files = (r.status === 0 ? r.stdout.split('\n') : []).filter((f) => f.endsWith('.yml'));
   for (const rel of files) {
     const text = readFileSync(resolve(repoRoot, rel), 'utf8');
-    for (const m of text.matchAll(/fuaran-py==([0-9][0-9A-Za-z.\-+]*)/g)) {
+    for (const m of text.matchAll(/fuaran-ui==([0-9][0-9A-Za-z.\-+]*)/g)) {
       const where = found.get(m[1]) ?? [];
       where.push(rel.replace(`${dir}/`, ''));
       found.set(m[1], where);
@@ -219,7 +219,7 @@ const main = async () => {
   const subjects = [];
   for (const [name, version] of inScope) subjects.push({ kind: 'npm', name, version });
   for (const [version, where] of pyPins())
-    subjects.push({ kind: 'pypi', name: 'fuaran-py', version, where });
+    subjects.push({ kind: 'pypi', name: 'fuaran-ui', version, where });
 
   let behind = 0;
   let unverified = 0;

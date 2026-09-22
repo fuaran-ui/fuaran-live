@@ -214,7 +214,7 @@ let private tsSource (h: Holes) : string =
   + "});\n"
 
 let private pySource (h: Holes) : string =
-  "from fuaran_py.ui import box, metric, Flex, Role\n\n"
+  "from fuaran_ui.ui import box, metric, Flex, Role\n\n"
   + "# The same tree, authored in Python.\n"
   + "dashboard = box(\"rosetta-root\",\n"
   + "    layout=Flex.VERTICAL, role=Role.DASHBOARD, heading=\"Revenue snapshot\",\n"
@@ -758,7 +758,7 @@ let private RosettaView () : ReactElement =
         "Visual Basic", "Fuaran.UI.CSharp", vbFluentSource holes
         "Visual Basic (XML)", "Fuaran.UI.VisualBasic", vbSource holes
         "TypeScript", "@fuaran-ui/ui", tsSource holes
-        "Python", "fuaran_py.ui", pySource holes
+        "Python", "fuaran_ui.ui", pySource holes
         "Go", "fuaran-go", goSource holes
         "Rust", "fuaran-rs", rustSource holes
         "Swift", "fuaran-swift (SwiftUI)", swiftSource holes

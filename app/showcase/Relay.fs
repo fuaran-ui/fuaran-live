@@ -214,7 +214,7 @@ let private stations: Station[] =
        Title = "Author the app"
        OpsThrough = 1
        Code =
-         "from fuaran_py.ui import box, metric, callout, Flex, Role\n\n"
+         "from fuaran_ui.ui import box, metric, callout, Flex, Role\n\n"
          + "# The data scientist authors the base dashboard from the quarter's data.\n"
          + "dashboard = box(\"rl-root\",\n"
          + "    layout=Flex.VERTICAL, role=Role.DASHBOARD, heading=\"Q3 revenue\",\n"

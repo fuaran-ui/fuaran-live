@@ -52,7 +52,7 @@ describe('source projection – per-language builder source', () => {
     expect(out).toContain('fuaran.metric(');
     expect(out).toContain("label='Revenue'");
     // `value=`, not the wire's `source=`: since fuaran#1142 the Python leg emits
-    // per-kind against the real `fuaran_py.ui` constructor signatures rather than
+    // per-kind against the real `fuaran_ui.ui` constructor signatures rather than
     // re-spelling the wire's own field names through the generic walker.
     expect(out).toContain('value=binding.static(1234.5)');
   });

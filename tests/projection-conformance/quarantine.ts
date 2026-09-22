@@ -207,7 +207,8 @@ export interface QuarantineEntry {
  * cell is simply absent.
  *
  * The state, as re-measured 2026-09-07 against fuaran-py 0.3.0 and re-run
- * unchanged 2026-09-09 against the pinned 0.4.0: six ids, two constructs, both
+ * unchanged 2026-09-09 against the pinned 0.4.0 (the distribution is `fuaran-ui`
+ * from 0.6.0 — Phase 1694 — and the pin now names 0.7.0): six ids, two constructs, both
  * host lag with the probe agreeing, all on the Python arm. The TypeScript and F#
  * arms hold none, and in both cases the emptiness is an assertion — every node
  * fixture is required to re-encode byte-identically there. The F# arm was EMPTY

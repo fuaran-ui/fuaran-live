@@ -324,11 +324,14 @@ describe('the pinned host has released the rename', () => {
   // what let a tree saved, shared or permalinked before the rename still open,
   // and an encoder-only rename would pass the first assertion alone.
   //
-  // The two hosts this arm does NOT pin are still behind, and that is where the
-  // remaining conformance red lives rather than here: the F# tier at the
-  // deliberate `Fuaran.UI` 0.79.0 pin (0.85.0 is the first release carrying the
-  // rename) and `fuaran-py`, whose newest release, 0.5.0, does not carry it at
-  // all. Neither is an npm pin and neither is fixable from this file.
+  // The two hosts this arm does NOT pin were both behind when this block was
+  // written, and that is where the remaining conformance red lived rather than
+  // here: the F# tier at the deliberate `Fuaran.UI` 0.79.0 pin (0.85.0 is the
+  // first release carrying the rename), and the Python host, whose newest
+  // release then — `fuaran-py` 0.5.0 — did not carry it at all. The Python side
+  // is now closed: the distribution was renamed to `fuaran-ui` (Phase 1694) and
+  // `fuaran-ui` 0.7.0 carries the rename, so the three workflow pins name it.
+  // Neither is an npm pin and neither is fixable from this file.
   const legacyInput = readFileSync(
     resolve(corpusDir, 'lenient/lenient-transform-column-member-legacy.json'),
     'utf8',

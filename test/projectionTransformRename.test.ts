@@ -324,11 +324,14 @@ describe('the pinned host has released the rename', () => {
   // what let a tree saved, shared or permalinked before the rename still open,
   // and an encoder-only rename would pass the first assertion alone.
   //
-  // The two hosts this arm does NOT pin are still behind, and that is where the
-  // remaining conformance red lives rather than here: the F# tier at the
-  // deliberate `Fuaran.UI` 0.79.0 pin (0.85.0 is the first release carrying the
-  // rename) and `fuaran-py`, whose newest release, 0.5.0, does not carry it at
-  // all. Neither is an npm pin and neither is fixable from this file.
+  // Of the two hosts this arm does NOT pin, one has since been raised and one
+  // has not. The F# tier now pins `Fuaran.UI.*` 0.85.0 — the first release
+  // carrying the rename — so its five transform fixtures pass and its arm is
+  // green. `fuaran-py` is what remains: its newest release, 0.5.0, does not
+  // carry the rename at all, so five Python fixtures still fail and the Python
+  // capability-manifest falsifier fires alongside them because those five are
+  // unpredicted. That is not fixable from this file and not fixable by any npm
+  // pin; it needs a fuaran-py release.
   const legacyInput = readFileSync(
     resolve(corpusDir, 'lenient/lenient-transform-column-member-legacy.json'),
     'utf8',

@@ -110,3 +110,50 @@ the contract compiled against did not move at the switch.
   ceilings into both conformance arms. The playground's packaged `Fuaran.UI.*`
   pin in `app/FuaranLive.fsproj` is a separate slot on its own rhythm and did
   not move here.
+
+## The OTHER pin — the playground's packaged `Fuaran.UI.*` family
+
+Everything above is about the `ref:` in the six workflows. There is a second
+tier pin in this repo and it is **not** the same slot: `app/FuaranLive.fsproj`
+consumes the tier as published nuget.org packages at its own version, because
+the playground project does not check the sibling out at all.
+
+They move independently, and it is worth saying so plainly because the natural
+assumption is the other way — a reader who has just read this document will
+reasonably expect one number. Two facts follow from that:
+
+- **Raising the packages does not oblige raising the `ref:`, and vice versa.**
+  The two have been unequal since the ref reached v0.80.0 against a 0.79.0
+  package family, and were raised separately again on 2026-09-22.
+- **The costs are different in kind.** Moving the `ref:` is source-affecting
+  against `app/showcase/` and must move in all six workflows with the migration
+  in one commit (above). Moving the package family affects the playground's
+  compile and the Fable output paths, and rides no workflow edit at all.
+
+**What a package raise touches**, all in one commit:
+
+1. the `Fuaran.UI.*` versions in `app/FuaranLive.fsproj`;
+2. **the `Fuaran.Core.*` versions beside them** — read the new tier's nuspec
+   from the registry and match its declared Core version. These are DIRECT pins
+   on packages the tier also depends on, so a number left behind does not hold
+   Core back, it downgrades the tier's own dependency and emits NU1605, and one
+   NU160x line on msbuild's stdout kills the Fable project cracker outright;
+3. `app/output/fable_modules/<PackageId>.<Version>/` paths, which carry the
+   version — `test/tierOutput.ts` (the one place the suite names them) and
+   `scripts/fable-app.mjs`;
+4. any declared tier lag the raise closes — see the canonical-form assertion in
+   `test/permalinkGallery.test.ts`, whose normalisation is deleted rather than
+   kept once the tier emits the canonical spelling;
+5. the registry-evidence block in `test/restoreGraphPublic.test.ts`.
+
+### History — the package family
+
+- **0.79.0 → 0.85.0** (2026-09-22) — the release whose `SchemaGen` emits Phase
+  1821's canonical dataframe spellings (`project.columns`, `TransformSortKey.column`;
+  the old `cols` / `col` remain decode aliases). It took the F# arm of the
+  projection-conformance gate from five failing transform fixtures to none, and
+  closed the one-member normalisation `test/permalinkGallery.test.ts` had been
+  carrying to keep its byte comparison honest about the lag. It also moved
+  `Fuaran.Core.*` 0.21.0 → 0.28.0 per point 2 above. The `ref:` did **not**
+  move with it: no showcase contract needed it, and a five-release source jump
+  carries its own migration budget that this raise had no reason to spend.

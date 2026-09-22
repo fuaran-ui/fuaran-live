@@ -260,11 +260,23 @@ let private explorerSource: Fuaran.Core.DataSource =
 /// The region scope, as an expression: "All" means no constraint, anything else
 /// matches the column. `Param "region"` is bound per evaluation from the state
 /// slot the `Select` writes — the pipeline itself names no value.
+///
+/// `ColExpr.` is spelled out on `Param` and `Lit` deliberately. Core also
+/// carries a `Slot<'T>` with cases of both names (it is `RequireQualifiedAccess`
+/// precisely so `Slot.Lit 10` cannot shadow `Lit (Int 10)`), and the bare
+/// `Fuaran.Core.Param` resolves to the wrong one of the two — reported as a
+/// deprecation and then as a type mismatch against `ColExpr`, which is a
+/// confusing pair of errors to meet at a call site that used to compile. Naming
+/// the union removes the question.
 let private regionScope: Fuaran.Core.ColExpr =
   Fuaran.Core.Binary(
     Fuaran.Core.Or,
-    Fuaran.Core.Binary(Fuaran.Core.Eq, Fuaran.Core.Param "region", Fuaran.Core.Lit(Fuaran.Core.Str "All")),
-    Fuaran.Core.Binary(Fuaran.Core.Eq, Fuaran.Core.Col "region", Fuaran.Core.Param "region")
+    Fuaran.Core.Binary(
+      Fuaran.Core.Eq,
+      Fuaran.Core.ColExpr.Param "region",
+      Fuaran.Core.ColExpr.Lit(Fuaran.Core.Str "All")
+    ),
+    Fuaran.Core.Binary(Fuaran.Core.Eq, Fuaran.Core.Col "region", Fuaran.Core.ColExpr.Param "region")
   )
 
 /// The one place the param is bound. Both readers below share it, so both
@@ -286,7 +298,11 @@ let private byProduct: Fuaran.Core.Transform list =
            Of = "units" }
         : Fuaran.Core.Agg) ]
     )
-    Fuaran.Core.Sort [ "revenue", Fuaran.Core.Desc ] ]
+    // `Sort`'s COLUMN is a `Slot<string>` (Core 0.23.0), so a host can bind
+    // "sort by whichever column the user picked" without a structure parallel
+    // to the transform. This one is a fixed column, so it is a literal slot.
+    // The direction stays a plain value — nothing asked for a bound direction.
+    Fuaran.Core.Sort [ Fuaran.Core.Slot.Lit "revenue", Fuaran.Core.Desc ] ]
 
 /// The same scope with no group key — a global aggregate, which resolves as the
 /// 1×1 result cell a scalar slot (a `Metric`'s value) reads.

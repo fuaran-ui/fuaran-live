@@ -26,18 +26,26 @@
 //  would have pinned a name that merely looked right, and nothing in this repo
 //  would have objected. See the `## Dependencies` section of `CLAUDE.md`.
 //
-//  REGISTRY EVIDENCE (checked 2026-09-14 against the public flat-container
+//  REGISTRY EVIDENCE (re-checked 2026-09-22 against the public flat-container
 //  index; recorded here rather than fetched by the test, which stays offline
 //  and deterministic). Every id+version below was served:
-//    Fuaran.UI 0.79.0 · Fuaran.UI.Renderer 0.79.0 · Fuaran.UI.Ops 0.79.0
-//    Fuaran.UI.OpStream.Abstractions 0.79.0 · Fuaran.UI.OpStream.Replay 0.79.0
-//    Fuaran.UI.ServerDriven 0.79.0 · Fuaran.UI.AiWire 0.81.0
-//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.21.0
+//    Fuaran.UI 0.85.0 · Fuaran.UI.Renderer 0.85.0 · Fuaran.UI.Ops 0.85.0
+//    Fuaran.UI.OpStream.Abstractions 0.85.0 · Fuaran.UI.OpStream.Replay 0.85.0
+//    Fuaran.UI.ServerDriven 0.85.0 · Fuaran.UI.AiWire 0.85.0
+//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.28.0
 //    Fuaran.Program.Runtime 0.4.0
-//  The pins sit deliberately behind the language tier's current emit — the six
-//  CI workflows pin the sibling source checkout at a tier ref and move with it
-//  in one commit (`docs/tier-pin.md`) — so "behind" and "unobtainable" are
-//  different questions and only the second one is a defect.
+//  The `Fuaran.Core.*` line moved 0.21.0 -> 0.28.0 WITH the tier family and not
+//  on its own account: those are direct pins on packages the tier also depends
+//  on, and the 0.85.0 tier declares Core 0.28.0 where 0.79.0 declared 0.21.0 —
+//  a direct pin beats a transitive floor, so leaving them behind downgrades the
+//  tier's own dependency (NU1605) rather than holding Core back. The reasoning
+//  is at the pins themselves in `app/FuaranLive.fsproj`.
+//
+//  A PIN MAY STILL SIT BEHIND THE TIER'S HEAD DELIBERATELY — the six CI
+//  workflows pin the sibling SOURCE checkout at a tier ref, a separate slot on
+//  its own rhythm that moves with a showcase migration in one commit
+//  (`docs/tier-pin.md`) — so "behind" and "unobtainable" are different
+//  questions and only the second one is a defect.
 //
 //  WHAT THIS LOCK DOES NOT CLAIM. It is offline, so it cannot tell you that a
 //  version is on the registry TODAY; it tells you that the id set has not moved

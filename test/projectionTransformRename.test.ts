@@ -30,8 +30,8 @@
 // This suite is deliberately about the PROJECTOR alone. The byte-identical
 // re-encode against the real `@fuaran-ui/*` packages is the conformance harness's
 // job (`tests/projection-conformance/`), and that arm additionally depends on the
-// pinned host — see `the pinned host has not yet released the rename` at the foot
-// of this file.
+// pinned host — see `the pinned host has released the rename` at the foot of this
+// file.
 //
 // Requires `pnpm run fable:app` to have produced app/output/.
 
@@ -307,37 +307,61 @@ describe('canonical wins where a value carries both spellings', () => {
   }
 });
 
-describe('the pinned host has not yet released the rename', () => {
-  // A FALSIFIER, not a preference — and the reason the projection-conformance
-  // arm cannot be green today however correct this projector is.
+describe('the pinned host has released the rename', () => {
+  // This block used to assert the OPPOSITE — that the pinned `@fuaran-ui/ops`
+  // still encoded the LEGACY names — as a falsifier naming why the TypeScript
+  // conformance arm could not be green however correct this projector was: that
+  // arm re-encodes a projected tree through the pinned packages and compares it
+  // to the corpus, the corpus is read UNPINNED and carried the canonical
+  // spellings, and no published release carried them yet. Its own instruction
+  // was to raise the pin the moment it went red and retire it.
   //
-  // That arm asserts that a projected tree, executed against the pinned
-  // `@fuaran-ui/*` packages, RE-ENCODES byte-identically to the corpus fixture.
-  // The corpus is read UNPINNED, at whatever the shared specification's HEAD is,
-  // and it carries the canonical spellings today. The pinned encoder still
-  // writes the legacy ones — no published release carries the rename — so those
-  // fixtures differ by exactly one member name, on the host's side of the
-  // comparison rather than the projector's. This repo's `host-pin-drift`
-  // sentinel exists to report that class before it arrives as a red gate.
+  // `@fuaran-ui/ops` 0.28.0 released the rename and this repo now pins it, so
+  // that is what happened. What replaces the falsifier is its mirror image,
+  // because the property is still worth holding and a deleted assertion holds
+  // nothing: the pinned host EMITS the canonical spellings, and still DECODES
+  // the legacy ones. The second half is the load-bearing one — the aliases are
+  // what let a tree saved, shared or permalinked before the rename still open,
+  // and an encoder-only rename would pass the first assertion alone.
   //
-  // The remedy is the ordinary one for a pinned host that predates the corpus:
-  // raise the npm pin once the release lands. This assertion goes RED the moment
-  // it does, which is the moment to raise it, re-run the conformance arm and
-  // delete this block.
+  // The two hosts this arm does NOT pin are still behind, and that is where the
+  // remaining conformance red lives rather than here: the F# tier at the
+  // deliberate `Fuaran.UI` 0.79.0 pin (0.85.0 is the first release carrying the
+  // rename) and `fuaran-py`, whose newest release, 0.5.0, does not carry it at
+  // all. Neither is an npm pin and neither is fixable from this file.
   const legacyInput = readFileSync(
     resolve(corpusDir, 'lenient/lenient-transform-column-member-legacy.json'),
     'utf8',
   ).trim();
 
-  it('the pinned @fuaran-ui/ops still encodes the legacy member names', () => {
-    const decoded = (ops as { decodeNode: (s: string) => unknown }).decodeNode(legacyInput);
-    const reEncoded = (ops as { encodeNode: (n: unknown) => string }).encodeNode(
+  const reEncodeThroughPinnedHost = (wire: string): string => {
+    const decoded = (ops as { decodeNode: (s: string) => unknown }).decodeNode(wire);
+    return (ops as { encodeNode: (n: unknown) => string }).encodeNode(
       (decoded as { value?: unknown }).value ?? decoded,
     );
+  };
+
+  it('still DECODES the legacy member names — the aliases did not go away', () => {
+    const decoded = (ops as { decodeNode: (s: string) => { ok?: boolean } }).decodeNode(
+      legacyInput,
+    );
     expect(
-      reEncoded,
-      'the pinned @fuaran-ui/ops now emits `columns` — raise the npm pin, re-run the conformance arm, and delete this block',
-    ).toContain('"cols"');
-    expect(reEncoded).toContain('"col"');
+      decoded.ok,
+      'the pinned @fuaran-ui/ops rejects the legacy spellings — a tree saved or permalinked before the rename no longer opens',
+    ).toBe(true);
+  });
+
+  it('ENCODES the canonical member names', () => {
+    const reEncoded = reEncodeThroughPinnedHost(legacyInput);
+    // Asserted as MEMBER tokens — with the colon — and not as bare substrings.
+    // `"col"` is also the `$type` of a column-reference expression
+    // (`{"$type":"col","name":"amount"}`), which this fixture carries and which
+    // the rename never touched; a bare `not.toContain('"col"')` fails on it and
+    // would be testing the wrong thing. `"columns":` alone is likewise satisfied
+    // by a `DataGrid`'s untouched member, so the negatives carry the weight.
+    expect(reEncoded).toContain('"columns":');
+    expect(reEncoded).toContain('"column":');
+    expect(reEncoded).not.toContain('"cols":');
+    expect(reEncoded).not.toContain('"col":');
   });
 });

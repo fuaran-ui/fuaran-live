@@ -325,13 +325,24 @@ describe('the pinned host has released the rename', () => {
   // and an encoder-only rename would pass the first assertion alone.
   //
   // The two hosts this arm does NOT pin were both behind when this block was
-  // written, and that is where the remaining conformance red lived rather than
-  // here: the F# tier at the deliberate `Fuaran.UI` 0.79.0 pin (0.85.0 is the
-  // first release carrying the rename), and the Python host, whose newest
-  // release then — `fuaran-py` 0.5.0 — did not carry it at all. The Python side
-  // is now closed: the distribution was renamed to `fuaran-ui` (Phase 1694) and
-  // `fuaran-ui` 0.7.0 carries the rename, so the three workflow pins name it.
-  // Neither is an npm pin and neither is fixable from this file.
+  // first written, and that is where the remaining conformance red lived rather
+  // than here. Both have since been raised, in two commits that had to meet:
+  //
+  //   - the F# tier now pins `Fuaran.UI.*` 0.85.0, the first release carrying
+  //     the rename, so its five transform fixtures pass;
+  //   - the Python tier now installs `fuaran-ui` 0.7.0. That host needed a
+  //     RENAME before it could be raised at all — Phase 1694 moved the
+  //     distribution to `fuaran-ui` and the import package to `fuaran_ui`, and
+  //     `fuaran-py` stops at 0.5.0, which does not carry the rename and never
+  //     will. Its five transform fixtures pass now too, and the Python
+  //     capability-manifest falsifier — which fired alongside them, because
+  //     five failures the manifest did not predict read as projector lag —
+  //     agrees again.
+  //
+  // Neither was an npm pin and neither was fixable from this file. What is
+  // worth keeping from all of that is the shape: this projector was correct
+  // before any of the three hosts could prove it, and the arms went green by
+  // pins moving, not by this file changing.
   const legacyInput = readFileSync(
     resolve(corpusDir, 'lenient/lenient-transform-column-member-legacy.json'),
     'utf8',

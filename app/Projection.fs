@@ -5873,8 +5873,15 @@ let private fsRecordTable: (string * string * string list) list =
      "FragmentDecl",
      [ "Body|body|!|n"
        "Name|name|!|s"
-       "Holes|holes|?|L<U:HoleDecl>"
-       "Effect|effect|?|R:EffectClass" ])
+       // Phase 1670 made both of these OMIT-AT-DEFAULT rather than optional, so
+       // the host form and the wire form say the same thing: no holes IS the
+       // empty list, and a pure-deterministic effect IS the degenerate effect.
+       // They read `?` here until the tier pin reached 0.85.0, at which point
+       // `Some(...)` / `Option.None` stopped typechecking against the record.
+       // The wire is unchanged either way — both are omitted on encode — which
+       // is why this is a presence-column edit and not a descriptor one.
+       "Holes|holes|=[]|L<U:HoleDecl>"
+       "Effect|effect|=EffectClass.pureDeterministic|R:EffectClass" ])
     ("FragmentRefSpec", "FragmentRef", [ "Name|name|!|s"; "Args|args|?|M<U:FragmentArg>" ])
     ("GuestChannel", "", [ "Direction|direction|!|E:ChannelDirection"; "MessageShape|messageShape|?|s" ])
     ("HeadingSpec",
@@ -6845,10 +6852,40 @@ let private fsPairList (items: JsonValue list) : string =
      |> String.concat "; ")
   + " ]"
 
+/// A `Fuaran.Core.Slot<'T>` — a scalar a host may bind instead of fixing.
+///
+/// On the wire a slot is its bare literal, or `{"$param":"name"}` for the bound
+/// form; the literal spelling is the one the encoder emits when nothing is
+/// bound, so the two shapes are what the decoder discriminates on. `litOf` is
+/// the emitter for the underlying scalar, which differs per slot (`Sort`'s
+/// column is a string, `Limit`'s two counts are ints).
+///
+/// Not every `(column, direction)` pair is a slot: a `window` spec's frame
+/// ordering was deliberately left a plain string when `Sort`'s key was widened,
+/// so `fsOrderList` below keeps the unwrapped spelling and only the `sort` step
+/// reads through here.
+let private fsSlotOf (litOf: JsonValue -> string) (v: JsonValue) : string =
+  match JsonValue.tryField "$param" v with
+  | Some(JString n) -> "Fuaran.Core.Slot.Param(" + fsStr n + ")"
+  | _ -> "Fuaran.Core.Slot.Lit(" + litOf v + ")"
+
+/// A `WindowSpec.OrderBy` list — plain `(string * SortDir)` pairs.
 let private fsOrderList (items: JsonValue list) : string =
   "[ "
   + (items
      |> List.map (fun o -> "(" + fsStr (sortKeyColumn o) + ", " + fsSortDir (strOf "dir" o) + ")")
+     |> String.concat "; ")
+  + " ]"
+
+/// A `Sort` step's keys — `(Slot<string> * SortDir)` pairs, the column a slot
+/// since Core 0.23.0 so a host can bind "sort by whichever column the user
+/// picked" without a structure parallel to the transform.
+let private fsSortKeyList (items: JsonValue list) : string =
+  "[ "
+  + (items
+     |> List.map (fun o ->
+       let column = fieldReq (aliasedName "column" "col" o) o
+       "(" + fsSlotOf fsStrOf column + ", " + fsSortDir (strOf "dir" o) + ")")
      |> String.concat "; ")
   + " ]"
 
@@ -6916,13 +6953,15 @@ let private fsTransformStep (v: JsonValue) : string =
     + ", "
     + fsStrList (arrOf "valueVars" v)
     + ")"
-  | Some "sort" -> "Fuaran.Core.Transform.Sort(" + fsOrderList (arrOf "by" v) + ")"
+  | Some "sort" -> "Fuaran.Core.Transform.Sort(" + fsSortKeyList (arrOf "by" v) + ")"
   | Some "distinct" -> "Fuaran.Core.Transform.Distinct"
   | Some "limit" ->
+    // Both counts are `Slot<int>` since Core 0.23.0 — a page size and a page
+    // offset are the two slots a UI binds most often.
     "Fuaran.Core.Transform.Limit("
-    + fsIntOf (fieldReq "n" v)
+    + fsSlotOf fsIntOf (fieldReq "n" v)
     + ", "
-    + fsIntOf (fieldReq "offset" v)
+    + fsSlotOf fsIntOf (fieldReq "offset" v)
     + ")"
   | Some "union" -> "Fuaran.Core.Transform.Union(" + fsDataSource (fieldReq "source" v) + ")"
   | Some "intersect" -> "Fuaran.Core.Transform.Intersect(" + fsDataSource (fieldReq "source" v) + ")"
@@ -7134,13 +7173,40 @@ and private fsTextSource (depth: int) (v: JsonValue) : string =
     match dollarType v with
     | Some "Bound" -> "TextSource.Bound(" + fsBinding Fd.Str (depth + 1) (fieldReq "binding" v) + ")"
     | Some "I18n" ->
+      // Phase 1661 — a `TextSource.I18n` ARGUMENT is a `Binding<JVal>` in
+      // memory, not a bare value, and the wire carries no tag saying which of
+      // the two arms it is: an object carrying `$type` is the binding arm, any
+      // other JSON value the literal arm, and a `Static` argument carrying a
+      // value re-encodes BARE (WIRE_FORMAT.md §5). So BOTH arms project as
+      // bindings — the literal one wrapped in `Binding.Static`, which is what
+      // puts the bare value back on the wire. This is the same shape `tsBinding`
+      // emits at the TypeScript site and the same one `Fd.BindStatic` applies to
+      // every other bare-or-tagged slot in the table.
+      //
+      // This site read the whole bag as raw JSON (`fsJVal`) until the pin
+      // reached 0.85.0, and round-tripped by ACCIDENT: the pre-widening encoder
+      // re-emitted whatever object it was handed, so a raw `{"$type":"State",…}`
+      // and a raw `1908` both came back byte-identical while neither was ever a
+      // `Binding`. It is a compile error now rather than a silent wrong answer.
+      //
+      // `Binding.I18n`'s own bag is NOT this shape — every argument there is a
+      // case object with no bare spelling — which is why that site below has
+      // always read through `fsBinding` and needs no equivalent.
       let args =
         match fieldReq "args" v with
         | JObject [] -> "Map.empty"
         | JObject ms ->
           "Map.ofList [ "
           + (ms
-             |> List.map (fun (k, x) -> "(" + fsStr k + ", " + fsJVal x + ")")
+             |> List.map (fun (k, x) ->
+               "("
+               + fsStr k
+               + ", "
+               + (if (dollarType x).IsSome then
+                    fsBinding Fd.Jv (depth + 1) x
+                  else
+                    "Binding.Static(Some(" + fsJVal x + "))")
+               + ")")
              |> String.concat "; ")
           + " ]"
         | _ -> "Map.empty"

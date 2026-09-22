@@ -37,8 +37,8 @@
 //      the published fuaran-py package, so there is no second encoder left to drift.
 //      The mutation is kept here because it is the clearest statement of the class
 //      the surviving locks still catch.)
-//    - Wheel digest (Phase 1166): appending one byte to the vendored
-//      public/pandas/fuaran_py-0.0.4-py3-none-any.whl -> the digest assertion is red.
+//    - Wheel digest (Phase 1166): appending one byte to the vendored wheel under
+//      public/pandas/ -> the digest assertion is red.
 //      Worth recording because the OTHER legs stayed green: zipimport tolerates
 //      trailing bytes, so the corrupted wheel still imported and still emitted
 //      canonical wire. The digest lock is the only thing standing between the page
@@ -64,8 +64,9 @@
 //    2. public/rosetta/py-host.py      `rosetta_encode` - independent Python Node
 //       encoder. Headless here; its Pyodide page-run is the same builder.
 //    3. app/showcase/pandas-host.ts    `PY_BOOTSTRAP`   - the Pandas Dashboard cell
-//       runner. Since Phase 1166 the page authors through the PUBLISHED fuaran-py
-//       package (`fuaran_py.ui.quick`) rather than a hand-rolled shim, so this file
+//       runner. Since Phase 1166 the page authors through the PUBLISHED Python
+//       package (`fuaran_ui.ui.quick`, `fuaran-py` before the Phase 1694 rename)
+//       rather than a hand-rolled shim, so this file
 //       hand-authors no wire of its own - but it is still where the emitter LIVES
 //       (the bootstrap that binds the cell's `fuaran` name and calls the package's
 //       `encode`, plus the DEFAULT_CELL the page ships), which is why it moved out
@@ -164,9 +165,9 @@ import { decodeNode, encodeNode } from '@fuaran-ui/ops';
 import { encodeWireTs } from '../app/showcase/rosetta-hosts';
 import {
   DEFAULT_CELL,
-  FUARAN_PY_VERSION,
-  FUARAN_PY_WHEEL,
-  FUARAN_PY_WHEEL_SHA256,
+  FUARAN_UI_VERSION,
+  FUARAN_UI_WHEEL,
+  FUARAN_UI_WHEEL_SHA256,
   PY_BOOTSTRAP,
 } from '../app/showcase/pandas-host';
 
@@ -257,7 +258,7 @@ describe('emitter lock - Rosetta Python host (public/rosetta/py-host.py)', () =>
 
 // ─── 3. Pandas Dashboard - the published-package cell runner (headless) ──────
 //
-// Phase 1166. The page's Python is the published `fuaran-py` package plus two
+// Phase 1166. The page's Python is the published `fuaran-ui` package plus two
 // things this repo authors: the bootstrap that binds the cell's `fuaran` name and
 // calls the package's `encode` (PY_BOOTSTRAP), and the cell the page opens with
 // (DEFAULT_CELL). Both are imported from the shipped module rather than restated
@@ -268,7 +269,7 @@ describe('emitter lock - Rosetta Python host (public/rosetta/py-host.py)', () =>
 // The lock therefore runs the exact bytes the browser installs, offline, with no
 // interpreter setup at all beyond CPython itself.
 describe('emitter lock - Pandas Dashboard host (app/showcase/pandas-host.ts)', () => {
-  const wheelPath = join(repoRoot, 'public/pandas', FUARAN_PY_WHEEL);
+  const wheelPath = join(repoRoot, 'public/pandas', FUARAN_UI_WHEEL);
 
   // A pandas-free cell exercising every builder the DEFAULT_CELL uses: metric_strip
   // (value/source law + omit-when-default), markdown (bare-string Literal collapse),
@@ -307,9 +308,9 @@ describe('emitter lock - Pandas Dashboard host (app/showcase/pandas-host.ts)', (
   // makes "the published package" a checkable claim rather than a comment - a wheel
   // built locally, or a version bumped in the filename and not the digest, fails here.
   it('the vendored wheel is the exact artefact PyPI published', () => {
-    expect(FUARAN_PY_WHEEL).toBe(`fuaran_py-${FUARAN_PY_VERSION}-py3-none-any.whl`);
+    expect(FUARAN_UI_WHEEL).toBe(`fuaran_ui-${FUARAN_UI_VERSION}-py3-none-any.whl`);
     const bytes = readFileSync(wheelPath);
-    expect(createHash('sha256').update(bytes).digest('hex')).toBe(FUARAN_PY_WHEEL_SHA256);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(FUARAN_UI_WHEEL_SHA256);
   });
 
   it.skipIf(noPy)(

@@ -5,8 +5,8 @@ module Fuaran.Showcase.Pandas
 //  dashboard. Pillar: "one wire, many worlds".
 //
 //  A notebook cell runs real pandas over a bundled CSV IN THE BROWSER (Pyodide),
-//  then authors a Fuaran tree with the PUBLISHED `fuaran-py` package's terse
-//  surface (`fuaran_py.ui.quick`, installed by micropip when the visitor first
+//  then authors a Fuaran tree with the PUBLISHED `fuaran-ui` package's terse
+//  surface (`fuaran_ui.ui.quick`, installed by micropip when the visitor first
 //  clicks Run) and emits canonical wire JSON through the package's own encoder.
 //  The F# host decodes that wire and renders the dashboard beside the cell – no
 //  server, no JavaScript written by the author.
@@ -21,7 +21,7 @@ module Fuaran.Showcase.Pandas
 //  all run for real, client-side. Pyodide's cold start (~10 MB CPython + pandas) is
 //  lazy and behind the Run button; heavy workloads are slow in-browser – the honesty
 //  note points at the same package running locally for those, which is a thing a
-//  visitor can do today (`pip install fuaran-py`). It used to promise a server-side
+//  visitor can do today (`pip install fuaran-ui`). It used to promise a server-side
 //  path that nothing in the estate ships; Phase 1166 removed that claim rather than
 //  replacing it with another unshipped one.
 // ============================================================================
@@ -180,7 +180,7 @@ let private PandasView () : ReactElement =
                       Html.div
                         [ prop.className "pn-empty"
                           prop.text
-                            "Run the cell – the first click downloads CPython + pandas (~10 MB) and installs fuaran-py, then renders." ] ] ] ] ]
+                            "Run the cell – the first click downloads CPython + pandas (~10 MB) and installs fuaran-ui, then renders." ] ] ] ] ]
 
   let ticker =
     if not ranOnce then
@@ -229,13 +229,13 @@ let private PandasView () : ReactElement =
               [ prop.children
                   [ Html.li
                       [ prop.text
-                          "Everything runs in your browser: real CPython and pandas via Pyodide compute over the bundled CSV, the published fuaran-py package — installed here with micropip, the same release you get from PyPI — authors a Fuaran tree, and the F# host decodes the canonical wire and renders it. No server re-runs your script; Streamlit's model is exactly the thing this replaces." ]
+                          "Everything runs in your browser: real CPython and pandas via Pyodide compute over the bundled CSV, the published fuaran-ui package — installed here with micropip, the same release you get from PyPI — authors a Fuaran tree, and the F# host decodes the canonical wire and renders it. No server re-runs your script; Streamlit's model is exactly the thing this replaces." ]
                     Html.li
                       [ prop.text
                           "Re-run with a change and the page derives the real structural tree-diff between the old tree and the new one, then shows the op ticker: the UI is patched with a handful of typed operations, not re-rendered. That is the difference between an artefact that is data and a script that re-executes." ]
                     Html.li
                       [ prop.text
-                          "Honest limits: Pyodide's cold start and heavy pandas workloads are slow in-browser, so this demo sizes its data to feel instant. Neither limit is the language's — run pip install fuaran-py in your own environment and these same four lines author the same tree over as much data as your machine will hold." ]
+                          "Honest limits: Pyodide's cold start and heavy pandas workloads are slow in-browser, so this demo sizes its data to feel instant. Neither limit is the language's — run pip install fuaran-ui in your own environment and these same four lines author the same tree over as much data as your machine will hold." ]
                     Html.li
                       [ prop.children
                           [ Html.text

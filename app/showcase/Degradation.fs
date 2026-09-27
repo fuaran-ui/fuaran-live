@@ -45,6 +45,11 @@ let private fsCode =
 
 let private pyCode = "def hypotenuse(a, b):\n    return (a * a + b * b) ** 0.5"
 
+// Phase 1854 — a synthetic F* lemma: F* and F# have deterministic grammars, so
+// both blocks arrive tokenised with zero JavaScript; Python has none and stays plain.
+let private fstCode =
+  "(* a lemma the solver discharges *)\nval square_nonneg : x:int -> Lemma (x * x >= 0)\nlet square_nonneg x = ()"
+
 let private scrollCard (i: int) : Node<unit> =
   Fuaran.card
     (sprintf "dl-sc-%d" i)
@@ -68,11 +73,14 @@ let private exhibit: Node<unit> =
               Variant = HeadingVariant.Standard }
           Fuaran.markdown
             "dl-md"
-            "This card is **sample content** – a deliberate mix of the pieces that normally lean on JavaScript: a typeset equation, syntax-highlighted code in two languages, a modal dialog, and a clipped scroll region. It's here to be stress-tested, not read. Turn scripts off and watch each one survive."
+            "This card is **sample content** – a deliberate mix of the pieces that normally lean on JavaScript: a typeset equation, syntax-highlighted code in three languages, a modal dialog, and a clipped scroll region. It's here to be stress-tested, not read. Turn scripts off and watch each one survive."
           // In-subset — renders as native MathML: real superscripts with zero
           // JavaScript on the script-disabled rung (Phase 658).
           Fuaran.math "dl-eq" "a^2 + b^2 = c^2"
-          // Out-of-subset (`\int`, `\,`) — deterministically falls back to the
+          // In-subset since Phase 1853 — a formal statement (quantifier, membership,
+          // implication, comparison) also typesets as native MathML with zero JavaScript.
+          Fuaran.math "dl-eq3" "\\forall x.\\ x \\in S \\Rightarrow f(x) \\le c"
+          // Out-of-subset (`\int`) — deterministically falls back to the
           // raw LaTeX source span, so the source tier stays visible on the page.
           Fuaran.math "dl-eq2" "\\int_0^1 x^2 \\, dx"
           Fuaran.codeBlockSpec
@@ -83,6 +91,17 @@ let private exhibit: Node<unit> =
                 LineNumbers = true
                 HighlightLines = [ 2 ]
                 Copyable = true }
+          // Phase 1854 — the deterministic highlighting tier: F* (and the F# block
+          // above) render class-only `tok-*` spans with zero JavaScript.
+          Fuaran.codeBlockSpec
+            "dl-fst"
+            { Defaults.codeBlock with
+                Language = "fstar"
+                Code = fstCode
+                LineNumbers = true
+                Copyable = true }
+          // No grammar for Python — it keeps the plain escaped text on every rung
+          // below the rich layer, which is the probe's control.
           Fuaran.codeBlockSpec
             "dl-py"
             { Defaults.codeBlock with
@@ -120,12 +139,13 @@ let private legend: TierRow list =
   [ { Kind = "Math"
       Source = "the LaTeX string on the wire"
       Fallback =
-        "native MathML in-subset (real superscripts, no JS), else escaped source – deterministic, parity-pinned"
+        "native MathML in-subset (real superscripts, quantifiers and relations, no JS), else escaped source – deterministic, parity-pinned"
       Rich = "KaTeX typeset (client-only)" }
     { Kind = "CodeBlock"
       Source = "the code text + line/highlight semantics"
-      Fallback = "structured <pre> with line numbers + highlight rows"
-      Rich = "syntax colours + copy button (client-only)" }
+      Fallback =
+        "F* / F# tokenised into class-only tok-* spans (no JS), other languages plain – structured <pre> with line numbers + highlight rows"
+      Rich = "richer highlighting for other languages + copy button (client-only)" }
     { Kind = "Markdown"
       Source = "the GFM markdown text"
       Fallback = "one deterministic GFM render, conformance-gated"
@@ -153,7 +173,12 @@ type private Probe =
     Modal: int
     Scroll: int
     Scripts: int
-    HighlightSpans: int }
+    HighlightSpans: int
+    Formal: int
+    TokKw: int
+    Highlighted: int
+    PlainTok: int
+    PlainBlock: int }
 
 let private renderTree (n: Node<unit>) : ReactElement =
   Render.renderWithSources BindingResolver.empty ignore n
@@ -188,7 +213,12 @@ let private DegradationView () : ReactElement =
           Modal = p?modal
           Scroll = p?scroll
           Scripts = p?scripts
-          HighlightSpans = p?highlightSpans }
+          HighlightSpans = p?highlightSpans
+          Formal = p?formal
+          TokKw = p?tokKw
+          Highlighted = p?highlighted
+          PlainTok = p?plainTok
+          PlainBlock = p?plainBlock }
     )
 
   // After the exhibit renders, apply the rich layer to rung 1 and build the
@@ -285,7 +315,28 @@ let private DegradationView () : ReactElement =
                          Html.span
                            [ prop.className (if p.Msup > 0 then "dl-probe-item" else "dl-probe-bad")
                              prop.text (sprintf "MathML superscripts ✓ (%d ⟨msup⟩)" p.Msup) ]
+                         Html.span
+                           [ prop.className (if p.Formal = 3 then "dl-probe-item" else "dl-probe-bad")
+                             prop.text (sprintf "formal statement ✓ (%d/3 of ⟨mo⟩ ∀ ⇒ ≤)" p.Formal) ]
                          Html.span [ prop.className "dl-probe-item"; prop.text (sprintf "code ✓ (%d)" p.Code) ]
+                         Html.span
+                           [ prop.className (
+                               if p.TokKw > 0 && p.Highlighted = 2 then
+                                 "dl-probe-item"
+                               else
+                                 "dl-probe-bad"
+                             )
+                             prop.text (
+                               sprintf "highlighted with no JS ✓ (%d ⟨tok-kw⟩, %d/2 F*·F# blocks)" p.TokKw p.Highlighted
+                             ) ]
+                         Html.span
+                           [ prop.className (
+                               if p.PlainTok = 0 && p.PlainBlock = 1 then
+                                 "dl-probe-item"
+                               else
+                                 "dl-probe-bad"
+                             )
+                             prop.text (sprintf "unknown language stays plain ✓ (%d token spans)" p.PlainTok) ]
                          Html.span [ prop.className "dl-probe-item"; prop.text (sprintf "modal ✓ (%d)" p.Modal) ]
                          Html.span [ prop.className "dl-probe-item"; prop.text (sprintf "scroll ✓ (%d)" p.Scroll) ]
                          Html.span
@@ -347,7 +398,7 @@ let private DegradationView () : ReactElement =
                           "Both rungs render the same tree through the shipped renderer. The fidelity contract puts everything deterministic on the wire, so the base render needs no JavaScript – the rich layer (highlighting, the copy button, opening and dismissing the dialog) is declared client-only, layered on top. That's why rung 1 lets you drive the dialog and rung 2 cannot." ]
                     Html.li
                       [ prop.text
-                          "Rung 2 is genuinely script-disabled: the same markup is placed in a sandboxed iframe with no allow-scripts, so nothing can run. The equation still typesets with REAL superscripts – native MathML, laid out by the browser with zero JavaScript (an out-of-subset equation stays as its readable LaTeX source) – and the code structure, the dialog in its open state (no portal), and the scroll clipping all still render. The page reads the iframe back to confirm zero scripts and zero highlight spans reached it, that genuine ⟨msup⟩ elements are present, and everything else did too." ]
+                          "Rung 2 is genuinely script-disabled: the same markup is placed in a sandboxed iframe with no allow-scripts, so nothing can run. The equation still typesets with REAL superscripts – native MathML, laid out by the browser with zero JavaScript (an out-of-subset equation stays as its readable LaTeX source) – and the code structure, the dialog in its open state (no portal), and the scroll clipping all still render. The F* and F# blocks are highlighted all the same: their keywords, comments and operators arrive as deterministic class-only token spans the renderer emitted, while the Python block beside them, which has no grammar, stays plain. The page reads the iframe back to confirm zero scripts and zero rich-layer highlight spans reached it, that the F* and F# blocks carry ⟨tok-kw⟩ spans and the Python block none, that genuine ⟨msup⟩ elements are present, that the formal statement's ∀, ⇒ and ≤ arrive as real ⟨mo⟩ operators, and everything else did too." ]
                     Html.li
                       [ prop.text
                           "The wire source is the parity-clean data every conformant host renders. The byte-for-byte cross-host agreement (F#, TypeScript, Python) and the break-the-contract red build are enforced by the conformance gate in CI – a real gate you can run, not a claim this page can prove client-side." ]

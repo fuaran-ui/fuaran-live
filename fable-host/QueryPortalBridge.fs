@@ -152,10 +152,18 @@ let private tableOfRows (schema: Schema) (rows: (string * JVal) list list) : Tab
   { Schema = schema; Columns = columns }
 
 /// Project a `Table` back to row-objects (`{ col: value }[]`) for the TS renderer.
+/// Each column's cell list is read ONCE into an array and indexed per row –
+/// `Column.cell i` walks the linked list (O(i)), which made this O(rows² × columns).
+/// A column shorter than the row count pads with `Null`, exactly as `Column.cell`
+/// answered past the end.
 let private tableToRowsJs (t: Table) : obj =
   let n = Table.rowCount t
+  let columns = t.Columns |> List.map (fun c -> c.Name, List.toArray c.Cells)
 
-  [| for i in 0 .. n - 1 -> createObj [ for c in t.Columns -> c.Name ==> cellToJs (Column.cell i c) ] |]
+  let cellAt (i: int) (cells: Cell[]) : Cell =
+    if i < cells.Length then cells.[i] else Null
+
+  [| for i in 0 .. n - 1 -> createObj [ for name, cells in columns -> name ==> cellToJs (cellAt i cells) ] |]
   |> box
 
 /// Apply a local refinement to ALREADY-FETCHED rows and re-type the dashboard –

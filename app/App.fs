@@ -2735,7 +2735,7 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                     toolDetails "Console: query and poke the live tree" false (consolePane model dispatch)
                     toolDetails "Compare: Fuaran vs conventional JS" false (comparePane model dispatch)
                     toolDetails
-                      "Host fidelity: this tree per declared render tier"
+                      "Host fidelity: this tree per declared render tier and speech class"
                       false
                       (HostPreview.HostPreviewPane model.Session.Tree)
                     (if dualHostEnabled then

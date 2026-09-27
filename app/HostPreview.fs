@@ -33,6 +33,19 @@ module Fuaran.Live.HostPreview
 //  offered: the parity test pins the tier set, so a new tier is a red test and
 //  a deliberate ruling rather than a silent omission.
 //
+//  The speech view (round 2 of Phase 1818). Phase 1813 gave every kind row a
+//  `speech` column — a class drawn from the manifest's closed `speechClasses`
+//  (spoken / derived / announced-only / omitted) and a note — so the switcher
+//  gains one more entry, `speech`, by a ruling on that vocabulary: it shows,
+//  per node, the class the node's kind DECLARES, with the kind's note, and
+//  lists the nodes the class says are omitted (plus any kind with no row). It
+//  does not run a speech projection, it infers nothing about a subtree beyond
+//  what each node's own row says, and it cannot see a node's own authored
+//  speech override — the wire member that carries one is not in the pinned
+//  decoder, so the view is the per-kind declaration and says so. A class the
+//  manifest adds is refused at parse until it is ruled on (the test pins the
+//  vocabulary).
+//
 //  This is a DECLARED-FIDELITY SIMULATION: it shows what the manifest declares,
 //  not any host's pixels, and imitates no host's theme.
 // ============================================================================
@@ -53,16 +66,47 @@ module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 /// A render tier the manifest declares, offered as a preview host.
 type Host = { Id: string; Meaning: string }
 
+/// A class from the manifest's closed `speechClasses` vocabulary.
+type SpeechClass = { Class: string; Meaning: string }
+
+/// One kind's declared speech ruling (its `speech` column).
+type SpeechRow = { Class: string; Note: string }
+
 /// One kind's row, reduced to the members the preview reads.
 type KindRow =
-  { Kind: string
+  {
+    Kind: string
     RichClass: string
-    Fallback: string }
+    Fallback: string
+    /// `None` when the row declares no `speech` column.
+    Speech: SpeechRow option
+  }
 
 type Manifest =
-  { Hosts: Host list
+  {
+    Hosts: Host list
     Tiers: string list
-    Rows: Map<string, KindRow> }
+    /// The declared speech vocabulary, in manifest order (empty when the
+    /// manifest declares none — the speech view is then not offered).
+    SpeechClasses: SpeechClass list
+    Rows: Map<string, KindRow>
+  }
+
+/// The switcher entry for the speech view. It is not a render tier: it is
+/// offered when, and only when, the manifest declares `speechClasses`.
+[<Literal>]
+let SpeechHostId = "speech"
+
+/// The speech class whose nodes the view lists (the class's declared meaning:
+/// "reported in the projection's omission list rather than dropped").
+[<Literal>]
+let OmittedClass = "omitted"
+
+/// The speech classes this view has a ruling for. A class outside this set is
+/// refused at parse, so a vocabulary the manifest grows is a red test and a
+/// deliberate ruling rather than a silently mislabelled node.
+let private ruledSpeechClasses =
+  set [ "spoken"; "derived"; "announced-only"; OmittedClass ]
 
 /// A node's declared fidelity on the chosen host.
 [<RequireQualifiedAccess>]
@@ -123,26 +167,73 @@ let parseManifest (doc: obj) : Result<Manifest, string> =
           | None -> None)
         |> List.ofArray
 
+      let speechClasses =
+        match arr (get doc "speechClasses") with
+        | None -> Ok []
+        | Some classes ->
+          classes
+          |> Array.map (fun c ->
+            match str (get c "class") with
+            | Some cls when ruledSpeechClasses.Contains cls ->
+              Ok
+                { SpeechClass.Class = cls
+                  Meaning = str (get c "meaning") |> Option.defaultValue "" }
+            | Some cls -> Error(sprintf "the speech class `%s` has no ruling in this preview" cls)
+            | None -> Error "a `speechClasses` entry lacks its `class`")
+          |> List.ofArray
+          |> List.fold
+            (fun acc r ->
+              match acc, r with
+              | Ok xs, Ok x -> Ok(xs @ [ x ])
+              | (Error _ as e), _ -> e
+              | _, Error e -> Error e)
+            (Ok [])
+
+      let declaredSpeech =
+        match speechClasses with
+        | Ok cs -> cs |> List.map (fun c -> c.Class) |> Set.ofList
+        | Error _ -> Set.empty
+
       let rows =
         kinds
         |> Array.map (fun k ->
           let rich = get k "rich"
+          let speech = get k "speech"
 
           match str (get k "kind"), (if isNull rich then None else str (get rich "class")) with
           | Some kind, Some cls ->
-            Ok
+            let speechRow =
+              if isNull speech then
+                Ok None
+              else
+                match str (get speech "class") with
+                | Some sc when declaredSpeech.Contains sc ->
+                  Ok(
+                    Some
+                      { SpeechRow.Class = sc
+                        Note = str (get speech "note") |> Option.defaultValue "" }
+                  )
+                | _ -> Error(sprintf "the %s row's `speech.class` is not one of the declared `speechClasses`" kind)
+
+            speechRow
+            |> Result.map (fun sp ->
               { Kind = kind
                 RichClass = cls
-                Fallback = str (get k "fallback") |> Option.defaultValue "" }
+                Fallback = str (get k "fallback") |> Option.defaultValue ""
+                Speech = sp })
           | _ -> Error "a kind row lacks its `kind` or `rich.class`")
         |> List.ofArray
 
-      match
-        rows
-        |> List.tryPick (function
-          | Error e -> Some e
-          | Ok _ -> None)
-      with
+      let firstError =
+        match speechClasses with
+        | Error e -> Some e
+        | Ok _ ->
+          rows
+          |> List.tryPick (function
+            | Error e -> Some e
+            | Ok _ -> None)
+
+      match firstError with
       | Some e -> Error e
       | None ->
         let rows =
@@ -151,12 +242,27 @@ let parseManifest (doc: obj) : Result<Manifest, string> =
             | Ok r -> Some r
             | Error _ -> None)
 
+        let speechClasses = speechClasses |> Result.defaultValue []
+
+        let speechHost =
+          match speechClasses with
+          | [] -> []
+          | _ ->
+            [ { Id = SpeechHostId
+                Meaning =
+                  "what a speech projection says for each node, by the speech class its kind declares: "
+                  + (speechClasses
+                     |> List.map (fun c -> sprintf "%s (%s)" c.Class c.Meaning)
+                     |> String.concat "; ") } ]
+
         Ok
           { Hosts =
-              tierPairs
-              |> List.filter (fun (id, _) -> (ruleFor id).IsSome)
-              |> List.map (fun (id, meaning) -> { Id = id; Meaning = meaning })
+              (tierPairs
+               |> List.filter (fun (id, _) -> (ruleFor id).IsSome)
+               |> List.map (fun (id, meaning) -> { Id = id; Meaning = meaning }))
+              @ speechHost
             Tiers = tierPairs |> List.map fst
+            SpeechClasses = speechClasses
             Rows = rows |> List.map (fun r -> r.Kind, r) |> Map.ofList }
 
 /// The bundled copy of the corpus manifest (a build input; see the header).
@@ -263,6 +369,88 @@ let describe (f: Fidelity) : string =
   | Fidelity.Placeholder -> "placeholder: the declared fallback stands in"
   | Fidelity.Undeclared -> "undeclared: the manifest carries no row for this kind"
 
+// ─── the speech view ─────────────────────────────────────────────────────────
+
+/// One node, annotated with the speech class its kind declares.
+type SpeechNode =
+  {
+    Id: string
+    Kind: string
+    /// The declared class, or `None` when the kind has no row or no `speech`.
+    Class: string option
+    Note: string
+    Children: SpeechNode list
+  }
+
+type SpeechPreview =
+  {
+    Root: SpeechNode
+    Total: int
+    /// Per declared class, in the manifest's vocabulary order: how many nodes.
+    ByClass: (string * int) list
+    Undeclared: int
+    /// The nodes whose class is `omitted`, then those with no declared class,
+    /// each in document order — the list the pane makes clickable.
+    Listed: SpeechNode list
+  }
+
+/// Annotate every node (the same traversal as `annotate`, never pruned: each
+/// node carries its own kind's ruling) with its declared speech class. `None`
+/// when the manifest declares no speech vocabulary.
+let annotateSpeech (manifest: Manifest) (node: Node<obj>) : SpeechPreview option =
+  match manifest.SpeechClasses with
+  | [] -> None
+  | classes ->
+    let rec walk (n: Node<obj>) : SpeechNode =
+      let kind = RenderFidelity.wireNameOf n.Kind
+
+      let speech = Map.tryFind kind manifest.Rows |> Option.bind (fun r -> r.Speech)
+
+      { Id = idOf n
+        Kind = kind
+        Class = speech |> Option.map (fun s -> s.Class)
+        Note = speech |> Option.map (fun s -> s.Note) |> Option.defaultValue ""
+        Children = Introspect.descendantNodes n |> List.map walk }
+
+    let root = walk node
+
+    let rec flatten (s: SpeechNode) : SpeechNode list =
+      s :: (s.Children |> List.collect flatten)
+
+    let all = flatten root
+
+    Some
+      { Root = root
+        Total = all.Length
+        ByClass =
+          classes
+          |> List.map (fun c -> c.Class, all |> List.filter (fun s -> s.Class = Some c.Class) |> List.length)
+        Undeclared = all |> List.filter (fun s -> s.Class.IsNone) |> List.length
+        Listed =
+          (all |> List.filter (fun s -> s.Class = Some OmittedClass))
+          @ (all |> List.filter (fun s -> s.Class.IsNone)) }
+
+/// The one-line speech summary: "6 nodes on the speech view: 2 spoken,
+/// 3 derived, 1 announced-only, 0 omitted", naming undeclared kinds when present.
+let speechSummary (preview: SpeechPreview) : string =
+  let counts =
+    preview.ByClass
+    |> List.map (fun (cls, n) -> sprintf "%d %s" n cls)
+    |> String.concat ", "
+
+  let tail =
+    match preview.Undeclared with
+    | 0 -> ""
+    | n -> "; " + plural n "undeclared kind" "undeclared kinds"
+
+  sprintf "%s on the speech view: %s%s" (plural preview.Total "node" "nodes") counts tail
+
+let describeSpeech (s: SpeechNode) : string =
+  match s.Class with
+  | Some cls when s.Note = "" -> cls
+  | Some cls -> sprintf "%s: %s" cls s.Note
+  | None -> "undeclared: the manifest declares no speech ruling for this kind"
+
 // ─── the view ────────────────────────────────────────────────────────────────
 
 /// The id a degraded node's labelled wrapper carries in the preview render.
@@ -348,24 +536,59 @@ let dress (manifest: Manifest) (hostId: string) (node: Node<obj>) : Node<obj> =
 /// The CSS selector of the host preview's render scope.
 let private scope = ".fl-host-preview-root"
 
-[<Emit("""(function(id, scopeSel){
+/// The attribute the renderer stamps on every node it renders.
+let private renderedAttr = "data-fuaran-node-id"
+
+/// The attribute the speech outline stamps on each of its entries.
+let private speechAttr = "data-speech-node-id"
+
+[<Emit("""(function(id, scopeSel, attr){
   try {
     var root = document.querySelector(scopeSel);
     if (!root) { return; }
-    var all = root.querySelectorAll('[data-fuaran-node-id]');
+    var all = root.querySelectorAll('[' + attr + ']');
     for (var i = 0; i < all.length; i++) { all[i].style.outline = ''; }
     var esc = String(id).split('\\').join('\\\\').split('"').join('\\"');
-    var el = root.querySelector('[data-fuaran-node-id="' + esc + '"]');
+    var el = root.querySelector('[' + attr + '="' + esc + '"]');
     if (!el) { return; }
     el.style.outline = '2px solid currentColor';
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   } catch (e) { }
-})($0, $1)""")>]
-let private reveal (nodeId: string) (scopeSelector: string) : unit = jsNative
+})($0, $1, $2)""")>]
+let private reveal (nodeId: string) (scopeSelector: string) (attr: string) : unit = jsNative
 
 /// The one sentence that keeps the preview honest.
 let honesty =
   "This is a declared-fidelity simulation: it shows what the published render-fidelity manifest declares for each kind on the chosen tier, not that host's pixels, and it imitates no host's theme."
+
+/// The speech view's one sentence: declared, not a screen reader.
+let speechHonesty =
+  "This is a declared-fidelity simulation: it shows the speech class the published render-fidelity manifest declares for each node's kind, not what a screen reader or any speech projection would actually say."
+
+let private degradedList (items: (string * string) list) (attr: string) : ReactElement =
+  match items with
+  | [] -> Html.none
+  | _ ->
+    Html.ul
+      [ prop.children
+          [ for (targetId, text) in items ->
+              Html.li
+                [ Html.button
+                    [ prop.style [ style.textAlign.left ]
+                      prop.onClick (fun _ -> reveal targetId scope attr)
+                      prop.text text ] ] ] ]
+
+let rec private speechOutline (s: SpeechNode) : ReactElement =
+  let line = s.Id + " (" + s.Kind + ") - " + describeSpeech s
+
+  let nested =
+    match s.Children with
+    | [] -> []
+    | children -> [ Html.ul [ prop.children (children |> List.map speechOutline) ] ]
+
+  Html.li
+    [ prop.custom (speechAttr, s.Id)
+      prop.children (Html.span [ prop.text line ] :: nested) ]
 
 [<ReactComponent>]
 let HostPreviewPane (tree: Node<obj> option) : ReactElement =
@@ -389,41 +612,58 @@ let HostPreviewPane (tree: Node<obj> option) : ReactElement =
         | Some id when manifest.Hosts |> List.exists (fun h -> h.Id = id) -> id
         | _ -> first.Id
 
-      match annotate manifest root hostId with
+      let host = manifest.Hosts |> List.find (fun h -> h.Id = hostId)
+
+      let switcher =
+        Html.div
+          [ prop.role "radiogroup"
+            prop.ariaLabel "Preview host"
+            prop.style [ style.display.flex; style.gap (length.px 6); style.flexWrap.wrap ]
+            prop.children
+              [ for h in manifest.Hosts ->
+                  Html.button
+                    [ prop.role "radio"
+                      prop.ariaChecked (h.Id = hostId)
+                      prop.title h.Meaning
+                      prop.style [ style.fontWeight (if h.Id = hostId then 700 else 400) ]
+                      prop.onClick (fun _ -> setChosen (Some h.Id))
+                      prop.text h.Id ] ] ]
+
+      let body =
+        if hostId = SpeechHostId then
+          match annotateSpeech manifest root with
+          | None -> None
+          | Some preview ->
+            Some(
+              speechHonesty,
+              speechSummary preview,
+              degradedList
+                [ for s in preview.Listed -> s.Id, sprintf "%s (%s): %s" s.Id s.Kind (describeSpeech s) ]
+                speechAttr,
+              Html.ul [ prop.children [ speechOutline preview.Root ] ]
+            )
+        else
+          match annotate manifest root hostId with
+          | None -> None
+          | Some preview ->
+            Some(
+              honesty,
+              summary preview,
+              degradedList
+                [ for d in preview.Degraded -> wrapperId d.Id, sprintf "%s (%s): %s" d.Id d.Kind (describe d.Fidelity) ]
+                renderedAttr,
+              Render.renderWithSources BindingResolver.empty ignore (dress manifest hostId root)
+            )
+
+      match body with
       | None -> Html.none
-      | Some preview ->
+      | Some(sentence, line, listed, rendered) ->
         Html.div
           [ prop.className "fl-host-preview"
             prop.children
-              [ Html.p [ prop.style [ style.fontSize (length.em 0.9) ]; prop.text honesty ]
-                Html.div
-                  [ prop.role "radiogroup"
-                    prop.ariaLabel "Preview host"
-                    prop.style [ style.display.flex; style.gap (length.px 6); style.flexWrap.wrap ]
-                    prop.children
-                      [ for h in manifest.Hosts ->
-                          Html.button
-                            [ prop.role "radio"
-                              prop.ariaChecked (h.Id = hostId)
-                              prop.title h.Meaning
-                              prop.style [ style.fontWeight (if h.Id = hostId then 700 else 400) ]
-                              prop.onClick (fun _ -> setChosen (Some h.Id))
-                              prop.text h.Id ] ] ]
-                Html.p
-                  [ prop.style [ style.fontSize (length.em 0.85) ]
-                    prop.text preview.Host.Meaning ]
-                Html.p [ prop.custom ("aria-live", "polite"); prop.text (summary preview) ]
-                (match preview.Degraded with
-                 | [] -> Html.none
-                 | degraded ->
-                   Html.ul
-                     [ prop.children
-                         [ for d in degraded ->
-                             Html.li
-                               [ Html.button
-                                   [ prop.style [ style.textAlign.left ]
-                                     prop.onClick (fun _ -> reveal (wrapperId d.Id) scope)
-                                     prop.text (sprintf "%s (%s): %s" d.Id d.Kind (describe d.Fidelity)) ] ] ] ])
-                Html.div
-                  [ prop.className "fl-host-preview-root"
-                    prop.children [ Render.renderWithSources BindingResolver.empty ignore (dress manifest hostId root) ] ] ] ]
+              [ Html.p [ prop.style [ style.fontSize (length.em 0.9) ]; prop.text sentence ]
+                switcher
+                Html.p [ prop.style [ style.fontSize (length.em 0.85) ]; prop.text host.Meaning ]
+                Html.p [ prop.custom ("aria-live", "polite"); prop.text line ]
+                listed
+                Html.div [ prop.className "fl-host-preview-root"; prop.children [ rendered ] ] ] ]

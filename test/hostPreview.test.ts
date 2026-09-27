@@ -12,6 +12,9 @@
 //      silently left out of the switcher, so it turns this suite red instead.
 //   3. The pure annotation reads every node's status off its kind's row, and the
 //      summary's counts equal a count taken straight from the manifest JSON.
+//   4. The speech view (Phase 1813's `speech` column, ruled on in round 2): the
+//      speech vocabulary is pinned, each node carries its kind's declared class,
+//      and the omitted nodes are the listed ones.
 //
 // The corpus is read at $FUARAN_WIRE_FIXTURES, else at the sibling
 // ../wire-format-fixtures clone (the layout CI checks out). An absent corpus is
@@ -27,10 +30,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   annotate,
+  annotateSpeech,
   bundled,
   dress,
   honesty,
   parseManifest,
+  speechHonesty,
+  speechSummary,
   summary,
   wrapperId,
   // @ts-expect-error untyped Fable output
@@ -146,11 +152,12 @@ describe('the host set is what the manifest declares', () => {
     expect([...manifest.Tiers]).toEqual(['source', 'fallback', 'rich']);
   });
 
-  it('the kind rows carry no per-host column yet — one appearing is a switcher entry to rule on', () => {
+  it('the kind-row columns are exactly the ruled ones — a new column is a switcher entry to rule on', () => {
     // The manifest declares tiers, not named hosts. When a projection adds its
-    // own column to the kind rows (a speech or card projection, a native
-    // surface), this goes red on the bundle refresh, and the preview gains
-    // that host by ruling on the column's vocabulary rather than by guessing it.
+    // own column to the kind rows (a card projection, a native surface), this
+    // goes red on the bundle refresh, and the preview gains that host by ruling
+    // on the column's vocabulary rather than by guessing it. `speech` (Phase
+    // 1813) is ruled on: it is the speech view, and every row must carry it.
     const rows: Record<string, unknown>[] = JSON.parse(readFileSync(bundledPath, 'utf8')).kinds;
     const members = new Set(rows.flatMap((r) => Object.keys(r)));
     expect([...members].sort()).toEqual(
@@ -164,12 +171,47 @@ describe('the host set is what the manifest declares', () => {
         'rich',
         'sensitive',
         'source',
+        'speech',
       ].sort(),
     );
+    // `speech` is USED, not merely tolerated: every row declares it, with no
+    // member the speech view does not read.
+    for (const r of rows)
+      expect(Object.keys(r.speech as object).sort(), String(r.kind)).toEqual(['class', 'note']);
   });
 
-  it('the switcher offers the render tiers, never the source tier', () => {
-    expect([...manifest.Hosts].map((h: { Id: string }) => h.Id)).toEqual(['fallback', 'rich']);
+  it('the speech vocabulary is pinned — a new class needs a ruling, not silence', () => {
+    const pinned = ['spoken', 'derived', 'announced-only', 'omitted'];
+    expect([...manifest.SpeechClasses].map((c: { Class: string }) => c.Class)).toEqual(pinned);
+    const declared: { class: string }[] = JSON.parse(
+      readFileSync(bundledPath, 'utf8'),
+    ).speechClasses;
+    expect(declared.map((c) => c.class)).toEqual(pinned);
+  });
+
+  it('parseManifest refuses a speech class it has no ruling for, and a row outside the vocabulary', () => {
+    const doc = JSON.parse(readFileSync(bundledPath, 'utf8'));
+    const grown = {
+      ...doc,
+      speechClasses: [...doc.speechClasses, { class: 'sung', meaning: 'x' }],
+    };
+    expect(parseManifest(grown).tag).toBe(1);
+    const stray = {
+      ...doc,
+      kinds: doc.kinds.map((k: { kind: string }, i: number) =>
+        i === 0 ? { ...k, speech: { class: 'whispered', note: '' } } : k,
+      ),
+    };
+    expect(parseManifest(stray).tag).toBe(1);
+    expect(parseManifest(doc).tag).toBe(0);
+  });
+
+  it('the switcher offers the render tiers and the speech view, never the source tier', () => {
+    expect([...manifest.Hosts].map((h: { Id: string }) => h.Id)).toEqual([
+      'fallback',
+      'rich',
+      'speech',
+    ]);
     for (const h of manifest.Hosts) expect(h.Meaning.length).toBeGreaterThan(0);
   });
 
@@ -268,5 +310,125 @@ describe('the dressed render tree', () => {
     expect(honesty).toMatch(/declared-fidelity simulation/);
     expect(honesty).toMatch(/not that host's pixels/);
     expect(honesty.split('. ').length).toBe(1);
+  });
+});
+
+describe('the speech view', () => {
+  const manifest = ok(bundled, 'the bundled manifest');
+  const doc: { kinds: { kind: string; speech: { class: string; note: string } }[] } = JSON.parse(
+    readFileSync(bundledPath, 'utf8'),
+  );
+  const speechOf = (kind: string) => doc.kinds.find((r) => r.kind === kind)?.speech;
+
+  const withOmitted = tree(
+    box('root', [
+      {
+        id: 'heading-1',
+        kind: { $type: 'Heading', level: 2, text: 'Totals', variant: 'Standard' },
+      },
+      { id: 'skeleton-1', kind: { $type: 'Skeleton', rows: 3 } },
+      {
+        id: 'button-go',
+        kind: {
+          $type: 'Button',
+          label: 'Go',
+          onClick: { $type: 'Notify', channel: 'go', payload: 'x' },
+          variant: 'Primary',
+        },
+      },
+    ]),
+  );
+
+  type SpeechNode = {
+    Id: string;
+    Kind: string;
+    Class: string | undefined;
+    Note: string;
+    Children: Iterable<SpeechNode>;
+  };
+
+  it('each node carries the class its kind declares, with the kind note', () => {
+    const p = annotateSpeech(manifest, withOmitted);
+    const flat: SpeechNode[] = [];
+    const walk = (n: SpeechNode) => {
+      flat.push(n);
+      for (const c of n.Children) walk(c);
+    };
+    walk(p.Root);
+    expect(flat.map((n) => n.Id)).toEqual(['root', 'heading-1', 'skeleton-1', 'button-go']);
+    for (const n of flat) {
+      expect(n.Class, n.Kind).toBe(speechOf(n.Kind)?.class);
+      expect(n.Note, n.Kind).toBe(speechOf(n.Kind)?.note);
+    }
+  });
+
+  it('the summary counts every declared class, and the omitted nodes are the listed ones', () => {
+    const p = annotateSpeech(manifest, withOmitted);
+    expect(p.Total).toBe(4);
+    const kinds = ['Box', 'Heading', 'Skeleton', 'Button'];
+    for (const [cls, n] of p.ByClass as Iterable<[string, number]>) {
+      expect(n, cls).toBe(kinds.filter((k) => speechOf(k)?.class === cls).length);
+    }
+    expect([...p.Listed].map((s: { Id: string }) => s.Id)).toEqual(['skeleton-1']);
+    expect(speechSummary(p)).toBe(
+      '4 nodes on the speech view: 1 spoken, 1 derived, 1 announced-only, 1 omitted',
+    );
+  });
+
+  it('the speech view is not a render tier: annotate and dress leave it alone', () => {
+    expect(annotate(manifest, withOmitted, 'speech')).toBeUndefined();
+    expect(dress(manifest, 'speech', withOmitted)).toBe(withOmitted);
+  });
+
+  it('a manifest without a speech vocabulary offers no speech view', () => {
+    const plain = JSON.parse(readFileSync(bundledPath, 'utf8'));
+    delete plain.speechClasses;
+    for (const k of plain.kinds) delete k.speech;
+    const m = ok(parseManifest(plain), 'the speech-less manifest');
+    expect([...m.Hosts].map((h: { Id: string }) => h.Id)).toEqual(['fallback', 'rich']);
+    expect(annotateSpeech(m, withOmitted)).toBeUndefined();
+  });
+
+  it('says in one sentence that it is declared, not a screen reader', () => {
+    expect(speechHonesty).toMatch(/declared-fidelity simulation/);
+    expect(speechHonesty).toMatch(/not what a screen reader/);
+    expect(speechHonesty.split('. ').length).toBe(1);
+  });
+});
+
+describe('the CodeBlock row is read as the corpus declares it', () => {
+  const manifest = ok(bundled, 'the bundled manifest');
+  const row = JSON.parse(readFileSync(bundledPath, 'utf8')).kinds.find(
+    (r: { kind: string }) => r.kind === 'CodeBlock',
+  );
+  const code = tree(
+    box('root', [
+      {
+        id: 'code-1',
+        kind: {
+          $type: 'CodeBlock',
+          code: 'let x = 1',
+          copyable: true,
+          highlightLines: [],
+          language: 'fsharp',
+          lineNumbers: false,
+        },
+      },
+    ]),
+  );
+
+  it('on the fallback tier the placeholder carries the declared fallback verbatim', () => {
+    expect(row.rich.class).toBe('clientOnly');
+    const p = annotate(manifest, code, 'fallback');
+    const d = [...p.Degraded].find((n: { Id: string }) => n.Id === 'code-1');
+    expect(d.Fidelity.tag).toBe(PLACEHOLDER);
+    expect(d.Fallback).toBe(row.fallback);
+  });
+
+  it('on the speech view it carries the declared speech class', () => {
+    const p = annotateSpeech(manifest, code);
+    const node = [...p.Root.Children][0];
+    expect(node.Class).toBe(row.speech.class);
+    expect(node.Note).toBe(row.speech.note);
   });
 });

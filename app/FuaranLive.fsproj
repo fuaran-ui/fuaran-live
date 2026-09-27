@@ -115,6 +115,11 @@
          absence is the point — the module that builds a contribution and the
          module that holds the key stores are never in scope together. -->
     <Compile Include="Contribute.fs" />
+    <!-- Phase 1818 — the host-fidelity preview: the current tree shown as each
+         render tier the bundled fidelity manifest (fidelity/render-fidelity.json,
+         byte-locked to the specification corpus by test/hostPreview.test.ts)
+         declares it. -->
+    <Compile Include="HostPreview.fs" />
     <!-- Phase 1628 — the render-latency measurement harness. Compiled into this
          project (rather than into a project of its own) because it renders
          through exactly the tier this project pins, and a second project would

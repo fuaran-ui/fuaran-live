@@ -2734,6 +2734,10 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
                     toolDetails "Examples & pattern bank" noTree (galleryPane model dispatch)
                     toolDetails "Console: query and poke the live tree" false (consolePane model dispatch)
                     toolDetails "Compare: Fuaran vs conventional JS" false (comparePane model dispatch)
+                    toolDetails
+                      "Host fidelity: this tree per declared render tier"
+                      false
+                      (HostPreview.HostPreviewPane model.Session.Tree)
                     (if dualHostEnabled then
                        toolDetails "Dual-host wire parity" false (parityPane model dispatch)
                      else

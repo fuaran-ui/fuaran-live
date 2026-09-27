@@ -24,3 +24,8 @@ dist-measure
 # tooling writes this file when it claims or moves this app's slot, so a hand
 # format is undone by the next claim and the format gate re-reddens with it.
 ports.json
+
+# The bundled render-fidelity manifest — a byte-faithful copy of the
+# specification corpus's file (test/hostPreview.test.ts byte-compares the two),
+# so a reformat here would be drift the parity lock goes red on.
+app/fidelity/render-fidelity.json

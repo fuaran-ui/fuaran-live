@@ -72,7 +72,10 @@ let private exhibit: Node<unit> =
           // In-subset — renders as native MathML: real superscripts with zero
           // JavaScript on the script-disabled rung (Phase 658).
           Fuaran.math "dl-eq" "a^2 + b^2 = c^2"
-          // Out-of-subset (`\int`, `\,`) — deterministically falls back to the
+          // In-subset since Phase 1853 — a formal statement (quantifier, membership,
+          // implication, comparison) also typesets as native MathML with zero JavaScript.
+          Fuaran.math "dl-eq3" "\\forall x.\\ x \\in S \\Rightarrow f(x) \\le c"
+          // Out-of-subset (`\int`) — deterministically falls back to the
           // raw LaTeX source span, so the source tier stays visible on the page.
           Fuaran.math "dl-eq2" "\\int_0^1 x^2 \\, dx"
           Fuaran.codeBlockSpec
@@ -120,7 +123,7 @@ let private legend: TierRow list =
   [ { Kind = "Math"
       Source = "the LaTeX string on the wire"
       Fallback =
-        "native MathML in-subset (real superscripts, no JS), else escaped source – deterministic, parity-pinned"
+        "native MathML in-subset (real superscripts, quantifiers and relations, no JS), else escaped source – deterministic, parity-pinned"
       Rich = "KaTeX typeset (client-only)" }
     { Kind = "CodeBlock"
       Source = "the code text + line/highlight semantics"
@@ -153,7 +156,8 @@ type private Probe =
     Modal: int
     Scroll: int
     Scripts: int
-    HighlightSpans: int }
+    HighlightSpans: int
+    Formal: int }
 
 let private renderTree (n: Node<unit>) : ReactElement =
   Render.renderWithSources BindingResolver.empty ignore n
@@ -188,7 +192,8 @@ let private DegradationView () : ReactElement =
           Modal = p?modal
           Scroll = p?scroll
           Scripts = p?scripts
-          HighlightSpans = p?highlightSpans }
+          HighlightSpans = p?highlightSpans
+          Formal = p?formal }
     )
 
   // After the exhibit renders, apply the rich layer to rung 1 and build the
@@ -285,6 +290,9 @@ let private DegradationView () : ReactElement =
                          Html.span
                            [ prop.className (if p.Msup > 0 then "dl-probe-item" else "dl-probe-bad")
                              prop.text (sprintf "MathML superscripts ✓ (%d ⟨msup⟩)" p.Msup) ]
+                         Html.span
+                           [ prop.className (if p.Formal = 3 then "dl-probe-item" else "dl-probe-bad")
+                             prop.text (sprintf "formal statement ✓ (%d/3 of ⟨mo⟩ ∀ ⇒ ≤)" p.Formal) ]
                          Html.span [ prop.className "dl-probe-item"; prop.text (sprintf "code ✓ (%d)" p.Code) ]
                          Html.span [ prop.className "dl-probe-item"; prop.text (sprintf "modal ✓ (%d)" p.Modal) ]
                          Html.span [ prop.className "dl-probe-item"; prop.text (sprintf "scroll ✓ (%d)" p.Scroll) ]
@@ -347,7 +355,7 @@ let private DegradationView () : ReactElement =
                           "Both rungs render the same tree through the shipped renderer. The fidelity contract puts everything deterministic on the wire, so the base render needs no JavaScript – the rich layer (highlighting, the copy button, opening and dismissing the dialog) is declared client-only, layered on top. That's why rung 1 lets you drive the dialog and rung 2 cannot." ]
                     Html.li
                       [ prop.text
-                          "Rung 2 is genuinely script-disabled: the same markup is placed in a sandboxed iframe with no allow-scripts, so nothing can run. The equation still typesets with REAL superscripts – native MathML, laid out by the browser with zero JavaScript (an out-of-subset equation stays as its readable LaTeX source) – and the code structure, the dialog in its open state (no portal), and the scroll clipping all still render. The page reads the iframe back to confirm zero scripts and zero highlight spans reached it, that genuine ⟨msup⟩ elements are present, and everything else did too." ]
+                          "Rung 2 is genuinely script-disabled: the same markup is placed in a sandboxed iframe with no allow-scripts, so nothing can run. The equation still typesets with REAL superscripts – native MathML, laid out by the browser with zero JavaScript (an out-of-subset equation stays as its readable LaTeX source) – and the code structure, the dialog in its open state (no portal), and the scroll clipping all still render. The page reads the iframe back to confirm zero scripts and zero highlight spans reached it, that genuine ⟨msup⟩ elements are present, that the formal statement's ∀, ⇒ and ≤ arrive as real ⟨mo⟩ operators, and everything else did too." ]
                     Html.li
                       [ prop.text
                           "The wire source is the parity-clean data every conformant host renders. The byte-for-byte cross-host agreement (F#, TypeScript, Python) and the break-the-contract red build are enforced by the conformance gate in CI – a real gate you can run, not a claim this page can prove client-side." ]

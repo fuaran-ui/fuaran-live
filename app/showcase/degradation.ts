@@ -86,11 +86,18 @@ export function probeIframe(): {
   scroll: number;
   scripts: number;
   highlightSpans: number;
+  formal: number;
 } {
   const f = document.querySelector('.dl-rung2 iframe') as HTMLIFrameElement | null;
   const doc = f?.contentDocument;
   const q = (sel: string) => (doc ? doc.querySelectorAll(sel).length : -1);
+  // Phase 1853 — the formal-statement exemplar typesets on the no-JS rung: how
+  // many of the three operators ∀ / ⇒ / ≤ are present as genuine MathML <mo>
+  // elements (3 = all of them; the raw-source fallback would give 0).
+  const mos = doc ? Array.from(doc.querySelectorAll('mo'), (m) => m.textContent ?? '') : null;
+  const formal = mos ? ['∀', '⇒', '≤'].filter((op) => mos.includes(op)).length : -1;
   return {
+    formal,
     math: q('.fuaran-math'),
     // Phase 658 — the no-JS MathML tier: real <msup> superscripts, rendered by
     // the browser with zero scripts. Proves the equation is genuinely typeset,

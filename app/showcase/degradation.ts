@@ -42,6 +42,10 @@ export function highlightRich(): number {
   let touched = 0;
   codes.forEach((el) => {
     if (el.getAttribute('data-dl-hl')) return;
+    // Phase 1854 — the renderer already tokenised this block deterministically
+    // (F*, F#); the rich layer skips it, exactly as the `data-highlighted`
+    // marker exists to let an enhancer do.
+    if (el.getAttribute('data-highlighted') === 'deterministic') return;
     const text = el.textContent || '';
     const html = escapeHtml(text).replace(/[A-Za-z_]+/g, (m) =>
       KEYWORDS.has(m) ? `<span class="dl-kw">${m}</span>` : m,
@@ -87,6 +91,10 @@ export function probeIframe(): {
   scripts: number;
   highlightSpans: number;
   formal: number;
+  tokKw: number;
+  highlighted: number;
+  plainTok: number;
+  plainBlock: number;
 } {
   const f = document.querySelector('.dl-rung2 iframe') as HTMLIFrameElement | null;
   const doc = f?.contentDocument;
@@ -108,5 +116,13 @@ export function probeIframe(): {
     scroll: q('.fuaran-scrollarea'),
     scripts: q('script'),
     highlightSpans: q('.dl-kw'),
+    // Phase 1854 — the deterministic highlighting tier on the no-JS rung: the
+    // F* and F# blocks carry renderer-emitted `tok-kw` spans (no script ran to
+    // make them), and the Python block beside them — no grammar — carries no
+    // token span at all and no `data-highlighted` marker.
+    tokKw: q('.tok-kw'),
+    highlighted: q('code[data-highlighted="deterministic"]'),
+    plainTok: q('.fuaran-codeblock[data-language="python"] [class^="tok-"]'),
+    plainBlock: q('.fuaran-codeblock[data-language="python"] code:not([data-highlighted])'),
   };
 }

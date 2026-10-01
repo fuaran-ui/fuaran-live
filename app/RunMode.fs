@@ -11,10 +11,11 @@ module Fuaran.Live.RunMode
 //
 //  Nothing in this file is an interpreter. The fold, the re-resolution, the
 //  budget and the closed effect vocabulary all come from the published
-//  `Fuaran.Program.Runtime` package, which shares them with the server
-//  placement. That sharing is the claim worth making: the tree you watch run
-//  here behaves the way it would behave on a server, because it is the same
-//  code, not a browser-shaped reimplementation of it.
+//  `Fuaran.Program.Runtime` package, through its UI adapter `Fuaran.Program.UI`,
+//  which shares them with the server placement. That sharing is the claim
+//  worth making: the tree you watch run here behaves the way it would behave
+//  on a server, because it is the same code, not a browser-shaped
+//  reimplementation of it.
 //
 //  ── What makes this safe to point at an LLM's output ────────────────────────
 //  The tree is untrusted by construction, and three separate things bound it:
@@ -46,6 +47,9 @@ open Fuaran.UI.ServerDriven
 open Fuaran.UI.ServerDriven.Validation
 open Fuaran.Program.Bounded
 open Fuaran.Program.Runtime
+// The UI adapter, opened LAST: since 0.6.0 the core above is domain-generic, and
+// the adapter's UI instantiation (and its pre-0.6.0 names) must shadow it.
+open Fuaran.Program.UI
 
 // ─── the two effect performers this host offers ──────────────────────────────
 //

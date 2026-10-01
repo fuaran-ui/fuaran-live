@@ -5690,7 +5690,8 @@ let private fsRecordTable: (string * string * string list) list =
        "Label|label|?|B<s>"
        "LabelledBy|labelledBy|?|s"
        "LiveRegion|liveRegion|?|E:LiveRegionKind"
-       "Role|role|?|aria" ])
+       "Role|role|?|aria"
+       "Speak|speak|?|U:TextSource" ])
     ("BadgeSpec", "Badge", [ "Label|label|!|U:TextSource"; "Variant|variant|!|E:BadgeVariant" ])
     ("BoxSpec",
      "Box",
@@ -5780,6 +5781,8 @@ let private fsRecordTable: (string * string * string list) list =
        "KeepRowsTogether|keepRowsTogether|=false|b"
        "RepeatHeader|repeatHeader|=false|b"
        "Exportable|exportable|=false|b"
+       "WindowStateKey|windowStateKey|?|s"
+       "RowTotal|rowTotal|?|B<i>"
        "Source|source|!|B<core:rows>"
        "StaticRows|staticRows|?|R:StaticRows"
        "OnRowClick|onRowClick|?|C" ])
@@ -7474,6 +7477,7 @@ and private fsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
         "Style = " + opt "style" (fsRecordLit "SemanticStyle" (depth + 1))
         "Tooltip = " + opt "tooltip" (fsTextSource (depth + 1))
         "Visible = " + opt "visible" (fsBinding Fd.Bool (depth + 1))
+        "Fallback = " + opt "fallback" (fsNodeExpr (depth + 1))
         "Motion = Option.None"
         "ExtraAttributes = Option.None" ]
 

@@ -133,7 +133,7 @@ describe('the gallery', () => {
       // member the pinned tier emitted after the corpus made it omit-at-default
       // (cleared at Fuaran.UI 0.78.0), and Phase 1821's `cols`/`col` ->
       // `columns`/`column` dataframe rename, which the F# tier first emits at
-      // Fuaran.UI.Ops 0.85.0 — the pin this repo now carries, which is why the
+      // Fuaran.UI.Ops 0.85.0 — a release the pin here has reached, which is why the
       // one-member normalisation that used to sit here is gone. A future lag
       // gets the same treatment: declare it, name the release that closes it,
       // and delete it on the raise rather than letting it become furniture.

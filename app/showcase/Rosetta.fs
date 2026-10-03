@@ -90,6 +90,7 @@ let private metricNode (nid: string) (label: string) (value: float) : Node<unit>
     Accessibility = None
     Motion = None
     ExtraAttributes = None
+    Fallback = None
     Tooltip = None
     Visible = None }
 

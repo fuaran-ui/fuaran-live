@@ -29,6 +29,7 @@ namespace Fuaran.Showcase
 module internal PatternBankEngine =
 
   open Fuaran.Core
+  open Fuaran.Compute
 
   type Pattern =
     { Id: string

@@ -6,7 +6,7 @@ module Fuaran.Showcase.LivingSheet
 //
 //  Every number in the dashboard is computed live by a declarative transform
 //  pipeline (derive a margin column → filter by a threshold → group by region
-//  with aggregates) run by the REAL `Fuaran.Core.DataFrame` reference evaluator,
+//  with aggregates) run by the REAL `Fuaran.Compute.DataFrame` reference evaluator,
 //  compiled to JavaScript via Fable. Edit a source cell or drag the threshold and
 //  the whole dashboard recomputes in-browser – no server, no spreadsheet engine.
 //
@@ -18,7 +18,7 @@ module Fuaran.Showcase.LivingSheet
 //  (the cross-host parity contract), so the compute travels with the app.
 //
 //  Honest scope (stated in the footer): the evaluator, the pipeline codec, and the
-//  source codec are the real shipped `Fuaran.Core.DataFrame` / `.Column` surfaces
+//  source codec are the real shipped `Fuaran.Compute.DataFrame` / `Fuaran.Core.Column` surfaces
 //  (FSharp.Core-only, Fable-clean) – this page runs them directly. The transform
 //  algebra shown is the actual v1 verb set; the JSON in the drawer is the actual
 //  canonical wire the codecs emit. Nothing here needs a server.
@@ -28,11 +28,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Fuaran.Core
+open Fuaran.Compute
 open Fuaran.UI
 open Fuaran.UI.Types
 open Fuaran.UI.Renderer
 
-module DF = Fuaran.Core.DataFrame
+module DF = Fuaran.Compute.DataFrame
 
 [<Emit("Number($0)")>]
 let private jsNumber (s: string) : float = jsNative
@@ -128,7 +129,7 @@ let private buildPipeline (derive: bool) (filter: bool) (group: bool) : Transfor
     if filter then
       Filter(Binary(Ge, Col "units", Param "minUnits"))
     if group then
-      let aggs =
+      let aggs: Agg list =
         [ { Name = "revenue"
             Fn = Sum
             Of = "revenue" }
@@ -170,6 +171,7 @@ let private cellText (c: Cell) : string =
   | Cell.Int i -> string i
   | Cell.Float f -> sprintf "%g" (System.Math.Round(f, 3))
   | Cell.Str s -> s
+  | Cell.Decimal s -> s
   | Cell.Bool b -> (if b then "true" else "false")
   | Cell.Date s
   | Cell.Timestamp s -> s
@@ -423,7 +425,7 @@ let private LivingSheetView () : ReactElement =
               [ prop.children
                   [ Html.li
                       [ prop.text
-                          "Every number in the dashboard is computed by the real Fuaran.Core.DataFrame reference evaluator, compiled to JavaScript via Fable. Editing a source cell or the threshold re-runs the actual pipeline in your browser – there is no server and no separate spreadsheet engine." ]
+                          "Every number in the dashboard is computed by the real Fuaran.Compute.DataFrame reference evaluator, compiled to JavaScript via Fable. Editing a source cell or the threshold re-runs the actual pipeline in your browser – there is no server and no separate spreadsheet engine." ]
                     Html.li
                       [ prop.text
                           "The pipeline you toggle is the actual serialisable Transform algebra – derive / filter / groupBy from the shipped v1 verb set. The threshold drives a real pipeline Param, whose reactive edge is derived from the expression, not separately wired." ]

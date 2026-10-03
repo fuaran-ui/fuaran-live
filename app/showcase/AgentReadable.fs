@@ -174,7 +174,8 @@ let private declaredModule: ModuleAffordance =
   { Id = moduleId
     Active = true
     Fields = declaredFields
-    Commands = declaredModuleCommands }
+    Commands = declaredModuleCommands
+    Scope = None }
 
 // ─── Projection: the declaration as DOM attributes ───────────────────────────
 //

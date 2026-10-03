@@ -110,6 +110,20 @@ the contract compiled against did not move at the switch.
   ceilings into both conformance arms. The playground's packaged `Fuaran.UI.*`
   pin in `app/FuaranLive.fsproj` is a separate slot on its own rhythm and did
   not move here.
+- **v0.90.0** (2026-10-03) — a ten-release jump, and source-affecting in three
+  ways the showcase names. `Node` gains a required `Fallback` (the two
+  hand-built `Node<unit>` literals in `Relay.fs` and `Rosetta.fs` set
+  `Fallback = None`); `ModuleAffordance` gains `Scope` (`AgentReadable.fs` sets
+  `None`, which is the page itself); and the dataframe surface — `DataFrame`,
+  `ColExpr`, `Agg`, `Transform`, `DataFrameCodec` — moved out of `Fuaran.Core`
+  into the `Fuaran.Compute.DataFrame` package, namespace `Fuaran.Compute`,
+  reached through the tier's own reference (`open Fuaran.Compute` in
+  `LivingSheet.fs`, `Charts.fs`, `PatternBank.fs`; the GroupBy aggregate list
+  is annotated `Agg list` so its `{ Name; Fn; Of }` literals do not resolve to
+  `FragmentSignature`). `Cell` gained a `Decimal` case, so `cellText` gains the
+  arm. The tier pins `Fuaran.Core.*` at 0.34.0, so the showcase's two direct
+  Core pins (`Function`, `Wire`) moved 0.21.0 → 0.34.0 in the same commit — a
+  number left behind is an NU1605 downgrade, which kills the Fable cracker.
 
 ## The OTHER pin — the playground's packaged `Fuaran.UI.*` family
 

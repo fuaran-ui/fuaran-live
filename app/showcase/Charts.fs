@@ -12,7 +12,7 @@ module Fuaran.Showcase.Charts
 //    • The chart's `Source` is a `Binding.Transform` – an embedded
 //      `Fuaran.Core.DataSource` + a declarative pipeline (the real dataframe
 //      algebra) that RIDES THE WIRE. The renderer evaluates it client-side with
-//      the shipped `Fuaran.Core.DataFrame` reference evaluator (Fable → JS), so
+//      the shipped `Fuaran.Compute.DataFrame` reference evaluator (Fable → JS), so
 //      the figure's *data derivation* is itself canonical wire data – no server,
 //      no charting library. Toggle the "variance" derived column and the pipeline
 //      grows a step; the chart re-plots it live.
@@ -31,6 +31,7 @@ module Fuaran.Showcase.Charts
 
 open Feliz
 open Fuaran.Core
+open Fuaran.Compute
 open Fuaran.UI
 open Fuaran.UI.Types
 open Fuaran.UI.Renderer
@@ -90,7 +91,7 @@ let private varianceExpr: ColExpr = Binary(Sub, Col "revenue", Col "target")
 /// raw source columns; on ⇒ `variance` becomes a plottable series computed by
 /// the evaluator at render time. A param-free pipeline is byte-identical to the
 /// no-op shape, so an unused transform costs nothing on the wire.
-let private buildPipeline (variance: bool) : Fuaran.Core.Transform list =
+let private buildPipeline (variance: bool) : Fuaran.Compute.Transform list =
   [ if variance then
       Derive("variance", varianceExpr) ]
 

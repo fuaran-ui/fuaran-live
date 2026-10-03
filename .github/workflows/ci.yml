@@ -67,7 +67,7 @@ jobs:
           # and the number it exists to give would never appear.
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 

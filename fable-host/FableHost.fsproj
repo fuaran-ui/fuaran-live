@@ -61,6 +61,14 @@
          NOT linked: it moved to Fuaran.UI.Ops.Abstractions and now reaches this
          compile transitively via the Fuaran.UI.Renderer ProjectReference
          (Renderer → Telemetry.Abstractions → Ops.Abstractions). -->
+    <!-- The decoder's repair vocabulary – self-contained, no opens. JsonDecode.fs
+         names `Repair.RepairId.*` in its [<Literal>] counter ids since tier
+         v0.90.0, so without this link the host fails to Fable-compile with
+         FS0039 'Repair is not defined'. Ordered before JsonDecode.fs, as in the
+         tier's own Fuaran.UI.Ops.fsproj. -->
+    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Repair.fs">
+      <Link>linked\Repair.fs</Link>
+    </Compile>
     <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\JsonDecode.fs">
       <Link>linked\JsonDecode.fs</Link>
     </Compile>

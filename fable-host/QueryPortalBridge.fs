@@ -25,6 +25,7 @@ module Fuaran.Live.QueryPortalBridge
 
 open Fable.Core.JsInterop
 open Fuaran.Core
+open Fuaran.Compute
 open Fuaran.UI
 open Fuaran.UI.Ops
 open Fuaran.UI.Ops.Types
@@ -168,7 +169,7 @@ let private tableToRowsJs (t: Table) : obj =
 
 /// Apply a local refinement to ALREADY-FETCHED rows and re-type the dashboard –
 /// the Phase 324 fast-path, run by the shipped `Fuaran.UI.QueryRefine.refineLocally`
-/// (the pinned `Fuaran.Core.DataFrame` evaluator), NOT a TS re-implementation of
+/// (the pinned `Fuaran.Compute.DataFrame` evaluator), NOT a TS re-implementation of
 /// the algebra. A follow-on tweak ("sort descending", "filter region", "regroup by
 /// month") thus costs ZERO re-query and ZERO LLM tokens by construction.
 ///

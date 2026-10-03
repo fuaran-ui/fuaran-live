@@ -110,6 +110,7 @@ the contract compiled against did not move at the switch.
   ceilings into both conformance arms. The playground's packaged `Fuaran.UI.*`
   pin in `app/FuaranLive.fsproj` is a separate slot on its own rhythm and did
   not move here.
+
 - **v0.90.0** (2026-10-03) — a ten-release jump, and source-affecting in three
   ways the showcase names. `Node` gains a required `Fallback` (the two
   hand-built `Node<unit>` literals in `Relay.fs` and `Rosetta.fs` set

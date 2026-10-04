@@ -125,6 +125,23 @@ the contract compiled against did not move at the switch.
   arm. The tier pins `Fuaran.Core.*` at 0.34.0, so the showcase's two direct
   Core pins (`Function`, `Wire`) moved 0.21.0 → 0.34.0 in the same commit — a
   number left behind is an NU1605 downgrade, which kills the Fable cracker.
+- **v0.91.0** (2026-10-04, Phase 1882) — a raise of the second, cheap kind,
+  found by the diff the v0.80.0 entry asks for. Against v0.90.0 the tier's
+  library delta the showcase can reach is `Fuaran.UI.Ops/JsonDecode.fs`,
+  `Fuaran.UI/PreEmitValidate.fs` (the expression bound now counts a rounding
+  scale, so a document near `MaxExprNodes` that v0.90.0 accepted may be refused
+  — the release is classed breaking for that BEHAVIOUR, and no showcase page
+  authors a document near the bound) and the re-synced embedded renderer
+  bundle; the rest is the new `Fuaran.UI.Program*` adapter packages, which no
+  showcase project references. No showcase record widened and the tier still
+  declares `Fuaran.Core.*` 0.34.0, so the two direct Core pins did not move.
+  The one source edit rides for completeness rather than necessity: the
+  `SlotTree` arm in `TypedQuestion.fs`'s `spaceText`, whose absence has been an
+  incomplete-match warning since Core 0.31.0 grew the tree space. It rides with
+  the `@fuaran-ui/*` 0.29.0 set (`ops` 0.29.0, `schema` 0.25.0, `ui` 0.23.0,
+  `renderer` 0.26.0) and `fuaran-ui` 0.8.0, the releases carrying Phases 1810,
+  1811, 1812 and 1892 — which is what cleared the projection-conformance
+  quarantine's TypeScript entries and its four Python 1812 / 1892 entries.
 
 ## The OTHER pin — the playground's packaged `Fuaran.UI.*` family
 

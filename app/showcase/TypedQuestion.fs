@@ -362,6 +362,10 @@ let private spaceText (s: ValueSpace) : string =
   | StringLen(lo, hi) -> sprintf "string, %d–%d chars" lo hi
   | Enum values -> "one of " + String.concat " | " values
   | AnyString -> "any string"
+  // The tree space (Fuaran.Core 0.31.0+) is a capability space, not an elicitation
+  // one, so a question never carries it; the arm exists so the match is total.
+  | SlotTree(Some kind) -> sprintf "a %s subtree" kind
+  | SlotTree None -> "a subtree"
 
 let private answerValueText (v: AnswerValue) : string =
   match v with

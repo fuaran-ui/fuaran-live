@@ -68,7 +68,7 @@ the shared corpus it projects the wire JSON to Python source, **executes** the
 generated source against the real host (every fixture in ONE CPython process),
 re-encodes via `fuaran_ui.ui.encode`, and asserts byte-identity with the fixture.
 Run it with `pnpm conformance`; the arm needs a CPython carrying the Python host
-(`python -m venv .venv` then `pip install fuaran-ui==0.7.0`, or point
+(`python -m venv .venv` then `pip install fuaran-ui==0.8.0`, or point
 `FUARAN_PY_PYTHON` at an interpreter that already has it). It **fails** rather
 than skips when the host is absent: an arm that goes green without its oracle is
 worse than no arm.
@@ -78,8 +78,8 @@ the TypeScript leg can always fall back to a typed in-memory object literal,
 Python has **no such escape hatch**: `encode` calls `.to_wire()` on the root, and
 the structural `fuaran_ui.model.Obj` has no such method, so a construct the typed
 authoring model does not carry has no spelling at all. Measured against
-`fuaran-ui` 0.7.0 — the release the three workflows pin, and the one the standing
-entries were last re-run against — the remaining set falls in two families:
+`fuaran-ui` 0.8.0 — the release the three workflows pin, and the one the standing
+entries were last re-run against — the remaining set falls in three families:
 (the distribution was `fuaran-py` up to 0.5.0; Phase 1694 renamed it, and the
 import package with it, so older notes here and elsewhere cite the old name for
 releases that genuinely carried it)
@@ -90,6 +90,8 @@ releases that genuinely carried it)
 - **A record narrower than the wire** — `TransformBinding.source` is a bare
   `DataSource` rather than the wire's `TransformSource`, so a `State`- or
   `Live`-bound source has no spelling.
+- **A discriminator with no payload** — `ColumnKind` is a bare tag, so a
+  row-action `Button` / `ButtonGroup` column cell loses its `label` / `buttons`.
 
 Two families that held most of this set are now EMPTY, and each is kept named
 because its shape recurs and its remedy is not the others'. The **hardcoded

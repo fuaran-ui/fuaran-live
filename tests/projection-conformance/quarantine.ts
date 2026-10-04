@@ -220,28 +220,25 @@ export interface QuarantineEntry {
  * fixture quarantined on one arm and not the other is a single row whose other
  * cell is simply absent.
  *
- * The state, as re-measured 2026-10-04 (Phase 2023) against the pinned hosts —
- * `@fuaran-ui/ops` 0.28.0 / `@fuaran-ui/ui` 0.22.0, `fuaran-ui` 0.7.0 on PyPI and
+ * The state, as re-measured 2026-10-04 (Phase 1882) against the pinned hosts —
+ * `@fuaran-ui/ops` 0.29.0 / `@fuaran-ui/ui` 0.23.0, `fuaran-ui` 0.8.0 on PyPI and
  * `Fuaran.UI` 0.91.0 — is in the census test's generated name. Every entry is HOST
  * lag with the probe agreeing; none is the projector's. What each family is:
  *
- *   • TypeScript — the corpus moved ahead of the last PUBLISHED TypeScript host.
- *     Phases 1811 (the temporal rename to `DateTime` / `DateTimeRange` /
- *     `Format.DateTime`), 1812 (`accessibility.speak` and the author-declared
- *     `fallback`) and 1892 (`DataGrid.windowStateKey` / `rowTotal`) all landed in
- *     fuaran-ts's sources after its v0.28.0 tag, and no later release exists, so
- *     the pinned encoder cannot write the keys whatever the projector emits. These
- *     clear on the release, and the self-clearing check names each one the moment
- *     it round-trips. The arm held NONE from 2026-08-30 to 2026-10-04, and its
- *     preference is unchanged: a shortfall the pinned host CAN encode is taught,
- *     never listed (the row-action column cells, Phase 2023, were taught).
- *   • Python — `fuaran-ui` 0.7.0 does not model the same 1812 / 1892 slots, nor a
- *     row-action column cell's label. Its manifest is SILENT on all four (record,
- *     kind and case fields are uncovered families, and the column-kind union is
- *     out of scope), so each entry carries the `residual` naming that silence.
- *     0.8.0 models the 1812 / 1892 slots; raising the pin is not a one-line act,
- *     because 0.8.0 also carries the 1810 / 1811 temporal vocabulary the Python
- *     projector has not been taught, and it is tracked as its own phase.
+ *   • TypeScript — none. The 0.29.0 set carries Phases 1811 (the temporal rename
+ *     to `DateTime` / `DateTimeRange` / `Format.DateTime`), 1812
+ *     (`accessibility.speak` and the author-declared `fallback`) and 1892
+ *     (`DataGrid.windowStateKey` / `rowTotal`), which held the arm's eleven
+ *     entries from Phase 2023 until this raise; app/Projection.fs was taught all
+ *     three in the same change. The arm's preference is unchanged: a shortfall
+ *     the pinned host CAN encode is taught, never listed.
+ *   • Python — `Binding.Expr` (declined, fuaran#1580), the bare-`DataSource`
+ *     transform source and a row-action column cell's label. 0.8.0 models the
+ *     1812 / 1892 slots, so those four entries cleared on the raise, with the
+ *     projector taught them and the 1810 / 1811 temporal vocabulary together.
+ *     Where the manifest is SILENT on what an entry needs (hosted cases, case
+ *     fields under the out-of-scope column-kind union), the entry carries the
+ *     `residual` naming that silence.
  *   • F# — none. Its host is the pinned `Fuaran.UI` package, whose model IS the
  *     wire model, so every shortfall there has been the projector's own
  *     (fuaran#1657; the 1811 rename and the node fallback were taught in Phase
@@ -357,209 +354,7 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
     ],
   ],
 
-  // 3 — Phase 1811's temporal rename, ahead of the published TypeScript host.
-  // `@fuaran-ui/ops` 0.28.0 encodes the pre-rename `Date` / `DateRange` field
-  // kinds and the `Date` format, so a `DateTime` / `DateTimeRange` /
-  // `Format.DateTime` fixture has no spelling there; fuaran-ts's sources carry the
-  // rename unreleased. The probe names the rename's own factory members, which
-  // the release brings and 0.28.0 lacks.
-  [
-    'filters-date-range',
-    [
-      {
-        arm: 'typescript',
-        construct: 'formFieldKind.dateTimeRange',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1811',
-        reason: 'the published encoder has no DateTimeRange filter kind (Phase 1811, unreleased)',
-      },
-    ],
-  ],
-  [
-    'form-date',
-    [
-      {
-        arm: 'typescript',
-        construct: 'formFieldKind.dateTime',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1811',
-        reason: 'the published encoder has no DateTime field kind (Phase 1811, unreleased)',
-      },
-    ],
-  ],
-  [
-    'form-date-range',
-    [
-      {
-        arm: 'typescript',
-        construct: 'formFieldKind.dateTimeRange',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1811',
-        reason: 'the published encoder has no DateTimeRange field kind (Phase 1811, unreleased)',
-      },
-    ],
-  ],
-  [
-    'form-declarative-minimal',
-    [
-      {
-        arm: 'typescript',
-        construct: 'formFieldKind.dateTime',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1811',
-        reason: 'the published encoder has no DateTime field kind (Phase 1811, unreleased)',
-      },
-    ],
-  ],
-  [
-    'form-field-rules',
-    [
-      {
-        arm: 'typescript',
-        construct: 'formFieldKind.dateTime',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1811',
-        reason: 'the published encoder has no DateTime field kind (Phase 1811, unreleased)',
-      },
-    ],
-  ],
-  [
-    'format-bindings',
-    [
-      {
-        arm: 'typescript',
-        construct: 'localeFormat.dateTime',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1811',
-        reason: 'the published encoder has no Format.DateTime (Phase 1811, unreleased)',
-      },
-    ],
-  ],
-  [
-    'format-date-time',
-    [
-      {
-        arm: 'typescript',
-        construct: 'localeFormat.dateTime',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1811',
-        reason: 'the published encoder has no Format.DateTime (Phase 1811, unreleased)',
-      },
-    ],
-  ],
-
-  // 4 — Phase 1812's envelope slots: `accessibility.speak` and the node-level
-  // `fallback`. Neither the published TypeScript host nor `fuaran-ui` 0.7.0
-  // models them. `speak` is a type-level member with no runtime symbol of its
-  // own, so the TypeScript probe names `ops.liftFallback`, the runtime surface
-  // the same Phase-1812 commit added; the round trip is the direct falsifier.
-  [
-    'a11y-speak',
-    [
-      {
-        arm: 'typescript',
-        construct: 'ops.liftFallback',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1812',
-        reason: 'the published encoder drops accessibility.speak (Phase 1812, unreleased)',
-      },
-      {
-        arm: 'python',
-        construct: 'Accessibility.speak',
-        class: 'host',
-        owner: 'fuaran-py',
-        phase: 'fuaran#1812',
-        reason: 'fuaran-ui 0.7.0 has no Accessibility.speak; 0.8.0 models it',
-        residual: { family: 'recordFields', scopeKey: 'Accessibility' },
-      },
-    ],
-  ],
-  [
-    'envelope-fallback',
-    [
-      {
-        arm: 'typescript',
-        construct: 'ops.liftFallback',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1812',
-        reason: 'the published encoder drops the node-level fallback (Phase 1812, unreleased)',
-      },
-      {
-        arm: 'python',
-        construct: 'UiNode.fallback',
-        class: 'host',
-        owner: 'fuaran-py',
-        phase: 'fuaran#1812',
-        reason: 'fuaran-ui 0.7.0 has no UiNode.fallback; 0.8.0 models it',
-        // A node-envelope member: the corpus IDL types it as a node rather than a
-        // record field, so no §27 family names it directly. `recordFields` at
-        // `Node` is the family a claim about the envelope would have to make.
-        residual: { family: 'recordFields', scopeKey: 'Node' },
-      },
-    ],
-  ],
-
-  // 5 — Phase 1892's grid row window. The two slots are interface members on
-  // the TypeScript side with no runtime symbol, so the probe names `ops.repair`:
-  // the first `@fuaran-ui/ops` export that landed on fuaran-ts's main AFTER
-  // Phase 1892, so a release carrying it necessarily carries the window. The
-  // round trip is the direct falsifier here too.
-  [
-    'grid-windowed',
-    [
-      {
-        arm: 'typescript',
-        construct: 'ops.repair',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1892',
-        reason:
-          'the published encoder drops DataGrid.windowStateKey and rowTotal (Phase 1892, unreleased)',
-      },
-      {
-        arm: 'python',
-        construct: 'DataGrid.window_state_key',
-        class: 'host',
-        owner: 'fuaran-py',
-        phase: 'fuaran#1892',
-        reason: 'fuaran-ui 0.7.0 has no DataGrid.window_state_key / row_total; 0.8.0 models both',
-        residual: { family: 'kindFields' },
-      },
-    ],
-  ],
-  [
-    'grid-windowed-sorted',
-    [
-      {
-        arm: 'typescript',
-        construct: 'ops.repair',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#1892',
-        reason: 'the published encoder drops DataGrid.windowStateKey (Phase 1892, unreleased)',
-      },
-      {
-        arm: 'python',
-        construct: 'DataGrid.window_state_key',
-        class: 'host',
-        owner: 'fuaran-py',
-        phase: 'fuaran#1892',
-        reason: 'fuaran-ui 0.7.0 has no DataGrid.window_state_key; 0.8.0 models it',
-        residual: { family: 'kindFields' },
-      },
-    ],
-  ],
-
-  // 6 — a row-action column cell's label. `ColumnKind` is a bare discriminator
+  // 3 — a row-action column cell's label. `ColumnKind` is a bare discriminator
   // in every fuaran-ui release to date, so `Button` / `ButtonGroup` cells encode
   // with no `label` / `buttons`; the TypeScript host models both and the
   // projector emits them there. The column-kind union is out of the host
@@ -624,8 +419,8 @@ const emptyTally = (): ArmTally => ({ host: 0, projector: 0, both: 0 });
  * each carried their own counts; prose cannot be wrong out loud.
  */
 export const QUARANTINE_CENSUS: Readonly<Record<Arm, ArmTally>> = {
-  typescript: { host: 11, projector: 0, both: 0 },
-  python: { host: 12, projector: 0, both: 0 },
+  typescript: { host: 0, projector: 0, both: 0 },
+  python: { host: 8, projector: 0, both: 0 },
   // The F# arm holds NONE, and its emptiness is an assertion of its own
   // (fuaran#1657) — every node fixture is required to compile, execute and
   // re-encode byte-identically there. See `fsharp.test.ts`.

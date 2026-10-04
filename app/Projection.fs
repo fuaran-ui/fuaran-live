@@ -1031,7 +1031,19 @@ let private tsFormatIntent (v: JsonValue) : string =
     (match optNum "decimals" v with
      | Some d -> tsInline [ "kind", qs "Percent"; "decimals", numLit d ]
      | None -> "{ kind: 'Percent' }")
-  | Some "Date" -> tsInline [ "kind", qs "Date"; "dateStyle", qs (strOf "dateStyle" v) ]
+  // Phases 1810 / 1811 — `Format.Date` became `Format.DateTime`, a
+  // `dateStyle` / `timeStyle` pair with each half optional (`@fuaran-ui/schema`
+  // 0.25.0). Each member is written only where the wire carries it.
+  | Some "DateTime" ->
+    tsInline (
+      [ "kind", qs "DateTime" ]
+      @ (match optStr "dateStyle" v with
+         | Some d -> [ "dateStyle", qs d ]
+         | None -> [])
+      @ (match optStr "timeStyle" v with
+         | Some ts -> [ "timeStyle", qs ts ]
+         | None -> [])
+    )
   | Some "RelativeTime" -> tsInline [ "kind", qs "RelativeTime"; "unit", qs (strOf "unit" v) ]
   | Some "Duration" ->
     tsInline
@@ -1464,7 +1476,9 @@ let private tsCellFormat (v: JsonValue) : string =
      | Some d -> "format.percent(" + numLit d + ")"
      | None -> "format.percent()")
   | Some "SignificantDigits" -> "format.significantDigits(" + numLit (numOf "digits" v) + ")"
-  | Some "Date" -> "format.date(" + qs (strOf "format" v) + ")"
+  // Phase 1811 — `CellFormat.Date` became `DateTime`; `@fuaran-ui/ui` 0.23.0
+  // spells it `format.dateTime` and has no `format.date`.
+  | Some "DateTime" -> "format.dateTime(" + qs (strOf "format" v) + ")"
   // `Duration` / `RelativeTime` have no `format.*` helper in the TS tier, so
   // they project as the typed literal (the `Custom` precedent below).
   | Some "Duration" ->
@@ -1506,13 +1520,13 @@ let private ctrlDefault (kind: string) : string =
   | "Choice"
   | "SegmentedChoice" -> "undefined"
   | "Range" -> "[0, 0]"
-  | "DateRange" -> "['', '']"
+  | "DateTimeRange" -> "['', '']"
   // Phase 1121 — an auto-bound token field starts with no chips at all.
   | "Tokens" -> "[]"
   // Phase 1130 — the unset swatch: `#000000` is the native colour input's own
   // default, and the one `#rrggbb` form the control can hold.
   | "Color" -> "'#000000'"
-  | _ -> "''" // Text / TextArea / Date
+  | _ -> "''" // Text / TextArea / DateTime
 
 let private tsAutoBindValue (ab: AutoBind) (kind: string) : string =
   match ab with
@@ -1522,8 +1536,8 @@ let private tsAutoBindValue (ab: AutoBind) (kind: string) : string =
 /// The control's `value` binding: the wire's explicit value if present, else the
 /// reconstructed auto-binding. `Range`'s explicit value rides as a `{min,max}`
 /// object (the `Static` pair) and re-hydrates as `binding.static([min, max])`;
-/// `DateRange`'s rides as `{from,to}` (the 0.7.0 string pair) and re-hydrates as
-/// `binding.static([from, to])`.
+/// `DateTimeRange`'s (Phase 1811's name for `DateRange`) rides as `{from,to}`
+/// (the string pair) and re-hydrates as `binding.static([from, to])`.
 let private tsFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
   match JsonValue.tryField "value" v with
   | Some valV ->
@@ -1534,9 +1548,9 @@ let private tsFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
       + ", "
       + numLit (numOf "max" valV)
       + "])"
-    | "DateRange" when (dollarType valV).IsNone ->
+    | "DateTimeRange" when (dollarType valV).IsNone ->
       "binding.static([" + qs (strOf "from" valV) + ", " + qs (strOf "to" valV) + "])"
-    | "DateRange" when
+    | "DateTimeRange" when
       (dollarType valV) = Some "State"
       && (match JsonValue.tryField "defaultValue" valV with
           | Some d -> (dollarType d).IsNone && (JsonValue.tryField "from" d).IsSome
@@ -1625,17 +1639,19 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
       @ handler "onChange"
       @ [ "value", value; "constraints", tsConstraints false v ]
     )
-  | "Date" ->
+  // Phase 1811 — `Date` / `DateRange` became `DateTime` / `DateTimeRange`; the
+  // in-memory kinds carry the new names in `@fuaran-ui/schema` 0.25.0.
+  | "DateTime" ->
     tsInline (
-      [ "kind", qs "Date" ]
+      [ "kind", qs "DateTime" ]
       @ handler "onChange"
       @ [ "value", value
           "variant", qs (strOf "variant" v)
           "constraints", tsConstraints true v ]
     )
-  | "DateRange" ->
+  | "DateTimeRange" ->
     tsInline (
-      [ "kind", qs "DateRange" ]
+      [ "kind", qs "DateTimeRange" ]
       @ handler "onChange"
       @ [ "value", value
           "variant", qs (strOf "variant" v)
@@ -1930,6 +1946,11 @@ let private tsAccessibilityLit (v: JsonValue) : string =
     @ (match JsonValue.tryField "hidden" v with
        | Some b -> [ "hidden", tsBinding Opq.Scalar b ]
        | None -> [])
+    // Phase 1812 — the spoken description, a `TextSource` in memory (the
+    // `tooltip` precedent) even where the wire spells it as a bare string.
+    @ (match JsonValue.tryField "speak" v with
+       | Some t -> [ "speak", tsTextSourceLit t ]
+       | None -> [])
   )
 
 /// The per-kind ARIA default the smart ctor injects (mirrors
@@ -2144,6 +2165,11 @@ and private tsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
         @ (match JsonValue.tryField "visible" nodeV with
            | Some vis -> [ "visible", tsBinding Opq.Scalar vis ]
            | None -> [])
+        // Phase 1812 — the author-declared fallback: a whole node shown where
+        // this one cannot render. No smart ctor carries it either.
+        @ (match JsonValue.tryField "fallback" nodeV with
+           | Some f -> [ "fallback", tsNodeExpr (depth + 1) f ]
+           | None -> [])
 
       if List.isEmpty overrides then
         ctorExpr
@@ -2257,6 +2283,9 @@ and private tsBaseTraits (depth: int) (nodeV: JsonValue) : (string * string) lis
      | None -> [])
   @ (match JsonValue.tryField "visible" nodeV with
      | Some vis -> [ "visible", tsBinding Opq.Scalar vis ]
+     | None -> [])
+  @ (match JsonValue.tryField "fallback" nodeV with
+     | Some f -> [ "fallback", tsNodeExpr (depth + 1) f ]
      | None -> [])
 
 and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue) : string =
@@ -2416,6 +2445,14 @@ and private tsDataGridNode (depth: int) (id: string) (k: JsonValue) (nodeV: Json
          | None -> [])
       @ (match optStr "rowKeyField" k with
          | Some f -> [ "rowKeyField", qs f ]
+         | None -> [])
+      // Phase 1892 — the row window: the State key the grid reads its window
+      // from, and the bound total row count the window pages against.
+      @ (match optStr "windowStateKey" k with
+         | Some w -> [ "windowStateKey", qs w ]
+         | None -> [])
+      @ (match JsonValue.tryField "rowTotal" k with
+         | Some t -> [ "rowTotal", tsBinding Opq.Scalar t ]
          | None -> [])
       // The declarative sort / page / edit state slots: each names the State key
       // the grid reads its own affordance from, so each rides the wire verbatim.
@@ -3615,7 +3652,10 @@ let private pyCellFormat (v: JsonValue) : string =
      | Some d -> "format.percent(" + numLit d + ")"
      | None -> "format.percent()")
   | Some "SignificantDigits" -> "format.significant_digits(" + numLit (numOf "digits" v) + ")"
-  | Some "Date" -> "format.date(" + pq (strOf "format" v) + ")"
+  // Phase 1811 — `CellFormat.Date` became `DateTime` (the pattern renders a date,
+  // a time or both); fuaran-ui 0.8.0 spells it `format.date_time` and has no
+  // `format.date` at all, so the pre-rename tag has no Python spelling.
+  | Some "DateTime" -> "format.date_time(" + pq (strOf "format" v) + ")"
   | Some "Duration" -> "format.duration(" + pq (strOf "unit" v) + ", " + pq (strOf "style" v) + ")"
   | Some "RelativeTime" -> "format.relative_time(" + pq (strOf "unit" v) + ")"
   | _ -> "format.none()"
@@ -3627,7 +3667,19 @@ let private pyFormatIntent (v: JsonValue) : string =
     (match optNum "decimals" v with
      | Some d -> "t.FmtPercent(" + numLit d + ")"
      | None -> "t.FmtPercent()")
-  | Some "Date" -> "t.FmtDate(" + pq (strOf "dateStyle" v) + ")"
+  // Phases 1810 / 1811 — `Format.Date` became `Format.DateTime`, a
+  // `dateStyle` / `timeStyle` pair with each half optional (fuaran-ui 0.8.0's
+  // `t.FmtDateTime`). Each keyword is written only where the wire carries it.
+  | Some "DateTime" ->
+    pyCall
+      "t.FmtDateTime"
+      []
+      ((match optStr "dateStyle" v with
+        | Some d -> [ "date_style", pq d ]
+        | None -> [])
+       @ (match optStr "timeStyle" v with
+          | Some ts -> [ "time_style", pq ts ]
+          | None -> []))
   | Some "RelativeTime" -> "t.FmtRelativeTime(" + pq (strOf "unit" v) + ")"
   | Some "Duration" -> "t.FmtDuration(" + pq (strOf "unit" v) + ", " + pq (strOf "style" v) + ")"
   // Phase 1533 — elapsed-time-since, modelled by fuaran-py from 0.1.0. `unit`
@@ -3946,7 +3998,7 @@ let private pyCtrlDefault (kind: string) : string =
   | "Choice"
   | "SegmentedChoice" -> "None"
   | "Range" -> "[0, 0]"
-  | "DateRange" -> "['', '']"
+  | "DateTimeRange" -> "['', '']"
   // Phase 1121 — an auto-bound token field starts with no chips at all.
   | "Tokens" -> "[]"
   // Phase 1130 — the unset swatch, the one `#rrggbb` form the control can hold.
@@ -3973,13 +4025,13 @@ let private pyFieldValue (ab: AutoBind) (kind: string) (v: JsonValue) : string =
     // own `to_wire` into the bare `{"max":…,"min":…}` object. A dict would reach
     // the same bytes through `_lower`, but only by taking a path the annotation
     // does not admit — and "build every value from a typed record" is the rule
-    // this whole leg's measurement rests on. `DateRange` keeps its wire-object
-    // spelling deliberately: its record is unchanged by this release and the
-    // decision to pass the pair through is recorded above.
+    // this whole leg's measurement rests on. `DateTimeRange` (Phase 1811's name
+    // for `DateRange`) took the same typed spelling in fuaran-ui 0.8.0:
+    // `value: Binding | tuple[str, str]`, lowered by `DateTimeRangeField.to_wire`
+    // into the bare `{"from":…,"to":…}` object.
     | "Range" when (dollarType valV).IsNone -> "(" + pyNum (numOf "min" valV) + ", " + pyNum (numOf "max" valV) + ")"
-    | "DateRange" when (dollarType valV).IsNone ->
-      "{'from': " + pq (strOf "from" valV) + ", 'to': " + pq (strOf "to" valV) + "}"
-    | "DateRange" when
+    | "DateTimeRange" when (dollarType valV).IsNone -> "(" + pq (strOf "from" valV) + ", " + pq (strOf "to" valV) + ")"
+    | "DateTimeRange" when
       (dollarType valV) = Some "State"
       && (match JsonValue.tryField "defaultValue" valV with
           | Some d -> (dollarType d).IsNone && (JsonValue.tryField "from" d).IsSome
@@ -4064,17 +4116,20 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
   // there was no `RangeField` at all and this kind fell through to the `Text`
   // fallback, which is a different record and a different document.
   | "Range" -> pyCall "t.RangeField" [] (optValue @ minMaxStep false @ pyHandler "onChange" "on_change" v)
-  | "Date" ->
+  // Phase 1811 — `Date` / `DateRange` became `DateTime` / `DateTimeRange`
+  // (fuaran-ui 0.8.0's `t.DateTimeField` / `t.DateTimeRangeField`; the pre-rename
+  // records are gone from the host, so the old tags have no Python spelling).
+  | "DateTime" ->
     pyCall
-      "t.DateField"
+      "t.DateTimeField"
       []
       (optValue
        @ [ "variant", pq (strOf "variant" v) ]
        @ minMaxStep true
        @ pyHandler "onChange" "on_change" v)
-  | "DateRange" ->
+  | "DateTimeRange" ->
     pyCall
-      "t.DateRangeField"
+      "t.DateTimeRangeField"
       []
       (optValue
        @ [ "variant", pq (strOf "variant" v) ]
@@ -4566,6 +4621,11 @@ let private pyAccessibilityLit (v: JsonValue) : string =
         | None -> [])
      @ (match JsonValue.tryField "hidden" v with
         | Some b -> [ "hidden", pyBinding Opq.Scalar b ]
+        | None -> [])
+     // Phase 1812 — the spoken description, modelled from fuaran-ui 0.8.0 as a
+     // `TextSource` (the `tooltip` precedent).
+     @ (match JsonValue.tryField "speak" v with
+        | Some t -> [ "speak", pyTextSource t ]
         | None -> []))
 
 // ── The per-kind node emitter ────────────────────────────────────────────────
@@ -4639,6 +4699,11 @@ and private pyNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
       // which is why it rides the same `replace` seam `visible` does.
       @ (match JsonValue.tryField "tooltip" nodeV with
          | Some tip -> [ "tooltip", pyTextSource tip ]
+         | None -> [])
+      // Phase 1812 — `UiNode.fallback`, modelled from fuaran-ui 0.8.0: a whole
+      // node, lowered by `UiNode.to_wire` itself, so it is handed over typed.
+      @ (match JsonValue.tryField "fallback" nodeV with
+         | Some f -> [ "fallback", pyNodeExpr (depth + 1) f ]
          | None -> [])
 
     if List.isEmpty overrides then
@@ -4747,6 +4812,9 @@ and private pyBaseTraits (depth: int) (nodeV: JsonValue) : (string * string) lis
      | None -> [])
   @ (match JsonValue.tryField "tooltip" nodeV with
      | Some tip -> [ "tooltip", pyTextSource tip ]
+     | None -> [])
+  @ (match JsonValue.tryField "fallback" nodeV with
+     | Some f -> [ "fallback", pyNodeExpr (depth + 1) f ]
      | None -> [])
 
 /// The fallback for a kind with no constructor arm: the typed record named by
@@ -5325,6 +5393,14 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           // erased `rowKey`.
           @ (match optStr "rowKeyField" k with
              | Some f -> [ "rowKeyField", pq f ]
+             | None -> [])
+          // Phase 1892 — the row window, which the constructor reaches from
+          // fuaran-ui 0.8.0: the window's State key and the bound row total.
+          @ (match optStr "windowStateKey" k with
+             | Some w -> [ "windowStateKey", pq w ]
+             | None -> [])
+          @ (match JsonValue.tryField "rowTotal" k with
+             | Some t -> [ "rowTotal", pyBinding Opq.Scalar t ]
              | None -> [])
           // Phase 1581 — the declarative sort / page / edit slots and the five
           // transfer / export / print flags. The record carried the last five

@@ -21,8 +21,9 @@
 //  never published to again. The conformance arm moved to `fuaran-ui==0.7.0` first
 //  (68e9ad9) and deliberately left this wheel behind, because re-vendoring it is a
 //  digest-locked act of its own — the one this file now records. The wheel is the
-//  published 0.7.0, which carries Phase 1821's `project.columns` / `column` wire
-//  rename. The `quick` authoring surface is unchanged across the move: every
+//  published 0.8.0 (raised from 0.7.0 with the conformance arm, Phase 1882), which
+//  carries Phase 1821's `project.columns` / `column` wire rename and the 1810 / 1811
+//  temporal vocabulary. The `quick` authoring surface is unchanged across the move: every
 //  builder the page calls (`dashboard` / `metric_strip` / `markdown` / `grid`) has
 //  the same signature it had at 0.0.4, so the only adaptation here is the import.
 //  (The HOST_ID the capability manifest reports is still `fuaran-py` — it names the
@@ -31,7 +32,7 @@
 //  WHY THE WHEEL IS VENDORED RATHER THAN FETCHED FROM PyPI. The showcase entries
 //  are the zero-key-egress half of the site: their CSP is `connect-src 'self'` plus
 //  the pinned Pyodide CDN and loopback, and every allowance in vite.config.ts is a
-//  narrow, named exception. `micropip.install("fuaran-ui==0.7.0")` from PyPI would
+//  narrow, named exception. `micropip.install("fuaran-ui==0.8.0")` from PyPI would
 //  need `pypi.org` + `files.pythonhosted.org` added to that policy — widening the
 //  shipped egress surface for every visitor of every showcase page, including the
 //  ones who never click Run. So the exact published artefact is committed under
@@ -39,8 +40,8 @@
 //  untouched, and the install is a same-origin fetch.
 //
 //  The vendored bytes are pinned to the PUBLISHED ones. The digest below is the
-//  `bdist_wheel` sha256 that PyPI's JSON API reports for fuaran-ui 0.7.0
-//  (https://pypi.org/pypi/fuaran-ui/0.7.0/json); test/emitterLocks.test.ts hashes
+//  `bdist_wheel` sha256 that PyPI's JSON API reports for fuaran-ui 0.8.0
+//  (https://pypi.org/pypi/fuaran-ui/0.8.0/json); test/emitterLocks.test.ts hashes
 //  the committed file and asserts it matches, so a locally-built wheel — or a
 //  version bumped in one place and not the other — fails CI rather than shipping.
 // ============================================================================
@@ -49,14 +50,14 @@ const PYODIDE_VERSION = '0.26.4';
 const PYODIDE_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 
 /** The published `fuaran-ui` release this page authors against. */
-export const FUARAN_UI_VERSION = '0.7.0';
+export const FUARAN_UI_VERSION = '0.8.0';
 
 /** The vendored wheel's filename, under `public/pandas/`. */
 export const FUARAN_UI_WHEEL = `fuaran_ui-${FUARAN_UI_VERSION}-py3-none-any.whl`;
 
 /** The sha256 PyPI publishes for that wheel — the pin the vendored bytes are held to. */
 export const FUARAN_UI_WHEEL_SHA256 =
-  '7e8fc778750f25565349527db0fb92390bc3db3bccccf14c3c67a0894e4e65aa';
+  '54affc1573f7b3dc23e38981413af05120076b844573ed79d04517bc6c8cefc9';
 
 /**
  * The host bootstrap, executed once after the package is installed.
@@ -129,7 +130,7 @@ async function boot(onProgress: (msg: string) => void): Promise<any> {
   const micropip = pyodide.pyimport('micropip');
   try {
     // `deps: false` keeps the install to this one same-origin URL. Belt-and-braces
-    // today — every Requires-Dist in the 0.7.0 wheel is gated behind an extra
+    // today — every Requires-Dist in the 0.8.0 wheel is gated behind an extra
     // (`dev`, `live-host`), so the runtime dependency set is EMPTY and a resolving
     // install would query nothing — but it means the day the package grows a
     // runtime dependency this fails loudly here instead of silently attempting an

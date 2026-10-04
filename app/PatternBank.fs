@@ -19,6 +19,7 @@ namespace Fuaran.Live
 module internal PatternBankEngine =
 
   open Fuaran.Core
+  open Fuaran.Compute
 
   type Pattern =
     { Id: string

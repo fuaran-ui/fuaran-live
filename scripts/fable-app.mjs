@@ -105,15 +105,16 @@ const required = [
   // emits it under fable_modules/<PackageId>.<Version>/. Raising the Fuaran.UI.*
   // pin in app/FuaranLive.fsproj means raising the version here and in
   // test/tierOutput.ts — the only two places the path is spelled out.
-  'app/output/fable_modules/Fuaran.UI.Ops.0.86.0/Apply.fs.js',
-  'app/output/fable_modules/Fuaran.UI.Ops.0.86.0/JsonDecode.fs.js',
-  'app/output/fable_modules/Fuaran.UI.OpStream.Abstractions.0.86.0/CanonicalJson.fs.js',
+  'app/output/fable_modules/Fuaran.UI.Ops.0.91.0/Apply.fs.js',
+  'app/output/fable_modules/Fuaran.UI.Ops.0.91.0/JsonDecode.fs.js',
+  'app/output/fable_modules/Fuaran.UI.OpStream.Abstractions.0.91.0/CanonicalJson.fs.js',
   // The bounded program loop — run mode's engine. Its absence means the loop was
   // not reached by the compile, which a green Fable run would otherwise hide.
   // Since the loop's 0.6.0 the client runtime (`Program`) lives in its UI
-  // adapter package, over the domain-generic core; the Fuaran.Program.* pins
-  // in app/FuaranLive.fsproj move this path too.
-  'app/output/fable_modules/Fuaran.Program.UI.0.6.0/Program.fs.js',
+  // adapter package, over the domain-generic core. Since Phase 2016 that
+  // adapter is Fuaran.UI.Program, a member of the Fuaran.UI.* family, so the
+  // family pin moves this path too.
+  'app/output/fable_modules/Fuaran.UI.Program.0.91.0/Program.fs.js',
   'app/showcase/output/App.js',
   'app/showcase/output/Receiver.js',
 ];

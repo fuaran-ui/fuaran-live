@@ -170,9 +170,20 @@
          UNRESOLVED where it resolved to the empty value — a tree that wants the
          empty value declares it as the binding's default.
 
+         AT 0.91.0 SINCE PHASE 2016 — the release that first ships the bounded
+         program loop's UI adapter INSIDE this family, as `Fuaran.UI.Program`
+         (below; it was `Fuaran.Program.UI`, published with the loop's core), so
+         the adapter now moves with the family rather than with the loop. Two
+         things a reader of this tree meets: from 0.90.0 the dataframe pipeline
+         types (`Transform`, `ColExpr`, `Slot` and the enums beside them) live in
+         the `Fuaran.Compute` namespace, which the gallery, the pattern bank and
+         the F# projection target now name; and from 0.91.0 the expression
+         bound counts a rounding scale as a node, so a pipeline near
+         `MaxExprNodes` that decoded on 0.86.0 may be refused.
+
          NOTE THE `Fuaran.Core.*` PINS FURTHER DOWN MOVE WITH THIS FAMILY. The
-         0.86.0 tier declares `Fuaran.Core.*` 0.32.0 where 0.85.0 declared
-         0.28.0, and those Core pins are DIRECT here — a direct pin beats a
+         0.91.0 tier declares `Fuaran.Core.*` 0.34.0 (0.86.0 declared 0.32.0,
+         0.85.0 declared 0.28.0), and those Core pins are DIRECT here — a direct pin beats a
          transitive floor, so leaving them at 0.21.0 would not hold the tier
          back, it would downgrade the tier's own dependency and emit NU1605.
          Per the NU1603 note above, one NU160x line on msbuild's stdout is
@@ -196,14 +207,14 @@
          loop's 0.2.0), then over `Action.Navigate`, widened from a bare route
          string to a (`TextSource`, `NavigateTarget`) pair at 0.78.0 and lifted
          at the loop's 0.4.0. BOTH ARE CLEAR: nothing caps the family today.
-         Since the loop's 0.6.0 (pinned below) the shape has changed: its core
-         references no `Fuaran.UI.*` package at all, and its UI adapter declares
-         the family at 0.86.0 as a LOWER bound — which this family meets exactly,
-         so the floor is not a raise the loop is waiting on. Read the two lifts as the
-         standing shape rather than as history: a lower bound is not a
-         compatibility claim (see the loop's own comment below), so a tier
-         widening can cap this family again at any release, and the remedy is
-         always the other producer's, never a pin here. -->
+         Since the loop's 0.6.0 the shape has changed: its core references no
+         `Fuaran.UI.*` package at all, and since Phase 2016 its UI adapter is a
+         member of this family, built and released with it — so the ceiling
+         those two lifts describe can no longer arise between the adapter and
+         the family. What remains is the adapter's own floor on the loop's core
+         (`Fuaran.Program.Runtime`, below), which is that producer's version
+         line and moves with this family only when an adapter release requires
+         it. -->
     <!-- The portable AI-connector wire substrate (Phase 1698): the JsonValue /
          JsonHost canonical-JSON model, the provider contract types, and the
          IHttpTransport egress seam. `Byok.fs` expresses the three providers
@@ -240,37 +251,35 @@
          reached only from the parser's `#if FABLE_COMPILER` arm - which is the
          arm this project compiles. -->
     <PackageReference Include="Fuaran.UI.AiWire" Version="0.85.0" />
-    <PackageReference Include="Fuaran.UI" Version="0.86.0" />
-    <PackageReference Include="Fuaran.UI.Renderer" Version="0.86.0" />
-    <PackageReference Include="Fuaran.UI.Ops" Version="0.86.0" />
-    <PackageReference Include="Fuaran.UI.OpStream.Abstractions" Version="0.86.0" />
-    <PackageReference Include="Fuaran.UI.OpStream.Replay" Version="0.86.0" />
+    <PackageReference Include="Fuaran.UI" Version="0.91.0" />
+    <PackageReference Include="Fuaran.UI.Renderer" Version="0.91.0" />
+    <PackageReference Include="Fuaran.UI.Ops" Version="0.91.0" />
+    <PackageReference Include="Fuaran.UI.OpStream.Abstractions" Version="0.91.0" />
+    <PackageReference Include="Fuaran.UI.OpStream.Replay" Version="0.91.0" />
     <!-- Pinned EXPLICITLY even though nothing here opens it: the bounded program
          loop below declares it only as a LOWER bound, so without this line NuGet
          picks that floor and Fable extracts a tier-version-skewed copy of its
          sources into the same compile as the family above — which fails on the
          first member either side widened. It is a Fuaran.UI.* package and moves
          with the family. -->
-    <PackageReference Include="Fuaran.UI.ServerDriven" Version="0.86.0" />
+    <PackageReference Include="Fuaran.UI.ServerDriven" Version="0.91.0" />
     <!-- The bounded program loop: the client placement that runs a wire-decoded
          program tree interactively in the browser — no hand-authored update
-         function, no message type, no server. A DIFFERENT producer on its own
-         version line. Since its 0.6.0 the loop is TWO layers: a domain-generic
-         core (`Fuaran.Program.Runtime`, over `.Bounded`) that references no
-         `Fuaran.UI.*` package, and the UI adapter (`Fuaran.Program.UI`) that
-         instantiates that core over UI trees and keeps the pre-0.6.0 names as
-         aliases. A consumer of UI trees takes both, and opens
-         `Fuaran.Program.UI` AFTER its `Fuaran.Program.*` opens so the adapter's
-         names are the ones in scope (see RunMode.fs). Both at the ONE 0.6.0
-         the producer releases them under; the adapter declares the family above
-         at 0.86.0 as a LOWER bound, which the family meets, so the consumption
-         stays NU1603/NU1605-clean. A lower bound is not a compatibility claim,
-         and 0.78.0 was where that showed: the loop's then-published 0.2.0
-         declared a 0.70.0 floor and capped the family anyway, on the
-         `Action.Navigate` widening described above, until 0.4.0 adopted it.
-         Apache-2.0, published on the public tier. -->
-    <PackageReference Include="Fuaran.Program.Runtime" Version="0.6.0" />
-    <PackageReference Include="Fuaran.Program.UI" Version="0.6.0" />
+         function, no message type, no server. Since the loop's 0.6.0 it is TWO
+         layers: a domain-generic core (`Fuaran.Program.Runtime`, over
+         `.Bounded`) that references no `Fuaran.UI.*` package — a DIFFERENT
+         producer on its own version line — and the UI adapter that instantiates
+         that core over UI trees and keeps the pre-0.6.0 names as aliases. Since
+         Phase 2016 the adapter is `Fuaran.UI.Program`, a member of the family
+         above at the family's version (it was `Fuaran.Program.UI`, released
+         with the core up to 0.7.1). A consumer of UI trees takes both, and opens
+         `Fuaran.UI.Program` AFTER its `Fuaran.Program.*` opens so the adapter's
+         names are the ones in scope (see RunMode.fs). The adapter 0.91.0 is
+         built on the core's 0.7.1 and declares it as a floor, so the core pin
+         reads 0.7.1; below it would be NU1605. Apache-2.0, published on the
+         public tier. -->
+    <PackageReference Include="Fuaran.Program.Runtime" Version="0.7.1" />
+    <PackageReference Include="Fuaran.UI.Program" Version="0.91.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -293,22 +302,22 @@
          and a direct pin beats a transitive floor — so a number below what the
          family declares does not pin Core back, it DOWNGRADES the family's own
          dependency and emits NU1605, which per the NU1603 note beside the
-         family is enough to kill the Fable project cracker. 0.86.0 declares
-         `Fuaran.Core.*` 0.32.0 (0.85.0 declared 0.28.0), so these read 0.32.0.
+         family is enough to kill the Fable project cracker. 0.91.0 declares
+         `Fuaran.Core.*` 0.34.0 (0.86.0 declared 0.32.0), so these read 0.34.0.
          Raising the family means re-reading its nuspec and moving these in the
          same commit; the registry's own index is the place to read it, not this
          comment and not a sibling's props file. -->
-    <PackageReference Include="Fuaran.Core.Tree" Version="0.32.0" />
-    <PackageReference Include="Fuaran.Core.Ops" Version="0.32.0" />
+    <PackageReference Include="Fuaran.Core.Tree" Version="0.34.0" />
+    <PackageReference Include="Fuaran.Core.Ops" Version="0.34.0" />
     <!-- The Pattern Bank fast path runs the real Fuaran.Core signature-search
          engine (FunctionRegistry.findBySignature – the same engine powering the
          public Fuaran.UI.FastPath package). Fable-source-packed. -->
-    <PackageReference Include="Fuaran.Core.Function" Version="0.32.0" />
+    <PackageReference Include="Fuaran.Core.Function" Version="0.34.0" />
     <!-- The linked OpRecord/StreamEntry/HashChain slice (Phase 466 panel
          provenance) delegates to the Fuaran.Core op-stream skeleton, exactly as
          the real Fuaran.UI.OpStream.Abstractions.fsproj does; same linked-not-
          referenced rationale as the Core.Tree/Ops pair above. -->
-    <PackageReference Include="Fuaran.Core.OpStream" Version="0.32.0" />
+    <PackageReference Include="Fuaran.Core.OpStream" Version="0.34.0" />
   </ItemGroup>
 
 </Project>

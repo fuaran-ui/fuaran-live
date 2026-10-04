@@ -26,17 +26,22 @@
 //  would have pinned a name that merely looked right, and nothing in this repo
 //  would have objected. See the `## Dependencies` section of `CLAUDE.md`.
 //
-//  REGISTRY EVIDENCE (re-checked 2026-10-01 against the public flat-container
+//  REGISTRY EVIDENCE (re-checked 2026-10-04 against the public flat-container
 //  index; recorded here rather than fetched by the test, which stays offline
 //  and deterministic). Every id+version below was served:
-//    Fuaran.UI 0.86.0 · Fuaran.UI.Renderer 0.86.0 · Fuaran.UI.Ops 0.86.0
-//    Fuaran.UI.OpStream.Abstractions 0.86.0 · Fuaran.UI.OpStream.Replay 0.86.0
-//    Fuaran.UI.ServerDriven 0.86.0 · Fuaran.UI.AiWire 0.85.0
-//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.32.0
-//    Fuaran.Program.Runtime 0.6.0 · Fuaran.Program.UI 0.6.0
-//  The `Fuaran.Core.*` line moved 0.28.0 -> 0.32.0 WITH the tier family and not
+//    Fuaran.UI 0.91.0 · Fuaran.UI.Renderer 0.91.0 · Fuaran.UI.Ops 0.91.0
+//    Fuaran.UI.OpStream.Abstractions 0.91.0 · Fuaran.UI.OpStream.Replay 0.91.0
+//    Fuaran.UI.ServerDriven 0.91.0 · Fuaran.UI.Program 0.91.0
+//    Fuaran.UI.AiWire 0.85.0
+//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.34.0
+//    Fuaran.Program.Runtime 0.7.1
+//  The program loop's UI adapter is a member of the UI family since Phase 2016:
+//  it ships from the language tier as `Fuaran.UI.Program` (it was
+//  `Fuaran.Program.UI`, published by the program domain up to 0.7.1), so it is
+//  pinned with the family and its old id leaves the allowed set.
+//  The `Fuaran.Core.*` line moves 0.32.0 -> 0.34.0 WITH the tier family and not
 //  on its own account: those are direct pins on packages the tier also depends
-//  on, and the 0.86.0 tier declares Core 0.32.0 where 0.85.0 declared 0.28.0 —
+//  on, and the 0.91.0 tier declares Core 0.34.0 where 0.86.0 declared 0.32.0 —
 //  a direct pin beats a transitive floor, so leaving them behind downgrades the
 //  tier's own dependency (NU1605) rather than holding Core back. The reasoning
 //  is at the pins themselves in `app/FuaranLive.fsproj`.
@@ -80,6 +85,9 @@ const ALLOWED_PACKAGE_IDS: readonly string[] = [
   'Fuaran.UI.OpStream.Abstractions',
   'Fuaran.UI.OpStream.Replay',
   'Fuaran.UI.ServerDriven',
+  // The program loop's UI adapter, which instantiates the program runtime below
+  // over UI trees (a family member since Phase 2016).
+  'Fuaran.UI.Program',
   // The portable AI-connector wire substrate this repo's BYOK layer is built
   // on — adopted as a package by Phase 1698, which deleted the vendored copy.
   'Fuaran.UI.AiWire',
@@ -90,9 +98,8 @@ const ALLOWED_PACKAGE_IDS: readonly string[] = [
   'Fuaran.Core.OpStream',
   'Fuaran.Core.Wire',
   // The program/logic domain runtime (public, nuget.org): the domain-generic
-  // core, and since its 0.6.0 the UI adapter that instantiates it over UI trees.
+  // core. Its UI adapter is pinned with the UI family above.
   'Fuaran.Program.Runtime',
-  'Fuaran.Program.UI',
   // Fable / Feliz toolchain (public, nuget.org).
   'Fable.Core',
   'Fable.Elmish',

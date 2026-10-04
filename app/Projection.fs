@@ -5627,9 +5627,9 @@ type private Fd =
   | CoreRows
   /// `Fuaran.Core.DataSource`
   | CoreDs
-  /// One `Fuaran.Core.Transform` pipeline step.
+  /// One `Fuaran.Compute.Transform` pipeline step.
   | CoreTf
-  /// `Fuaran.Core.ColExpr`
+  /// `Fuaran.Compute.ColExpr`
   | CoreEx
   /// A literal F# expression: a declared member the encoder never writes.
   | Verbatim of string
@@ -6700,7 +6700,7 @@ let private fsBinOp (tag: string) : string =
     | "startsWith" -> "StartsWith"
     | _ -> "EndsWith"
 
-  "Fuaran.Core.BinOp." + case
+  "Fuaran.Compute.BinOp." + case
 
 let private fsScalarFn (tag: string) : string =
   let case =
@@ -6723,7 +6723,7 @@ let private fsScalarFn (tag: string) : string =
     | "greatest" -> "Greatest"
     | _ -> "IndexOf"
 
-  "Fuaran.Core.ScalarFn." + case
+  "Fuaran.Compute.ScalarFn." + case
 
 let private fsAggFn (tag: string) : string =
   let case =
@@ -6752,17 +6752,17 @@ let private fsJoinKind (tag: string) : string =
     | "anti" -> "Anti"
     | _ -> "Inner"
 
-  "Fuaran.Core.JoinKind." + case
+  "Fuaran.Compute.JoinKind." + case
 
 let private fsSortDir (tag: string) : string =
   if tag = "desc" then
-    "Fuaran.Core.SortDir.Desc"
+    "Fuaran.Compute.SortDir.Desc"
   else
-    "Fuaran.Core.SortDir.Asc"
+    "Fuaran.Compute.SortDir.Asc"
 
 let private fsWindowFn (tag: string) (n: int option) : string =
   match tag with
-  | "ntile" -> "Fuaran.Core.WindowFn.NTile(" + string (n |> Option.defaultValue 0) + ")"
+  | "ntile" -> "Fuaran.Compute.WindowFn.NTile(" + string (n |> Option.defaultValue 0) + ")"
   | _ ->
     let case =
       match tag with
@@ -6779,24 +6779,24 @@ let private fsWindowFn (tag: string) (n: int option) : string =
       | "rollingSum" -> "RollingSum"
       | _ -> "RowNumber"
 
-    "Fuaran.Core.WindowFn." + case
+    "Fuaran.Compute.WindowFn." + case
 
 let rec private fsColExpr (v: JsonValue) : string =
   match dollarType v with
-  | Some "col" -> "Fuaran.Core.ColExpr.Col(" + fsStr (strOf "name" v) + ")"
-  | Some "lit" -> "Fuaran.Core.ColExpr.Lit(" + fsCellLiteral (fieldReq "cell" v) + ")"
-  | Some "param" -> "Fuaran.Core.ColExpr.Param(" + fsStr (strOf "name" v) + ")"
+  | Some "col" -> "Fuaran.Compute.ColExpr.Col(" + fsStr (strOf "name" v) + ")"
+  | Some "lit" -> "Fuaran.Compute.ColExpr.Lit(" + fsCellLiteral (fieldReq "cell" v) + ")"
+  | Some "param" -> "Fuaran.Compute.ColExpr.Param(" + fsStr (strOf "name" v) + ")"
   | Some "binary" ->
-    "Fuaran.Core.ColExpr.Binary("
+    "Fuaran.Compute.ColExpr.Binary("
     + fsBinOp (strOf "op" v)
     + ", "
     + fsColExpr (fieldReq "left" v)
     + ", "
     + fsColExpr (fieldReq "right" v)
     + ")"
-  | Some "not" -> "Fuaran.Core.ColExpr.Not(" + fsColExpr (fieldReq "expr" v) + ")"
+  | Some "not" -> "Fuaran.Compute.ColExpr.Not(" + fsColExpr (fieldReq "expr" v) + ")"
   | Some "coalesce" ->
-    "Fuaran.Core.ColExpr.Coalesce([ "
+    "Fuaran.Compute.ColExpr.Coalesce([ "
     + (arrOf "exprs" v |> List.map fsColExpr |> String.concat "; ")
     + " ])"
   | Some "case" ->
@@ -6810,19 +6810,19 @@ let rec private fsColExpr (v: JsonValue) : string =
         + ")")
       |> String.concat "; "
 
-    "Fuaran.Core.ColExpr.Case([ "
+    "Fuaran.Compute.ColExpr.Case([ "
     + arms
     + " ], "
     + fsColExpr (fieldReq "else" v)
     + ")"
   | Some "cast" ->
-    "Fuaran.Core.ColExpr.Cast("
+    "Fuaran.Compute.ColExpr.Cast("
     + fsColumnType (strOf "type" v)
     + ", "
     + fsColExpr (fieldReq "expr" v)
     + ")"
   | Some "apply" ->
-    "Fuaran.Core.ColExpr.ApplyFn("
+    "Fuaran.Compute.ColExpr.ApplyFn("
     + fsScalarFn (strOf "fn" v)
     + ", [ "
     + (arrOf "args" v |> List.map fsColExpr |> String.concat "; ")
@@ -6831,19 +6831,19 @@ let rec private fsColExpr (v: JsonValue) : string =
     // One tag, two constructors: a literal item list, or a named parameter.
     match optStr "param" v with
     | Some p ->
-      "Fuaran.Core.ColExpr.InParam("
+      "Fuaran.Compute.ColExpr.InParam("
       + fsColExpr (fieldReq "expr" v)
       + ", "
       + fsStr p
       + ")"
     | None ->
-      "Fuaran.Core.ColExpr.InList("
+      "Fuaran.Compute.ColExpr.InList("
       + fsColExpr (fieldReq "expr" v)
       + ", [ "
       + (arrOf "items" v |> List.map fsColExpr |> String.concat "; ")
       + " ])"
-  | Some "isNull" -> "Fuaran.Core.ColExpr.IsNull(" + fsColExpr (fieldReq "expr" v) + ")"
-  | _ -> "Fuaran.Core.ColExpr.Lit(Fuaran.Core.Cell.Null)"
+  | Some "isNull" -> "Fuaran.Compute.ColExpr.IsNull(" + fsColExpr (fieldReq "expr" v) + ")"
+  | _ -> "Fuaran.Compute.ColExpr.Lit(Fuaran.Core.Cell.Null)"
 
 let private fsStrList (items: JsonValue list) : string =
   "[ " + (items |> List.map fsStrOf |> String.concat "; ") + " ]"
@@ -6855,7 +6855,7 @@ let private fsPairList (items: JsonValue list) : string =
      |> String.concat "; ")
   + " ]"
 
-/// A `Fuaran.Core.Slot<'T>` — a scalar a host may bind instead of fixing.
+/// A `Fuaran.Compute.Slot<'T>` — a scalar a host may bind instead of fixing.
 ///
 /// On the wire a slot is its bare literal, or `{"$param":"name"}` for the bound
 /// form; the literal spelling is the one the encoder emits when nothing is
@@ -6869,8 +6869,8 @@ let private fsPairList (items: JsonValue list) : string =
 /// reads through here.
 let private fsSlotOf (litOf: JsonValue -> string) (v: JsonValue) : string =
   match JsonValue.tryField "$param" v with
-  | Some(JString n) -> "Fuaran.Core.Slot.Param(" + fsStr n + ")"
-  | _ -> "Fuaran.Core.Slot.Lit(" + litOf v + ")"
+  | Some(JString n) -> "Fuaran.Compute.Slot.Param(" + fsStr n + ")"
+  | _ -> "Fuaran.Compute.Slot.Lit(" + litOf v + ")"
 
 /// A `WindowSpec.OrderBy` list — plain `(string * SortDir)` pairs.
 let private fsOrderList (items: JsonValue list) : string =
@@ -6894,10 +6894,10 @@ let private fsSortKeyList (items: JsonValue list) : string =
 
 let private fsTransformStep (v: JsonValue) : string =
   match dollarType v with
-  | Some "filter" -> "Fuaran.Core.Transform.Filter(" + fsColExpr (fieldReq "pred" v) + ")"
-  | Some "project" -> "Fuaran.Core.Transform.Project(" + fsPairList (projectColumns v) + ")"
+  | Some "filter" -> "Fuaran.Compute.Transform.Filter(" + fsColExpr (fieldReq "pred" v) + ")"
+  | Some "project" -> "Fuaran.Compute.Transform.Project(" + fsPairList (projectColumns v) + ")"
   | Some "derive" ->
-    "Fuaran.Core.Transform.Derive("
+    "Fuaran.Compute.Transform.Derive("
     + fsStr (strOf "name" v)
     + ", "
     + fsColExpr (fieldReq "expr" v)
@@ -6915,13 +6915,13 @@ let private fsTransformStep (v: JsonValue) : string =
         + " }")
       |> String.concat "; "
 
-    "Fuaran.Core.Transform.GroupBy("
+    "Fuaran.Compute.Transform.GroupBy("
     + fsStrList (arrOf "keys" v)
     + ", [ "
     + aggs
     + " ])"
   | Some "join" ->
-    "Fuaran.Core.Transform.Join("
+    "Fuaran.Compute.Transform.Join("
     + fsDataSource (fieldReq "source" v)
     + ", "
     + fsPairList (arrOf "on" v)
@@ -6929,7 +6929,7 @@ let private fsTransformStep (v: JsonValue) : string =
     + fsJoinKind (strOf "how" v)
     + ")"
   | Some "window" ->
-    "Fuaran.Core.Transform.Window { PartitionBy = "
+    "Fuaran.Compute.Transform.Window { PartitionBy = "
     + fsStrList (arrOf "partitionBy" v)
     + "; OrderBy = "
     + fsOrderList (arrOf "orderBy" v)
@@ -6941,7 +6941,7 @@ let private fsTransformStep (v: JsonValue) : string =
     + fsStr (strOf "as" v)
     + " }"
   | Some "pivot" ->
-    "Fuaran.Core.Transform.Pivot { Index = "
+    "Fuaran.Compute.Transform.Pivot { Index = "
     + fsStrList (arrOf "index" v)
     + "; On = "
     + fsStr (strOf "on" v)
@@ -6951,25 +6951,25 @@ let private fsTransformStep (v: JsonValue) : string =
     + fsAggFn (strOf "agg" v)
     + " }"
   | Some "unpivot" ->
-    "Fuaran.Core.Transform.Unpivot("
+    "Fuaran.Compute.Transform.Unpivot("
     + fsStrList (arrOf "idVars" v)
     + ", "
     + fsStrList (arrOf "valueVars" v)
     + ")"
-  | Some "sort" -> "Fuaran.Core.Transform.Sort(" + fsSortKeyList (arrOf "by" v) + ")"
-  | Some "distinct" -> "Fuaran.Core.Transform.Distinct"
+  | Some "sort" -> "Fuaran.Compute.Transform.Sort(" + fsSortKeyList (arrOf "by" v) + ")"
+  | Some "distinct" -> "Fuaran.Compute.Transform.Distinct"
   | Some "limit" ->
     // Both counts are `Slot<int>` since Core 0.23.0 — a page size and a page
     // offset are the two slots a UI binds most often.
-    "Fuaran.Core.Transform.Limit("
+    "Fuaran.Compute.Transform.Limit("
     + fsSlotOf fsIntOf (fieldReq "n" v)
     + ", "
     + fsSlotOf fsIntOf (fieldReq "offset" v)
     + ")"
-  | Some "union" -> "Fuaran.Core.Transform.Union(" + fsDataSource (fieldReq "source" v) + ")"
-  | Some "intersect" -> "Fuaran.Core.Transform.Intersect(" + fsDataSource (fieldReq "source" v) + ")"
-  | Some "except" -> "Fuaran.Core.Transform.Except(" + fsDataSource (fieldReq "source" v) + ")"
-  | _ -> "Fuaran.Core.Transform.Distinct"
+  | Some "union" -> "Fuaran.Compute.Transform.Union(" + fsDataSource (fieldReq "source" v) + ")"
+  | Some "intersect" -> "Fuaran.Compute.Transform.Intersect(" + fsDataSource (fieldReq "source" v) + ")"
+  | Some "except" -> "Fuaran.Compute.Transform.Except(" + fsDataSource (fieldReq "source" v) + ")"
+  | _ -> "Fuaran.Compute.Transform.Distinct"
 
 /// A `Fuaran.Core.Row seq` — the typed row feed. Cells are boxed scalars; the
 /// codec's own `float`-first arm order means an integral float and a boxed int

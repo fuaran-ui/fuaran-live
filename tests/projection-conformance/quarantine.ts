@@ -183,6 +183,20 @@ export interface QuarantineEntry {
   readonly construct: string;
   /** Which repository owns the cause. `both` additionally sets `projectorConstruct`. */
   readonly class: CauseClass;
+  /**
+   * The repository whose act CLEARS the entry (Phase 2023): a host that must
+   * model or release the construct, or this repository when the projector or a
+   * pin here has to move. An entry nobody owns is a silent skip with a reason
+   * attached, which is what this field exists to make impossible.
+   */
+  readonly owner: string;
+  /**
+   * The roadmap phase the entry is tracked against, as `fuaran#NNNN` (Phase
+   * 2023): the phase whose work clears it, or — for a gap a phase deliberately
+   * declined to close — the phase that decided so. Checked for shape by
+   * `registerQuarantineChecks`, never left blank.
+   */
+  readonly phase: string;
   /** The sentence for the human. Free text; the `construct` is what the probes read. */
   readonly reason: string;
   /**
@@ -206,15 +220,32 @@ export interface QuarantineEntry {
  * fixture quarantined on one arm and not the other is a single row whose other
  * cell is simply absent.
  *
- * The state, as re-measured 2026-09-07 against fuaran-py 0.3.0 and re-run
- * unchanged 2026-09-09 against the pinned 0.4.0 (the distribution is `fuaran-ui`
- * from 0.6.0 — Phase 1694 — and the pin now names 0.7.0): six ids, two constructs, both
- * host lag with the probe agreeing, all on the Python arm. The TypeScript and F#
- * arms hold none, and in both cases the emptiness is an assertion — every node
- * fixture is required to re-encode byte-identically there. The F# arm was EMPTY
- * FROM ITS FIRST RUN (fuaran#1657): its host is the pinned `Fuaran.UI` package,
- * whose model IS the wire model, so a construct the corpus carries is a
- * construct the package declares and every shortfall was the projector's own.
+ * The state, as re-measured 2026-10-04 (Phase 2023) against the pinned hosts —
+ * `@fuaran-ui/ops` 0.28.0 / `@fuaran-ui/ui` 0.22.0, `fuaran-ui` 0.7.0 on PyPI and
+ * `Fuaran.UI` 0.91.0 — is in the census test's generated name. Every entry is HOST
+ * lag with the probe agreeing; none is the projector's. What each family is:
+ *
+ *   • TypeScript — the corpus moved ahead of the last PUBLISHED TypeScript host.
+ *     Phases 1811 (the temporal rename to `DateTime` / `DateTimeRange` /
+ *     `Format.DateTime`), 1812 (`accessibility.speak` and the author-declared
+ *     `fallback`) and 1892 (`DataGrid.windowStateKey` / `rowTotal`) all landed in
+ *     fuaran-ts's sources after its v0.28.0 tag, and no later release exists, so
+ *     the pinned encoder cannot write the keys whatever the projector emits. These
+ *     clear on the release, and the self-clearing check names each one the moment
+ *     it round-trips. The arm held NONE from 2026-08-30 to 2026-10-04, and its
+ *     preference is unchanged: a shortfall the pinned host CAN encode is taught,
+ *     never listed (the row-action column cells, Phase 2023, were taught).
+ *   • Python — `fuaran-ui` 0.7.0 does not model the same 1812 / 1892 slots, nor a
+ *     row-action column cell's label. Its manifest is SILENT on all four (record,
+ *     kind and case fields are uncovered families, and the column-kind union is
+ *     out of scope), so each entry carries the `residual` naming that silence.
+ *     0.8.0 models the 1812 / 1892 slots; raising the pin is not a one-line act,
+ *     because 0.8.0 also carries the 1810 / 1811 temporal vocabulary the Python
+ *     projector has not been taught, and it is tracked as its own phase.
+ *   • F# — none. Its host is the pinned `Fuaran.UI` package, whose model IS the
+ *     wire model, so every shortfall there has been the projector's own
+ *     (fuaran#1657; the 1811 rename and the node fallback were taught in Phase
+ *     2023), and the arm's emptiness is an assertion.
  */
 export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new Map<
   string,
@@ -226,11 +257,29 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
   // with its reasons, so this is a standing gap rather than a release in flight.
   [
     'expr-scalar',
-    [{ arm: 'python', construct: 'Binding.Expr', class: 'host', reason: 'no Binding.Expr' }],
+    [
+      {
+        arm: 'python',
+        construct: 'Binding.Expr',
+        class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1580',
+        reason: 'no Binding.Expr',
+      },
+    ],
   ],
   [
     'expr-params-state-selection',
-    [{ arm: 'python', construct: 'Binding.Expr', class: 'host', reason: 'no Binding.Expr' }],
+    [
+      {
+        arm: 'python',
+        construct: 'Binding.Expr',
+        class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1580',
+        reason: 'no Binding.Expr',
+      },
+    ],
   ],
   [
     'switch-predicate',
@@ -239,6 +288,8 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         arm: 'python',
         construct: 'Binding.Expr',
         class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1580',
         reason:
           'SwitchCase.when is modelled from 0.1.0 and emitted; the predicate is a Binding.Expr, which is not modelled',
       },
@@ -251,6 +302,8 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         arm: 'python',
         construct: 'Binding.Expr',
         class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1580',
         reason:
           'UiNode.visible is modelled from 0.1.0 and emitted, and its Binding.Query predicate is modelled from 0.3.0 and emitted; the remaining predicate is a Binding.Expr, which is not modelled',
       },
@@ -260,7 +313,9 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
   // 2 — a record narrower than the wire. `TransformBinding.source` is a bare
   // `DataSource` rather than the wire's `TransformSource` DU, so a source that
   // is `{"$type":"State"}` has no spelling at all — the fixture reads as a
-  // literal table where the wire names a state key.
+  // literal table where the wire names a state key. Tracked against the phase
+  // that first measured it on this arm; fuaran-py carries no phase of its own
+  // for the record yet.
   [
     'badge-transform-live',
     [
@@ -268,6 +323,8 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         arm: 'python',
         construct: 'cp.TransformSource',
         class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1100',
         reason:
           'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
         // The gap is INSIDE a slot the corpus IDL types as `hosted`, so it lives in
@@ -286,6 +343,8 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         arm: 'python',
         construct: 'cp.TransformSource',
         class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1100',
         reason:
           'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
         // The gap is INSIDE a slot the corpus IDL types as `hosted`, so it lives in
@@ -294,6 +353,243 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         // A manifest therefore says nothing here, and this entry is what stands in
         // its place until one does.
         residual: { family: 'hostedCases', scopeKey: 'Binding.Transform.source' },
+      },
+    ],
+  ],
+
+  // 3 — Phase 1811's temporal rename, ahead of the published TypeScript host.
+  // `@fuaran-ui/ops` 0.28.0 encodes the pre-rename `Date` / `DateRange` field
+  // kinds and the `Date` format, so a `DateTime` / `DateTimeRange` /
+  // `Format.DateTime` fixture has no spelling there; fuaran-ts's sources carry the
+  // rename unreleased. The probe names the rename's own factory members, which
+  // the release brings and 0.28.0 lacks.
+  [
+    'filters-date-range',
+    [
+      {
+        arm: 'typescript',
+        construct: 'formFieldKind.dateTimeRange',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1811',
+        reason: 'the published encoder has no DateTimeRange filter kind (Phase 1811, unreleased)',
+      },
+    ],
+  ],
+  [
+    'form-date',
+    [
+      {
+        arm: 'typescript',
+        construct: 'formFieldKind.dateTime',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1811',
+        reason: 'the published encoder has no DateTime field kind (Phase 1811, unreleased)',
+      },
+    ],
+  ],
+  [
+    'form-date-range',
+    [
+      {
+        arm: 'typescript',
+        construct: 'formFieldKind.dateTimeRange',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1811',
+        reason: 'the published encoder has no DateTimeRange field kind (Phase 1811, unreleased)',
+      },
+    ],
+  ],
+  [
+    'form-declarative-minimal',
+    [
+      {
+        arm: 'typescript',
+        construct: 'formFieldKind.dateTime',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1811',
+        reason: 'the published encoder has no DateTime field kind (Phase 1811, unreleased)',
+      },
+    ],
+  ],
+  [
+    'form-field-rules',
+    [
+      {
+        arm: 'typescript',
+        construct: 'formFieldKind.dateTime',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1811',
+        reason: 'the published encoder has no DateTime field kind (Phase 1811, unreleased)',
+      },
+    ],
+  ],
+  [
+    'format-bindings',
+    [
+      {
+        arm: 'typescript',
+        construct: 'localeFormat.dateTime',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1811',
+        reason: 'the published encoder has no Format.DateTime (Phase 1811, unreleased)',
+      },
+    ],
+  ],
+  [
+    'format-date-time',
+    [
+      {
+        arm: 'typescript',
+        construct: 'localeFormat.dateTime',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1811',
+        reason: 'the published encoder has no Format.DateTime (Phase 1811, unreleased)',
+      },
+    ],
+  ],
+
+  // 4 — Phase 1812's envelope slots: `accessibility.speak` and the node-level
+  // `fallback`. Neither the published TypeScript host nor `fuaran-ui` 0.7.0
+  // models them. `speak` is a type-level member with no runtime symbol of its
+  // own, so the TypeScript probe names `ops.liftFallback`, the runtime surface
+  // the same Phase-1812 commit added; the round trip is the direct falsifier.
+  [
+    'a11y-speak',
+    [
+      {
+        arm: 'typescript',
+        construct: 'ops.liftFallback',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1812',
+        reason: 'the published encoder drops accessibility.speak (Phase 1812, unreleased)',
+      },
+      {
+        arm: 'python',
+        construct: 'Accessibility.speak',
+        class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1812',
+        reason: 'fuaran-ui 0.7.0 has no Accessibility.speak; 0.8.0 models it',
+        residual: { family: 'recordFields', scopeKey: 'Accessibility' },
+      },
+    ],
+  ],
+  [
+    'envelope-fallback',
+    [
+      {
+        arm: 'typescript',
+        construct: 'ops.liftFallback',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1812',
+        reason: 'the published encoder drops the node-level fallback (Phase 1812, unreleased)',
+      },
+      {
+        arm: 'python',
+        construct: 'UiNode.fallback',
+        class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1812',
+        reason: 'fuaran-ui 0.7.0 has no UiNode.fallback; 0.8.0 models it',
+        // A node-envelope member: the corpus IDL types it as a node rather than a
+        // record field, so no §27 family names it directly. `recordFields` at
+        // `Node` is the family a claim about the envelope would have to make.
+        residual: { family: 'recordFields', scopeKey: 'Node' },
+      },
+    ],
+  ],
+
+  // 5 — Phase 1892's grid row window. The two slots are interface members on
+  // the TypeScript side with no runtime symbol, so the probe names `ops.repair`:
+  // the first `@fuaran-ui/ops` export that landed on fuaran-ts's main AFTER
+  // Phase 1892, so a release carrying it necessarily carries the window. The
+  // round trip is the direct falsifier here too.
+  [
+    'grid-windowed',
+    [
+      {
+        arm: 'typescript',
+        construct: 'ops.repair',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1892',
+        reason:
+          'the published encoder drops DataGrid.windowStateKey and rowTotal (Phase 1892, unreleased)',
+      },
+      {
+        arm: 'python',
+        construct: 'DataGrid.window_state_key',
+        class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1892',
+        reason: 'fuaran-ui 0.7.0 has no DataGrid.window_state_key / row_total; 0.8.0 models both',
+        residual: { family: 'kindFields' },
+      },
+    ],
+  ],
+  [
+    'grid-windowed-sorted',
+    [
+      {
+        arm: 'typescript',
+        construct: 'ops.repair',
+        class: 'host',
+        owner: 'fuaran-ts',
+        phase: 'fuaran#1892',
+        reason: 'the published encoder drops DataGrid.windowStateKey (Phase 1892, unreleased)',
+      },
+      {
+        arm: 'python',
+        construct: 'DataGrid.window_state_key',
+        class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1892',
+        reason: 'fuaran-ui 0.7.0 has no DataGrid.window_state_key; 0.8.0 models it',
+        residual: { family: 'kindFields' },
+      },
+    ],
+  ],
+
+  // 6 — a row-action column cell's label. `ColumnKind` is a bare discriminator
+  // in every fuaran-ui release to date, so `Button` / `ButtonGroup` cells encode
+  // with no `label` / `buttons`; the TypeScript host models both and the
+  // projector emits them there. The column-kind union is out of the host
+  // manifest's scope (its discriminator is computed at run time), so the
+  // residual names the case-field family under it.
+  [
+    'grid-action-column-clean',
+    [
+      {
+        arm: 'python',
+        construct: 'ColumnKind.label',
+        class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1909',
+        reason: 'ColumnKind carries no label, so a Button / ButtonGroup cell loses it',
+        residual: { family: 'caseFields', scopeKey: 'CellKindErased' },
+      },
+    ],
+  ],
+  [
+    'grid-action-column-field',
+    [
+      {
+        arm: 'python',
+        construct: 'ColumnKind.label',
+        class: 'host',
+        owner: 'fuaran-py',
+        phase: 'fuaran#1909',
+        reason: 'ColumnKind carries no label, so a Button cell loses it',
+        residual: { family: 'caseFields', scopeKey: 'CellKindErased' },
       },
     ],
   ],
@@ -328,8 +624,8 @@ const emptyTally = (): ArmTally => ({ host: 0, projector: 0, both: 0 });
  * each carried their own counts; prose cannot be wrong out loud.
  */
 export const QUARANTINE_CENSUS: Readonly<Record<Arm, ArmTally>> = {
-  typescript: { host: 0, projector: 0, both: 0 },
-  python: { host: 6, projector: 0, both: 0 },
+  typescript: { host: 11, projector: 0, both: 0 },
+  python: { host: 12, projector: 0, both: 0 },
   // The F# arm holds NONE, and its emptiness is an assertion of its own
   // (fuaran#1657) — every node fixture is required to compile, execute and
   // re-encode byte-identically there. See `fsharp.test.ts`.
@@ -488,6 +784,13 @@ export interface ArmProbe {
    * than adding noise to a failure already named.
    */
   readonly blocked?: () => string | undefined;
+  /**
+   * A reason the arm was NOT RUN on this machine (Phase 2023): no interpreter for
+   * it here, and none declared. Distinct from `blocked`, which is RED; a not-run
+   * arm registers its checks as SKIPPED, so it reads as neither a pass nor a
+   * failure.
+   */
+  readonly notRun?: () => string | undefined;
 }
 
 /**
@@ -509,97 +812,114 @@ export const registerQuarantineChecks = (probe: ArmProbe): void => {
   const { arm } = probe;
   const mine = entriesFor(arm);
 
-  describe(`quarantine table — ${arm} arm (Phase 1584)`, () => {
-    it(`quarantine: ${quarantineSummary()} — the ${arm} arm's declared census is the table's own tally`, () => {
-      // Generated, not narrated: the counts are in this test's NAME, so every run
-      // prints the WHOLE cross-arm state and neither file has to be read against
-      // the other. The declared constant is what makes a drifted count fail
-      // rather than merely read as out of date.
-      expect(
-        tally()[arm],
-        `QUARANTINE_CENSUS.${arm} is stale — the table now holds:\n${quarantineRows()}`,
-      ).toEqual({ ...QUARANTINE_CENSUS[arm] });
-    });
-
-    it(`every ${arm}-arm quarantined id names a real fixture`, () => {
-      const ids = new Set(probe.fixtureIds);
-      for (const id of mine.keys())
-        expect(ids.has(id), `quarantined '${id}' is not in the corpus — remove it`).toBe(true);
-    });
-
-    it(`every ${arm}-arm construct token resolves against the pinned host`, () => {
-      // A token the resolver cannot answer is a claim about nothing. Reported
-      // here, once, rather than inside each entry probe — a misspelled record
-      // name would otherwise read as "the host lacks it", which is exactly the
-      // vacuous hold the falsifier exists to make impossible.
-      if (probe.blocked?.() !== undefined) return; // the arm's own suite fails, loudly
-      const unresolved: string[] = [];
-      for (const e of mine.values())
-        for (const token of e.projectorConstruct
-          ? [e.construct, e.projectorConstruct]
-          : [e.construct]) {
-          const verdict = probe.hostModels(token);
-          if (verdict === undefined) unresolved.push(`${token}: not probed`);
-          else if ('error' in verdict) unresolved.push(`${token}: ${verdict.error}`);
-        }
-      expect(unresolved, `unresolvable construct token(s):\n  ${unresolved.join('\n  ')}`).toEqual(
-        [],
-      );
-    });
-
-    for (const [id, entry] of mine) {
-      it(`${id} — the reason's construct is where it says it is (${entry.construct})`, () => {
-        if (probe.blocked?.() !== undefined) return;
-
-        /** Host lag: the pinned host must NOT model what the entry blames it for. */
-        const hostSide = (token: string) => {
-          const verdict = probe.hostModels(token);
-          if (verdict === undefined || 'error' in verdict) return; // the token test reports it
-          if (!verdict.models) return; // the entry holds
-
-          const emitted = emissionPattern(arm, token).test(probe.projectedSource(id) ?? '');
-          expect(
-            verdict.models,
-            emitted
-              ? `'${id}' blames the ${arm} host for '${token}', but the pinned host MODELS it (${verdict.detail}) and the projector already emits it — REMOVE the entry or re-derive its reason`
-              : `'${id}' blames the ${arm} host for '${token}', but the pinned host MODELS it (${verdict.detail}) and app/Projection.fs never emits it — this is PROJECTOR lag: re-class the entry as class: 'projector' (or teach app/Projection.fs)`,
-          ).toBe(false);
-        };
-
-        /** Projector lag: the host models it and app/Projection.fs must not emit it. */
-        const projectorSide = (token: string) => {
-          const verdict = probe.hostModels(token);
-          if (verdict === undefined || 'error' in verdict) return;
-          expect(
-            verdict.models,
-            `'${id}' claims app/Projection.fs lags on '${token}', but the pinned ${arm} host does not model it (${verdict.detail}) — this is HOST lag: re-class the entry as class: 'host'`,
-          ).toBe(true);
-          expect(
-            emissionPattern(arm, token).test(probe.projectedSource(id) ?? ''),
-            `'${id}' claims app/Projection.fs lags on '${token}', but the projected source already emits it — REMOVE the entry or re-derive its reason`,
-          ).toBe(false);
-        };
-
-        if (entry.class === 'host' || entry.class === 'both') hostSide(entry.construct);
-        if (entry.class === 'projector') projectorSide(entry.construct);
-        if (entry.class === 'both') {
-          expect(
-            entry.projectorConstruct,
-            `'${id}' is class: 'both' and must name its projectorConstruct`,
-          ).toBeDefined();
-          projectorSide(entry.projectorConstruct!);
-        }
-      });
-
-      it(`${id} is quarantined on the ${arm} arm (${entry.reason})`, () => {
-        if (probe.blocked?.() !== undefined) return;
-        const result = probe.roundTrip(id);
-        if (!result.ok) return; // still un-projectable — the entry holds
+  describe.skipIf(probe.notRun?.() !== undefined)(
+    `quarantine table — ${arm} arm (Phase 1584)`,
+    () => {
+      it(`quarantine: ${quarantineSummary()} — the ${arm} arm's declared census is the table's own tally`, () => {
+        // Generated, not narrated: the counts are in this test's NAME, so every run
+        // prints the WHOLE cross-arm state and neither file has to be read against
+        // the other. The declared constant is what makes a drifted count fail
+        // rather than merely read as out of date.
         expect(
-          result.encoded,
-          `'${id}' now round-trips on the ${arm} arm — the ${entry.class === 'projector' ? 'projector learned it' : 'host grew the construct'}; REMOVE it from QUARANTINE`,
-        ).not.toBe(probe.wireOf(id));
+          tally()[arm],
+          `QUARANTINE_CENSUS.${arm} is stale — the table now holds:\n${quarantineRows()}`,
+        ).toEqual({ ...QUARANTINE_CENSUS[arm] });
       });
-    }
-  });
+
+      it(`every ${arm}-arm entry names its owner and the phase it is tracked against`, () => {
+        // Phase 2023 — an entry nobody owns is a silent skip with a reason attached.
+        const unowned: string[] = [];
+        for (const [id, e] of mine) {
+          if (typeof e.owner !== 'string' || e.owner.trim() === '') unowned.push(`${id}: no owner`);
+          if (typeof e.phase !== 'string' || !/^fuaran#\d+$/.test(e.phase))
+            unowned.push(`${id}: phase '${String(e.phase)}' is not a fuaran#NNNN citation`);
+        }
+        expect(unowned, `entries without an owner or a phase:\n  ${unowned.join('\n  ')}`).toEqual(
+          [],
+        );
+      });
+
+      it(`every ${arm}-arm quarantined id names a real fixture`, () => {
+        const ids = new Set(probe.fixtureIds);
+        for (const id of mine.keys())
+          expect(ids.has(id), `quarantined '${id}' is not in the corpus — remove it`).toBe(true);
+      });
+
+      it(`every ${arm}-arm construct token resolves against the pinned host`, () => {
+        // A token the resolver cannot answer is a claim about nothing. Reported
+        // here, once, rather than inside each entry probe — a misspelled record
+        // name would otherwise read as "the host lacks it", which is exactly the
+        // vacuous hold the falsifier exists to make impossible.
+        if (probe.blocked?.() !== undefined) return; // the arm's own suite fails, loudly
+        const unresolved: string[] = [];
+        for (const e of mine.values())
+          for (const token of e.projectorConstruct
+            ? [e.construct, e.projectorConstruct]
+            : [e.construct]) {
+            const verdict = probe.hostModels(token);
+            if (verdict === undefined) unresolved.push(`${token}: not probed`);
+            else if ('error' in verdict) unresolved.push(`${token}: ${verdict.error}`);
+          }
+        expect(
+          unresolved,
+          `unresolvable construct token(s):\n  ${unresolved.join('\n  ')}`,
+        ).toEqual([]);
+      });
+
+      for (const [id, entry] of mine) {
+        it(`${id} — the reason's construct is where it says it is (${entry.construct})`, () => {
+          if (probe.blocked?.() !== undefined) return;
+
+          /** Host lag: the pinned host must NOT model what the entry blames it for. */
+          const hostSide = (token: string) => {
+            const verdict = probe.hostModels(token);
+            if (verdict === undefined || 'error' in verdict) return; // the token test reports it
+            if (!verdict.models) return; // the entry holds
+
+            const emitted = emissionPattern(arm, token).test(probe.projectedSource(id) ?? '');
+            expect(
+              verdict.models,
+              emitted
+                ? `'${id}' blames the ${arm} host for '${token}', but the pinned host MODELS it (${verdict.detail}) and the projector already emits it — REMOVE the entry or re-derive its reason`
+                : `'${id}' blames the ${arm} host for '${token}', but the pinned host MODELS it (${verdict.detail}) and app/Projection.fs never emits it — this is PROJECTOR lag: re-class the entry as class: 'projector' (or teach app/Projection.fs)`,
+            ).toBe(false);
+          };
+
+          /** Projector lag: the host models it and app/Projection.fs must not emit it. */
+          const projectorSide = (token: string) => {
+            const verdict = probe.hostModels(token);
+            if (verdict === undefined || 'error' in verdict) return;
+            expect(
+              verdict.models,
+              `'${id}' claims app/Projection.fs lags on '${token}', but the pinned ${arm} host does not model it (${verdict.detail}) — this is HOST lag: re-class the entry as class: 'host'`,
+            ).toBe(true);
+            expect(
+              emissionPattern(arm, token).test(probe.projectedSource(id) ?? ''),
+              `'${id}' claims app/Projection.fs lags on '${token}', but the projected source already emits it — REMOVE the entry or re-derive its reason`,
+            ).toBe(false);
+          };
+
+          if (entry.class === 'host' || entry.class === 'both') hostSide(entry.construct);
+          if (entry.class === 'projector') projectorSide(entry.construct);
+          if (entry.class === 'both') {
+            expect(
+              entry.projectorConstruct,
+              `'${id}' is class: 'both' and must name its projectorConstruct`,
+            ).toBeDefined();
+            projectorSide(entry.projectorConstruct!);
+          }
+        });
+
+        it(`${id} is quarantined on the ${arm} arm (${entry.reason})`, () => {
+          if (probe.blocked?.() !== undefined) return;
+          const result = probe.roundTrip(id);
+          if (!result.ok) return; // still un-projectable — the entry holds
+          expect(
+            result.encoded,
+            `'${id}' now round-trips on the ${arm} arm — the ${entry.class === 'projector' ? 'projector learned it' : 'host grew the construct'}; REMOVE it from QUARANTINE`,
+          ).not.toBe(probe.wireOf(id));
+        });
+      }
+    },
+  );
 };

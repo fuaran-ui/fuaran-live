@@ -98,17 +98,18 @@ const evalExpr = (expr: string): Node<unknown> => {
 // The quarantine is the SHARED table (Phase 1584) — `./quarantine.ts`, one row
 // per fixture with a cell per arm, so a fixture quarantined here and not on the
 // Python arm is readable in the row rather than by diffing two files. This arm's
-// slice is EMPTY as of 2026-08-30 and its emptiness is the assertion: every
-// node-round-trip fixture is required to re-encode byte-identically, so a
-// projector that falls behind the corpus fails by name rather than being
-// absorbed into a list. Why it is empty, and the two failure shapes this arm's
-// shortfalls take, are recorded in that file's header beside the Python arm's.
+// slice was EMPTY from 2026-08-30 to 2026-10-04; since Phase 2023 it holds only
+// HOST lag — corpus vocabulary the last PUBLISHED `@fuaran-ui/ops` cannot encode,
+// each entry naming its owner and phase and clearing by name the moment a release
+// round-trips it. Projector lag is never listed here: every fixture the pinned
+// host CAN encode is required to re-encode byte-identically, so a projector that
+// falls behind the corpus fails by name rather than being absorbed into a list.
 //
 // If a future corpus addition lands here as a failure, the choice is to teach
-// the projector or — where a slot genuinely has no reachable ctor and no literal
-// form — to add a `{ arm: 'typescript', … }` entry with its construct token and
-// reason. Prefer teaching it: the previous list decayed for eight days precisely
-// because a list is easier to append to than an emitter is to extend.
+// the projector or — only where the pinned host genuinely cannot spell the slot —
+// to add a `{ arm: 'typescript', … }` entry with its construct token, owner,
+// phase and reason. Prefer teaching it: the previous list decayed for eight days
+// precisely because a list is easier to append to than an emitter is to extend.
 const tsQuarantine = entriesFor('typescript');
 
 // -- Omit-at-default cover (Phase 1603) --------------------------------------
@@ -373,6 +374,9 @@ const TS_NAMESPACES: Readonly<Record<string, unknown>> = {
   formFieldKind,
   nodeId,
   iconSource,
+  // The locale-aware `Format` builders `binding.format` takes — the surface a
+  // `Format.DateTime` claim is about (Phase 2023).
+  localeFormat: ui.localeFormat,
   ui,
   ops,
 };
@@ -412,11 +416,10 @@ registerQuarantineChecks({
   roundTrip: tsRoundTrip,
 });
 
-// The resolver above has NO live entries to exercise it — this arm's quarantine
-// is empty and is meant to stay that way — so it is proved here instead. A probe
-// nothing runs is worth less than no probe, because it reads as coverage; the
-// Python arm's equivalent resolver is exercised by six standing entries and needs
-// no self-test. Both directions and the refusal, so a resolver that answered
+// The resolver above is proved here as well as by this arm's live entries: the
+// entries exercise only the "lacks" direction, and an arm whose quarantine
+// empties again on the next release would leave it with none. A probe nothing
+// runs is worth less than no probe, because it reads as coverage. Both directions and the refusal, so a resolver that answered
 // "models" (or "error") unconditionally fails one of these three.
 describe("the TypeScript arm's construct resolver (Phase 1584)", () => {
   it('reports a symbol the pinned surface HAS', () => {

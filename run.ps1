@@ -22,9 +22,22 @@
 .PARAMETER Build
     Produce a static production build in dist/ instead of serving the dev server.
 
+.PARAMETER Gate
+    Run the non-interactive gate and exit with its result instead of serving:
+    the same legs CI's build job runs before it builds — frozen-lockfile install,
+    Prettier check, typecheck, BOTH Fable compiles (the apps and the fable-host
+    bridge), the unit suite, and the projection-conformance suite. No dev server,
+    no browser. The conformance suite's Python arm runs wherever an interpreter
+    carrying the pinned host is available (a repo-local .venv, or
+    FUARAN_PY_PYTHON) and reports NOT RUN — skipped, never green — where none is.
+
 .EXAMPLE
     .\run.ps1
     Install + serve the playground + open a browser tab.
+
+.EXAMPLE
+    pwsh -NoProfile -File run.ps1 -Gate
+    Run the gate; exit 0 only when every leg is green.
 
 .EXAMPLE
     .\run.ps1 -Build
@@ -35,10 +48,16 @@
 param(
     [switch] $SkipInstall,
     [switch] $NoBrowser,
-    [switch] $Build
+    [switch] $Build,
+    [switch] $Gate
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Seeded at GLOBAL scope: a plain assignment creates a script-scope copy that hides
+# the real exit code when this script is invoked with `&`, so a skipped or
+# native-free stage would read whatever ran last as its own verdict.
+$global:LASTEXITCODE = 0
 
 # Per workspace ../CLAUDE.md "Sibling launcher conventions": Node's *.ps1 shims
 # have a substring-slice argument-corruption bug when invoked from inside another
@@ -87,6 +106,45 @@ try {
     # later with a "command not found" that names the symptom and not the cause.
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet tool restore failed with exit code ${LASTEXITCODE} — the Fable tool is not available, so the app cannot compile."
+    }
+
+    if ($Gate) {
+        # Each stage seeds the exit code, runs, and fails the gate on a throw OR a
+        # non-zero code, so no stage can inherit another's verdict. `exit` inside
+        # the try still runs the `finally` below.
+        function Invoke-GateStage {
+            param([string] $Name, [scriptblock] $Body)
+            Write-Host ""
+            Write-Host "=== gate: $Name ===" -ForegroundColor Cyan
+            $global:LASTEXITCODE = 0
+            try {
+                & $Body
+            }
+            catch {
+                Write-Host "GATE FAILED at '$Name': $_" -ForegroundColor Red
+                exit 1
+            }
+            if ($global:LASTEXITCODE -ne 0) {
+                Write-Host "GATE FAILED at '$Name' (exit $global:LASTEXITCODE)" -ForegroundColor Red
+                exit $global:LASTEXITCODE
+            }
+        }
+
+        if (-not $SkipInstall) {
+            Invoke-GateStage 'install (frozen lockfile)' { Invoke-Pnpm install --frozen-lockfile }
+        }
+        Invoke-GateStage 'format check' { Invoke-Pnpm format:check }
+        Invoke-GateStage 'typecheck' { Invoke-Pnpm typecheck }
+        # BOTH Fable outputs: the unit suite reaches fable-host/output through the
+        # query-portal bridge, and the conformance suite executes app/output.
+        Invoke-GateStage 'Fable compile (apps)' { Invoke-Pnpm run fable:app }
+        Invoke-GateStage 'Fable compile (fable-host bridge)' { Invoke-Pnpm run fable }
+        Invoke-GateStage 'unit suite' { Invoke-Pnpm run test:unit }
+        Invoke-GateStage 'projection-conformance suite' { Invoke-Pnpm run conformance }
+
+        Write-Host ""
+        Write-Host "GATE PASSED" -ForegroundColor Green
+        exit 0
     }
 
     if (-not $SkipInstall) {

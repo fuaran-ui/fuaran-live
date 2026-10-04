@@ -87,6 +87,45 @@ const resolvePython = (): string => {
   return process.platform === 'win32' ? 'python' : 'python3';
 };
 
+/**
+ * Why this arm is NOT RUN here, or `undefined` when it runs (Phase 2023).
+ *
+ * An arm is required wherever it CAN run, and reported NOT RUN — skipped, so
+ * neither green nor red — only where it cannot: no interpreter carrying the host
+ * on this machine, and none declared. Declaring one (`FUARAN_PY_PYTHON`, which CI
+ * sets) makes the arm mandatory, so a declared interpreter that will not start,
+ * or lacks the host, is the loud failure below and never a skip.
+ *
+ * Undeclared, two machines read as NOT RUN, and both measured nothing about the
+ * projector: one with no interpreter at all (on Windows, the "app execution
+ * alias" stub that prints an install hint and exits non-zero), and one whose
+ * interpreter lacks `fuaran_ui` — which used to report every Python fixture as
+ * a failure, a red that measured only the machine.
+ */
+const notRunReason = ((): string | undefined => {
+  if (process.env.FUARAN_PY_PYTHON) return undefined;
+  const python = resolvePython();
+  const probe = spawnSync(
+    python,
+    [
+      '-c',
+      'import sys, importlib.util; sys.stdout.write("host" if importlib.util.find_spec("fuaran_ui") else "bare")',
+    ],
+    { input: '', encoding: 'utf8', timeout: 30_000 },
+  );
+  if (probe.error !== undefined || probe.status !== 0)
+    return `no Python interpreter on this machine ('${python}' did not start${
+      probe.error ? `: ${probe.error.message}` : `, exit ${String(probe.status)}`
+    }); create .venv with the pinned host, or set FUARAN_PY_PYTHON, to run it`;
+  if (probe.stdout !== 'host')
+    return `the interpreter '${python}' has no fuaran_ui host installed; create .venv with the pinned host, or set FUARAN_PY_PYTHON, to run it`;
+  return undefined;
+})();
+
+describe.skipIf(notRunReason === undefined)('Python projection conformance — NOT RUN', () => {
+  it.skip(`NOT RUN: ${notRunReason ?? ''}`, () => {});
+});
+
 // This arm's slice of the SHARED quarantine (Phase 1584). The table itself,
 // the construct-token grammar and the six dated measurement passes that produced
 // the standing entries all live in ./quarantine.ts, keyed by fixture id with one
@@ -123,6 +162,7 @@ const pyQuarantine = entriesFor('python');
 // actually took, so this comment never has to be the record of it.
 
 const probeHostDeclaration = (): HostDeclaration => {
+  if (notRunReason !== undefined) return {};
   try {
     const proc = spawnSync(resolvePython(), [resolve(here, 'python_exec.py')], {
       input: JSON.stringify({ cases: [], constructs: [] }),
@@ -195,6 +235,7 @@ let constructs: Record<string, ConstructVerdict> = {};
 let fatal: string | undefined;
 
 beforeAll(() => {
+  if (notRunReason !== undefined) return;
   const cases = nodeFixtures.map((f) => ({
     id: f.id,
     expr: projectPythonExpr(readFileSync(resolve(corpusDir, f.inputFile), 'utf8').trim()) as string,
@@ -241,10 +282,11 @@ beforeAll(() => {
   constructs = payload.constructs ?? {};
 }, 300_000);
 
-describe('Python projection conformance (Node corpus)', () => {
+describe.skipIf(notRunReason !== undefined)('Python projection conformance (Node corpus)', () => {
   it('the Python executor ran', () => {
-    // A hard failure, never a skip: a conformance arm that goes green without
-    // its oracle is worse than no arm at all. Install the host with
+    // A hard failure wherever the arm runs: a conformance arm that goes green
+    // without its oracle is worse than no arm at all. Only a machine with no
+    // interpreter and none declared skips it, as NOT RUN (above). Install the host with
     // `python -m venv .venv && .venv/…/pip install fuaran-ui==0.7.0`, or point
     // FUARAN_PY_PYTHON at an interpreter that already has it.
     expect(fatal, fatal ?? '').toBeUndefined();
@@ -299,6 +341,7 @@ registerQuarantineChecks({
     return result?.ok === true ? { ok: true, encoded: result.encoded } : { ok: false };
   },
   blocked: () => fatal,
+  notRun: () => notRunReason,
 });
 
 // -- The capability manifest's own checks (Phase 1582, WIRE_FORMAT §27) ------
@@ -328,58 +371,61 @@ const roundTrips = (id: string): boolean => {
   return result.encoded === readFileSync(resolve(corpusDir, fixture.inputFile), 'utf8').trim();
 };
 
-describe(`capability manifest — Python arm (${
-  manifestResolution.mode === 'computed'
-    ? `computed from ${manifestResolution.manifest.host} ${manifestResolution.manifest.hostVersion}`
-    : 'pre-manifest fallback'
-})`, () => {
-  it(`this run used the ${manifestResolution.mode} path${
-    manifestResolution.mode === 'fallback' ? ` — ${manifestResolution.reason}` : ''
-  }`, () => {
-    // Not an assertion about which path is right: the pinned release publishes no
-    // manifest, so the fallback IS the correct outcome today. What must hold is
-    // that the reason is a sentence a reader can act on, naming both versions
-    // where a mismatch is what refused it.
-    if (manifestResolution.mode === 'fallback') expect(manifestResolution.reason).not.toBe('');
-    else expect(manifestResolution.manifest.tokens.length).toBeGreaterThan(0);
-  });
+describe.skipIf(notRunReason !== undefined)(
+  `capability manifest — Python arm (${
+    manifestResolution.mode === 'computed'
+      ? `computed from ${manifestResolution.manifest.host} ${manifestResolution.manifest.hostVersion}`
+      : 'pre-manifest fallback'
+  })`,
+  () => {
+    it(`this run used the ${manifestResolution.mode} path${
+      manifestResolution.mode === 'fallback' ? ` — ${manifestResolution.reason}` : ''
+    }`, () => {
+      // Not an assertion about which path is right: the pinned release publishes no
+      // manifest, so the fallback IS the correct outcome today. What must hold is
+      // that the reason is a sentence a reader can act on, naming both versions
+      // where a mismatch is what refused it.
+      if (manifestResolution.mode === 'fallback') expect(manifestResolution.reason).not.toBe('');
+      else expect(manifestResolution.manifest.tokens.length).toBeGreaterThan(0);
+    });
 
-  it('every fixture that fails is one the manifest predicted, or a declared residual', () => {
-    // §27.4 rule 3 — the whole point of computing the set. A shortfall nobody
-    // declared is a failure of THIS repo's projector, not of the host, and it must
-    // fail rather than be absorbed.
-    if (computedUnmodelled === undefined || fatal !== undefined) return;
-    const unexplained = nodeFixtures
-      .filter((f) => !heldAside.has(f.id) && !roundTrips(f.id))
-      .map((f) => `${f.id}: ${executed.get(f.id)?.error ?? 'did not re-encode byte-identically'}`)
-      .sort();
-    expect(
-      unexplained,
-      `these fixtures failed on the Python arm, and ${manifestResolution.mode === 'computed' ? `${manifestResolution.manifest.host} ${manifestResolution.manifest.hostVersion}` : 'the host'} declares it CAN author every construct they exercise — that makes them app/Projection.fs lag, not host lag:\n  ${unexplained.join('\n  ')}`,
-    ).toEqual([]);
-  });
+    it('every fixture that fails is one the manifest predicted, or a declared residual', () => {
+      // §27.4 rule 3 — the whole point of computing the set. A shortfall nobody
+      // declared is a failure of THIS repo's projector, not of the host, and it must
+      // fail rather than be absorbed.
+      if (computedUnmodelled === undefined || fatal !== undefined) return;
+      const unexplained = nodeFixtures
+        .filter((f) => !heldAside.has(f.id) && !roundTrips(f.id))
+        .map((f) => `${f.id}: ${executed.get(f.id)?.error ?? 'did not re-encode byte-identically'}`)
+        .sort();
+      expect(
+        unexplained,
+        `these fixtures failed on the Python arm, and ${manifestResolution.mode === 'computed' ? `${manifestResolution.manifest.host} ${manifestResolution.manifest.hostVersion}` : 'the host'} declares it CAN author every construct they exercise — that makes them app/Projection.fs lag, not host lag:\n  ${unexplained.join('\n  ')}`,
+      ).toEqual([]);
+    });
 
-  it('every fixture the manifest predicts unmodelled in fact fails', () => {
-    // §27.4 rule 4 — the self-clearing half, computed. A predicted-unmodelled
-    // fixture that round-trips means the manifest under-declares (or the host grew
-    // the construct and the manifest is stale); either is worth a name, and a
-    // silently passing held-aside fixture is how the hand-written list decayed.
-    if (computedUnmodelled === undefined || fatal !== undefined) return;
-    const cleared = [...computedUnmodelled]
-      .filter(([id]) => roundTrips(id))
-      .map(([id, missing]) => `${id} (predicted unmodelled on ${missing.join(', ')})`)
-      .sort();
-    expect(
-      cleared,
-      `these fixtures round-trip although the manifest declares the constructs absent — the host grew them and the manifest is stale, or its generator under-declares:\n  ${cleared.join('\n  ')}`,
-    ).toEqual([]);
-  });
+    it('every fixture the manifest predicts unmodelled in fact fails', () => {
+      // §27.4 rule 4 — the self-clearing half, computed. A predicted-unmodelled
+      // fixture that round-trips means the manifest under-declares (or the host grew
+      // the construct and the manifest is stale); either is worth a name, and a
+      // silently passing held-aside fixture is how the hand-written list decayed.
+      if (computedUnmodelled === undefined || fatal !== undefined) return;
+      const cleared = [...computedUnmodelled]
+        .filter(([id]) => roundTrips(id))
+        .map(([id, missing]) => `${id} (predicted unmodelled on ${missing.join(', ')})`)
+        .sort();
+      expect(
+        cleared,
+        `these fixtures round-trip although the manifest declares the constructs absent — the host grew them and the manifest is stale, or its generator under-declares:\n  ${cleared.join('\n  ')}`,
+      ).toEqual([]);
+    });
 
-  it('no residual entry stands on a claim the manifest now makes', () => {
-    // §27.4 rule 6. The residual exists so an unclaimed family does not become a
-    // silent hole; this is what stops it becoming a hand-written list instead.
-    if (manifestResolution.mode !== 'computed') return;
-    const stale = staleResiduals(manifestResolution.manifest, residuals);
-    expect(stale, `stale residual declaration(s):\n  ${stale.join('\n  ')}`).toEqual([]);
-  });
-});
+    it('no residual entry stands on a claim the manifest now makes', () => {
+      // §27.4 rule 6. The residual exists so an unclaimed family does not become a
+      // silent hole; this is what stops it becoming a hand-written list instead.
+      if (manifestResolution.mode !== 'computed') return;
+      const stale = staleResiduals(manifestResolution.manifest, residuals);
+      expect(stale, `stale residual declaration(s):\n  ${stale.join('\n  ')}`).toEqual([]);
+    });
+  },
+);

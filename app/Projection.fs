@@ -2016,6 +2016,20 @@ let private tsGridColumnErased (v: JsonValue) : string =
       + " }, defaultTone: "
       + qs defaultTone
       + " }"
+    // The row-action cells: the label is a wire `TextSource` and the handler a
+    // `(row) -> Action` closure the encoder erases to `"<closure>"`, so the
+    // label is the whole of what survives the wire.
+    | "Button" ->
+      "{ kind: 'Button', label: "
+      + tsTextSourceLit (fieldReq "label" kindObj)
+      + ", onClick: () => action.chain([]) }"
+    | "ButtonGroup" ->
+      let buttons =
+        arrOf "buttons" kindObj
+        |> List.map (fun b -> "[" + tsTextSourceLit (fieldReq "label" b) + ", () => action.chain([])]")
+        |> String.concat ", "
+
+      "{ kind: 'ButtonGroup', buttons: [" + buttons + "] }"
     | _ -> "{ kind: 'Text' }"
 
   tsInline (
@@ -5786,7 +5800,7 @@ let private fsRecordTable: (string * string * string list) list =
        "Source|source|!|B<core:rows>"
        "StaticRows|staticRows|?|R:StaticRows"
        "OnRowClick|onRowClick|?|C" ])
-    ("DateRangePair", "", [ "From|from|!|s"; "To|to|!|s" ])
+    ("DateTimeRangePair", "", [ "From|from|!|s"; "To|to|!|s" ])
     ("DefaultSort", "", [ "Column|column|!|i"; "Direction|direction|!|E:SortDirection" ])
     ("DisclosureSpec",
      "Disclosure",
@@ -6113,7 +6127,7 @@ let private fsUnionTable: (string * string * string list) list =
     ("CellFormat", "Currency", [ "code|code|!|s" ])
     ("CellFormat", "Percent", [ "decimals|decimals|?|i" ])
     ("CellFormat", "SignificantDigits", [ "digits|digits|!|i" ])
-    ("CellFormat", "Date", [ "format|format|!|s" ])
+    ("CellFormat", "DateTime", [ "format|format|!|s" ])
     ("CellFormat", "Duration", [ "unit|unit|!|E:DurationUnit"; "style|style|!|E:DurationStyle" ])
     ("CellFormat", "RelativeTime", [ "unit|unit|!|E:RelativeTimeUnit" ])
     ("CellFormat", "Custom", [ "fn|fn|!|C" ])
@@ -6183,18 +6197,18 @@ let private fsUnionTable: (string * string * string list) list =
        "onChange|onChange|?|C"
        "orientation|orientation|!|E:Orientation" ])
     ("FormFieldKind",
-     "Date",
+     "DateTime",
      [ "value|value|?|B<s>"
        "onChange|onChange|?|C"
-       "variant|variant|!|E:DateVariant"
+       "variant|variant|!|E:DateTimeVariant"
        "min|min|?|s"
        "max|max|?|s"
        "step|step|?|f" ])
     ("FormFieldKind",
-     "DateRange",
-     [ "value|value|?|BS<R:DateRangePair>"
+     "DateTimeRange",
+     [ "value|value|?|BS<R:DateTimeRangePair>"
        "onChange|onChange|?|C"
-       "variant|variant|!|E:DateVariant"
+       "variant|variant|!|E:DateTimeVariant"
        "min|min|?|s"
        "max|max|?|s"
        "step|step|?|f" ])
@@ -6220,7 +6234,7 @@ let private fsUnionTable: (string * string * string list) list =
     ("Format", "Number", [ "decimals|decimals|?|i" ])
     ("Format", "Currency", [ "isoCode|isoCode|!|s" ])
     ("Format", "Percent", [ "decimals|decimals|?|i" ])
-    ("Format", "Date", [ "dateStyle|dateStyle|!|E:DateStyle" ])
+    ("Format", "DateTime", [ "dateStyle|dateStyle|?|E:DateStyle"; "timeStyle|timeStyle|?|E:TimeStyle" ])
     ("Format", "RelativeTime", [ "unit|unit|!|E:RelativeTimeUnit" ])
     ("Format", "Duration", [ "unit|unit|!|E:DurationUnit"; "style|style|!|E:DurationStyle" ])
     ("Format", "Since", [ "unit|unit|?|E:RelativeTimeUnit" ])
@@ -6299,7 +6313,7 @@ let private fsEnumTable: string list =
     "ChartXScale|Category,Temporal"
     "CompareOp|Eq=eq,Neq=neq,Lt=lt,Lte=lte,Gt=gt,Gte=gte"
     "DateStyle|Short,Medium,Long,Full"
-    "DateVariant|Date,Time,DateTime"
+    "DateTimeVariant|Date,Time,DateTime"
     "DeterminismSource|Deterministic,Clock,Random,Network"
     "DurationStyle|Compact,Clock,Long"
     "DurationUnit|Seconds,Minutes,Hours"
@@ -6331,6 +6345,7 @@ let private fsEnumTable: string list =
     "TextDirection|Auto=auto,Ltr=ltr,Rtl=rtl"
     "TextFormat|Email=email,Url=url,Tel=tel"
     "TimeGrain|Second,Minute,Hour,Day"
+    "TimeStyle|Short,Medium,Long,Full"
     "ToneVariant|Default,Subdued,Brand,Success,Warning,Critical,Info"
     "TrackKind|Subtitles,Captions,Descriptions,Chapters"
     "TrendPolarity|HigherIsBetter,LowerIsBetter" ]
@@ -7442,10 +7457,12 @@ and private fsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
   // `Visible` is the one envelope trait with no published `Node.*` modifier, so
   // a node carrying it takes the record-literal path below rather than reaching
   // past its own constructor with a `{ (…) with … }` update. Same surface, and
-  // it keeps every emission a single unambiguous shape.
-  let hasVisible = (fieldOpt "visible" nodeV).IsSome
+  // it keeps every emission a single unambiguous shape. The author-declared
+  // `Fallback` (Phase 1812) is the second such trait, so it takes the same path.
+  let needsRecord =
+    (fieldOpt "visible" nodeV).IsSome || (fieldOpt "fallback" nodeV).IsSome
 
-  match (if hasVisible then None else Map.tryFind kindType fsCtors) with
+  match (if needsRecord then None else Map.tryFind kindType fsCtors) with
   | Some(ctor, injectsA11y, shape) ->
     let core = "Fuaran." + ctor + " " + fsStr id + " " + specExpr shape
 

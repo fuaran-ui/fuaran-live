@@ -36,11 +36,11 @@ import { PROVIDER_ORIGINS } from '../src/byok/origins';
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 import {
   createKeyStore,
-  egressProbeFlat,
-  providerOriginsFlat,
   scrubOnUnload,
   // @ts-expect-error untyped Fable output
 } from '../app/output/Byok.js';
+// @ts-expect-error untyped Fable output
+import { egressProbeFlat, providerOriginsFlat } from '../app/output/testing/ByokProbes.js';
 
 // A sentinel with no substring in common with anything else the app emits, so a
 // match is never a coincidence. Long enough to clear the redaction helper's

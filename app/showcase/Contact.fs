@@ -21,9 +21,6 @@ module CJson = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 [<Emit("encodeURIComponent($0)")>]
 let private encodeUri (s: string) : string = jsNative
 
-[<Emit("(function(){ try { navigator.clipboard.writeText($0); return true; } catch(e){ return false; } })()")>]
-let private copyText (s: string) : bool = jsNative
-
 /// Fire a URL (a `mailto:`) at click time, so no `mailto:` is ever written into
 /// the page – that is the string email harvesters grep for first.
 [<Emit("window.location.href = $0")>]
@@ -140,7 +137,7 @@ let private ContactView () : ReactElement =
                               Html.button
                                 [ prop.className "ct-copy"
                                   prop.text (if copied then "Copied ✓" else "Copy address")
-                                  prop.onClick (fun _ -> setCopied (copyText contactEmail)) ] ] ]
+                                  prop.onClick (fun _ -> setCopied (Fuaran.Live.Interop.writeClipboard contactEmail)) ] ] ]
                       Html.p
                         [ prop.className "ct-plain"
                           prop.children

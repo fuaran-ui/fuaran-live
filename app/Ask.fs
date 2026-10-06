@@ -85,31 +85,6 @@ let buildAnswerJson (getState: string -> obj option) (contract: AnswerContract) 
 
   Canon.render (JObj(List.sortBy fst entries))
 
-/// Flat headless wrapper: `stateJson` is a plain `{"<stateKey>": <scalar>}`
-/// object standing in for the scoped store; the contract comes from the
-/// envelope wire. Returns the canonical answer object JSON ("" on bad input).
-let buildAnswerJsonFlat (stateJson: string) (envelopeWire: string) : string =
-  match Elc.decodeEnvelope envelopeWire with
-  | Error _ -> ""
-  | Ok env ->
-    match Json.parse stateJson with
-    | Ok(JObj fields) ->
-      let getState (key: string) : obj option =
-        fields
-        |> List.tryPick (fun (k, v) ->
-          if k <> key then
-            None
-          else
-            match v with
-            | JStr s -> Some(box s)
-            | JInt i -> Some(box (float i))
-            | JFloat f -> Some(box f)
-            | JBool b -> Some(box b)
-            | _ -> None)
-
-      buildAnswerJson getState env.Contract
-    | _ -> ""
-
 // ─── display helpers ─────────────────────────────────────────────────────────
 
 let private spaceText (s: ValueSpace) : string =
@@ -131,7 +106,7 @@ let outcomeKindName (o: ElicitationOutcome) : string =
 
 /// The write-back substrate for ask trees: routes the decoded controls' value
 /// write-backs into this ask's scoped store, which `submit` reads to build the
-/// answer. Lazy so importing this module headlessly (the flat test surface)
+/// answer. Lazy so importing this module headlessly (testing/AskProbes.fs does)
 /// never touches the browser.
 ///
 /// Deny-by-default is deliberate here, and this host wants no policy of its own.

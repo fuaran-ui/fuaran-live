@@ -57,9 +57,6 @@ open Fuaran.UI.Program
 // click asked to fill, the other moves focus. Neither can reach a network
 // origin, which is why they are the two that can be offered at all here.
 
-[<Emit("navigator.clipboard && navigator.clipboard.writeText($0)")>]
-let private writeClipboard (text: string) : unit = jsNative
-
 [<Emit("(function(){ var e = document.getElementById($0); if (e && e.focus) e.focus(); })()")>]
 let private focusNode (nodeId: string) : unit = jsNative
 
@@ -126,7 +123,7 @@ let private registry (onDenied: EffectDenial -> unit) : EffectRegistry =
   EffectRegistry.denyAll
   |> EffectRegistry.register "WriteToClipboard" (fun fx ->
     match fx with
-    | ClientEffect.WriteToClipboard text -> writeClipboard text
+    | ClientEffect.WriteToClipboard text -> Interop.writeClipboard text |> ignore
     | _ -> ())
   |> EffectRegistry.register "Focus" (fun fx ->
     match fx with

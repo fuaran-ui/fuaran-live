@@ -144,9 +144,13 @@ type IContributionSink =
 //
 // Agent mode (the self-debug loop) needs a richer call than `Send`: the model
 // must be able to *call introspection tools* and receive their results over
-// multiple turns. This is a strict superset of `Send` – the same provider, the
-// same key, the same single origin – so it lives behind `IAgenticProvider`, an
-// extension of `IAIProvider`. As of Phase 327 ALL THREE providers implement it.
+// multiple turns. It is a separate seam, `IAgenticProvider`, standing alone
+// rather than extending `IAIProvider` (Phase 2081): the loop needs only the
+// agentic call, so a provider that drives the loop – a real adapter, the keyless
+// demo, a test's scripted one – implements exactly that and nothing it would
+// have to stub. The provider's identity (id, label, default model) is the
+// registry descriptor's. Every provider in the registry offers both seams over
+// the same key and the same single origin.
 //
 // These types are fuaran-live's **ordered** projection over the shared portable
 // connector contract in `Fuaran.UI.AiWire`. The shared
@@ -202,9 +206,8 @@ type AgentOutcome =
   | Ok of content: AgentContentBlock list * stopReason: AgentStopReason * usage: ProviderUsage option
   | Error of ProviderError
 
-/// A provider that additionally supports the multi-turn tool-use loop. The
-/// Anthropic BYOK provider implements it; the agent loop depends only on this
+/// A provider of the multi-turn tool-use loop. Every BYOK adapter offers one
+/// beside its single-shot `IAIProvider`; the agent loop depends only on this
 /// interface, so a server host could drive the identical loop.
 type IAgenticProvider =
-  inherit IAIProvider
   abstract member SendAgentic: AgentRequest -> Async<AgentOutcome>

@@ -53,6 +53,12 @@
     <Compile Include="..\shared\Brand.fs">
       <Link>shared\Brand.fs</Link>
     </Compile>
+    <!-- The small JS interop helpers (Phase 2081) - one definition each, shared
+         with the playground. No key, no provider origin: its one network helper
+         reads a same-origin artefact as text. -->
+    <Compile Include="..\shared\Interop.fs">
+      <Link>shared\Interop.fs</Link>
+    </Compile>
     <!-- The multi-language source projector (Attesor's engine). The PURE JSON
          model it walks arrives as a package now (see the PackageReference
          below) rather than as two linked files from a repo-local vendor
@@ -78,6 +84,11 @@
          it – the drift class the Navigator page used to carry. -->
     <Compile Include="..\navigator\Cursor.fs">
       <Link>navigator\Cursor.fs</Link>
+    </Compile>
+    <!-- The pattern bank (Phase 2081) – the ONE definition of its engine and
+         seed catalogues, shared with the playground's pattern-bank panel. -->
+    <Compile Include="..\shared\PatternBank.fs">
+      <Link>shared\PatternBank.fs</Link>
     </Compile>
     <Compile Include="Pillars.fs" />
     <!-- The shared page frame (title / lede / body / honesty), the wire drawer

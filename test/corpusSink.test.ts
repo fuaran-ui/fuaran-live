@@ -38,18 +38,18 @@ import { readFileSync } from 'node:fs';
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 // @ts-expect-error untyped Fable output
 import { empty, ingestResult } from '../app/output/Session.js';
+// @ts-expect-error untyped Fable output
+import { configured, sinkUrl } from '../app/output/Contribute.js';
 import {
   buildFlat,
-  configured,
   contributeProbeFlat,
   findingsFlat,
   prepareFlat,
   providerOriginsFlat,
-  sinkUrl,
   // @ts-expect-error untyped Fable output
-} from '../app/output/Contribute.js';
+} from '../app/output/testing/ContributeProbes.js';
 // @ts-expect-error untyped Fable output
-import { providerOriginsFlat as adapterOrigins } from '../app/output/Byok.js';
+import { providerOriginsFlat as adapterOrigins } from '../app/output/testing/ByokProbes.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 

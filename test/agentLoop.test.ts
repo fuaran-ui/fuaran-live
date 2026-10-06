@@ -24,8 +24,8 @@ import {
   runPanelProbe,
   runAdvisoryProbe,
   runAdvisoryRepeatProbe,
-  // @ts-expect-error untyped Fable output (no .d.ts for app/output/Agent.js)
-} from '../app/output/Agent.js';
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/AgentProbes.js)
+} from '../app/output/testing/AgentProbes.js';
 
 // A corpus-valid full-tree emission (wire-format-fixtures/nodes/metric-1 – the
 // canonical flat shape the F# decoder certifies against).

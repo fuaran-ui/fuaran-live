@@ -76,8 +76,7 @@ let scrubOnUnload (clear: unit -> unit) : unit =
 /// `Browser.*` binding surface.
 let browserEffectPorts: EffectPorts =
   { new EffectPorts with
-      member _.WriteToClipboard(text) =
-        emitJsStatement text "navigator.clipboard && navigator.clipboard.writeText($0)"
+      member _.WriteToClipboard(text) = Interop.writeClipboard text |> ignore
 
       // The revoke is DEFERRED to a later task, not called on the next line.
       // `click()` on a detached anchor starts the download asynchronously, and
@@ -494,7 +493,7 @@ let private anthropicHeaders (key: string) =
 
 /// Pull `usage.{input_tokens,output_tokens}` when present (the loop's token
 /// counter needs real counts; absence is tolerated – a turn still returns).
-let private anthropicUsage (json: JsonValue) : ProviderUsage option =
+let internal anthropicUsage (json: JsonValue) : ProviderUsage option =
   match JsonValue.tryField "usage" json with
   | Some usage ->
     match
@@ -519,7 +518,7 @@ let private anthropicText (json: JsonValue) : string =
 
 /// Parse the response `content` array into the portable ordered block shape
 /// (text + tool_use – what an assistant turn can emit).
-let private anthropicBlocks (json: JsonValue) : AgentContentBlock list =
+let internal anthropicBlocks (json: JsonValue) : AgentContentBlock list =
   match json |> JsonValue.tryField "content" |> Option.bind JsonValue.asArray with
   | Some blocks ->
     blocks
@@ -547,7 +546,7 @@ let private anthropicBlocks (json: JsonValue) : AgentContentBlock list =
       | _ -> None)
   | None -> []
 
-let private anthropicStop (json: JsonValue) : AgentStopReason =
+let internal anthropicStop (json: JsonValue) : AgentStopReason =
   json
   |> JsonValue.tryField "stop_reason"
   |> Option.bind JsonValue.asString
@@ -577,7 +576,7 @@ let private anthropicMessageJson (m: AgentMessage) : JsonValue =
     [ "role", jstr (roleStr "assistant" m.Role)
       "content", jarr (m.Content |> List.map anthropicBlockJson) ]
 
-let private anthropicAgenticBody (request: AgentRequest) : JsonValue =
+let internal anthropicAgenticBody (request: AgentRequest) : JsonValue =
   jobj (
     [ "model", jstr request.Model
       "max_tokens", jint request.MaxTokens
@@ -595,8 +594,8 @@ let private anthropicAgenticBody (request: AgentRequest) : JsonValue =
         ) ]
   )
 
-let createAnthropicProvider (getKey: unit -> string option) : IAgenticProvider =
-  { new IAgenticProvider with
+let createAnthropicProvider (getKey: unit -> string option) : IAIProvider =
+  { new IAIProvider with
       member _.Id = "anthropic"
       member _.Label = "Claude (Anthropic)"
       member _.DefaultModel = DEFAULT_CLAUDE_MODEL
@@ -620,8 +619,11 @@ let createAnthropicProvider (getKey: unit -> string option) : IAgenticProvider =
             match! postJson (ANTHROPIC_ORIGIN + "/v1/messages") (anthropicHeaders key) body with
             | Result.Error e -> return ProviderOutcome.Error e
             | Result.Ok json -> return ProviderOutcome.Ok(anthropicText json, anthropicUsage json)
-          })
+          }) }
 
+/// The agentic (tool-use) Anthropic adapter – same origin, same per-call key read.
+let createAnthropicAgentic (getKey: unit -> string option) : IAgenticProvider =
+  { new IAgenticProvider with
       member _.SendAgentic(request) =
         async {
           match getKey () with
@@ -645,7 +647,7 @@ let createAnthropicProvider (getKey: unit -> string option) : IAgenticProvider =
 // ============================================================================
 
 /// One OpenAI-compatible vendor.
-type private OpenAiCompatibleConfig =
+type internal OpenAiCompatibleConfig =
   {
     Id: string
     Label: string
@@ -666,7 +668,7 @@ type private OpenAiCompatibleConfig =
     OutputTokensIncludeReasoning: bool
   }
 
-let private openAiUsageWith (includeReasoning: bool) (json: JsonValue) : ProviderUsage option =
+let internal openAiUsageWith (includeReasoning: bool) (json: JsonValue) : ProviderUsage option =
   match JsonValue.tryField "usage" json with
   | Some usage ->
     match
@@ -690,8 +692,6 @@ let private openAiUsageWith (includeReasoning: bool) (json: JsonValue) : Provide
     | _ -> None
   | None -> None
 
-let private openAiUsage (json: JsonValue) : ProviderUsage option = openAiUsageWith true json
-
 let private openAiFirstMessage (json: JsonValue) : JsonValue option =
   json
   |> JsonValue.tryField "choices"
@@ -705,7 +705,7 @@ let private openAiText (json: JsonValue) : string =
   |> Option.defaultValue ""
 
 /// OpenAI's `finish_reason` → the portable stop vocabulary.
-let private openAiStop (json: JsonValue) : AgentStopReason =
+let internal openAiStop (json: JsonValue) : AgentStopReason =
   match
     json
     |> JsonValue.tryField "choices"
@@ -720,7 +720,7 @@ let private openAiStop (json: JsonValue) : AgentStopReason =
 /// Parse the assistant message into ordered blocks: a `Text` (when non-empty)
 /// followed by one `ToolUse` per `tool_calls[]` entry (arguments are a JSON
 /// string – parsed back to a JS object for the dispatcher).
-let private openAiBlocks (json: JsonValue) : AgentContentBlock list =
+let internal openAiBlocks (json: JsonValue) : AgentContentBlock list =
   match openAiFirstMessage json with
   | None -> []
   | Some message ->
@@ -817,7 +817,7 @@ let private openAiMessages (m: AgentMessage) : JsonValue list =
 
     toolResults @ userText
 
-let private openAiCompatibleAgenticBody (cfg: OpenAiCompatibleConfig) (request: AgentRequest) : JsonValue =
+let internal openAiCompatibleAgenticBody (cfg: OpenAiCompatibleConfig) (request: AgentRequest) : JsonValue =
   let systemMsg = jobj [ "role", jstr "system"; "content", jstr request.System ]
   let turns = request.Messages |> List.collect openAiMessages
 
@@ -841,11 +841,8 @@ let private openAiCompatibleAgenticBody (cfg: OpenAiCompatibleConfig) (request: 
     @ cfg.ExtraFields
   )
 
-let private createOpenAiCompatibleProvider
-  (cfg: OpenAiCompatibleConfig)
-  (getKey: unit -> string option)
-  : IAgenticProvider =
-  { new IAgenticProvider with
+let private createOpenAiCompatibleProvider (cfg: OpenAiCompatibleConfig) (getKey: unit -> string option) : IAIProvider =
+  { new IAIProvider with
       member _.Id = cfg.Id
       member _.Label = cfg.Label
       member _.DefaultModel = cfg.DefaultModel
@@ -871,8 +868,14 @@ let private createOpenAiCompatibleProvider
             | Result.Error e -> return ProviderOutcome.Error e
             | Result.Ok json ->
               return ProviderOutcome.Ok(openAiText json, openAiUsageWith cfg.OutputTokensIncludeReasoning json)
-          })
+          }) }
 
+/// The agentic (tool-use) adapter for an OpenAI-compatible vendor.
+let private createOpenAiCompatibleAgentic
+  (cfg: OpenAiCompatibleConfig)
+  (getKey: unit -> string option)
+  : IAgenticProvider =
+  { new IAgenticProvider with
       member _.SendAgentic(request) =
         async {
           match getKey () with
@@ -895,7 +898,7 @@ let private createOpenAiCompatibleProvider
                 )
         } }
 
-let private openAiConfig: OpenAiCompatibleConfig =
+let internal openAiConfig: OpenAiCompatibleConfig =
   { Id = "openai"
     Label = "GPT (OpenAI)"
     DefaultModel = DEFAULT_OPENAI_MODEL
@@ -908,7 +911,7 @@ let private openAiConfig: OpenAiCompatibleConfig =
 /// convention confirmed 2026-07-16 from platform.kimi.ai docs, via the eval
 /// suite's seam). No `prompt_cache_key` (its caching is automatic with no
 /// routing hint) and the documented `max_tokens` cap name.
-let private kimiConfig: OpenAiCompatibleConfig =
+let internal kimiConfig: OpenAiCompatibleConfig =
   { Id = "kimi"
     Label = "Kimi (Moonshot)"
     DefaultModel = DEFAULT_KIMI_MODEL
@@ -924,7 +927,7 @@ let private kimiConfig: OpenAiCompatibleConfig =
 /// reports them OUTSIDE `completion_tokens`, so the usage parse folds
 /// `completion_tokens_details.reasoning_tokens` back in to keep the cost
 /// readout honest (the eval seam's same normalisation).
-let private xaiConfig: OpenAiCompatibleConfig =
+let internal xaiConfig: OpenAiCompatibleConfig =
   { Id = "xai"
     Label = "Grok (xAI)"
     DefaultModel = DEFAULT_GROK_MODEL
@@ -933,14 +936,23 @@ let private xaiConfig: OpenAiCompatibleConfig =
     ExtraFields = grokPostureFields
     OutputTokensIncludeReasoning = false }
 
-let createOpenAIProvider: (unit -> string option) -> IAgenticProvider =
+let createOpenAIProvider: (unit -> string option) -> IAIProvider =
   createOpenAiCompatibleProvider openAiConfig
 
-let createGrokProvider: (unit -> string option) -> IAgenticProvider =
+let createOpenAIAgentic: (unit -> string option) -> IAgenticProvider =
+  createOpenAiCompatibleAgentic openAiConfig
+
+let createGrokProvider: (unit -> string option) -> IAIProvider =
   createOpenAiCompatibleProvider xaiConfig
 
-let createKimiProvider: (unit -> string option) -> IAgenticProvider =
+let createGrokAgentic: (unit -> string option) -> IAgenticProvider =
+  createOpenAiCompatibleAgentic xaiConfig
+
+let createKimiProvider: (unit -> string option) -> IAIProvider =
   createOpenAiCompatibleProvider kimiConfig
+
+let createKimiAgentic: (unit -> string option) -> IAgenticProvider =
+  createOpenAiCompatibleAgentic kimiConfig
 
 // ============================================================================
 //  Gemini (generateContent: system_instruction; roles user|model; tool-use via
@@ -948,7 +960,7 @@ let createKimiProvider: (unit -> string option) -> IAgenticProvider =
 //  call's id IS its function name and a result keys back on that name)
 // ============================================================================
 
-let private geminiUsage (json: JsonValue) : ProviderUsage option =
+let internal geminiUsage (json: JsonValue) : ProviderUsage option =
   match JsonValue.tryField "usageMetadata" json with
   | Some usage ->
     match
@@ -979,7 +991,7 @@ let private geminiText (json: JsonValue) : string =
 /// `Text`; each `functionCall` part becomes a `ToolUse` whose id is the function
 /// name (Gemini has no call id – the name is the key a `functionResponse` pairs
 /// back on).
-let private geminiBlocks (json: JsonValue) : AgentContentBlock list =
+let internal geminiBlocks (json: JsonValue) : AgentContentBlock list =
   let parts = geminiParts json
 
   let text =
@@ -1010,7 +1022,7 @@ let private geminiBlocks (json: JsonValue) : AgentContentBlock list =
 
 /// Gemini's stop: any `functionCall` part means tool-use regardless of the enum;
 /// else map the `finishReason` enum.
-let private geminiStop (json: JsonValue) : AgentStopReason =
+let internal geminiStop (json: JsonValue) : AgentStopReason =
   let hasCall =
     geminiParts json
     |> List.exists (fun p -> (p |> JsonValue.tryField "functionCall").IsSome)
@@ -1091,7 +1103,7 @@ let rec private geminiSchemaValue (json: JsonValue) : JsonValue =
 // config – the published evaluation measured reduced thinking as harmful to
 // output quality on the Gemini family (its deliberation is content-load-
 // bearing), so the provider default is the recommended posture here.
-let private geminiAgenticBody (request: AgentRequest) : JsonValue =
+let internal geminiAgenticBody (request: AgentRequest) : JsonValue =
   let functionDeclarations =
     request.Tools
     |> List.map (fun t ->
@@ -1106,8 +1118,8 @@ let private geminiAgenticBody (request: AgentRequest) : JsonValue =
       "tools", jarr [ jobj [ "functionDeclarations", jarr functionDeclarations ] ]
       "toolConfig", jobj [ "functionCallingConfig", jobj [ "mode", jstr "AUTO" ] ] ]
 
-let createGeminiProvider (getKey: unit -> string option) : IAgenticProvider =
-  { new IAgenticProvider with
+let createGeminiProvider (getKey: unit -> string option) : IAIProvider =
+  { new IAIProvider with
       member _.Id = "gemini"
       member _.Label = "Gemini (Google)"
       member _.DefaultModel = DEFAULT_GEMINI_MODEL
@@ -1132,8 +1144,11 @@ let createGeminiProvider (getKey: unit -> string option) : IAgenticProvider =
             match! postJson (geminiUrl request.Model) [ "x-goog-api-key", key ] body with
             | Result.Error e -> return ProviderOutcome.Error e
             | Result.Ok json -> return ProviderOutcome.Ok(geminiText json, geminiUsage json)
-          })
+          }) }
 
+/// The agentic (tool-use) Gemini adapter – same origin, same per-call key read.
+let createGeminiAgentic (getKey: unit -> string option) : IAgenticProvider =
+  { new IAgenticProvider with
       member _.SendAgentic(request) =
         async {
           match getKey () with
@@ -1185,8 +1200,8 @@ let providers: ProviderDescriptor list =
         [ { Id = DEFAULT_CLAUDE_MODEL
             Label = "Claude Opus 4.8" } ]
       Origin = ANTHROPIC_ORIGIN
-      Create = (fun getKey -> createAnthropicProvider getKey :> IAIProvider)
-      CreateAgentic = Some createAnthropicProvider }
+      Create = createAnthropicProvider
+      CreateAgentic = Some createAnthropicAgentic }
     { Id = "openai"
       Label = "GPT (OpenAI)"
       DefaultModel = DEFAULT_OPENAI_MODEL
@@ -1194,8 +1209,8 @@ let providers: ProviderDescriptor list =
         [ { Id = DEFAULT_OPENAI_MODEL
             Label = "GPT-5.6 Sol" } ]
       Origin = OPENAI_ORIGIN
-      Create = (fun getKey -> createOpenAIProvider getKey :> IAIProvider)
-      CreateAgentic = Some createOpenAIProvider }
+      Create = createOpenAIProvider
+      CreateAgentic = Some createOpenAIAgentic }
     { Id = "gemini"
       Label = "Gemini (Google)"
       DefaultModel = DEFAULT_GEMINI_MODEL
@@ -1203,8 +1218,8 @@ let providers: ProviderDescriptor list =
         [ { Id = DEFAULT_GEMINI_MODEL
             Label = "Gemini 3.1 Pro" } ]
       Origin = GEMINI_ORIGIN
-      Create = (fun getKey -> createGeminiProvider getKey :> IAIProvider)
-      CreateAgentic = Some createGeminiProvider }
+      Create = createGeminiProvider
+      CreateAgentic = Some createGeminiAgentic }
     { Id = "kimi"
       Label = "Kimi (Moonshot)"
       DefaultModel = DEFAULT_KIMI_MODEL
@@ -1212,8 +1227,8 @@ let providers: ProviderDescriptor list =
         [ { Id = DEFAULT_KIMI_MODEL
             Label = "Kimi K3" } ]
       Origin = KIMI_ORIGIN
-      Create = (fun getKey -> createKimiProvider getKey :> IAIProvider)
-      CreateAgentic = Some createKimiProvider }
+      Create = createKimiProvider
+      CreateAgentic = Some createKimiAgentic }
     { Id = "xai"
       Label = "Grok (xAI)"
       DefaultModel = DEFAULT_GROK_MODEL
@@ -1221,8 +1236,8 @@ let providers: ProviderDescriptor list =
         [ { Id = DEFAULT_GROK_MODEL
             Label = "Grok 4.5" } ]
       Origin = XAI_ORIGIN
-      Create = (fun getKey -> createGrokProvider getKey :> IAIProvider)
-      CreateAgentic = Some createGrokProvider } ]
+      Create = createGrokProvider
+      CreateAgentic = Some createGrokAgentic } ]
 
 [<Literal>]
 let defaultProviderId = "anthropic"
@@ -1232,197 +1247,3 @@ let descriptorFor (id: string) : ProviderDescriptor =
   providers
   |> List.tryFind (fun p -> p.Id = id)
   |> Option.defaultValue (List.head providers)
-
-// ─── flat test surface (Fable smoke per provider – Phase 327) ────────────────
-//
-// The per-provider agentic request build + response parse are pure (they speak
-// the shared `JsonValue` model, not `fetch`), so they're testable headlessly
-// over the Fable output without a live LLM. These project the body builders +
-// the response parsers to flat values (a serialized string / an anonymous
-// record) assertable from vitest across the Fable boundary, exercising all
-// three providers' block↔wire translation.
-
-/// Build a representative agentic request body for `providerId` and return its
-/// serialized JSON – a tool definition + a turn with text + a `tool_use` + a
-/// following `tool_result`, so the request path for every block kind is covered.
-let agenticRequestBodyFlat (providerId: string) : string =
-  let request: AgentRequest =
-    { System = "sys"
-      Model = "m"
-      MaxTokens = 1024
-      Tools =
-        [ { Name = "getNodeState"
-            Description = "read a node"
-            InputSchema =
-              // `additionalProperties` is deliberately present: Anthropic and
-              // the OpenAI-compatible vendors pass it through; Gemini's body
-              // builder must STRIP it (its schema subset rejects the key) –
-              // both behaviours are locked by the vitest suite.
-              createObj
-                [ "type" ==> "object"
-                  "properties" ==> createObj [ "nodeId" ==> createObj [ "type" ==> "string" ] ]
-                  "additionalProperties" ==> false ] } ]
-      Messages =
-        [ { Role = User
-            Content = [ AgentContentBlock.Text "build it" ] }
-          { Role = Assistant
-            Content =
-              [ AgentContentBlock.Text "inspecting"
-                AgentContentBlock.ToolUse("tu-1", "getNodeState", createObj [ "nodeId" ==> "n1" ]) ] }
-          { Role = User
-            Content = [ AgentContentBlock.ToolResult("tu-1", "{\"found\":true}", false) ] } ] }
-
-  match providerId with
-  | "openai" -> JsonHost.serialize (openAiCompatibleAgenticBody openAiConfig request)
-  | "kimi" -> JsonHost.serialize (openAiCompatibleAgenticBody kimiConfig request)
-  | "xai" -> JsonHost.serialize (openAiCompatibleAgenticBody xaiConfig request)
-  | "gemini" -> JsonHost.serialize (geminiAgenticBody request)
-  | _ -> JsonHost.serialize (anthropicAgenticBody request)
-
-/// Parse a canned agentic response for `providerId` to a flat shape: the count
-/// of text + tool-use blocks, the first tool's name + a stable arg, the stop
-/// reason (string), and the token totals.
-let parseAgenticResponseFlat
-  (providerId: string)
-  (responseJson: string)
-  : {| Blocks: int
-       ToolUses: int
-       FirstToolName: string
-       StopReason: string
-       InTokens: int
-       OutTokens: int |}
-  =
-  let json = JsonHost.parse responseJson |> Option.defaultValue JNull
-
-  let blocks, stop, usage =
-    match providerId with
-    | "openai"
-    | "kimi" -> openAiBlocks json, openAiStop json, openAiUsage json
-    | "xai" -> openAiBlocks json, openAiStop json, openAiUsageWith false json
-    | "gemini" -> geminiBlocks json, geminiStop json, geminiUsage json
-    | _ -> anthropicBlocks json, anthropicStop json, anthropicUsage json
-
-  let toolUses =
-    blocks
-    |> List.choose (function
-      | AgentContentBlock.ToolUse(_, name, _) -> Some name
-      | _ -> None)
-
-  let stopStr =
-    match stop with
-    | AgentStopReason.ToolUse -> "tool_use"
-    | AgentStopReason.EndTurn -> "end_turn"
-    | AgentStopReason.MaxTokens -> "max_tokens"
-    | AgentStopReason.Other -> "other"
-
-  {| Blocks = List.length blocks
-     ToolUses = List.length toolUses
-     FirstToolName = (toolUses |> List.tryHead |> Option.defaultValue "")
-     StopReason = stopStr
-     InTokens = (usage |> Option.map (fun u -> u.InputTokens) |> Option.defaultValue 0)
-     OutTokens = (usage |> Option.map (fun u -> u.OutputTokens) |> Option.defaultValue 0) |}
-
-/// Every provider origin the registry can egress to, flattened for the test
-/// boundary. This is the mirror side of `src/byok/origins.ts` (the constants
-/// vite.config.ts builds the CSP `connect-src` from): the egress test asserts
-/// the two sets are equal, so "the policy and the egress code cannot drift
-/// apart" is enforced rather than merely asserted in a comment.
-let providerOriginsFlat () : string array =
-  providers |> List.map _.Origin |> List.toArray
-
-let private errorKindName (kind: ProviderErrorKind) : string =
-  match kind with
-  | Config -> "config"
-  | Auth -> "auth"
-  | RateLimit -> "rate-limit"
-  | Network -> "network"
-  | ProviderFault -> "provider-fault"
-
-/// Drive ONE complete provider round trip for `providerId` — a fresh memory-only
-/// key store holding `key`, the real adapter, the real egress helper, the real
-/// `fetch` call — against whatever `fetch` the host has installed, and flatten
-/// the outcome for the vitest boundary. `agentic` selects the tool-use path.
-///
-/// This is the surface `test/networkEgress.test.ts` drives: the test installs an
-/// instrumented `fetch` plus fake storage/console/telemetry globals, runs the
-/// probe over every provider and every failure branch, and asserts the key
-/// reached the auth header and nowhere else. The failure branches matter most —
-/// a credential escapes through a message far more plausibly than through a
-/// request — so the returned `Message` is asserted as carefully as the request.
-let egressProbeFlat
-  (providerId: string)
-  (key: string)
-  (agentic: bool)
-  : JS.Promise<
-      {| Kind: string
-         Message: string
-         Text: string |}
-     >
-  =
-  let store = createKeyStore ()
-  store.Set key
-  let descriptor = descriptorFor providerId
-  let getKey () = store.Get()
-
-  let flat
-    kind
-    message
-    text
-    : {| Kind: string
-         Message: string
-         Text: string |}
-    =
-    {| Kind = kind
-       Message = message
-       Text = text |}
-
-  async {
-    if agentic then
-      match descriptor.CreateAgentic with
-      | None -> return flat "unsupported" "" ""
-      | Some mk ->
-        let request: AgentRequest =
-          { System = "sys"
-            Model = descriptor.DefaultModel
-            MaxTokens = 256
-            Tools =
-              [ { Name = "getNodeState"
-                  Description = "read a node"
-                  InputSchema = createObj [ "type" ==> "object" ] } ]
-            Messages =
-              [ { Role = User
-                  Content = [ AgentContentBlock.Text "build it" ] } ] }
-
-        match! (mk getKey).SendAgentic request with
-        | AgentOutcome.Error e -> return flat (errorKindName e.Kind) e.Message ""
-        | AgentOutcome.Ok(blocks, _, _) ->
-          let text =
-            blocks
-            |> List.choose (function
-              | AgentContentBlock.Text t -> Some t
-              | _ -> None)
-            |> String.concat ""
-
-          return flat "ok" "" text
-    else
-      let request: ProviderRequest =
-        { System = "sys"
-          Model = descriptor.DefaultModel
-          MaxTokens = 256
-          Messages = [ { Role = User; Content = "build it" } ] }
-
-      match! (descriptor.Create getKey).Send request with
-      | ProviderOutcome.Error e -> return flat (errorKindName e.Kind) e.Message ""
-      | ProviderOutcome.Ok(text, _) -> return flat "ok" "" text
-  }
-  |> Async.StartAsPromise
-
-/// `estimateCostUsd` flattened for the vitest boundary: -1.0 ⇒ unknown model
-/// (the readout shows tokens only).
-let estimateCostUsdFlat (model: string) (inputTokens: int) (outputTokens: int) : float =
-  estimateCostUsd model inputTokens outputTokens |> Option.defaultValue -1.0
-
-/// The default model id per provider, flattened for the test boundary – every
-/// one must have an entry in the indicative price table.
-let defaultModelIdsFlat () : string array =
-  providers |> List.map _.DefaultModel |> List.toArray

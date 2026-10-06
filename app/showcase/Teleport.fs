@@ -79,8 +79,6 @@ let private lsSet (key: string) (value: string) : unit = jsNative
 [<Emit("window.localStorage.removeItem($0)")>]
 let private lsRemove (key: string) : unit = jsNative
 
-[<Emit("navigator.clipboard && navigator.clipboard.writeText($0)")>]
-let private clipboardWrite (text: string) : unit = jsNative
 
 // replaceState (not location.hash assignment) – updates the address bar
 // without pushing history entries or firing hashchange, so the live pass can
@@ -886,7 +884,7 @@ let private TeleportView (bare: bool) : ReactElement =
                                                "Copy link"
                                            )
                                            prop.onClick (fun _ ->
-                                             clipboardWrite p.Url
+                                             Fuaran.Live.Interop.writeClipboard p.Url |> ignore
                                              setCopied (Some "link")) ]
                                        Html.button
                                          [ prop.className "tp-hop-btn"
@@ -968,7 +966,7 @@ let private TeleportView (bare: bool) : ReactElement =
                                "Copy the app"
                            )
                            prop.onClick (fun _ ->
-                             clipboardWrite p.Encoded
+                             Fuaran.Live.Interop.writeClipboard p.Encoded |> ignore
                              setCopied (Some "string")) ] ] ]
              | _ -> Html.none)
             pasteRow ] ]

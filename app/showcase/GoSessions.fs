@@ -37,16 +37,11 @@ open Feliz
 open Fuaran.UI
 open Fuaran.UI.Types
 open Fuaran.UI.Renderer
+open Fuaran.Live.Interop
 
 module Decode = Fuaran.UI.Ops.JsonDecode
 
-// ─── small JS interop (mirrors Evaluation.fs' tolerant-read helpers) ──────────
-
-[<Emit("(function(){ try { return JSON.parse($0); } catch(e){ return null; } })()")>]
-let private tryParseJson (s: string) : obj = jsNative
-
-[<Emit("($0 == null ? null : $0[$1])")>]
-let private field (o: obj) (k: string) : obj = jsNative
+// ─── small JS interop (tryParseJson / field / fetchText: shared/Interop.fs) ───
 
 [<Emit("(function(){ var v = ($0==null?null:$0[$1]); return Array.isArray(v)?v:[]; })()")>]
 let private fieldArr (o: obj) (k: string) : obj[] = jsNative
@@ -286,10 +281,6 @@ type private ReplayLoad =
   | Loading
   | Loaded of obj // the parsed artefact
   | Missing of string
-
-// fetch(url) → text, in JS; a non-OK / network error routes to onErr.
-[<Emit("fetch($0).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }).then($1).catch(function(e){ $2(String(e&&e.message?e.message:e)); })")>]
-let private fetchText (url: string) (onText: string -> unit) (onErr: string -> unit) : unit = jsNative
 
 [<Emit("setInterval($0,$1)")>]
 let private setInterval (cb: unit -> unit) (ms: int) : int = jsNative

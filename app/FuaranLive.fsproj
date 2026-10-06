@@ -52,6 +52,9 @@
          preference) – one definition for both entries of the site (the showcase
          project links the same file). -->
     <Compile Include="shared\Brand.fs" />
+    <!-- The small JS interop helpers (Phase 2081): one definition each, shared
+         with the showcase project, which links the same file. -->
+    <Compile Include="shared\Interop.fs" />
     <Compile Include="Ports.fs" />
     <Compile Include="Byok.fs" />
     <Compile Include="SystemPrompt.fs" />
@@ -67,6 +70,11 @@
     <Compile Include="Voice.fs" />
     <Compile Include="Live.fs" />
     <Compile Include="WebRtc.fs" />
+    <!-- The pattern bank's engine and seed catalogues (Phase 2081): ONE
+         definition, generic over the message type, which the showcase project
+         links as it links navigator\Cursor.fs. PatternBank.fs is this entry's
+         panel over it. -->
+    <Compile Include="shared\PatternBank.fs" />
     <Compile Include="PatternBank.fs" />
     <!-- The session-free cursor core (Phase 744): the walk's canonical
          definition — path-of-ids state, DFS moves, end-stop, re-resolution.
@@ -118,6 +126,17 @@
     <Compile Include="measure\Capture.fs" />
     <!-- Phase 2047 — the tool-panel disclosure whose body mounts only while open. -->
     <Compile Include="Disclosure.fs" />
+    <!-- Phase 2081 — TEST-ONLY modules: the probes, scripted providers and flat
+         adapters the vitest suite imports from the Fable output. Compiled here
+         so they build against exactly what the app builds against; imported by
+         nothing in the app, so the modules above hold only what the playground
+         runs. Ordered before App.fs, which must stay last. -->
+    <Compile Include="testing\AgentProbes.fs" />
+    <Compile Include="testing\AskProbes.fs" />
+    <Compile Include="testing\ByokProbes.fs" />
+    <Compile Include="testing\ConsoleProbes.fs" />
+    <Compile Include="testing\ContributeProbes.fs" />
+    <Compile Include="testing\PatternBankProbes.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

@@ -48,13 +48,6 @@ importSideEffects "./app.css"
 // maps the common names to currentColor SVG masks (see app/icon-glyphs.css).
 importSideEffects "./icon-glyphs.css"
 
-// Toggle the chrome-token class on <html> so the page background (outside the
-// max-width shell) darkens too and the ported --fuaran-color-* chrome tokens
-// flip – mirrors the showcase's applyDarkClass. Rendered trees re-colour via
-// themeStyleElement; this covers the body + branded chrome.
-[<Emit("(function(){ try { document.documentElement.classList.toggle('ds-dark', $0); } catch(e){} })()")>]
-let private applyDarkClass (dark: bool) : unit = jsNative
-
 // The brand palette + dark theme + persisted preference live in Brand.fs – the
 // single shared home, so the chrome and every rendered node re-colour from one
 // definition.
@@ -793,7 +786,7 @@ let private init () : Model * Cmd<Msg> =
     [ parityListenCmd
       copyEnhanceCmd
       mathEnhanceCmd
-      Cmd.ofEffect (fun _ -> applyDarkClass (Brand.initialDark ()))
+      Cmd.ofEffect (fun _ -> Interop.applyDarkClass (Brand.initialDark ()))
       (if isAudience then audienceSubscribeCmd else Cmd.none)
       // The join-link auto-answer: the scanned offer starts the handshake
       // immediately, so the phone lands directly on its answer code.
@@ -834,7 +827,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     { model with Dark = dark },
     Cmd.ofEffect (fun _ ->
       Brand.persistDark dark
-      applyDarkClass dark)
+      Interop.applyDarkClass dark)
   | ToggleMic ->
     if not model.VoiceSupported then
       model, Cmd.none

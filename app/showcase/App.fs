@@ -54,11 +54,6 @@ importSideEffects "../icon-glyphs.css"
 //  Brand module (one definition for both entries of the site). The chrome
 //  (`--fuaran-color-*`) flips via a `.ds-dark` class in app.css.
 
-// Toggle the chrome-token class on <html> so the body background (outside the
-// max-width shell) darkens too – the component tokens flip via themeStyleElement.
-[<Emit("(function(){ try { document.documentElement.classList.toggle('ds-dark', $0); } catch(e){} })()")>]
-let private applyDarkClass (dark: bool) : unit = jsNative
-
 type Model =
   {
     Route: Pages.Route
@@ -130,7 +125,7 @@ let private init () : Model * Cmd<Msg> =
       mathEnhanceCmd
       Conformance.loadCmd ConformanceResult
       pageCmd
-      Cmd.ofEffect (fun _ -> applyDarkClass dark) ]
+      Cmd.ofEffect (fun _ -> Fuaran.Live.Interop.applyDarkClass dark) ]
 
 let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
   match msg with
@@ -146,7 +141,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     { model with Dark = dark },
     Cmd.ofEffect (fun _ ->
       Brand.persistDark dark
-      applyDarkClass dark)
+      Fuaran.Live.Interop.applyDarkClass dark)
 
 
 let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =

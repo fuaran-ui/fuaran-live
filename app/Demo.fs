@@ -239,13 +239,6 @@ let createProvider () : IAgenticProvider =
   let calls = ref 0
 
   { new IAgenticProvider with
-      member _.Id = "demo"
-      member _.Label = "Scripted demo"
-      member _.DefaultModel = "scripted-demo"
-
-      member _.Send(_request) =
-        async { return ProviderOutcome.Ok("", None) }
-
       member _.SendAgentic(request) =
         async {
           do! Async.Sleep paceMs

@@ -19,7 +19,7 @@ import {
   estimateCostUsdFlat,
   defaultModelIdsFlat,
   // @ts-expect-error untyped Fable output
-} from '../app/output/Byok.js';
+} from '../app/output/testing/ByokProbes.js';
 
 // Canned tool-use responses in each provider's native wire shape: a text block +
 // one tool_use on getNodeState(nodeId: "n1") + real token usage.

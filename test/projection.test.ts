@@ -80,6 +80,20 @@ describe('source projection – per-language builder source', () => {
     expect(out).toContain('Value = Binding.Static(1234.5)');
   });
 
+  it('VB (fluent) projects the factory + `With { }` initialiser shape', () => {
+    const out = projectByName('vbfluent', metricNode);
+    expect(out).toContain('Fuaran.Metric(New MetricOptions With {'); // factory + options type
+    expect(out).toContain('.Id = "metric-1"'); // id folded into the initialiser
+    expect(out).toContain('.Label = "Revenue"'); // Literal → bare string, PascalCase member
+    expect(out).toContain('.Value = Binding.Static(1234.5)');
+    // VB string literals double their quotes – there is no backslash escape.
+    const quoted = projectByName(
+      'vbfluent',
+      '{"id":"q","kind":{"$type":"Metric","label":"say \\"hi\\"","value":{"$type":"Static","value":1}}}',
+    );
+    expect(quoted).toContain('.Label = "say ""hi"""');
+  });
+
   it('VB projects the XML-literal shape (attributes, format-*, $-bound elided)', () => {
     const out = projectByName('vb', metricNode);
     expect(out).toContain('<Metric id="metric-1"'); // element = kind, id attribute
@@ -103,7 +117,7 @@ describe('source projection – per-language builder source', () => {
 
   it('never crashes on an uncovered kind – generic fallback', () => {
     const weird = '{"id":"x","kind":{"$type":"ZibbleWidget","foo":[1,2,{"bar":true}]}}';
-    for (const lang of ['json', 'typescript', 'python', 'fsharp', 'csharp', 'vb']) {
+    for (const lang of ['json', 'typescript', 'python', 'fsharp', 'csharp', 'vb', 'vbfluent']) {
       const out = projectByName(lang, weird);
       expect(typeof out).toBe('string');
       expect(out.length).toBeGreaterThan(0);

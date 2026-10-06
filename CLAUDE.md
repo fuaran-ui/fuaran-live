@@ -30,6 +30,9 @@ fuaran-live/
 ├── app/                    # the playground Fable project (compiled to app/output/, gitignored)
 │   ├── FuaranLive.fsproj   #   the language tier as published packages, versions from ../Directory.Build.props
 │   ├── shared/Brand.fs     #   the SHARED brand module (palette theme + persisted light/dark preference)
+│   ├── shared/Interop.fs   #   the SHARED small JS interop helpers (tolerant JSON, fetch-as-text, clipboard, …)
+│   ├── shared/PatternBank.fs # the SHARED pattern bank: engine + both seed catalogues (showcase links it)
+│   ├── testing/            #   TEST-ONLY probes + flat adapters the vitest suite imports; nothing in the app does
 │   ├── Ports.fs            #   IAIProvider + EffectPorts seams (port of the former ports.ts)
 │   ├── Byok.fs             #   memory key store + browser effect ports + the Anthropic `fetch` provider
 │   ├── SystemPrompt.fs     #   the system prompt = the language repo's drift-checked prompt pack
@@ -139,7 +142,7 @@ parser reads untrusted provider responses, so carrying a copy means owning secur
 which makes re-vendoring a decision rather than a convenience.
 
 **What is NOT shared, and would not become shared by adopting a package: `app/Agent.fs`'s loop.**
-The emit→observe→repair loop in this repo is its own — 1,963 lines of Fable over JS interop and
+The emit→observe→repair loop in this repo is its own — over a thousand lines of Fable over JS interop and
 browser DOM reading, built around the browser rather than ported to it. **No published package
 provides that loop.** Phase 1753 checked the public registry directly and found none, and its
 finding is recorded here because the opposite assumption is the natural one to make: publishing the

@@ -36,7 +36,9 @@ import { fileURLToPath } from 'node:url';
 // @ts-expect-error untyped Fable output
 import { empty, ingestResult } from '../app/output/Session.js';
 // @ts-expect-error untyped Fable output
-import { accepted, examples, parseFlat, runLine } from '../app/output/Console.js';
+import { accepted, examples } from '../app/output/Console.js';
+// @ts-expect-error untyped Fable output
+import { parseFlat, runLine } from '../app/output/testing/ConsoleProbes.js';
 // The session's op list is an F# list across the boundary; the navigator's own
 // flat projection is the established way to count it from a test.
 // @ts-expect-error untyped Fable output

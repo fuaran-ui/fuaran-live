@@ -186,12 +186,6 @@ type private ChainEntry =
     Hash: string
     Prev: string }
 
-/// A fixed timestamp so the chain is content-addressed (the hash is a pure
-/// function of prev-hash + sequence + actor + op – edit the same way, get the
-/// same chain), rather than wall-clock-dependent.
-let private fixedTs =
-  System.DateTimeOffset(2020, 1, 1, 0, 0, 0, System.TimeSpan.Zero)
-
 // ─── The page ────────────────────────────────────────────────────────────────
 
 [<ReactComponent>]
@@ -279,7 +273,14 @@ let private ChartsView () : ReactElement =
           let summary = sprintf "%d typed op(s) → sales-chart · %s" (List.length ops) kinds
 
           let h =
-            HashChain.computeHash prevHash batchOp nextSeq fixedTs (Actor.Human "you") None OpResultEnvelope.Success
+            HashChain.computeHash
+              prevHash
+              batchOp
+              nextSeq
+              Fuaran.Live.Interop.chainTimestamp
+              (Actor.Human "you")
+              None
+              OpResultEnvelope.Success
 
           setChain (
             chain

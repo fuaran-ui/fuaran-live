@@ -152,16 +152,6 @@ let tryPayload (json: string) : PanelPayload option =
 
 // ─── ingest – the per-panel scoped fold ──────────────────────────────────────
 
-/// A fixed timestamp so each panel's chain is content-addressed – a pure
-/// function of prev-hash + sequence + actor + op. Replaying the same ops
-/// yields the same hashes (which is what makes `verify` meaningful), rather
-/// than a wall-clock-dependent record.
-let private fixedTs =
-  System.DateTimeOffset(2020, 1, 1, 0, 0, 0, System.TimeSpan.Zero)
-
-[<Emit("(function(j){ try { var t = JSON.parse(j).$type; return (typeof t === 'string') ? t : 'op'; } catch(e){ return 'op'; } })($0)")>]
-let private opKindOf (canonJson: string) : string = jsNative
-
 type PanelOutcome =
   /// The payload applied. `Mode` is "tree" / "op"; `IsNew` marks a panel's
   /// first appearance (the transcript renders its live row at that point).
@@ -253,11 +243,11 @@ let ingest (store: PanelStore) (author: Actor) (payload: PanelPayload) : PanelOu
           let prev = chainHead panel
 
           let hash =
-            HashChain.computeHash prev op seq fixedTs author None OpResultEnvelope.Success
+            HashChain.computeHash prev op seq Interop.chainTimestamp author None OpResultEnvelope.Success
 
           let entry =
             { Seq = seq
-              OpKind = opKindOf canonOp
+              OpKind = Interop.opTypeOf canonOp
               Hash = hash
               Prev = prev
               Author = author }
@@ -327,7 +317,14 @@ let verify (panel: Panel) : VerifyReport =
             match List.tryItem i panel.Chain, Decode.decodeOp opJson with
             | Some entry, Ok op ->
               let h =
-                HashChain.computeHash prev op (i + 1) fixedTs entry.Author None OpResultEnvelope.Success
+                HashChain.computeHash
+                  prev
+                  op
+                  (i + 1)
+                  Interop.chainTimestamp
+                  entry.Author
+                  None
+                  OpResultEnvelope.Success
 
               Some(h, oks && h = entry.Hash && entry.Prev = prev)
             | _ -> None))

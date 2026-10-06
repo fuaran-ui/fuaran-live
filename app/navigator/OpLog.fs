@@ -166,7 +166,7 @@ let verify (session: Session.SessionState) : VerifyReport =
             | Error _ -> None
             | Ok op ->
               let h =
-                HashChain.computeHash prev op (i + 1) Session.chainTimestamp entry.Actor None OpResultEnvelope.Success
+                HashChain.computeHash prev op (i + 1) Interop.chainTimestamp entry.Actor None OpResultEnvelope.Success
 
               Some(h, oks && h = entry.Hash && entry.Prev = prev && entry.Seq = i + 1)))
         (Some(Session.baseHash session, true))

@@ -21,6 +21,7 @@ open Feliz
 open Fuaran.UI
 open Fuaran.UI.Types
 open Fuaran.UI.Renderer
+open Fuaran.Live.Interop
 
 // ─── the published feed shape (see public/eval/README.md) ────────────────────
 
@@ -144,15 +145,6 @@ type FeedState =
   | Failed of string
 
 // ─── interop: fetch + tolerant JSON read + polling clock ─────────────────────
-
-[<Emit("fetch($0, {cache:'no-store'}).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }).then($1).catch(function(e){ $2(String(e&&e.message?e.message:e)); })")>]
-let private fetchInto (url: string) (onText: string -> unit) (onErr: string -> unit) : unit = jsNative
-
-[<Emit("(function(){ try { return JSON.parse($0); } catch(e){ return null; } })()")>]
-let private tryParseJson (s: string) : obj = jsNative
-
-[<Emit("($0 == null ? null : $0[$1])")>]
-let private field (o: obj) (k: string) : obj = jsNative
 
 [<Emit("(function(){ var v = ($0==null?null:$0[$1]); return Array.isArray(v)?v:[]; })()")>]
 let private fieldArr (o: obj) (k: string) : obj[] = jsNative
@@ -689,7 +681,7 @@ let private EvaluationView () : ReactElement =
   let basis, setBasis = React.useState CostBasis.Cold
 
   let load () =
-    fetchInto
+    fetchTextUncached
       (feedUrl ())
       (fun text ->
         setState (parseFeed text)

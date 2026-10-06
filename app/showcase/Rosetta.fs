@@ -10,8 +10,8 @@ module Fuaran.Showcase.Rosetta
 //  byte-parity strip in three honest tiers.
 //
 //  The honesty of the claim (stated in the footer): the source columns are
-//  idiomatic *projections* with parameterised holes, not live compilers. The
-//  parity strip is honestly tiered:
+//  *projections* of the exemplar's canonical wire through the site's one source
+//  projector, not live compilers. The parity strip is honestly tiered:
 //    Tier 1 – independent live encoders, five implementations converging on one
 //             hash, live:
 //      • F#     – the REAL `Fuaran.UI` canonical encoder (CanonicalJson.encodeNode)
@@ -152,332 +152,17 @@ let private jsNumber (s: string) : float = jsNative
 [<Emit("Number.isFinite($0)")>]
 let private jsFinite (n: float) : bool = jsNative
 
-// ─── Projected source columns (idiomatic authoring, hole-parameterised) ─────
-//  Display-only. What a human would write in each language to build this tree –
-//  the hole values are spliced in live. The wire hash, not this text, is what
+// ─── Projected source columns ───────────────────────────────────────────────
+//  Display-only: what a human would write in each language to build this tree.
+//  Every column is the site's ONE source projector (`Projection.projectTo`, the
+//  same engine the playground's Source card runs) applied to the exemplar's
+//  canonical wire – never a per-page template. So a label typed into a hole is
+//  escaped as each language escapes it, and the TypeScript, Python and F#
+//  columns are the projector's conformance-gated forms (executing them
+//  re-encodes the wire byte-identically). The wire hash, not this text, is what
 //  the parity strip computes.
 
-let private fsSource (h: Holes) : string =
-  "open Fuaran\n"
-  + "open Fuaran.UI.Types\n\n"
-  + "// A dashboard with a three-metric strip – one Fuaran tree.\n"
-  + "let dashboard =\n"
-  + "    Fuaran.box \"rosetta-root\"\n"
-  + "        { Layout = Flex Vertical\n"
-  + "          Role = Dashboard\n"
-  + "          Heading = Some (text \"Revenue snapshot\")\n"
-  + "          Children =\n"
-  + "            [ Fuaran.box \"rosetta-strip\"\n"
-  + "                { Layout = Flex Horizontal; Role = Group\n"
-  + "                  Children =\n"
-  + "                    [ Fuaran.metric \"m-a\" { label \""
-  + h.LabelA
-  + "\"; value "
-  + numText h.ValueA
-  + " }\n"
-  + "                      Fuaran.metric \"m-b\" { label \""
-  + h.LabelB
-  + "\"; value "
-  + numText h.ValueB
-  + " }\n"
-  + "                      Fuaran.metric \"m-c\" { label \""
-  + h.LabelC
-  + "\"; value "
-  + numText h.ValueC
-  + " } ] } ] }\n"
-
-let private tsSource (h: Holes) : string =
-  "import { box, metric, Flex, Role } from '@fuaran-ui/ui';\n\n"
-  + "// The same tree, authored in TypeScript.\n"
-  + "const dashboard = box('rosetta-root', {\n"
-  + "  layout: Flex.Vertical,\n"
-  + "  role: Role.Dashboard,\n"
-  + "  heading: 'Revenue snapshot',\n"
-  + "  children: [\n"
-  + "    box('rosetta-strip', { layout: Flex.Horizontal, role: Role.Group, children: [\n"
-  + "      metric('m-a', { label: '"
-  + h.LabelA
-  + "', value: "
-  + numText h.ValueA
-  + " }),\n"
-  + "      metric('m-b', { label: '"
-  + h.LabelB
-  + "', value: "
-  + numText h.ValueB
-  + " }),\n"
-  + "      metric('m-c', { label: '"
-  + h.LabelC
-  + "', value: "
-  + numText h.ValueC
-  + " }),\n"
-  + "    ] }),\n"
-  + "  ],\n"
-  + "});\n"
-
-let private pySource (h: Holes) : string =
-  "from fuaran_ui.ui import box, metric, Flex, Role\n\n"
-  + "# The same tree, authored in Python.\n"
-  + "dashboard = box(\"rosetta-root\",\n"
-  + "    layout=Flex.VERTICAL, role=Role.DASHBOARD, heading=\"Revenue snapshot\",\n"
-  + "    children=[\n"
-  + "        box(\"rosetta-strip\", layout=Flex.HORIZONTAL, role=Role.GROUP, children=[\n"
-  + "            metric(\"m-a\", label=\""
-  + h.LabelA
-  + "\", value="
-  + numText h.ValueA
-  + "),\n"
-  + "            metric(\"m-b\", label=\""
-  + h.LabelB
-  + "\", value="
-  + numText h.ValueB
-  + "),\n"
-  + "            metric(\"m-c\", label=\""
-  + h.LabelC
-  + "\", value="
-  + numText h.ValueC
-  + "),\n"
-  + "        ]),\n"
-  + "    ])\n"
-
-let private csSource (h: Holes) : string =
-  "using static Fuaran.UI.CSharp.Fuaran;\n\n"
-  + "// The same tree, authored in C#.\n"
-  + "var dashboard = Box(new()\n"
-  + "{\n"
-  + "    Id = \"rosetta-root\", Layout = Flex.Vertical,\n"
-  + "    Role = BoxRole.Dashboard, Heading = \"Revenue snapshot\",\n"
-  + "    Children =\n"
-  + "    [\n"
-  + "        Box(new()\n"
-  + "        {\n"
-  + "            Id = \"rosetta-strip\", Layout = Flex.Horizontal, Role = BoxRole.Group,\n"
-  + "            Children =\n"
-  + "            [\n"
-  + "                Metric(new() { Id = \"m-a\", Label = \""
-  + h.LabelA
-  + "\", Value = "
-  + numText h.ValueA
-  + " }),\n"
-  + "                Metric(new() { Id = \"m-b\", Label = \""
-  + h.LabelB
-  + "\", Value = "
-  + numText h.ValueB
-  + " }),\n"
-  + "                Metric(new() { Id = \"m-c\", Label = \""
-  + h.LabelC
-  + "\", Value = "
-  + numText h.ValueC
-  + " }),\n"
-  + "            ],\n"
-  + "        }),\n"
-  + "    ],\n"
-  + "});\n\n"
-  + "string wireJson = Encode(dashboard);\n"
-
-let private vbSource (h: Holes) : string =
-  "Imports Fuaran.UI.VisualBasic\n\n"
-  + "' The same tree, authored in Visual Basic (XML literals).\n"
-  + "Dim dashboard = <Box id=\"rosetta-root\" layout=\"Flex.Vertical\"\n"
-  + "                     role=\"Dashboard\" heading=\"Revenue snapshot\">\n"
-  + "                    <Box id=\"rosetta-strip\" layout=\"Flex.Horizontal\" role=\"Group\">\n"
-  + "                        <Metric id=\"m-a\" label=\""
-  + h.LabelA
-  + "\" value=\""
-  + numText h.ValueA
-  + "\"/>\n"
-  + "                        <Metric id=\"m-b\" label=\""
-  + h.LabelB
-  + "\" value=\""
-  + numText h.ValueB
-  + "\"/>\n"
-  + "                        <Metric id=\"m-c\" label=\""
-  + h.LabelC
-  + "\" value=\""
-  + numText h.ValueC
-  + "\"/>\n"
-  + "                    </Box>\n"
-  + "                </Box>\n\n"
-  + "Dim wireJson As String = FuaranXml.Encode(dashboard)\n"
-
-// The second Visual Basic dialect: the fluent factory (the same .NET authoring
-// surface C# calls) driven with VB's `With {}` object initialisers – a distinct
-// idiom, the same tree, the same bytes.
-let private vbFluentSource (h: Holes) : string =
-  "Imports Fuaran.UI.CSharp\n\n"
-  + "' The same tree, authored in Visual Basic (fluent factory).\n"
-  + "Dim dashboard = Fuaran.Box(New BoxOptions With {\n"
-  + "    .Id = \"rosetta-root\", .Orientation = Orientation.Vertical,\n"
-  + "    .Role = BoxRoleKind.Dashboard, .Heading = \"Revenue snapshot\",\n"
-  + "    .Children = {\n"
-  + "        Fuaran.Box(New BoxOptions With {\n"
-  + "            .Id = \"rosetta-strip\", .Orientation = Orientation.Horizontal,\n"
-  + "            .Role = BoxRoleKind.Group, .Wrap = True,\n"
-  + "            .Children = {\n"
-  + "                Fuaran.Metric(New MetricOptions With {.Id = \"m-a\", .Label = \""
-  + h.LabelA
-  + "\", .Value = "
-  + numText h.ValueA
-  + "}),\n"
-  + "                Fuaran.Metric(New MetricOptions With {.Id = \"m-b\", .Label = \""
-  + h.LabelB
-  + "\", .Value = "
-  + numText h.ValueB
-  + "}),\n"
-  + "                Fuaran.Metric(New MetricOptions With {.Id = \"m-c\", .Label = \""
-  + h.LabelC
-  + "\", .Value = "
-  + numText h.ValueC
-  + "})\n"
-  + "            }\n"
-  + "        })\n"
-  + "    }\n"
-  + "})\n\n"
-  + "Dim wireJson As String = Wire.Encode(dashboard)\n"
-
-let private goSource (h: Holes) : string =
-  "package main\n\n"
-  + "import \"github.com/fuaran-ui/fuaran-go/wire\"\n\n"
-  + "// The same tree, authored in Go.\n"
-  + "func metric(id, label string, value float64) wire.Node {\n"
-  + "    return wire.Node{ID: id, Kind: wire.Obj{Tag: \"Metric\", Fields: map[string]wire.Value{\n"
-  + "        \"label\": wire.Str(label),\n"
-  + "        \"value\": wire.Obj{Tag: \"Static\", Fields: map[string]wire.Value{\"value\": wire.Float(value)}},\n"
-  + "    }}}\n"
-  + "}\n\n"
-  + "strip := wire.Node{ID: \"rosetta-strip\", Kind: wire.Obj{Tag: \"Box\", Fields: map[string]wire.Value{\n"
-  + "    \"role\": wire.Str(\"Group\"),\n"
-  + "    \"layout\": wire.Obj{Tag: \"Flex\", Fields: map[string]wire.Value{\"direction\": wire.Str(\"Horizontal\"), \"wrap\": wire.Bool(true)}},\n"
-  + "    \"children\": wire.Arr{\n"
-  + "        metric(\"m-a\", \""
-  + h.LabelA
-  + "\", "
-  + numText h.ValueA
-  + "),\n"
-  + "        metric(\"m-b\", \""
-  + h.LabelB
-  + "\", "
-  + numText h.ValueB
-  + "),\n"
-  + "        metric(\"m-c\", \""
-  + h.LabelC
-  + "\", "
-  + numText h.ValueC
-  + "),\n"
-  + "    },\n"
-  + "}}}\n"
-  + "dashboard := wire.Node{ID: \"rosetta-root\", Kind: wire.Obj{Tag: \"Box\", Fields: map[string]wire.Value{\n"
-  + "    \"role\": wire.Str(\"Dashboard\"), \"heading\": wire.Str(\"Revenue snapshot\"),\n"
-  + "    \"layout\": wire.Obj{Tag: \"Flex\", Fields: map[string]wire.Value{\"direction\": wire.Str(\"Vertical\"), \"wrap\": wire.Bool(false)}},\n"
-  + "    \"children\": wire.Arr{strip},\n"
-  + "}}}\n\n"
-  + "wireJSON, _ := wire.EncodeNode(dashboard)\n"
-
-let private rustSource (h: Holes) : string =
-  "use fuaran_rs::canonical::JVal;\n"
-  + "use fuaran_rs::wire::{encode_node, Binding, BoxLayout, BoxRole, BoxSpec,\n"
-  + "    MetricSpec, Node, NodeKind, Orientation, StaticValue, TextSource};\n\n"
-  + "// The same tree, authored in Rust (native enums, exhaustive by construction).\n"
-  + "fn metric(id: &str, label: &str, value: f64) -> Node {\n"
-  + "    Node {\n"
-  + "        id: id.into(),\n"
-  + "        kind: NodeKind::Metric(MetricSpec {\n"
-  + "            label: TextSource::Literal(label.into()),\n"
-  + "            value: Binding::Static { value: StaticValue::Ast(JVal::Num(value)) },\n"
-  + "            ..MetricSpec::default()\n"
-  + "        }),\n"
-  + "        ..Node::default()\n"
-  + "    }\n"
-  + "}\n\n"
-  + "fn flex_box(id: &str, dir: Orientation, wrap: bool, role: BoxRole,\n"
-  + "            heading: Option<&str>, children: Vec<Node>) -> Node {\n"
-  + "    Node {\n"
-  + "        id: id.into(),\n"
-  + "        kind: NodeKind::Box(BoxSpec {\n"
-  + "            children,\n"
-  + "            heading: heading.map(|h| TextSource::Literal(h.into())),\n"
-  + "            layout: BoxLayout::Flex { direction: dir, gap: None, wrap },\n"
-  + "            role,\n"
-  + "        }),\n"
-  + "        ..Node::default()\n"
-  + "    }\n"
-  + "}\n\n"
-  + "let strip = flex_box(\"rosetta-strip\", Orientation::Horizontal, true, BoxRole::Group, None, vec![\n"
-  + "    metric(\"m-a\", \""
-  + h.LabelA
-  + "\", "
-  + numText h.ValueA
-  + "),\n"
-  + "    metric(\"m-b\", \""
-  + h.LabelB
-  + "\", "
-  + numText h.ValueB
-  + "),\n"
-  + "    metric(\"m-c\", \""
-  + h.LabelC
-  + "\", "
-  + numText h.ValueC
-  + "),\n"
-  + "]);\n"
-  + "let dashboard = flex_box(\"rosetta-root\", Orientation::Vertical, false,\n"
-  + "    BoxRole::Dashboard, Some(\"Revenue snapshot\"), vec![strip]);\n\n"
-  + "let wire_json = encode_node(&dashboard);\n"
-
-// The Swift + Kotlin columns are CONSUMPTION projections: a native surface over
-// the Rust reference core decodes the wire and renders it. They never encode – so
-// on the parity strip they carry the tier-3 badge and no hash cell.
-let private swiftSource (h: Holes) : string =
-  "import Fuaran  // native Swift surface over the Rust reference core\n\n"
-  + "// Decode-only: the Rust core owns the wire; SwiftUI renders the projection.\n"
-  + "let session = try FuaranSession(wire: rosettaWire)\n\n"
-  + "// The SwiftUI render arm over the decoded dashboard tree.\n"
-  + "var body: some View {\n"
-  + "    Dashboard(\"Revenue snapshot\") {\n"
-  + "        HStack {\n"
-  + "            Metric(\""
-  + h.LabelA
-  + "\", value: "
-  + numText h.ValueA
-  + ")\n"
-  + "            Metric(\""
-  + h.LabelB
-  + "\", value: "
-  + numText h.ValueB
-  + ")\n"
-  + "            Metric(\""
-  + h.LabelC
-  + "\", value: "
-  + numText h.ValueC
-  + ")\n"
-  + "        }\n"
-  + "    }\n"
-  + "}\n"
-
-let private ktSource (h: Holes) : string =
-  "import ui.fuaran.FuaranSession  // native Kotlin surface over the Rust core\n\n"
-  + "// Decode-only: the Rust core owns the wire; Compose renders the projection.\n"
-  + "val session = FuaranSession(rosettaWire)\n\n"
-  + "// The Jetpack Compose render arm over the decoded dashboard tree.\n"
-  + "@Composable\n"
-  + "fun Dashboard() = Column {\n"
-  + "    Text(\"Revenue snapshot\", style = MaterialTheme.typography.titleMedium)\n"
-  + "    Row {\n"
-  + "        Metric(\""
-  + h.LabelA
-  + "\", value = "
-  + numText h.ValueA
-  + ")\n"
-  + "        Metric(\""
-  + h.LabelB
-  + "\", value = "
-  + numText h.ValueB
-  + ")\n"
-  + "        Metric(\""
-  + h.LabelC
-  + "\", value = "
-  + numText h.ValueC
-  + ")\n"
-  + "    }\n"
-  + "}\n"
+module Lang = Fuaran.Live.Projection
 
 // ─── Wire diff (first divergent byte + a context window) ────────────────────
 
@@ -754,18 +439,20 @@ let private RosettaView () : ReactElement =
   // last two columns are native render surfaces (consumption, not encoding).
   let langTabs =
     let langs =
-      [ "F#", "Fuaran.UI", fsSource holes
-        "C#", "Fuaran.UI.CSharp", csSource holes
-        "Visual Basic", "Fuaran.UI.CSharp", vbFluentSource holes
-        "Visual Basic (XML)", "Fuaran.UI.VisualBasic", vbSource holes
-        "TypeScript", "@fuaran-ui/ui", tsSource holes
-        "Python", "fuaran_ui.ui", pySource holes
-        "Go", "fuaran-go", goSource holes
-        "Rust", "fuaran-rs", rustSource holes
-        "Swift", "fuaran-swift (SwiftUI)", swiftSource holes
-        "Kotlin", "fuaran-kt (Compose)", ktSource holes ]
+      [ "F#", "Fuaran.UI", Lang.Target.FSharp
+        "C#", "Fuaran.UI.CSharp", Lang.Target.CSharp
+        "Visual Basic", "Fuaran.UI.CSharp", Lang.Target.VisualBasicFluent
+        "Visual Basic (XML)", "Fuaran.UI.VisualBasic", Lang.Target.VisualBasic
+        "TypeScript", "@fuaran-ui/ui", Lang.Target.TypeScript
+        "Python", "fuaran_ui.ui", Lang.Target.Python
+        "Go", "fuaran-go", Lang.Target.Go
+        "Rust", "fuaran-rs", Lang.Target.Rust
+        "Swift", "fuaran-swift (SwiftUI)", Lang.Target.Swift
+        "Kotlin", "fuaran-kt (Compose)", Lang.Target.Kotlin ]
 
-    let _, activeTag, activeSrc = List.item activeLang langs
+    let _, activeTag, activeTarget = List.item activeLang langs
+    // Only the visible column is projected – a hole edit re-projects one tab.
+    let activeSrc = Lang.projectTo activeTarget fsWire
 
     Html.div
       [ prop.className "rosetta-tabs"
@@ -958,7 +645,7 @@ let private RosettaView () : ReactElement =
       "How honest is this?"
       [ Html.li
           [ prop.text
-              "The language tabs are idiomatic projections with parameterised edit-points – not live in-browser compilers. Editing a value re-projects each and re-encodes the wire. Visual Basic is shown in two dialects (the fluent factory and XML literals) – one language, two ways to author the same tree." ]
+              "The language tabs are projections of the exemplar's canonical wire through the same source projector the playground runs – not live in-browser compilers, and not per-page templates. Editing a value re-encodes the wire and re-projects it; the TypeScript, Python and F# tabs are the projector's conformance-gated forms, whose source re-encodes byte-identically. Visual Basic is shown in two dialects (the fluent factory and XML literals) – one language, two ways to author the same tree." ]
         Html.li
           [ prop.text
               "The F# hash is computed by the real Fuaran.UI canonical encoder compiled to JavaScript via Fable. The parity claim is about the wire bytes, not about shipping an F# compiler to the browser." ]

@@ -16,10 +16,10 @@ import { describe, it, expect } from 'vitest';
 import {
   runAskProbe,
   runAskRefusedProbe,
-  // @ts-expect-error untyped Fable output (no .d.ts for app/output/Agent.js)
-} from '../app/output/Agent.js';
-// @ts-expect-error untyped Fable output (no .d.ts for app/output/Ask.js)
-import { buildAnswerJsonFlat } from '../app/output/Ask.js';
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/AgentProbes.js)
+} from '../app/output/testing/AgentProbes.js';
+// @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/AskProbes.js)
+import { buildAnswerJsonFlat } from '../app/output/testing/AskProbes.js';
 
 describe('askUser – the ask-and-answer round trip (scripted human)', () => {
   it('threads an Answered outcome back as the tool result the model reads', async () => {

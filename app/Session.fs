@@ -50,19 +50,9 @@ type ConversationTurn = { Role: ProviderRole; Content: string }
 // The chain is unkeyed, so breaking it catches corruption and a careless edit,
 // not a writer who recomputes the following hashes; signing is a separate seam.
 
-/// A fixed timestamp, so the session chain is CONTENT-ADDRESSED — a pure
-/// function of prev-hash + sequence + actor + op, exactly as the panel chain is
-/// (Phase 466). Replaying the same ops in the same order reproduces the same
-/// hashes, which is what makes an exported log checkable by whoever receives it;
-/// a wall-clock stamp would make every replay disagree with the original.
-/// Public because verification has to hash with the same value the record was
-/// written with — a verifier that supplies its own timestamp checks nothing.
-let chainTimestamp =
-  System.DateTimeOffset(2020, 1, 1, 0, 0, 0, System.TimeSpan.Zero)
-
-/// The top-level `$type` of a canonical op document — the op's kind, for display.
-[<Emit("(function(j){ try { var t = JSON.parse(j).$type; return (typeof t === 'string') ? t : 'op'; } catch(e){ return 'op'; } })($0)")>]
-let private opKindOf (canonJson: string) : string = jsNative
+// The session chain is CONTENT-ADDRESSED – a pure function of prev-hash +
+// sequence + actor + op, exactly as the panel chain is (Phase 466) – because
+// it is written with `Interop.chainTimestamp`, the site's one fixed stamp.
 
 /// The origin marker for an op a HUMAN authored — a navigator property-panel
 /// commit. One stable id: the playground has no accounts, so claiming a user
@@ -200,12 +190,12 @@ let recordOp (session: SessionState) (actor: Actor) (op: TreeOp<obj>) (canonOp: 
   let seq = cursor + 1
 
   let hash =
-    HashChain.computeHash prev op seq chainTimestamp actor None OpResultEnvelope.Success
+    HashChain.computeHash prev op seq Interop.chainTimestamp actor None OpResultEnvelope.Success
 
   kept
   @ [ { Seq = seq
         OpJson = canonOp
-        OpKind = opKindOf canonOp
+        OpKind = Interop.opTypeOf canonOp
         Actor = actor
         Hash = hash
         Prev = prev } ]

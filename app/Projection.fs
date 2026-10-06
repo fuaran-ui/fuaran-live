@@ -53,6 +53,9 @@ type Target =
   | FSharp
   | CSharp
   | VisualBasic
+  /// Visual Basic over the fluent factory (the C# surface, VB initialisers).
+  /// Not an Output-box tab (`targets` below); the showcase's Rosetta page shows it.
+  | VisualBasicFluent
   | Go
   | Kotlin
   | Rust
@@ -82,6 +85,7 @@ let languageTag (target: Target) : string =
   | Target.FSharp -> "fsharp"
   | Target.CSharp -> "csharp"
   | Target.VisualBasic -> "vbnet"
+  | Target.VisualBasicFluent -> "vbnet"
   | Target.Go -> "go"
   | Target.Kotlin -> "kotlin"
   | Target.Rust -> "rust"
@@ -430,6 +434,63 @@ let private csSpec: LangSpec =
     Null = "null"
     StaticBinding = fun inner -> "Binding.Static(" + inner + ")"
     TextLiteral = fun t -> "\"" + escape '"' t + "\"" }
+
+// ─── VB, fluent factory (Fuaran.UI.CSharp, driven from Visual Basic) ─────────
+//
+// The second Visual Basic dialect: the same static-factory + options-object
+// surface C# calls, written with VB's `With { … }` object initialisers. It is
+// the C# spec's shape in VB tokens – `.Member =` initialisers, `{ … }` array
+// literals, `Nothing`, and quote-doubling (VB string literals have no
+// backslash escapes, so a line break is concatenated in as `vbLf`).
+
+let private vbStr (s: string) : string =
+  "\""
+  + s.Replace("\"", "\"\"").Replace("\r", "").Replace("\n", "\" & vbLf & \"")
+  + "\""
+
+let private vbFluentSpec: LangSpec =
+  { Node =
+      fun kind id fields depth ->
+        let ctor = upperFirst kind
+        let members = ("Id", vbStr id) :: fields
+
+        let body =
+          members
+          |> List.map (fun (k, v) -> pad (depth + 1) + "." + upperFirst k + " = " + v)
+          |> String.concat ",\n"
+
+        "Fuaran."
+        + ctor
+        + "(New "
+        + ctor
+        + "Options With {\n"
+        + body
+        + "\n"
+        + pad depth
+        + "})"
+    Obj =
+      fun members depth ->
+        if List.isEmpty members then
+          "New With { }"
+        else
+          let body =
+            members
+            |> List.map (fun (k, v) -> pad (depth + 1) + "." + upperFirst k + " = " + v)
+            |> String.concat ",\n"
+
+          "New With {\n" + body + "\n" + pad depth + "}"
+    Arr =
+      fun items depth ->
+        if List.isEmpty items then
+          "{ }"
+        else
+          let body = items |> List.map (fun it -> pad (depth + 1) + it) |> String.concat ",\n"
+          "{\n" + body + "\n" + pad depth + "}"
+    Str = vbStr
+    Bool = fun b -> if b then "True" else "False"
+    Null = "Nothing"
+    StaticBinding = fun inner -> "Binding.Static(" + inner + ")"
+    TextLiteral = vbStr }
 
 // ─── VB (Fuaran.UI.VisualBasic) – XML-literal shape ───────────────────────────
 //
@@ -8034,6 +8095,9 @@ let private walkFor (target: Target) (wireJson: string) : string =
     + fsExprWalk wireJson
   | Target.CSharp -> header "C# (Fuaran.UI.CSharp)" + project csSpec wireJson
   | Target.VisualBasic -> vbWalk wireJson
+  | Target.VisualBasicFluent ->
+    tickHeader "VB (Fuaran.UI.CSharp fluent factory)"
+    + project vbFluentSpec wireJson
   | Target.Go -> goWalk wireJson
   | Target.Kotlin -> header "Kotlin (fuaran-ui – decode-only host)" + project ktSpec wireJson
   | Target.Rust -> header "Rust (fuaran-rs)" + project rustSpec wireJson
@@ -8242,13 +8306,14 @@ let private targetNamed (targetName: string) : Target =
   | "fsharp" -> Target.FSharp
   | "csharp" -> Target.CSharp
   | "vb" -> Target.VisualBasic
+  | "vbfluent" -> Target.VisualBasicFluent
   | "go" -> Target.Go
   | "kotlin" -> Target.Kotlin
   | "rust" -> Target.Rust
   | "swift" -> Target.Swift
   | _ -> Target.Json
 
-/// Project by target name ("json"/"typescript"/"python"/"fsharp"/"csharp"/"vb")
+/// Project by target name ("json"/"typescript"/"python"/"fsharp"/"csharp"/"vb"/"vbfluent"/…)
 /// – a flat string surface assertable from vitest over the Fable output, so the
 /// projector's never-crash + per-language shape are testable headlessly.
 let projectByName (targetName: string) (wireJson: string) : string =

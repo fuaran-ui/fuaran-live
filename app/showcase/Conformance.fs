@@ -17,6 +17,7 @@ open Fable.Core
 open Elmish
 open Fuaran.UI
 open Fuaran.UI.Types
+open Fuaran.Live.Interop
 
 /// The published conformance-gate report shape (see public/conformance/README.md).
 type Report =
@@ -37,15 +38,6 @@ type PanelState =
   | Stale of string
 
 let reportUrl = "./conformance/report.generated.json"
-
-[<Emit("fetch($0).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }).then($1).catch(function(e){ $2(String(e && e.message ? e.message : e)); })")>]
-let private fetchInto (url: string) (onText: string -> unit) (onErr: string -> unit) : unit = jsNative
-
-[<Emit("(function(){ try { return JSON.parse($0); } catch (e) { return null; } })()")>]
-let private tryParseJson (s: string) : obj = jsNative
-
-[<Emit("($0 == null ? null : $0[$1])")>]
-let private field (o: obj) (k: string) : obj = jsNative
 
 let private parseReport (raw: string) : PanelState =
   let o = tryParseJson raw
@@ -77,7 +69,7 @@ let private parseReport (raw: string) : PanelState =
 /// error – it is the honest "no gate has run for this deploy yet" grey state.
 let loadCmd (onResult: PanelState -> 'Msg) : Cmd<'Msg> =
   Cmd.ofEffect (fun dispatch ->
-    fetchInto reportUrl (parseReport >> onResult >> dispatch) (fun _ ->
+    fetchText reportUrl (parseReport >> onResult >> dispatch) (fun _ ->
       dispatch (onResult (PanelState.Stale "no conformance report has been published for this deploy yet"))))
 
 let private shortSha (c: string) : string =

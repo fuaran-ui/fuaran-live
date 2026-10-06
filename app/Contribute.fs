@@ -148,7 +148,7 @@ let findings (json: string) : string list =
 // ─── the bundle ──────────────────────────────────────────────────────────────
 
 /// The session metadata a contribution carries. Supplied by the caller rather
-/// than read here, for the reason `Session.chainTimestamp` gives about its own
+/// than read here, for the reason `Interop.chainTimestamp` gives about its own
 /// stamp: a value this module read from the wall clock would make every test
 /// disagree with every other run, and the timestamp is data about the session,
 /// not about this module.
@@ -413,89 +413,3 @@ let controls (state: State) (hasTree: bool) (onConsent: bool -> unit) (onSend: u
              Html.none
            else
              Html.p [ prop.className "fl-contribute-status"; prop.text state.Status ]) ] ]
-
-// ─── flat surfaces for the headless suite ────────────────────────────────────
-//
-// F# `Result`s, DUs and lists are awkward across the Fable boundary, so — as
-// `Session.ingestResult` and `Console.runLine` already do — the guard and the
-// prepare path project to plain values.
-
-/// `findings` as a plain array.
-let findingsFlat (json: string) : string array = findings json |> Array.ofList
-
-/// The provider origins as a plain array, so the test can assert this list, the
-/// adapter registry's and the CSP module's are one set.
-let providerOriginsFlat () : string array = providerOrigins |> Array.ofList
-
-/// `build` from flat arguments.
-let buildFlat (providerId: string) (modelId: string) (capturedAt: string) (session: Session.SessionState) : string =
-  build
-    { ProviderId = providerId
-      ModelId = modelId
-      CapturedAt = capturedAt }
-    session
-
-/// `prepare`, flattened: `Ok` plus the payload, or the refusal reason.
-let prepareFlat
-  (providerId: string)
-  (modelId: string)
-  (capturedAt: string)
-  (session: Session.SessionState)
-  : {| Ok: bool
-       Reason: string
-       Json: string |}
-  =
-  match
-    prepare
-      { ProviderId = providerId
-        ModelId = modelId
-        CapturedAt = capturedAt }
-      session
-  with
-  | Ok(ContributionBundle.Verified json) ->
-    {| Ok = true
-       Reason = ""
-       Json = json |}
-  | Error reason ->
-    {| Ok = false
-       Reason = reason
-       Json = "" |}
-
-/// The WHOLE path a click takes — prepare, then post through a sink built for
-/// `endpoint` — projected flat. This is what the guard test drives, so what it
-/// exercises is the shipped sequence rather than a re-assembly of it: an
-/// endpoint of `""` is the public build, and a refused prepare must never reach
-/// the sink at all.
-let contributeProbeFlat
-  (endpoint: string)
-  (providerId: string)
-  (modelId: string)
-  (capturedAt: string)
-  (session: Session.SessionState)
-  : JS.Promise<{| Outcome: string; Reason: string |}> =
-  async {
-    match
-      prepare
-        { ProviderId = providerId
-          ModelId = modelId
-          CapturedAt = capturedAt }
-        session
-    with
-    | Error reason ->
-      return
-        {| Outcome = "refused"
-           Reason = reason |}
-    | Ok bundle ->
-      let! outcome = (sinkTo endpoint).Post bundle
-
-      return
-        match outcome with
-        | ContributionOutcome.Sent -> {| Outcome = "sent"; Reason = "" |}
-        | ContributionOutcome.Refused reason ->
-          {| Outcome = "refused"
-             Reason = reason |}
-        | ContributionOutcome.Failed reason ->
-          {| Outcome = "failed"
-             Reason = reason |}
-  }
-  |> Async.StartAsPromise

@@ -61,6 +61,7 @@ module Fuaran.Showcase.AgentReadable
 // ============================================================================
 
 open Fable.Core
+open Fuaran.Live.Interop
 open Fable.Core.JsInterop
 open Feliz
 open Fuaran.Core
@@ -304,9 +305,6 @@ let private applyAnnotations () : unit =
     | None -> ()
 
 // ─── The read: what a machine walking this page actually gets back ───────────
-
-[<Emit("(function(){ try { return JSON.parse($0); } catch (e) { return null; } })()")>]
-let private tryParseJson (raw: string) : obj = jsNative
 
 /// What a reader gets for "the value of this thing", in the order it would try:
 /// a form control's own value (a checkbox reports its checked state), then the

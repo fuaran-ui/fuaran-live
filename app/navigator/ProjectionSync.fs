@@ -29,11 +29,14 @@ module Fuaran.Live.ProjectionSync
 //
 //  The cursor arrives by SUBSCRIPTION (`Navigator.subscribeCursor`), not by
 //  prop: the Navigator owns the walk, this card only watches it. Everything
-//  else is derived from the session tree on each render, so an applied op —
-//  from the property panel, a model re-emission, a replayed permalink — re-runs
-//  the projection and lands the highlight on the focused node's NEW span with
-//  no edit path of its own. Scrolling uses `block: 'nearest'`, so a highlight
-//  already visible does not move at all; scroll context survives the edit.
+//  else is derived from the session's canonical wire, so an applied op — from
+//  the property panel, a model re-emission, a replayed permalink — changes the
+//  wire, re-runs the projection and lands the highlight on the focused node's
+//  NEW span with no edit path of its own. A render that changes neither the
+//  wire nor the open tab (a prompt keystroke, a run's tick) reuses the last
+//  projection rather than re-deriving it (Phase 2047). Scrolling uses
+//  `block: 'nearest'`, so a highlight already visible does not move at all;
+//  scroll context survives the edit.
 //
 //  History: until the 2026-07-30 workspace recomposition this module rendered
 //  three fixed language panes BESIDE the walk, inside the Navigator disclosure
@@ -44,9 +47,6 @@ module Fuaran.Live.ProjectionSync
 
 open Fable.Core
 open Feliz
-open Fuaran.UI.Types
-
-module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 
 /// The host's effect seam, bound to the browser implementation exactly as the
 /// Navigator binds it — the Copy button is the only effect this card performs.
@@ -80,10 +80,31 @@ let private effects = Byok.browserEffectPorts
 })()""")>]
 let private scrollHitsIntoView () : int = jsNative
 
+// ─── the projection, once per (wire, target) ─────────────────────────────────
+
+/// The last projection this card derived, with the two inputs it is a pure
+/// function of. `App.view` re-renders on every prompt keystroke, every second of
+/// a run's tick and every streamed emission; none of those changes the wire or
+/// the open tab, so none of them should re-run the per-language walk. A single
+/// entry is enough: there is one Source card, and a tab switch or a tree change
+/// replaces the entry rather than accumulating beside it.
+let mutable private lastProjection: (string * Projection.Target * Projection.Projected) option =
+  None
+
+/// `Projection.projectSpans`, memoised on (canonical wire, target). The key is
+/// the whole input, so a hit cannot serve a projection of anything else.
+let private projectionOf (target: Projection.Target) (wire: string) : Projection.Projected =
+  match lastProjection with
+  | Some(w, t, projected) when t = target && w = wire -> projected
+  | _ ->
+    let projected = Projection.projectSpans target wire
+    lastProjection <- Some(wire, target, projected)
+    projected
+
 // ─── one representation pane ─────────────────────────────────────────────────
 
 let private paneFor (target: Projection.Target) (label: string) (wire: string) (idPath: string list) : ReactElement =
-  let projected = Projection.projectSpans target wire
+  let projected = projectionOf target wire
   let focused = List.tryLast idPath
   let span = Projection.spanForPath projected idPath
 
@@ -157,11 +178,7 @@ let private tabLabel (target: Projection.Target) (label: string) : string =
 /// of the nine host-language projections, one tab at a time, cursor-synced to
 /// the Editor's walk. Supersedes the Inspector and Output boxes.
 [<ReactComponent>]
-let SourceCard
-  (tree: Node<obj> option)
-  (active: Projection.Target)
-  (onSelect: Projection.Target -> unit)
-  : ReactElement =
+let SourceCard (wire: string option) (active: Projection.Target) (onSelect: Projection.Target -> unit) : ReactElement =
   let idPath, setIdPath = React.useState ([||]: string array)
 
   // Subscribe once, and hand React the unsubscribe thunk as the effect's
@@ -201,15 +218,13 @@ let SourceCard
                   prop.onClick (fun _ -> onSelect t) ] ] ]
 
   let body =
-    match tree with
+    match wire with
     | None ->
       Html.div
         [ prop.className "fl-empty fl-ps-empty"
           prop.text
             "Build a UI – its canonical wire JSON plus illustrative builder source in all nine host languages appears here, and walking the tree in the Editor highlights the matching construct." ]
-    | Some root ->
-      let wire = Canon.encodeNode root
-
+    | Some wire ->
       let label =
         Projection.targets
         |> List.pick (fun (t, l) -> if t = active then Some(tabLabel t l) else None)

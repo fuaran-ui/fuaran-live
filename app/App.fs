@@ -33,7 +33,6 @@ open Fuaran.UI.Renderer
 open Fuaran.UI.OpStream.Abstractions
 open Fuaran.Live.Ports
 
-module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 module Elc = Fuaran.UI.OpStream.Abstractions.Elicitation
 
 importSideEffects "@fuaran-ui/renderer/css"
@@ -662,11 +661,7 @@ let private stopPairCmd: Cmd<Msg> =
 let private parityInput (model: Model) : (string * string) option =
   match model.ParityFixture with
   | Some f -> Some(f.wire, f.expected)
-  | None ->
-    model.Session.Tree
-    |> Option.map (fun t ->
-      let wire = Canon.encodeNode t
-      wire, wire)
+  | None -> Session.canonicalWire model.Session |> Option.map (fun wire -> wire, wire)
 
 /// Post a wire to both host iframes (drives a parity re-check). No-op when
 /// there is nothing to post or the host pages were not built.
@@ -2564,15 +2559,11 @@ let private audienceView (model: Model) : ReactElement =
           paneCard "Live preview" (previewPane None model) ] ]
 
 /// A collapsible "tool" panel – progressive disclosure for the secondary
-/// features so the core prompt→preview workspace stays front-and-centre.
-let private toolDetails (title: string) (openByDefault: bool) (body: ReactElement) : ReactElement =
-  Html.details
-    [ prop.className "pg-tool"
-      if openByDefault then
-        prop.custom ("open", true)
-      prop.children
-        [ Html.summary [ prop.text title ]
-          Html.div [ prop.className "pg-tool-body"; prop.children [ body ] ] ] ]
+/// features so the core prompt→preview workspace stays front-and-centre. The
+/// body is built and mounted only while the panel is open (Phase 2047), so a
+/// collapsed tool costs nothing on a keystroke — see `Disclosure.fs`.
+let private toolDetails (title: string) (openByDefault: bool) (body: unit -> ReactElement) : ReactElement =
+  Disclosure.ToolDetails title openByDefault body
 
 // ─── the left-column workspace tabs (2026-07-30 recomposition) ────────────────
 
@@ -2636,7 +2627,7 @@ let private editorPane (model: Model) (dispatch: Msg -> unit) : ReactElement =
 /// one tab at a time, cursor-synced to the Editor's walk. Supersedes the
 /// Inspector and Output disclosures.
 let private sourcePane (model: Model) (dispatch: Msg -> unit) : ReactElement =
-  ProjectionSync.SourceCard model.Session.Tree model.OutputTab (SelectOutputTab >> dispatch)
+  ProjectionSync.SourceCard (Session.canonicalWire model.Session) model.OutputTab (SelectOutputTab >> dispatch)
 
 /// The Console pane: the shipped in-page introspection surface, driven from the
 /// page instead of from a DevTools global. It sits with the other developer
@@ -2677,7 +2668,7 @@ let private contributePane (model: Model) (dispatch: Msg -> unit) : ReactElement
 /// what disables it; an absent one answers it.
 let private contributeSection (model: Model) (dispatch: Msg -> unit) : ReactElement =
   if Contribute.configured then
-    toolDetails "Contribute this session (anonymous)" false (contributePane model dispatch)
+    toolDetails "Contribute this session (anonymous)" false (fun () -> contributePane model dispatch)
   else
     Html.none
 
@@ -2731,15 +2722,13 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
               [ prop.className "pg-tools"
                 prop.children
                   [ Html.h2 [ prop.className "pg-tools-title"; prop.text "More tools" ]
-                    toolDetails "Examples & pattern bank" noTree (galleryPane model dispatch)
-                    toolDetails "Console: query and poke the live tree" false (consolePane model dispatch)
-                    toolDetails "Compare: Fuaran vs conventional JS" false (comparePane model dispatch)
-                    toolDetails
-                      "Host fidelity: this tree per declared render tier and speech class"
-                      false
-                      (HostPreview.HostPreviewPane model.Session.Tree)
+                    toolDetails "Examples & pattern bank" noTree (fun () -> galleryPane model dispatch)
+                    toolDetails "Console: query and poke the live tree" false (fun () -> consolePane model dispatch)
+                    toolDetails "Compare: Fuaran vs conventional JS" false (fun () -> comparePane model dispatch)
+                    toolDetails "Host fidelity: this tree per declared render tier and speech class" false (fun () ->
+                      HostPreview.HostPreviewPane model.Session.Tree)
                     (if dualHostEnabled then
-                       toolDetails "Dual-host wire parity" false (parityPane model dispatch)
+                       toolDetails "Dual-host wire parity" false (fun () -> parityPane model dispatch)
                      else
                        Html.none)
                     contributeSection model dispatch ] ]

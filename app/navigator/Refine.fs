@@ -153,16 +153,49 @@ let changeLine (change: NodeChange) : string =
   | NodeChangeKind.TextChanged(fromText, toText) -> sprintf "#%s: \"%s\" → \"%s\"" id fromText toText
   | NodeChangeKind.PropChanged _ -> sprintf "#%s: properties changed" id
 
+/// The last change set computed, with the live tree and the baseline it was
+/// computed from (Phase 2047). The pane re-renders on every keystroke — its own
+/// draft box's and the page's prompt box's — and neither changes the two trees,
+/// so the decode and the diff run once per (live tree, baseline) pair rather
+/// than once per render. Keyed on IDENTITY: the live tree is an immutable value
+/// every edit replaces, and a baseline is frozen once when a refinement is
+/// asked for, so an unchanged pair of references is an unchanged pair of trees.
+let mutable private lastChanges: (Node<obj> * Baseline * NodeChange list) option =
+  None
+
 /// The changes the re-emission made against the edited baseline (`[]` when
 /// there is nothing to compare — no baseline, no live tree, or bytes that will
 /// not decode).
 let changes (session: Session.SessionState) (baseline: Baseline option) : NodeChange list =
   match baseline, session.Tree with
   | Some b, Some live ->
-    match baselineTree b with
-    | Some before -> (Diff.diff before live).Changes
-    | None -> []
+    match lastChanges with
+    | Some(heldLive, heldBaseline, held) when
+      LanguagePrimitives.PhysicalEquality heldLive live
+      && LanguagePrimitives.PhysicalEquality heldBaseline b
+      ->
+      held
+    | _ ->
+      let computed =
+        match baselineTree b with
+        | Some before -> (Diff.diff before live).Changes
+        | None -> []
+
+      lastChanges <- Some(live, b, computed)
+      computed
   | _ -> []
+
+/// The edited ids, each paired with whether `changeSet` left it alone. An id
+/// absent from the diff was retained.
+let private retentionOf (baseline: Baseline) (changeSet: NodeChange list) : (string * bool) list =
+  let touched =
+    changeSet
+    |> List.map (fun c ->
+      let (NodeId id) = c.NodeId
+      id)
+    |> Set.ofList
+
+  baseline.EditedIds |> List.map (fun id -> id, not (Set.contains id touched))
 
 /// Per edited node: did the re-emission leave it alone? An id absent from the
 /// diff was retained — which is the acceptance criterion, stated as a fact
@@ -170,15 +203,7 @@ let changes (session: Session.SessionState) (baseline: Baseline option) : NodeCh
 let retention (session: Session.SessionState) (baseline: Baseline option) : (string * bool) list =
   match baseline with
   | None -> []
-  | Some b ->
-    let touched =
-      changes session baseline
-      |> List.map (fun c ->
-        let (NodeId id) = c.NodeId
-        id)
-      |> Set.ofList
-
-    b.EditedIds |> List.map (fun id -> id, not (Set.contains id touched))
+  | Some b -> retentionOf b (changes session baseline)
 
 // ─── flat diagnostic surface (cross-boundary friendly) ───────────────────────
 //
@@ -204,10 +229,15 @@ let overwrittenIds (session: Session.SessionState) (baseline: Baseline option) :
 // ─── the pane ────────────────────────────────────────────────────────────────
 
 /// The comparison readout — shown only once a refinement has come back.
+///
+/// The change set is computed ONCE and every line of the readout is read off
+/// it; until Phase 2047 the three readouts each re-ran the decode and the diff.
 let private comparison (session: Session.SessionState) (baseline: Baseline) : ReactElement =
-  let lines = changeLines session (Some baseline)
-  let retained = retainedIds session (Some baseline)
-  let overwritten = overwrittenIds session (Some baseline)
+  let changeSet = changes session (Some baseline)
+  let lines = changeSet |> List.map changeLine |> Array.ofList
+  let kept = retentionOf baseline changeSet
+  let retained = kept |> List.filter snd |> List.map fst |> Array.ofList
+  let overwritten = kept |> List.filter (snd >> not) |> List.map fst |> Array.ofList
 
   Html.div
     [ prop.className "fl-rf-result"

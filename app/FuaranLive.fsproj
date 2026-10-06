@@ -132,6 +132,8 @@
     <Compile Include="measure\Timing.fs" />
     <Compile Include="measure\Baseline.fs" />
     <Compile Include="measure\Capture.fs" />
+    <!-- Phase 2047 — the tool-panel disclosure whose body mounts only while open. -->
+    <Compile Include="Disclosure.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

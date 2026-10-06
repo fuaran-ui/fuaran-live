@@ -120,6 +120,37 @@ let empty: SessionState =
     Log = []
     History = [] }
 
+// ─── the canonical wire, once per session change (Phase 2047) ────────────────
+//
+// The views that show the tree as text (the Source card, the parity pane) all
+// start from the same canonical wire, and the page re-renders far more often
+// than the tree changes — every prompt keystroke, every second of a run's tick.
+// So the wire is computed once per tree and held here, beside the session.
+//
+// Keyed on the tree's IDENTITY, not its content: a session's tree is an
+// immutable value that every edit replaces (apply, rebase, undo, restore), so a
+// changed tree is always a different reference and the cache cannot serve a
+// stale wire. An unchanged reference is the same tree, so the cached bytes are
+// exactly what `Canon.encodeNode` would return. It is a memo rather than a
+// `SessionState` field because the tree is assigned at several sites outside
+// this module, and a stored wire would have to be kept in step at every one of
+// them — the defect class this keying cannot have.
+
+let mutable private lastWire: (Node<obj> * string) option = None
+
+/// The canonical wire JSON of the session's current tree (`None` before there is
+/// one), computed at most once per tree.
+let canonicalWire (session: SessionState) : string option =
+  match session.Tree with
+  | None -> None
+  | Some tree ->
+    match lastWire with
+    | Some(held, wire) when LanguagePrimitives.PhysicalEquality held tree -> Some wire
+    | _ ->
+      let wire = Canon.encodeNode tree
+      lastWire <- Some(tree, wire)
+      Some wire
+
 // ─── recording ───────────────────────────────────────────────────────────────
 
 /// The tree the recorded sequence replays from — `Snapshots[0]`, the session's

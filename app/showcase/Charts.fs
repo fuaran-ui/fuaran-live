@@ -403,54 +403,47 @@ let private ChartsView () : ReactElement =
             Html.pre [ prop.className "wire-json"; prop.children [ Html.code [ prop.text wire ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "ch-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "A live dataframe that is data" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The source table is an editable, first-party Fuaran data grid – edit any revenue or target cell and it dispatches a typed action. The grid is a node, not hand-rolled HTML." ]
-                    Html.li
-                      [ prop.text
-                          "The chart binds its data with a declarative transform pipeline that rides the wire. The renderer runs the real Fuaran dataframe evaluator in your browser (compiled to JavaScript), computes the rows – including the derived variance column when toggled – and renders them as inline SVG. No server, no charting library, no pre-baked numbers." ]
-                    Html.li
-                      [ prop.text
-                          "Every edit is folded into a hash-chained op-stream: each entry links to the previous by hash, so a corrupted or altered entry breaks the chain. The chain is an unkeyed digest, which makes it corruption detection rather than tamper evidence – anyone who can write the store can recompute the hashes that follow their edit, and catching that needs signing, a separate seam that is not shipped. The figure is notarised (the content hash) and diffable (the typed ops) – and portable, because the same wire renders byte-for-byte on the TypeScript and Python hosts, server-side and headless." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text "Author it from a notebook: the same shape a "
-                            Html.a [ prop.href "#/demo/pandas"; prop.text "pandas DataFrame" ]
-                            Html.text " emits – a table becomes a live, computed chart-as-data, not a rasterised PNG." ] ] ] ] ] ]
+    Exhibit.honesty
+      "A live dataframe that is data"
+      [ Html.li
+          [ prop.text
+              "The source table is an editable, first-party Fuaran data grid – edit any revenue or target cell and it dispatches a typed action. The grid is a node, not hand-rolled HTML." ]
+        Html.li
+          [ prop.text
+              "The chart binds its data with a declarative transform pipeline that rides the wire. The renderer runs the real Fuaran dataframe evaluator in your browser (compiled to JavaScript), computes the rows – including the derived variance column when toggled – and renders them as inline SVG. No server, no charting library, no pre-baked numbers." ]
+        Html.li
+          [ prop.text
+              "Every edit is folded into a hash-chained op-stream: each entry links to the previous by hash, so a corrupted or altered entry breaks the chain. The chain is an unkeyed digest, which makes it corruption detection rather than tamper evidence – anyone who can write the store can recompute the hashes that follow their edit, and catching that needs signing, a separate seam that is not shipped. The figure is notarised (the content hash) and diffable (the typed ops) – and portable, because the same wire renders byte-for-byte on the TypeScript and Python hosts, server-side and headless." ]
+        Html.li
+          [ prop.children
+              [ Html.text "Author it from a notebook: the same shape a "
+                Html.a [ prop.href "#/demo/pandas"; prop.text "pandas DataFrame" ]
+                Html.text " emits – a table becomes a live, computed chart-as-data, not a rasterised PNG." ] ] ]
 
-  Html.div
-    [ prop.className "ch-page"
-      prop.children
-        [ Html.h1 [ prop.className "ch-title"; prop.text "Chart-as-data" ]
-          Html.p
-            [ prop.className "ch-lede"
-              prop.text
-                "A figure is usually a PNG – an opaque pixel dump. Here an editable dataframe is authored as a Fuaran chart whose data-binding is a transform pipeline on the wire, computed live in the browser and rendered as inline SVG with no charting library. Edit a cell: the figure, its hash, and its op-stream all follow." ]
-          Html.div
-            [ prop.className "ch-split"
-              prop.children
-                [ Html.div
-                    [ prop.className "ch-data-pane"
-                      prop.children
-                        [ Html.span [ prop.className "ch-pane-tag"; prop.text "The DataFrame – edit any number" ]
-                          dataPane ] ]
-                  Html.div
-                    [ prop.className "ch-render-pane"
-                      prop.children
-                        [ Html.span
-                            [ prop.className "ch-pane-tag"
-                              prop.text "The chart (computed from the wire, no charting lib)" ]
-                          controls
-                          chartStage ] ] ] ]
-          notarised
-          opStream
-          wireDrawer
-          honesty ] ]
+  Exhibit.frame
+    "ch"
+    "Chart-as-data"
+    (Exhibit.lede
+      "A figure is usually a PNG – an opaque pixel dump. Here an editable dataframe is authored as a Fuaran chart whose data-binding is a transform pipeline on the wire, computed live in the browser and rendered as inline SVG with no charting library. Edit a cell: the figure, its hash, and its op-stream all follow.")
+    [ Html.div
+        [ prop.className "ch-split"
+          prop.children
+            [ Html.div
+                [ prop.className "ch-data-pane"
+                  prop.children
+                    [ Html.span [ prop.className "ch-pane-tag"; prop.text "The DataFrame – edit any number" ]
+                      dataPane ] ]
+              Html.div
+                [ prop.className "ch-render-pane"
+                  prop.children
+                    [ Html.span
+                        [ prop.className "ch-pane-tag"
+                          prop.text "The chart (computed from the wire, no charting lib)" ]
+                      controls
+                      chartStage ] ] ] ]
+      notarised
+      opStream
+      wireDrawer ]
+    honesty
 
 let page: ReactElement = ChartsView()

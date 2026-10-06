@@ -46,8 +46,7 @@
 //  version bumped in one place and not the other — fails CI rather than shipping.
 // ============================================================================
 
-const PYODIDE_VERSION = '0.26.4';
-const PYODIDE_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+import { loadPackages, runIsolated } from './pyodide';
 
 /** The published `fuaran-ui` release this page authors against. */
 export const FUARAN_UI_VERSION = '0.8.0';
@@ -116,15 +115,17 @@ export function defaultCell(): string {
   return DEFAULT_CELL;
 }
 
-let pyodidePromise: Promise<any> | null = null;
+let hostPromise: Promise<any> | null = null;
 
+// Boots the cell host on the shared interpreter: pandas + micropip, the vendored
+// package, the dataset, and the bootstrap in a namespace of its own. Returns that
+// namespace (`run_cell` lives there).
 async function boot(onProgress: (msg: string) => void): Promise<any> {
   onProgress('downloading CPython (~10 MB)…');
-  const mod = await import(/* @vite-ignore */ `${PYODIDE_BASE}pyodide.mjs`);
-  const pyodide = await mod.loadPyodide({ indexURL: PYODIDE_BASE });
+  const pyodide = await loadPackages([]);
 
   onProgress('loading pandas…');
-  await pyodide.loadPackage(['pandas', 'micropip']);
+  await loadPackages(['pandas', 'micropip']);
 
   onProgress(`installing fuaran-ui ${FUARAN_UI_VERSION}…`);
   const micropip = pyodide.pyimport('micropip');
@@ -150,20 +151,26 @@ async function boot(onProgress: (msg: string) => void): Promise<any> {
 
   // Put the CSV where `pd.read_csv("sales.csv")` will find it.
   pyodide.FS.writeFile('sales.csv', csv);
-  pyodide.runPython(PY_BOOTSTRAP);
+  const ns = runIsolated(pyodide, PY_BOOTSTRAP);
   onProgress('ready');
-  return pyodide;
+  return ns;
 }
 
 function ensure(onProgress: (msg: string) => void): Promise<any> {
-  if (pyodidePromise === null) pyodidePromise = boot(onProgress);
-  return pyodidePromise;
+  if (hostPromise === null) {
+    const p = boot(onProgress);
+    hostPromise = p;
+    p.catch(() => {
+      if (hostPromise === p) hostPromise = null;
+    });
+  }
+  return hostPromise;
 }
 
 // Run the visitor's cell → the canonical wire JSON it authored.
 async function runCell(code: string, onProgress: (msg: string) => void): Promise<string> {
-  const pyodide = await ensure(onProgress);
-  const fn = pyodide.globals.get('run_cell');
+  const ns = await ensure(onProgress);
+  const fn = ns.get('run_cell');
   try {
     return fn(code) as string;
   } finally {

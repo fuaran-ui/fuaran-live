@@ -17,6 +17,8 @@
 //  takes for its static parity strip, here in motion across a relay.
 // ============================================================================
 
+import { interpreterPromise, runIsolated } from './pyodide';
+
 // A browser-native SHA-256 (SubtleCrypto) – the TypeScript host's independent
 // digest, distinct from the F# managed hash and Python's hashlib.
 export async function sha256Hex(input: string): Promise<string> {
@@ -28,37 +30,41 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 
 // ─── Python host – Pyodide, lazy-loaded ──────────────────────────────────────
-//  Pinned Pyodide from the jsDelivr CDN, loaded only when the visitor turns on
-//  the Python verifier. First paint never touches this path.
+//  The showcase's one shared interpreter (./pyodide.ts), booted only when the
+//  visitor turns on the Python verifier. First paint never touches this path. The hasher
+//  source runs in a namespace of its own, so sharing the interpreter with the
+//  other Python pages shares nothing else.
 
-const PYODIDE_VERSION = '0.26.4';
-const PYODIDE_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+let hostPromise: Promise<any> | null = null;
 
-let pyodidePromise: Promise<any> | null = null;
-
-async function loadPyodide(): Promise<any> {
-  // @vite-ignore keeps Vite from trying to bundle the remote ESM entry.
-  const mod = await import(/* @vite-ignore */ `${PYODIDE_BASE}pyodide.mjs`);
-  const pyodide = await mod.loadPyodide({ indexURL: PYODIDE_BASE });
-  // The Python hasher lives beside this module as a static asset (served
+async function loadHost(): Promise<any> {
+  const py = await interpreterPromise();
+  // The Python source lives beside this module as a static asset (served
   // same-origin, so `connect-src 'self'` covers the fetch).
   const src = await fetch(new URL('relay/py-host.py', document.baseURI)).then((r) => {
     if (!r.ok) throw new Error(`py-host.py ${r.status}`);
     return r.text();
   });
-  pyodide.runPython(src);
-  return pyodide;
+  return runIsolated(py, src);
 }
 
+/** The host's namespace, loaded once. A failed load is forgotten so a retry
+ *  starts afresh. */
 export function ensurePython(): Promise<any> {
-  if (pyodidePromise === null) pyodidePromise = loadPyodide();
-  return pyodidePromise;
+  if (hostPromise === null) {
+    const p = loadHost();
+    hostPromise = p;
+    p.catch(() => {
+      if (hostPromise === p) hostPromise = null;
+    });
+  }
+  return hostPromise;
 }
 
 // Runs hashlib.sha256 fully in-browser over the exact canonical-wire bytes.
 export async function pythonSha256(input: string): Promise<string> {
-  const pyodide = await ensurePython();
-  const fn = pyodide.globals.get('relay_sha256');
+  const ns = await ensurePython();
+  const fn = ns.get('relay_sha256');
   try {
     return fn(input) as string;
   } finally {

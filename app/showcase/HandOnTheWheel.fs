@@ -302,36 +302,27 @@ let private HandOnTheWheelView () : ReactElement =
                 prop.children [ for t in List.truncate (step + 1) turns -> turnView t ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "how-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "A scripted view of a real mechanism" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The declared control surface is the point: a module says which fields an agent may set, each with a typed space. An agent reads that list and drives the fields by name – it never interprets a screenshot." ]
-                    Html.li
-                      [ prop.text
-                          "Every value here is checked against its declared space, exactly as the real contract does: in-space lands, out-of-space is refused with the range, an undeclared name is refused with the names that exist. A refusal is machine-readable – the agent can read it and correct itself." ]
-                    Html.li
-                      [ prop.text
-                          "Honest scope: this page's agent is a canned script so the shape is legible with zero egress – no key, no network. The live mechanism that lets a real agent read and drive a module's declared fields is a separately-shipped substrate wired into the hands-on tooling; here you are watching its shape, not a live agent." ]
-                    Html.li
-                      [ prop.text
-                          "The pulse is genuine: each live-module card carries a real data-ai-name attribute – the address the mechanism targets – and the set field lights up through the renderer's motion hook. Inspect the element and the machine-addressable name is right there." ] ] ] ] ]
+    Exhibit.honesty
+      "A scripted view of a real mechanism"
+      [ Html.li
+          [ prop.text
+              "The declared control surface is the point: a module says which fields an agent may set, each with a typed space. An agent reads that list and drives the fields by name – it never interprets a screenshot." ]
+        Html.li
+          [ prop.text
+              "Every value here is checked against its declared space, exactly as the real contract does: in-space lands, out-of-space is refused with the range, an undeclared name is refused with the names that exist. A refusal is machine-readable – the agent can read it and correct itself." ]
+        Html.li
+          [ prop.text
+              "Honest scope: this page's agent is a canned script so the shape is legible with zero egress – no key, no network. The live mechanism that lets a real agent read and drive a module's declared fields is a separately-shipped substrate wired into the hands-on tooling; here you are watching its shape, not a live agent." ]
+        Html.li
+          [ prop.text
+              "The pulse is genuine: each live-module card carries a real data-ai-name attribute – the address the mechanism targets – and the set field lights up through the renderer's motion hook. Inspect the element and the machine-addressable name is right there." ] ]
 
-  Html.div
-    [ prop.className "how-page"
-      prop.children
-        [ Html.h1 [ prop.className "how-title"; prop.text "Hand on the Wheel" ]
-          Html.p
-            [ prop.className "how-lede"
-              prop.text
-                "An agent shouldn't drive your interface by guessing at pixels. Here a module declares which of its fields an agent may set – by name, each with a typed space – and the agent reads that list, then turns the knobs directly. Good values land; bad ones are refused with the reason." ]
-          controlSurface
-          liveModule
-          session
-          honesty ] ]
+  Exhibit.frame
+    "how"
+    "Hand on the Wheel"
+    (Exhibit.lede
+      "An agent shouldn't drive your interface by guessing at pixels. Here a module declares which of its fields an agent may set – by name, each with a typed space – and the agent reads that list, then turns the knobs directly. Good values land; bad ones are refused with the reason.")
+    [ controlSurface; liveModule; session ]
+    honesty
 
 let page: ReactElement = HandOnTheWheelView()

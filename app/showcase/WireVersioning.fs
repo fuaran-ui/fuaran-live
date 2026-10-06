@@ -214,9 +214,6 @@ module private Engine =
 
 // ─── the UI (renders each host's real negotiation outcome) ───────────────────
 
-let private renderNode (n: Node<'msg>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 let private widgetNode (i: int) (w: Engine.Widget) : Node<unit> =
   match w with
   | Engine.WMetric(l, v) ->
@@ -244,7 +241,7 @@ let private widgetNode (i: int) (w: Engine.Widget) : Node<unit> =
 
 let private slotView (i: int) (slot: Engine.Slot) : ReactElement =
   match slot with
-  | Engine.Known w -> renderNode (widgetNode i w)
+  | Engine.Known w -> Exhibit.renderStatic (widgetNode i w)
   | Engine.Preserved(kind, bytes) ->
     Html.div
       [ prop.className "wv-preserved"
@@ -315,77 +312,69 @@ let private view () : ReactElement =
   let additiveClass, additiveResult = Engine.additiveStory
   let breakingClass, breakingResult = Engine.breakingStory
 
-  Html.div
-    [ prop.className "wv-page"
-      prop.children
-        [ Html.h1 [ prop.className "wv-title"; prop.text "The Versioning Envelope" ]
-          Html.p
-            [ prop.className "wv-lede"
-              prop.text
-                "One artefact, stamped with the schema that authored it, put on the wire once. Three hosts – each speaking a different version – read the same bytes. The one behind gracefully degrades and preserves what it can't render; a breaking version is refused outright, never silently mis-read. This is how a design outlives not just any framework, but schema change itself." ]
+  let honesty =
+    Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "Every outcome runs the real Fuaran.Core.Wire.Versioning substrate in your browser: the canonical $profile/$payload envelope above, negotiate, decodeTolerant / reencode, and classify / bump. Nothing is scripted." ]
+        Html.li
+          [ prop.text
+              "The core@1.0 host genuinely does not know the LiveTicker kind, so it preserves those bytes verbatim – and the byte-for-byte round-trip check proves the artefact survives intact through a host that can't render all of it." ]
+        Html.li
+          [ prop.text
+              "The core@2.0 refusal is the negotiate result, not a caught error: a different major is declared incompatible before any decode, so the host never mis-interprets bytes it wasn't built for." ]
+        Html.li
+          [ prop.children
+              [ Html.text "Same substrate as "
+                Html.a [ prop.href "#/demo/rosetta"; prop.text "Rosetta" ]
+                Html.text " – there the design outlives the language; here it outlives the schema version." ] ] ]
 
-          // the one artefact
-          Html.div
-            [ prop.className "wv-artefact"
-              prop.children
-                [ Html.div
-                    [ prop.className "wv-artefact-head"
-                      prop.children
-                        [ Html.span [ prop.className "wv-artefact-tag"; prop.text "The artefact on the wire" ]
-                          Html.span
-                            [ prop.className "wv-artefact-profile"
-                              prop.text (sprintf "$profile: %s" Engine.authoredText) ] ] ]
-                  Html.pre
-                    [ prop.className "wv-artefact-bytes"
-                      prop.children [ Html.code [ prop.text Engine.envelopeBytes ] ] ] ] ]
+  Exhibit.frame
+    "wv"
+    "The Versioning Envelope"
+    (Exhibit.lede
+      "One artefact, stamped with the schema that authored it, put on the wire once. Three hosts – each speaking a different version – read the same bytes. The one behind gracefully degrades and preserves what it can't render; a breaking version is refused outright, never silently mis-read. This is how a design outlives not just any framework, but schema change itself.")
+    [ // the one artefact
+      Html.div
+        [ prop.className "wv-artefact"
+          prop.children
+            [ Html.div
+                [ prop.className "wv-artefact-head"
+                  prop.children
+                    [ Html.span [ prop.className "wv-artefact-tag"; prop.text "The artefact on the wire" ]
+                      Html.span
+                        [ prop.className "wv-artefact-profile"
+                          prop.text (sprintf "$profile: %s" Engine.authoredText) ] ] ]
+              Html.pre
+                [ prop.className "wv-artefact-bytes"
+                  prop.children [ Html.code [ prop.text Engine.envelopeBytes ] ] ] ] ]
 
-          // three hosts
-          Html.h2 [ prop.className "wv-section-title"; prop.text "Three versions read it" ]
-          Html.div
-            [ prop.className "wv-hosts"
-              prop.children [ hostCard "core@1.2"; hostCard "core@1.0"; hostCard "core@2.0" ] ]
+      // three hosts
+      Html.h2 [ prop.className "wv-section-title"; prop.text "Three versions read it" ]
+      Html.div
+        [ prop.className "wv-hosts"
+          prop.children [ hostCard "core@1.2"; hostCard "core@1.0"; hostCard "core@2.0" ] ]
 
-          // computed version story
-          Html.div
-            [ prop.className "wv-evolution"
-              prop.children
-                [ Html.h3 [ prop.text "Why those version numbers?" ]
-                  Html.p
-                    [ prop.className "wv-evolution-note"
-                      prop.text
-                        "\"Is this change breaking?\" is computed from the schema delta, not a reviewer's opinion – no removed kinds is additive, any removal is breaking." ]
-                  Html.ul
-                    [ prop.children
-                        [ Html.li
-                            [ prop.children
-                                [ Html.strong [ prop.text "Add LiveTicker: " ]
-                                  Html.text (sprintf "%s → %s" additiveClass additiveResult) ] ]
-                          Html.li
-                            [ prop.children
-                                [ Html.strong [ prop.text "Remove Metric: " ]
-                                  Html.text (sprintf "%s → %s" breakingClass breakingResult) ] ] ] ] ] ]
-
-          // honesty
-          Html.div
-            [ prop.className "wv-honesty"
-              prop.children
-                [ Html.h3 [ prop.text "How honest is this?" ]
-                  Html.ul
-                    [ prop.children
-                        [ Html.li
-                            [ prop.text
-                                "Every outcome runs the real Fuaran.Core.Wire.Versioning substrate in your browser: the canonical $profile/$payload envelope above, negotiate, decodeTolerant / reencode, and classify / bump. Nothing is scripted." ]
-                          Html.li
-                            [ prop.text
-                                "The core@1.0 host genuinely does not know the LiveTicker kind, so it preserves those bytes verbatim – and the byte-for-byte round-trip check proves the artefact survives intact through a host that can't render all of it." ]
-                          Html.li
-                            [ prop.text
-                                "The core@2.0 refusal is the negotiate result, not a caught error: a different major is declared incompatible before any decode, so the host never mis-interprets bytes it wasn't built for." ]
-                          Html.li
-                            [ prop.children
-                                [ Html.text "Same substrate as "
-                                  Html.a [ prop.href "#/demo/rosetta"; prop.text "Rosetta" ]
-                                  Html.text
-                                    " – there the design outlives the language; here it outlives the schema version." ] ] ] ] ] ] ] ]
+      // computed version story
+      Html.div
+        [ prop.className "wv-evolution"
+          prop.children
+            [ Html.h3 [ prop.text "Why those version numbers?" ]
+              Html.p
+                [ prop.className "wv-evolution-note"
+                  prop.text
+                    "\"Is this change breaking?\" is computed from the schema delta, not a reviewer's opinion – no removed kinds is additive, any removal is breaking." ]
+              Html.ul
+                [ prop.children
+                    [ Html.li
+                        [ prop.children
+                            [ Html.strong [ prop.text "Add LiveTicker: " ]
+                              Html.text (sprintf "%s → %s" additiveClass additiveResult) ] ]
+                      Html.li
+                        [ prop.children
+                            [ Html.strong [ prop.text "Remove Metric: " ]
+                              Html.text (sprintf "%s → %s" breakingClass breakingResult) ] ] ] ] ] ] ]
+    honesty
 
 let page: ReactElement = view ()

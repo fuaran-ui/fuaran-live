@@ -954,40 +954,36 @@ let private RosettaView () : ReactElement =
                Html.none) ] ]
 
   let footer =
-    Html.div
-      [ prop.className "rosetta-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "How honest is this?" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The language tabs are idiomatic projections with parameterised edit-points – not live in-browser compilers. Editing a value re-projects each and re-encodes the wire. Visual Basic is shown in two dialects (the fluent factory and XML literals) – one language, two ways to author the same tree." ]
-                    Html.li
-                      [ prop.text
-                          "The F# hash is computed by the real Fuaran.UI canonical encoder compiled to JavaScript via Fable. The parity claim is about the wire bytes, not about shipping an F# compiler to the browser." ]
-                    Html.li
-                      [ prop.text
-                          "Tier 1 – independent live encoders. TypeScript, Python, Rust, and Go are from-scratch encoders that re-derive the same bytes: TypeScript in Web Crypto, Python as CPython compiled to WebAssembly (Pyodide), Rust as the certified reference core compiled to wasm32 (its additive encode export builds its own tree from the six holes), and Go as its stdlib-only codec compiled GOOS=js GOARCH=wasm. Five implementations, one set of bytes, live." ]
-                    Html.li
-                      [ prop.text
-                          "Tier 2 – .NET authoring veneers. C# (Fuaran.UI.CSharp) and Visual Basic (both the fluent factory and the XML literals) lower to the identical Fuaran.UI tree, so their wire is byte-identical to F# by construction – not an independent re-implementation. Author in the .NET language and idiom you already know; the bytes do not change." ]
-                    Html.li
-                      [ prop.text
-                          "Tier 3 – native render surfaces. Swift and Kotlin are native surfaces over the Rust reference core: they decode the wire and render it (SwiftUI / Compose) but never emit canonical bytes, so they carry no hash cell – the wire they render is the Rust hash above. Giving a decode-only surface a hash would be a lie." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text (
-                              "Wire format profile: "
-                              + wireProfile
-                              + ". The full specification and its cross-host conformance corpus live at "
-                            )
-                            Html.a
-                              [ prop.href "https://fuaran-ui.io"
-                                prop.target "_blank"
-                                prop.rel "noreferrer"
-                                prop.text "fuaran-ui.io" ]
-                            Html.text "." ] ] ] ] ] ]
+    Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "The language tabs are idiomatic projections with parameterised edit-points – not live in-browser compilers. Editing a value re-projects each and re-encodes the wire. Visual Basic is shown in two dialects (the fluent factory and XML literals) – one language, two ways to author the same tree." ]
+        Html.li
+          [ prop.text
+              "The F# hash is computed by the real Fuaran.UI canonical encoder compiled to JavaScript via Fable. The parity claim is about the wire bytes, not about shipping an F# compiler to the browser." ]
+        Html.li
+          [ prop.text
+              "Tier 1 – independent live encoders. TypeScript, Python, Rust, and Go are from-scratch encoders that re-derive the same bytes: TypeScript in Web Crypto, Python as CPython compiled to WebAssembly (Pyodide), Rust as the certified reference core compiled to wasm32 (its additive encode export builds its own tree from the six holes), and Go as its stdlib-only codec compiled GOOS=js GOARCH=wasm. Five implementations, one set of bytes, live." ]
+        Html.li
+          [ prop.text
+              "Tier 2 – .NET authoring veneers. C# (Fuaran.UI.CSharp) and Visual Basic (both the fluent factory and the XML literals) lower to the identical Fuaran.UI tree, so their wire is byte-identical to F# by construction – not an independent re-implementation. Author in the .NET language and idiom you already know; the bytes do not change." ]
+        Html.li
+          [ prop.text
+              "Tier 3 – native render surfaces. Swift and Kotlin are native surfaces over the Rust reference core: they decode the wire and render it (SwiftUI / Compose) but never emit canonical bytes, so they carry no hash cell – the wire they render is the Rust hash above. Giving a decode-only surface a hash would be a lie." ]
+        Html.li
+          [ prop.children
+              [ Html.text (
+                  "Wire format profile: "
+                  + wireProfile
+                  + ". The full specification and its cross-host conformance corpus live at "
+                )
+                Html.a
+                  [ prop.href "https://fuaran-ui.io"
+                    prop.target "_blank"
+                    prop.rel "noreferrer"
+                    prop.text "fuaran-ui.io" ]
+                Html.text "." ] ] ]
 
   let portabilityNote =
     Html.p
@@ -997,24 +993,21 @@ let private RosettaView () : ReactElement =
             Html.text
               "Because the app is a portable wire value – not framework-bound code – the same design renders on any conformant host, from a .NET or Python service to the browser, and outlives any single framework." ] ]
 
-  Html.div
-    [ prop.className "rosetta-page"
-      prop.children
-        [ Html.h1 [ prop.className "rosetta-title"; prop.text "Rosetta" ]
-          Html.p
-            [ prop.className "rosetta-lede"
-              prop.text
-                "One app, expressed across nine host languages – F#, C#, Visual Basic, TypeScript, Python, Go, Rust, Swift, and Kotlin – and the wire bytes are identical wherever they are computed. Pick a language, edit a value, and watch every host follow." ]
-          editPanel
-          langTabs
-          Html.div
-            [ prop.className "rosetta-stage"
-              prop.children
-                [ Html.h3 [ prop.className "rosetta-stage-title"; prop.text "The one rendered app" ]
-                  renderedApp ] ]
-          parityStrip
-          portabilityNote
-          breakItPanel
-          footer ] ]
+  Exhibit.frame
+    "rosetta"
+    "Rosetta"
+    (Exhibit.lede
+      "One app, expressed across nine host languages – F#, C#, Visual Basic, TypeScript, Python, Go, Rust, Swift, and Kotlin – and the wire bytes are identical wherever they are computed. Pick a language, edit a value, and watch every host follow.")
+    [ editPanel
+      langTabs
+      Html.div
+        [ prop.className "rosetta-stage"
+          prop.children
+            [ Html.h3 [ prop.className "rosetta-stage-title"; prop.text "The one rendered app" ]
+              renderedApp ] ]
+      parityStrip
+      portabilityNote
+      breakItPanel ]
+    footer
 
 let page: ReactElement = RosettaView()

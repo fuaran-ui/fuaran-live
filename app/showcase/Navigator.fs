@@ -534,57 +534,48 @@ let private NavigatorView () : ReactElement =
                 prop.text "Open the Navigator in the playground →" ] ] ]
 
   let honesty =
-    Html.details
-      [ prop.className "nv-honesty"
-        prop.children
-          [ Html.summary [ prop.text "What is real here" ]
-            Html.div
-              [ prop.children
-                  [ Html.ul
-                      [ prop.children
-                          [ Html.li
-                              [ prop.text
-                                  "The cursor, the two edits, undo and the projections all run the shipped substrate compiled into this page: the traversal surface for the walk, the apply engine for every edit, the canonical encoder for every byte shown, and the source projector for the three panes." ]
-                            Html.li
-                              [ prop.text
-                                  "Nothing here edits a tree by hand. Both edits are UpdateProp ops addressed by id; the values are coerced by each field's own spec, not by this page." ]
-                            Html.li
-                              [ prop.text
-                                  "Undo replays the log from the base tree rather than applying an inverse — which is why it cannot drift from the log it is scrubbing." ]
-                            Html.li
-                              [ prop.text
-                                  "The tree is canned and the edit set is fixed at two, because this page takes no key and calls nothing. The schema-derived property panel over every field, the structural insert/move/remove palette and the accessibility walk are the playground's, and are not reproduced here." ]
-                            Html.li
-                              [ prop.children
-                                  [ Html.text
-                                      "Walking a structure a machine can read, and changing it by naming ids rather than pointing at pixels, is the "
-                                    Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
-                                    Html.text " story at its most direct." ] ] ] ] ] ] ] ]
+    Exhibit.honesty
+      "What is real here"
+      [ Html.li
+          [ prop.text
+              "The cursor, the two edits, undo and the projections all run the shipped substrate compiled into this page: the traversal surface for the walk, the apply engine for every edit, the canonical encoder for every byte shown, and the source projector for the three panes." ]
+        Html.li
+          [ prop.text
+              "Nothing here edits a tree by hand. Both edits are UpdateProp ops addressed by id; the values are coerced by each field's own spec, not by this page." ]
+        Html.li
+          [ prop.text
+              "Undo replays the log from the base tree rather than applying an inverse — which is why it cannot drift from the log it is scrubbing." ]
+        Html.li
+          [ prop.text
+              "The tree is canned and the edit set is fixed at two, because this page takes no key and calls nothing. The schema-derived property panel over every field, the structural insert/move/remove palette and the accessibility walk are the playground's, and are not reproduced here." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "Walking a structure a machine can read, and changing it by naming ids rather than pointing at pixels, is the "
+                Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
+                Html.text " story at its most direct." ] ] ]
 
-  Html.div
-    [ prop.className "nv-page"
-      prop.children
-        [ Html.h1 [ prop.className "nv-title"; prop.text "The Navigator" ]
-          Html.p
-            [ prop.className "nv-lede"
-              prop.text
-                "Edit a running app through its own wire format. Walk it with a cursor, retitle a button, resize a heading, undo — and watch each action turn into the operation it actually is, in canonical bytes. No key, no server: the tree is right here." ]
-          rail
-          controls
-          Html.div
-            [ prop.className "nv-stage"
-              prop.children
-                [ Html.div
-                    [ prop.className "nv-left"
-                      prop.children
-                        [ breadcrumb
-                          Html.div [ prop.className "nv-preview"; prop.children [ renderTree tree ] ]
-                          if freePlay then
-                            freeControls ] ]
-                  Html.div [ prop.className "nv-right"; prop.children [ emittedPanel; nodePanel ] ] ] ]
-          if showProjections then
-            projections
-          handoff
-          honesty ] ]
+  Exhibit.frame
+    "nv"
+    "The Navigator"
+    (Exhibit.lede
+      "Edit a running app through its own wire format. Walk it with a cursor, retitle a button, resize a heading, undo — and watch each action turn into the operation it actually is, in canonical bytes. No key, no server: the tree is right here.")
+    [ rail
+      controls
+      Html.div
+        [ prop.className "nv-stage"
+          prop.children
+            [ Html.div
+                [ prop.className "nv-left"
+                  prop.children
+                    [ breadcrumb
+                      Html.div [ prop.className "nv-preview"; prop.children [ renderTree tree ] ]
+                      if freePlay then
+                        freeControls ] ]
+              Html.div [ prop.className "nv-right"; prop.children [ emittedPanel; nodePanel ] ] ] ]
+      if showProjections then
+        projections
+      handoff ]
+    honesty
 
 let page: ReactElement = NavigatorView()

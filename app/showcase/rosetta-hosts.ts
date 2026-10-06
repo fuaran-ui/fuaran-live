@@ -18,6 +18,8 @@
 //  deliberately breaks the float rule to show WHY canonical bytes are hard.
 // ============================================================================
 
+import { interpreterPromise, runIsolated } from './pyodide';
+
 // The 0.1+0.2 problem in one file: the canonical numeric form is the shortest
 // round-tripping decimal, laid out in .NET "R" notation. This is a faithful
 // port of the `formatFiniteDouble` the F# encoder uses on the Fable pipeline
@@ -210,31 +212,35 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 
 // ─── Python host – Pyodide, lazy-loaded ──────────────────────────────────────
-//  Pinned Pyodide, loaded from the jsDelivr CDN only when the visitor clicks
-//  "Run the Python host". First paint never touches this path.
+//  The showcase's one shared interpreter (./pyodide.ts), booted only when the
+//  visitor clicks "Run the Python host". First paint never touches this path. The encoder
+//  source runs in a namespace of its own, so sharing the interpreter with the
+//  other Python pages shares nothing else.
 
-const PYODIDE_VERSION = '0.26.4';
-const PYODIDE_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+let hostPromise: Promise<any> | null = null;
 
-let pyodidePromise: Promise<any> | null = null;
-
-async function loadPyodide(): Promise<any> {
-  // @vite-ignore keeps Vite from trying to bundle the remote ESM entry.
-  const mod = await import(/* @vite-ignore */ `${PYODIDE_BASE}pyodide.mjs`);
-  const pyodide = await mod.loadPyodide({ indexURL: PYODIDE_BASE });
-  // The independent Python canonical encoder lives beside this module as a
-  // static asset (served same-origin, so `connect-src 'self'` covers the fetch).
+async function loadHost(): Promise<any> {
+  const py = await interpreterPromise();
+  // The Python source lives beside this module as a static asset (served
+  // same-origin, so `connect-src 'self'` covers the fetch).
   const src = await fetch(new URL('rosetta/py-host.py', document.baseURI)).then((r) => {
     if (!r.ok) throw new Error(`py-host.py ${r.status}`);
     return r.text();
   });
-  pyodide.runPython(src);
-  return pyodide;
+  return runIsolated(py, src);
 }
 
+/** The host's namespace, loaded once. A failed load is forgotten so a retry
+ *  starts afresh. */
 export function ensurePython(): Promise<any> {
-  if (pyodidePromise === null) pyodidePromise = loadPyodide();
-  return pyodidePromise;
+  if (hostPromise === null) {
+    const p = loadHost();
+    hostPromise = p;
+    p.catch(() => {
+      if (hostPromise === p) hostPromise = null;
+    });
+  }
+  return hostPromise;
 }
 
 export interface HostResult {
@@ -245,8 +251,8 @@ export interface HostResult {
 // Runs the Python encoder + hashlib.sha256 fully in-browser. The six holes cross
 // as a JSON string; Python parses, builds its own tree, and returns {wire, hash}.
 export async function pythonCompute(h: Holes): Promise<HostResult> {
-  const pyodide = await ensurePython();
-  const fn = pyodide.globals.get('rosetta_encode');
+  const ns = await ensurePython();
+  const fn = ns.get('rosetta_encode');
   try {
     const out = fn(JSON.stringify(h)) as string;
     return JSON.parse(out) as HostResult;

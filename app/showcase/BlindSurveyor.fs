@@ -286,46 +286,39 @@ let private BlindSurveyorView () : ReactElement =
                Html.none) ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "bs-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "No pixels were consulted" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The observed column is real: the node's scroll/client width is measured from the laid-out DOM and fed to the shipped LayoutObserver derivation, which returns a typed OverflowHorizontal flag – the same signal the orchestrator's inspect_layout tool reads." ]
-                    Html.li
-                      [ prop.text
-                          "The blackout is an opaque overlay: it hides the pixels but leaves the element in layout, so measurement is identical shuttered or not. The answer during the blackout is computed from those live numbers, not a screenshot." ]
-                    Html.li
-                      [ prop.text
-                          "The blind fix swaps the grid to a wrapping track template – a real layout change; the observed column goes green before the shutter lifts. On a phone-width browser the responsive renderer already wraps the grid, so the overflow is a desktop-rig demonstration of the observer, caught before any breakpoint." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text "This is the layout half of the "
-                            Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
-                            Html.text " story – geometry as typed data on both ends." ] ] ] ] ] ]
+    Exhibit.honesty
+      "No pixels were consulted"
+      [ Html.li
+          [ prop.text
+              "The observed column is real: the node's scroll/client width is measured from the laid-out DOM and fed to the shipped LayoutObserver derivation, which returns a typed OverflowHorizontal flag – the same signal the orchestrator's inspect_layout tool reads." ]
+        Html.li
+          [ prop.text
+              "The blackout is an opaque overlay: it hides the pixels but leaves the element in layout, so measurement is identical shuttered or not. The answer during the blackout is computed from those live numbers, not a screenshot." ]
+        Html.li
+          [ prop.text
+              "The blind fix swaps the grid to a wrapping track template – a real layout change; the observed column goes green before the shutter lifts. On a phone-width browser the responsive renderer already wraps the grid, so the overflow is a desktop-rig demonstration of the observer, caught before any breakpoint." ]
+        Html.li
+          [ prop.children
+              [ Html.text "This is the layout half of the "
+                Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
+                Html.text " story – geometry as typed data on both ends." ] ] ]
 
-  Html.div
-    [ prop.className "bs-page"
-      prop.children
-        [ Html.h1 [ prop.className "bs-title"; prop.text "The Blind Surveyor" ]
-          Html.p
-            [ prop.className "bs-lede"
-              prop.text
-                "Black out the screen and ask whether the dashboard fits on a phone. It answers – naming the node that overflows – because layout in Fuaran is read, not looked at." ]
-          Html.div
-            [ prop.className "bs-split"
-              prop.children
-                [ Html.div
-                    [ prop.className "bs-preview-col"
-                      prop.children
-                        [ Html.h3 [ prop.className "bs-col-title"; prop.text "The survey" ]
-                          rig
-                          stage ] ]
-                  Html.div [ prop.className "bs-data-col"; prop.children [ ledger; blindPanel ] ] ] ]
-          controls
-          honesty ] ]
+  Exhibit.frame
+    "bs"
+    "The Blind Surveyor"
+    (Exhibit.lede
+      "Black out the screen and ask whether the dashboard fits on a phone. It answers – naming the node that overflows – because layout in Fuaran is read, not looked at.")
+    [ Html.div
+        [ prop.className "bs-split"
+          prop.children
+            [ Html.div
+                [ prop.className "bs-preview-col"
+                  prop.children
+                    [ Html.h3 [ prop.className "bs-col-title"; prop.text "The survey" ]
+                      rig
+                      stage ] ]
+              Html.div [ prop.className "bs-data-col"; prop.children [ ledger; blindPanel ] ] ] ]
+      controls ]
+    honesty
 
 let page: ReactElement = BlindSurveyorView()

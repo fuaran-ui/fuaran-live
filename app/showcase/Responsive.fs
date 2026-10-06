@@ -212,38 +212,31 @@ let private ResponsiveView () : ReactElement =
                Html.none) ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "rw-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "How honest is this?" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The three frames are real iframes at genuine device viewport widths (375 / 768 / 1280). An iframe's content sees its own width as the viewport, so the shipped responsive CSS fires per-frame – this is the actual renderer reacting, not a re-implementation. Each column count is read back from that frame's live grid-template-columns; it is a measured fact, not a caption." ]
-                    Html.li
-                      [ prop.text
-                          "You authored one tree with a grid that declares Cols = 3 – an intent, not a breakpoint. You wrote zero media queries. The renderer ships the two breakpoint rules shown above; the wire JSON carries only the intent, so it is byte-identical at every width." ]
-                    Html.li
-                      [ prop.text
-                          "The frames are scaled down so they sit side by side, but each lays out at its true device width – the fold from three columns to one is the shipped renderer's, decided by each frame's own viewport." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text "Declare the shape; the substrate resolves the CSS. This is the "
-                            Html.a [ prop.href "#/pillar/intent"; prop.text "intent-not-implementation" ]
-                            Html.text " thesis, applied to responsive layout." ] ] ] ] ] ]
+    Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "The three frames are real iframes at genuine device viewport widths (375 / 768 / 1280). An iframe's content sees its own width as the viewport, so the shipped responsive CSS fires per-frame – this is the actual renderer reacting, not a re-implementation. Each column count is read back from that frame's live grid-template-columns; it is a measured fact, not a caption." ]
+        Html.li
+          [ prop.text
+              "You authored one tree with a grid that declares Cols = 3 – an intent, not a breakpoint. You wrote zero media queries. The renderer ships the two breakpoint rules shown above; the wire JSON carries only the intent, so it is byte-identical at every width." ]
+        Html.li
+          [ prop.text
+              "The frames are scaled down so they sit side by side, but each lays out at its true device width – the fold from three columns to one is the shipped renderer's, decided by each frame's own viewport." ]
+        Html.li
+          [ prop.children
+              [ Html.text "Declare the shape; the substrate resolves the CSS. This is the "
+                Html.a [ prop.href "#/pillar/intent"; prop.text "intent-not-implementation" ]
+                Html.text " thesis, applied to responsive layout." ] ] ]
 
-  Html.div
-    [ prop.className "rw-page"
-      prop.children
-        [ Html.h1 [ prop.className "rw-title"; prop.text "Every Screen" ]
-          Html.p
-            [ prop.className "rw-lede"
-              prop.text
-                "One tree at phone, tablet, and desktop widths – reflowing itself from three columns to one, with not a single media query written. You declare the grid; the renderer decides the breakpoints." ]
-          framesRow
-          offscreen
-          Html.div [ prop.className "rw-grid2"; prop.children [ notWritten; wireDrawer ] ]
-          honesty ] ]
+  Exhibit.frame
+    "rw"
+    "Every Screen"
+    (Exhibit.lede
+      "One tree at phone, tablet, and desktop widths – reflowing itself from three columns to one, with not a single media query written. You declare the grid; the renderer decides the breakpoints.")
+    [ framesRow
+      offscreen
+      Html.div [ prop.className "rw-grid2"; prop.children [ notWritten; wireDrawer ] ] ]
+    honesty
 
 let page: ReactElement = ResponsiveView()

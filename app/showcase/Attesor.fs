@@ -91,9 +91,6 @@ let private exemplarWire: string = CJson.encodeNode exemplar
 
 // ─── The page ────────────────────────────────────────────────────────────────
 
-let private renderTree (n: Node<obj>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 /// The nine language tabs (the input box IS the JSON, so no JSON tab here).
 let private languageTargets: (Projection.Target * string) list =
   Projection.targets |> List.filter (fun (t, _) -> t <> Projection.Target.Json)
@@ -152,7 +149,9 @@ let private AttesorView () : ReactElement =
           [ Html.span
               [ prop.className "at-pane-tag"
                 prop.text "what this wire IS – the rendered app" ]
-            Html.div [ prop.className "at-preview-app"; prop.children [ renderTree goodTree ] ] ] ]
+            Html.div
+              [ prop.className "at-preview-app"
+                prop.children [ Exhibit.renderStatic goodTree ] ] ] ]
 
   let tabs =
     Html.div
@@ -170,36 +169,24 @@ let private AttesorView () : ReactElement =
         prop.children [ Html.code [ prop.text (Projection.projectTo target goodWire) ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "at-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "How honest is this?" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The projector is the playground's real multi-language source projector walking the canonical bytes above – pure string generation, and it never crashes: an unknown shape falls through a generic path rather than throwing." ]
-                    Html.li
-                      [ prop.text
-                          "Fidelity is per-leg: the TypeScript projection is a verified byte-round-trip (the generated source is executed in the conformance harness and asserted to rebuild identical bytes); the other legs are idiomatic projections – how the tree would look written in each language – not certified compilers." ]
-                    Html.li
-                      [ prop.text
-                          "Pasted wire is decoded by the real decoder – lenient-accepted shorthand normalises to canonical bytes before projection, and a reject keeps the last good wire, never a blank page." ] ] ] ] ]
+    Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "The projector is the playground's real multi-language source projector walking the canonical bytes above – pure string generation, and it never crashes: an unknown shape falls through a generic path rather than throwing." ]
+        Html.li
+          [ prop.text
+              "Fidelity is per-leg: the TypeScript projection is a verified byte-round-trip (the generated source is executed in the conformance harness and asserted to rebuild identical bytes); the other legs are idiomatic projections – how the tree would look written in each language – not certified compilers." ]
+        Html.li
+          [ prop.text
+              "Pasted wire is decoded by the real decoder – lenient-accepted shorthand normalises to canonical bytes before projection, and a reject keeps the last good wire, never a blank page." ] ]
 
-  Html.div
-    [ prop.className "at-page"
-      prop.children
-        [ Html.h1
-            [ prop.className "at-title"
-              prop.text "Attesor – read the wire back, in nine languages" ]
-          Html.p
-            [ prop.className "at-lede"
-              prop.text
-                "Rosetta shows nine languages converging on one wire. Attesor runs the arrow the other way: paste a wire, and read it back as idiomatic source in every host language – plus the app it renders, because the wire is the app. This is portability made concrete: write a UI once, in any of the nine languages, and it ports to every other – the wire is the common form every host can read back as its own code." ]
-          wireEditor
-          preview
-          tabs
-          projection
-          honesty ] ]
+  Exhibit.frame
+    "at"
+    "Attesor – read the wire back, in nine languages"
+    (Exhibit.lede
+      "Rosetta shows nine languages converging on one wire. Attesor runs the arrow the other way: paste a wire, and read it back as idiomatic source in every host language – plus the app it renders, because the wire is the app. This is portability made concrete: write a UI once, in any of the nine languages, and it ports to every other – the wire is the common form every host can read back as its own code.")
+    [ wireEditor; preview; tabs; projection ]
+    honesty
 
 let page: ReactElement = AttesorView()

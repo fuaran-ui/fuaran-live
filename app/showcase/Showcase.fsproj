@@ -80,60 +80,26 @@
       <Link>navigator\Cursor.fs</Link>
     </Compile>
     <Compile Include="Pillars.fs" />
-    <Compile Include="Replay.fs" />
-    <!-- The shared shell the platform-baseline exhibit pages (Phase 1129) are
-         built out of: the page frame, the wire drawer, and the two render
-         seams. Compiled ahead of every page that uses it. -->
+    <!-- The shared page frame (title / lede / body / honesty), the wire drawer
+         and the two render seams every page is built out of. Compiled ahead of
+         every page that uses it. -->
     <Compile Include="Exhibit.fs" />
-    <Compile Include="GoSessions.fs" />
+    <!-- The CI conformance panel - shell chrome, not a page. -->
     <Compile Include="Conformance.fs" />
-    <Compile Include="Rosetta.fs" />
-    <Compile Include="Attesor.fs" />
-    <Compile Include="Teleport.fs" />
-    <Compile Include="Skins.fs" />
-    <Compile Include="Kintsugi.fs" />
-    <Compile Include="TimeMachine.fs" />
-    <Compile Include="BlindSurveyor.fs" />
-    <Compile Include="Notarised.fs" />
-    <Compile Include="UnitTest.fs" />
-    <Compile Include="GitForInterfaces.fs" />
-    <Compile Include="Bouncer.fs" />
-    <Compile Include="Degradation.fs" />
-    <Compile Include="Pandas.fs" />
-    <Compile Include="Send.fs" />
-    <Compile Include="GrepApps.fs" />
-    <Compile Include="WhatIf.fs" />
-    <Compile Include="Bazaar.fs" />
-    <Compile Include="Relay.fs" />
-    <Compile Include="LivingSheet.fs" />
-    <Compile Include="Counterfactual.fs" />
-    <Compile Include="PatternBank.fs" />
-    <Compile Include="Charts.fs" />
-    <Compile Include="Responsive.fs" />
-    <Compile Include="Evaluation.fs" />
-    <Compile Include="Contact.fs" />
-    <Compile Include="WireVersioning.fs" />
-    <Compile Include="TypedQuestion.fs" />
-    <Compile Include="HandOnTheWheel.fs" />
-    <Compile Include="LocaleLens.fs" />
-    <Compile Include="AgentReadable.fs" />
-    <Compile Include="Navigator.fs" />
-    <!-- The platform-baseline exhibit pages (Phase 1129) — one capability of
-         the promotion-readiness wave each, in a real composition. -->
-    <Compile Include="Briefing.fs" />
-    <Compile Include="Embedded.fs" />
-    <Compile Include="Situation.fs" />
-    <Compile Include="Intake.fs" />
-    <Compile Include="Bidi.fs" />
-    <Compile Include="Invoice.fs" />
-    <Compile Include="Roster.fs" />
-    <Compile Include="Catalog.fs" />
-    <Compile Include="Outline.fs" />
-    <Compile Include="Handover.fs" />
-    <Compile Include="Attach.fs" />
-    <Compile Include="Receiver.fs" />
+    <!-- Every page file: one capability page each (plus the Evaluation and
+         Contact destinations). The glob is the point - adding a page is one
+         file here and one entry in Registry.fs, never a third edit. Pages are
+         independent of one another, so the glob's alphabetical order is a valid
+         compile order; the files named in Exclude are the shell, compiled
+         explicitly around it. -->
+    <Compile Include="*.fs" Exclude="Pillars.fs;Exhibit.fs;Conformance.fs;Registry.fs;Pages.fs;App.fs;Receiver.fs" />
+    <!-- The page registry: after the pages, because it names each page's value;
+         it loads each one as its own chunk. -->
+    <Compile Include="Registry.fs" />
     <Compile Include="Pages.fs" />
     <Compile Include="App.fs" />
+    <!-- The bare teleport receiver - its own entry (receiver.html). -->
+    <Compile Include="Receiver.fs" />
   </ItemGroup>
 
   <ItemGroup>

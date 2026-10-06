@@ -141,9 +141,6 @@ let rec private reId (prefix: string) (n: Node<unit>) : Node<unit> =
       Id = prefix + n.Id
       Kind = newKind }
 
-let private renderTree (n: Node<unit>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 // ─── The merge (the real engine) ─────────────────────────────────────────────
 
 /// Adopt = fold the variant branch into the current trunk via the shipped 3-way
@@ -226,7 +223,7 @@ let private CounterfactualView () : ReactElement =
                                 |> List.map (variantByKey >> (fun v -> v.Name))
                                 |> String.concat " + ")
                            ) ]) ] ]
-            Html.div [ prop.className "cf-trunk-app"; prop.children [ renderTree trunk ] ]
+            Html.div [ prop.className "cf-trunk-app"; prop.children [ Exhibit.renderStatic trunk ] ]
             (if Set.isEmpty adopted then
                Html.none
              else
@@ -298,7 +295,9 @@ let private CounterfactualView () : ReactElement =
                           [ Html.span [ prop.className "cf-guest-name"; prop.text v.Name ]
                             Html.span [ prop.className "cf-guest-tag"; prop.text v.Tagline ] ] ]
                     Html.span [ prop.className "cf-guest-branch"; prop.text ("branch: " + v.Key) ] ] ]
-            Html.div [ prop.className "cf-guest-app"; prop.children [ renderTree preview ] ]
+            Html.div
+              [ prop.className "cf-guest-app"
+                prop.children [ Exhibit.renderStatic preview ] ]
             Html.button
               [ prop.className "cf-adopt"
                 prop.disabled (isAdopted || (pending.IsSome && not isPending))
@@ -321,39 +320,30 @@ let private CounterfactualView () : ReactElement =
                 prop.children [ for v in variants -> guestPane v ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "cf-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "How honest is this?" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Each counterfactual is a real branch – a list of typed edit operations applied off the common base with the shipped apply engine – rendered in its own scope so nothing leaks between the variants or into your app until you adopt it." ]
-                    Html.li
-                      [ prop.text
-                          "Adopt runs the shipped structural three-way merge (the same engine the server host uses, compiled into this page). Adopting two variants that touch different cells auto-composes them; adopting one that rewrites a cell you already changed returns a real conflict, detected by comparing that node's canonical encoding across base, trunk, and branch." ]
-                    Html.li
-                      [ prop.text
-                          "On a conflict your app keeps its current value by default while the disjoint changes still merge around it; you can hand the contended cell to the variant instead. Adopting is incremental – your trunk evolves, and every later adoption merges against it, not the original base." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "The isolation boundary is Mount; rendering the literal boundary node needs the host guest-registry, so each guest scope is resolved directly here. Exploring counterfactuals without committing is the branch-and-merge face of the "
-                            Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
-                            Html.text " story." ] ] ] ] ] ]
+    Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "Each counterfactual is a real branch – a list of typed edit operations applied off the common base with the shipped apply engine – rendered in its own scope so nothing leaks between the variants or into your app until you adopt it." ]
+        Html.li
+          [ prop.text
+              "Adopt runs the shipped structural three-way merge (the same engine the server host uses, compiled into this page). Adopting two variants that touch different cells auto-composes them; adopting one that rewrites a cell you already changed returns a real conflict, detected by comparing that node's canonical encoding across base, trunk, and branch." ]
+        Html.li
+          [ prop.text
+              "On a conflict your app keeps its current value by default while the disjoint changes still merge around it; you can hand the contended cell to the variant instead. Adopting is incremental – your trunk evolves, and every later adoption merges against it, not the original base." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "The isolation boundary is Mount; rendering the literal boundary node needs the host guest-registry, so each guest scope is resolved directly here. Exploring counterfactuals without committing is the branch-and-merge face of the "
+                Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
+                Html.text " story." ] ] ]
 
-  Html.div
-    [ prop.className "cf-page"
-      prop.children
-        [ Html.h1 [ prop.className "cf-title"; prop.text "The Counterfactual Corner" ]
-          Html.p
-            [ prop.className "cf-lede"
-              prop.text
-                "Ask “what if?” and parallel universes of your app open side by side – each a live, isolated branch. Adopt the ones you like and a real structural merge folds them together; when two collide, you decide, with your own version winning by default." ]
-          trunkPane
-          resolveBanner
-          guests
-          honesty ] ]
+  Exhibit.frame
+    "cf"
+    "The Counterfactual Corner"
+    (Exhibit.lede
+      "Ask “what if?” and parallel universes of your app open side by side – each a live, isolated branch. Adopt the ones you like and a real structural merge folds them together; when two collide, you decide, with your own version winning by default.")
+    [ trunkPane; resolveBanner; guests ]
+    honesty
 
 let page: ReactElement = CounterfactualView()

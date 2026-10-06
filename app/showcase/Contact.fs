@@ -98,118 +98,111 @@ let private ContactView () : ReactElement =
                 prop.value value
                 prop.onChange (fun (v: string) -> onSet v) ] ] ]
 
-  Html.div
-    [ prop.className "ct-page"
-      prop.children
-        [ Html.h1 [ prop.className "ct-title"; prop.text "Get in touch" ]
-          Html.p
-            [ prop.className "ct-lede"
-              prop.text
-                "Even this is UI-as-data. Type a note and watch it become a Fuaran value, live. There is no backend: when you send, your own mail client sends it – the site never sees your message, stores it, or transmits it." ]
-          Html.div
-            [ prop.className "ct-grid"
-              prop.children
-                [ // ── the form (Feliz inputs) ──
-                  Html.div
-                    [ prop.className "ct-form"
-                      prop.children
-                        [ field "Your name" "Ada Lovelace" name setName
-                          field "Your email (optional)" "ada@example.com" email setEmail
-                          Html.label
-                            [ prop.className "ct-field"
-                              prop.children
-                                [ Html.span [ prop.className "ct-field-label"; prop.text "Message" ]
-                                  Html.textarea
-                                    [ prop.className "ct-input ct-textarea"
-                                      prop.rows 5
-                                      prop.placeholder "What's on your mind?"
-                                      prop.value message
-                                      prop.onChange (fun (v: string) -> setMessage v) ] ] ]
-                          Html.div
-                            [ prop.className "ct-actions"
-                              prop.children
-                                [ Html.button
-                                    [ prop.className (
-                                        if message.Trim() = "" then
-                                          "ct-send ct-send-disabled"
-                                        else
-                                          "ct-send"
-                                      )
-                                      prop.disabled (message.Trim() = "")
-                                      prop.onClick (fun _ ->
-                                        if message.Trim() <> "" then
-                                          sendMail ())
-                                      prop.text "Send via your mail client →" ]
-                                  Html.button
-                                    [ prop.className "ct-copy"
-                                      prop.text (if copied then "Copied ✓" else "Copy address")
-                                      prop.onClick (fun _ -> setCopied (copyText contactEmail)) ] ] ]
-                          Html.p
-                            [ prop.className "ct-plain"
-                              prop.children
-                                [ Html.text "Or write to "
-                                  Html.button
-                                    [ prop.className "ct-email-link"
-                                      prop.onClick (fun _ -> sendMail ())
-                                      prop.text contactEmail ]
-                                  Html.text " directly." ] ] ] ]
-                  // ── the live Fuaran preview ──
-                  Html.div
-                    [ prop.className "ct-preview"
-                      prop.children
-                        [ Html.span [ prop.className "ct-preview-tag"; prop.text "Your note, as a Fuaran tree" ]
-                          Render.renderWithSources BindingResolver.empty ignore tree
-                          Html.button
-                            [ prop.className "ct-wire-toggle"
-                              prop.text (
-                                if showWire then
-                                  "Hide the wire"
-                                else
-                                  "Show the wire – your note is data"
-                              )
-                              prop.onClick (fun _ -> setShowWire (not showWire)) ]
-                          (if showWire then
-                             Html.pre
-                               [ prop.className "ct-wire-json"
-                                 prop.children [ Html.code [ prop.text wire ] ] ]
-                           else
-                             Html.none) ] ] ] ]
-          (if subscribeUrl <> "" then
-             Html.div
-               [ prop.className "ct-subscribe"
-                 prop.children
-                   [ Html.h3 [ prop.className "ct-subscribe-title"; prop.text "Email updates" ]
-                     Html.p
-                       [ prop.className "ct-subscribe-note"
-                         prop.text
-                           "Want the occasional note when something ships? The list is run by a dedicated email provider – your address is stored with them, with one-click unsubscribe, and never with this site." ]
-                     Html.a
-                       [ prop.className "ct-subscribe-link"
-                         prop.href subscribeUrl
-                         prop.target "_blank"
-                         prop.rel "noreferrer"
-                         prop.text "Subscribe to updates →" ] ] ]
-           else
-             Html.none)
-          Html.div
-            [ prop.className "ct-honesty"
-              prop.children
-                [ Html.h3 [ prop.text "How honest is this?" ]
-                  Html.ul
-                    [ prop.children
-                        [ Html.li
-                            [ prop.text
-                                "There is no server and no form endpoint. \"Send\" opens your own mail client with the message pre-filled – the site never receives, stores, or transmits what you type." ]
-                          Html.li
-                            [ prop.text
-                                "The address is assembled in your browser and never written into the page as a link, so the link-scraping bots that harvest addresses come up empty." ]
-                          Html.li
-                            [ prop.text
-                                "The preview is your message rendered live through the same Fuaran.UI.Renderer as every demo, and the wire above is its real canonical JSON – the note genuinely is a typed value." ]
-                          Html.li
-                            [ prop.children
-                                [ Html.text "Contact, like everything here, is "
-                                  Html.a [ prop.href "#/pillar/intent"; prop.text "UI-as-data" ]
-                                  Html.text " – client-side, nothing uploaded." ] ] ] ] ] ] ] ]
+  Exhibit.frame
+    "ct"
+    "Get in touch"
+    (Exhibit.lede
+      "Even this is UI-as-data. Type a note and watch it become a Fuaran value, live. There is no backend: when you send, your own mail client sends it – the site never sees your message, stores it, or transmits it.")
+    [ Html.div
+        [ prop.className "ct-grid"
+          prop.children
+            [ // ── the form (Feliz inputs) ──
+              Html.div
+                [ prop.className "ct-form"
+                  prop.children
+                    [ field "Your name" "Ada Lovelace" name setName
+                      field "Your email (optional)" "ada@example.com" email setEmail
+                      Html.label
+                        [ prop.className "ct-field"
+                          prop.children
+                            [ Html.span [ prop.className "ct-field-label"; prop.text "Message" ]
+                              Html.textarea
+                                [ prop.className "ct-input ct-textarea"
+                                  prop.rows 5
+                                  prop.placeholder "What's on your mind?"
+                                  prop.value message
+                                  prop.onChange (fun (v: string) -> setMessage v) ] ] ]
+                      Html.div
+                        [ prop.className "ct-actions"
+                          prop.children
+                            [ Html.button
+                                [ prop.className (
+                                    if message.Trim() = "" then
+                                      "ct-send ct-send-disabled"
+                                    else
+                                      "ct-send"
+                                  )
+                                  prop.disabled (message.Trim() = "")
+                                  prop.onClick (fun _ ->
+                                    if message.Trim() <> "" then
+                                      sendMail ())
+                                  prop.text "Send via your mail client →" ]
+                              Html.button
+                                [ prop.className "ct-copy"
+                                  prop.text (if copied then "Copied ✓" else "Copy address")
+                                  prop.onClick (fun _ -> setCopied (copyText contactEmail)) ] ] ]
+                      Html.p
+                        [ prop.className "ct-plain"
+                          prop.children
+                            [ Html.text "Or write to "
+                              Html.button
+                                [ prop.className "ct-email-link"
+                                  prop.onClick (fun _ -> sendMail ())
+                                  prop.text contactEmail ]
+                              Html.text " directly." ] ] ] ]
+              // ── the live Fuaran preview ──
+              Html.div
+                [ prop.className "ct-preview"
+                  prop.children
+                    [ Html.span [ prop.className "ct-preview-tag"; prop.text "Your note, as a Fuaran tree" ]
+                      Render.renderWithSources BindingResolver.empty ignore tree
+                      Html.button
+                        [ prop.className "ct-wire-toggle"
+                          prop.text (
+                            if showWire then
+                              "Hide the wire"
+                            else
+                              "Show the wire – your note is data"
+                          )
+                          prop.onClick (fun _ -> setShowWire (not showWire)) ]
+                      (if showWire then
+                         Html.pre
+                           [ prop.className "ct-wire-json"
+                             prop.children [ Html.code [ prop.text wire ] ] ]
+                       else
+                         Html.none) ] ] ] ]
+      (if subscribeUrl <> "" then
+         Html.div
+           [ prop.className "ct-subscribe"
+             prop.children
+               [ Html.h3 [ prop.className "ct-subscribe-title"; prop.text "Email updates" ]
+                 Html.p
+                   [ prop.className "ct-subscribe-note"
+                     prop.text
+                       "Want the occasional note when something ships? The list is run by a dedicated email provider – your address is stored with them, with one-click unsubscribe, and never with this site." ]
+                 Html.a
+                   [ prop.className "ct-subscribe-link"
+                     prop.href subscribeUrl
+                     prop.target "_blank"
+                     prop.rel "noreferrer"
+                     prop.text "Subscribe to updates →" ] ] ]
+       else
+         Html.none) ]
+    (Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "There is no server and no form endpoint. \"Send\" opens your own mail client with the message pre-filled – the site never receives, stores, or transmits what you type." ]
+        Html.li
+          [ prop.text
+              "The address is assembled in your browser and never written into the page as a link, so the link-scraping bots that harvest addresses come up empty." ]
+        Html.li
+          [ prop.text
+              "The preview is your message rendered live through the same Fuaran.UI.Renderer as every demo, and the wire above is its real canonical JSON – the note genuinely is a typed value." ]
+        Html.li
+          [ prop.children
+              [ Html.text "Contact, like everything here, is "
+                Html.a [ prop.href "#/pillar/intent"; prop.text "UI-as-data" ]
+                Html.text " – client-side, nothing uploaded." ] ] ])
 
 let page: ReactElement = ContactView()

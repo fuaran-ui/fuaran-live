@@ -1,20 +1,18 @@
 module Fuaran.Showcase.Exhibit
 
 // ============================================================================
-//  The shared shell for the platform-baseline exhibit pages (Phase 1129).
+//  The shared shell every showcase page is drawn in.
 //
-//  Eleven pages land together, each showing one capability of the
-//  platform-baseline wave in a real composition. They share four things and
-//  nothing else: the page frame (title / lede / body / an honesty section), the
-//  wire drawer, and the two render seams — a static render for a tree with no
-//  live state, and a store-backed render for one that has.
+//  It began as the frame for the eleven platform-baseline exhibit pages
+//  (Phase 1129); since Phase 2080 every page uses it. Pages share four things
+//  and nothing else: the page frame (title / lede / body / an honesty section),
+//  the wire drawer, and the two render seams — a static render for a tree with
+//  no live state, and a store-backed render for one that has.
 //
-//  A shared module rather than eleven copies. The showcase's older pages each
-//  roll their own chrome, which was right when each was one page arriving on
-//  its own; eleven arriving in one change-set is a different question, and
-//  eleven copies of the same four helpers is residue by the time the second one
-//  is written. Nothing page-specific lives here — every page still owns its own
-//  tree, its own interaction and its own honesty claims, which are the parts
+//  A shared module rather than a copy per page: the older pages each rolled
+//  their own chrome, and forty copies of one scaffold had drifted apart in size
+//  and spacing. Nothing page-specific lives here — every page still owns its
+//  own tree, its own interaction and its own honesty notes, which are the parts
 //  that are actually different.
 //
 //  The honesty section is deliberately part of the frame. Every page on this
@@ -138,17 +136,61 @@ let panel (title: string) (note: string) (children: ReactElement list) : ReactEl
              Html.p [ prop.className "px-panel-note"; prop.text note ])
           Html.div [ prop.className "px-panel-body"; prop.children children ] ] ]
 
-/// The page frame. `slug` becomes the root class so a page can style its own
-/// interior without inventing a second wrapper.
-let shell (slug: string) (title: string) (lede: string) (body: ReactElement list) (claims: Claim list) : ReactElement =
+/// A lede whose text carries inline elements (a link, an emphasised term).
+/// `shell` takes the plain-text case; this is the same paragraph with children.
+let ledeWith (children: ReactElement list) : ReactElement =
+  Html.p [ prop.className "px-lede"; prop.children children ]
+
+/// A plain-text lede.
+let lede (text: string) : ReactElement =
+  Html.p [ prop.className "px-lede"; prop.text text ]
+
+/// The honesty section written as prose notes under a page's own heading — the
+/// form the capability pages carry, where a claim and its limit often share a
+/// sentence and a link. `shell`'s typed claims are the stricter form of the same
+/// section; both render inside the one `.px-honesty` frame.
+let honesty (heading: string) (notes: ReactElement list) : ReactElement =
+  Html.div
+    [ prop.className "px-honesty"
+      prop.children
+        [ Html.h3 [ prop.text heading ]
+          Html.ul [ prop.className "px-notes"; prop.children notes ] ] ]
+
+/// The page frame every showcase page is drawn in: the title, the lede, the
+/// body, and the honesty section, in that order and with one set of spacing
+/// rules. `slug` becomes the root class (`px-<slug>`) so a page can style its
+/// own interior without inventing a second wrapper.
+let frame
+  (slug: string)
+  (title: string)
+  (lede: ReactElement)
+  (body: ReactElement list)
+  (honesty: ReactElement)
+  : ReactElement =
   Html.div
     [ prop.className ("px-page px-" + slug)
       prop.children
         [ Html.h1 [ prop.className "px-title"; prop.text title ]
-          Html.p [ prop.className "px-lede"; prop.text lede ]
+          lede
           Html.div [ prop.className "px-body"; prop.children body ]
-          Html.div
-            [ prop.className "px-honesty"
-              prop.children
-                [ Html.h3 [ prop.text "How honest is this?" ]
-                  Html.ul [ prop.children [ for c in claims -> claimItem c ] ] ] ] ] ]
+          honesty ] ]
+
+/// The frame with typed claims — the exhibit pages' form, where every line of
+/// the honesty section is marked as shown or not shown.
+let shell
+  (slug: string)
+  (title: string)
+  (ledeText: string)
+  (body: ReactElement list)
+  (claims: Claim list)
+  : ReactElement =
+  frame
+    slug
+    title
+    (lede ledeText)
+    body
+    (Html.div
+      [ prop.className "px-honesty"
+        prop.children
+          [ Html.h3 [ prop.text "How honest is this?" ]
+            Html.ul [ prop.children [ for c in claims -> claimItem c ] ] ] ])

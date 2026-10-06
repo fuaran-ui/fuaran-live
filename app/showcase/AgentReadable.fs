@@ -514,9 +514,6 @@ let private renderLive (node: Node<obj>) : ReactElement =
       Csp = Csp.Permissive }
     node
 
-let private renderStatic (n: Node<'msg>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 let private seedStore () : unit =
   StateStore.set kTitle (box "The Dispossessed")
   StateStore.set kFormat (box "Print")
@@ -680,7 +677,7 @@ let private AgentReadableView () : ReactElement =
                   "An ordinary hold request at a small library. Nothing about it looks unusual, and nothing about it is: it is a typed Fuaran tree drawn by the same renderer as every other page here. Change anything, then re-read it below." ]
             renderLive holdForm
             (if placed then
-               renderStatic (
+               Exhibit.renderStatic (
                  Fuaran.callout
                    "ar-placed"
                    { Defaults.callout with
@@ -766,39 +763,30 @@ let private AgentReadableView () : ReactElement =
                         ) ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "ar-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "What is real here, and what is staged" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The read is real. The pane above walks the live DOM and reports what it finds; nothing in it is fed from the values that wrote the attributes. If the two ever disagreed, you would see the DOM's answer, not the page's intention." ]
-                    Html.li
-                      [ prop.text
-                          "The vocabulary is real. The shapes, the effects, and the three value-hint forms come from the shipped affordance types, and every payload is minted by the same canonical JSON encoder the wire format uses — so these strings cannot drift from the vocabulary they claim to speak." ]
-                    Html.li
-                      [ prop.text
-                          "The declaration is hand-authored. This page plays the host and says what its own controls afford; deriving such a declaration automatically is a host's business, and a host that derives nothing still answers honestly — an empty enumeration is a legitimate answer, never an error." ]
-                    Html.li
-                      [ prop.text
-                          "Absence carries meaning, and never as a null. An open end of a range is omitted, because a half-open bound is a real declaration and a sentinel would be a lie. A control the page chose not to publish is simply not in the list — a reader cannot tell withheld from never-existed, which is what makes silence a usable refusal. Saying \"readable only\" is the different, weaker statement: you may ask, you may not set." ]
-                    Html.li
-                      [ prop.text
-                          "Nothing leaves the tab. There is no key, no network call, and no model — the whole exchange is this page reading itself." ] ] ] ] ]
+    Exhibit.honesty
+      "What is real here, and what is staged"
+      [ Html.li
+          [ prop.text
+              "The read is real. The pane above walks the live DOM and reports what it finds; nothing in it is fed from the values that wrote the attributes. If the two ever disagreed, you would see the DOM's answer, not the page's intention." ]
+        Html.li
+          [ prop.text
+              "The vocabulary is real. The shapes, the effects, and the three value-hint forms come from the shipped affordance types, and every payload is minted by the same canonical JSON encoder the wire format uses — so these strings cannot drift from the vocabulary they claim to speak." ]
+        Html.li
+          [ prop.text
+              "The declaration is hand-authored. This page plays the host and says what its own controls afford; deriving such a declaration automatically is a host's business, and a host that derives nothing still answers honestly — an empty enumeration is a legitimate answer, never an error." ]
+        Html.li
+          [ prop.text
+              "Absence carries meaning, and never as a null. An open end of a range is omitted, because a half-open bound is a real declaration and a sentinel would be a lie. A control the page chose not to publish is simply not in the list — a reader cannot tell withheld from never-existed, which is what makes silence a usable refusal. Saying \"readable only\" is the different, weaker statement: you may ask, you may not set." ]
+        Html.li
+          [ prop.text
+              "Nothing leaves the tab. There is no key, no network call, and no model — the whole exchange is this page reading itself." ] ]
 
-  Html.div
-    [ prop.className "ar-page"
-      prop.children
-        [ Html.h1 [ prop.className "ar-title"; prop.text "The Agent-Readable Page" ]
-          Html.p
-            [ prop.className "ar-lede"
-              prop.text
-                "An assistant driving a web page today is mostly guessing: it looks at a rendering, infers what the controls might be, tries something, and learns from the failure. It does not have to be that way. A page whose interface is typed data can also declare, in the page itself, what it may be asked to do — the phrasings it understands, the synonyms it resolves, and the values each control accepts. Below is such a page, and beside it, exactly what a machine reading it gets back." ]
-          pagePanel
-          agentPanel
-          registryPanel
-          honesty ] ]
+  Exhibit.frame
+    "ar"
+    "The Agent-Readable Page"
+    (Exhibit.lede
+      "An assistant driving a web page today is mostly guessing: it looks at a rendering, infers what the controls might be, tries something, and learns from the failure. It does not have to be that way. A page whose interface is typed data can also declare, in the page itself, what it may be asked to do — the phrasings it understands, the synonyms it resolves, and the values each control accepts. Below is such a page, and beside it, exactly what a machine reading it gets back.")
+    [ pagePanel; agentPanel; registryPanel ]
+    honesty
 
 let page: ReactElement = AgentReadableView()

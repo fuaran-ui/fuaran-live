@@ -462,50 +462,43 @@ let private KintsugiView () : ReactElement =
                                 Html.code [ prop.className "k-step-text"; prop.text step.Text ] ] ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "k-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "No screenshots were taken" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Every diagnosis above is a typed signal read from the rendered tree – a failed assertion, the renderer's own unwired-button marker, a real StyleObserver contrast flag, a real LayoutObserver overflow flag. A vision model guessing at pixels can't name the exact node; structure can." ]
-                    Html.li
-                      [ prop.text
-                          "The heal is a recorded repair session, replayed – the keyless reliability floor. But the green at the end is not scripted: the senses re-run over the repaired structure and pass for real." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "This is closed-loop authoring: introspect → diagnose → emit a corrective op → re-check. The same senses power the "
-                            Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
-                            Html.text " story across the site." ] ] ] ] ] ]
+    Exhibit.honesty
+      "No screenshots were taken"
+      [ Html.li
+          [ prop.text
+              "Every diagnosis above is a typed signal read from the rendered tree – a failed assertion, the renderer's own unwired-button marker, a real StyleObserver contrast flag, a real LayoutObserver overflow flag. A vision model guessing at pixels can't name the exact node; structure can." ]
+        Html.li
+          [ prop.text
+              "The heal is a recorded repair session, replayed – the keyless reliability floor. But the green at the end is not scripted: the senses re-run over the repaired structure and pass for real." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "This is closed-loop authoring: introspect → diagnose → emit a corrective op → re-check. The same senses power the "
+                Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
+                Html.text " story across the site." ] ] ]
 
-  Html.div
-    [ prop.className "k-page"
-      prop.children
-        [ Html.h1 [ prop.className "k-title"; prop.text "Kintsugi" ]
-          Html.p
-            [ prop.className "k-lede"
-              prop.text
-                "Break the app on purpose. Watch the machine find the crack – from structure, not screenshots – and repair it in seconds." ]
-          Html.div
-            [ prop.className "k-split"
-              prop.children
-                [ Html.div
-                    [ prop.className "k-app-col"
-                      prop.children [ Html.h3 [ prop.className "k-col-title"; prop.text "The app" ]; stage ] ]
-                  Html.div [ prop.className "k-sense-col"; prop.children [ sensePanel ] ] ] ]
-          Html.div
-            [ prop.className "k-controls"
-              prop.children
-                [ Html.div
-                    [ prop.className "k-sabotage-block"
-                      prop.children
-                        [ Html.span [ prop.className "k-controls-label"; prop.text "Sabotage" ]
-                          sabotageRow ] ]
-                  healControls ] ]
-          healLogView
-          honesty ] ]
+  Exhibit.frame
+    "k"
+    "Kintsugi"
+    (Exhibit.lede
+      "Break the app on purpose. Watch the machine find the crack – from structure, not screenshots – and repair it in seconds.")
+    [ Html.div
+        [ prop.className "k-split"
+          prop.children
+            [ Html.div
+                [ prop.className "k-app-col"
+                  prop.children [ Html.h3 [ prop.className "k-col-title"; prop.text "The app" ]; stage ] ]
+              Html.div [ prop.className "k-sense-col"; prop.children [ sensePanel ] ] ] ]
+      Html.div
+        [ prop.className "k-controls"
+          prop.children
+            [ Html.div
+                [ prop.className "k-sabotage-block"
+                  prop.children
+                    [ Html.span [ prop.className "k-controls-label"; prop.text "Sabotage" ]
+                      sabotageRow ] ]
+              healControls ] ]
+      healLogView ]
+    honesty
 
 let page: ReactElement = KintsugiView()

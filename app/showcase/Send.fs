@@ -416,39 +416,30 @@ let private SendView () : ReactElement =
                Html.none) ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "sm-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "One artefact, zero forks" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "All three tabs are projections of the same wire tree – the JSON in the drawer is byte-identical across them. Because the app is data, \"render\" is a choice of target, not a rebuild." ]
-                    Html.li
-                      [ prop.text
-                          "The email tab is a real render target: a walk over the tree emitting table-based, inline-styled, no-JS HTML for the Display subset. Tabs degrade to stacked sections (every pane visible under its label – a per-kind policy the typed tree makes possible); other interactive kinds project to open-live links. HTML email is the most hostile target there is, and it falls out of the same artefact – reusable as scheduled report digests, not just a demo." ]
-                    Html.li
-                      [ prop.text
-                          "Honest limits: the document tab shows the render shape a crawler and the server renderer both produce (class + aria are parity-locked by the conformance corpus), but genuine server-side SSR and islands hydration – the \"hydration x-ray\" – need the SSR host and are declared here, not run in this static page." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "The dashboard that arrives in your Monday email and the one you click into are the same bytes – the "
-                            Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
-                            Html.text " thesis, at the projection layer." ] ] ] ] ] ]
+    Exhibit.honesty
+      "One artefact, zero forks"
+      [ Html.li
+          [ prop.text
+              "All three tabs are projections of the same wire tree – the JSON in the drawer is byte-identical across them. Because the app is data, \"render\" is a choice of target, not a rebuild." ]
+        Html.li
+          [ prop.text
+              "The email tab is a real render target: a walk over the tree emitting table-based, inline-styled, no-JS HTML for the Display subset. Tabs degrade to stacked sections (every pane visible under its label – a per-kind policy the typed tree makes possible); other interactive kinds project to open-live links. HTML email is the most hostile target there is, and it falls out of the same artefact – reusable as scheduled report digests, not just a demo." ]
+        Html.li
+          [ prop.text
+              "Honest limits: the document tab shows the render shape a crawler and the server renderer both produce (class + aria are parity-locked by the conformance corpus), but genuine server-side SSR and islands hydration – the \"hydration x-ray\" – need the SSR host and are declared here, not run in this static page." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "The dashboard that arrives in your Monday email and the one you click into are the same bytes – the "
+                Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
+                Html.text " thesis, at the projection layer." ] ] ]
 
-  Html.div
-    [ prop.className "sm-page"
-      prop.children
-        [ Html.h1 [ prop.className "sm-title"; prop.text "Send Me That App" ]
-          Html.p
-            [ prop.className "sm-lede"
-              prop.text
-                "The same app, three ways: a crawlable document a search engine can read, an email-safe digest, and the live interactive thing – one artefact, zero forks." ]
-          tabs
-          pane
-          wireDrawer
-          honesty ] ]
+  Exhibit.frame
+    "sm"
+    "Send Me That App"
+    (Exhibit.lede
+      "The same app, three ways: a crawlable document a search engine can read, an email-safe digest, and the live interactive thing – one artefact, zero forks.")
+    [ tabs; pane; wireDrawer ]
+    honesty
 
 let page: ReactElement = SendView()

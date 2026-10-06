@@ -416,41 +416,30 @@ let private GrepAppsView () : ReactElement =
                             [ Html.div [ prop.className "gy-thumb-scale"; prop.children [ renderTree app.Tree ] ] ] ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "gy-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "The results are the apps" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Every result is a real app tree rendered live and small – not a screenshot. Hover the query and matched nodes glow inside each result, because the query matched structure, not a metadata tag." ]
-                    Html.li
-                      [ prop.text
-                          "Each chip compiles to a real structural predicate over the canonical wire format, evaluated in-memory across the corpus – you cannot do this to a folder of React components, because they are not data. Your UI has a schema, so it has a query language." ]
-                    Html.li
-                      [ prop.text
-                          "Honest scope: this is a curated in-memory corpus and a tree-walk predicate engine – the plan's v1, no store required. In production the same retrieval rides the shipped signature-searchable pattern bank; the demo's predicates are self-contained." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "A corpus of apps is a database – structural search is the marketplace, the pattern bank, and coverage ledgers wearing a friendly face. The "
-                            Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
-                            Html.text " thesis, at corpus scale." ] ] ] ] ] ]
+    Exhibit.honesty
+      "The results are the apps"
+      [ Html.li
+          [ prop.text
+              "Every result is a real app tree rendered live and small – not a screenshot. Hover the query and matched nodes glow inside each result, because the query matched structure, not a metadata tag." ]
+        Html.li
+          [ prop.text
+              "Each chip compiles to a real structural predicate over the canonical wire format, evaluated in-memory across the corpus – you cannot do this to a folder of React components, because they are not data. Your UI has a schema, so it has a query language." ]
+        Html.li
+          [ prop.text
+              "Honest scope: this is a curated in-memory corpus and a tree-walk predicate engine – the plan's v1, no store required. In production the same retrieval rides the shipped signature-searchable pattern bank; the demo's predicates are self-contained." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "A corpus of apps is a database – structural search is the marketplace, the pattern bank, and coverage ledgers wearing a friendly face. The "
+                Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
+                Html.text " thesis, at corpus scale." ] ] ]
 
-  Html.div
-    [ prop.className "gy-page"
-      prop.children
-        [ Html.h1 [ prop.className "gy-title"; prop.text "Grep Your Apps" ]
-          Html.p
-            [ prop.className "gy-lede"
-              prop.text
-                "Query a database of applications – “find every app with a data grid, or a Critical alert, or bound to revenue” – and the search results ARE the running apps." ]
-          chipBar
-          termField
-          reveal
-          countLine
-          wall
-          honesty ] ]
+  Exhibit.frame
+    "gy"
+    "Grep Your Apps"
+    (Exhibit.lede
+      "Query a database of applications – “find every app with a data grid, or a Critical alert, or bound to revenue” – and the search results ARE the running apps.")
+    [ chipBar; termField; reveal; countLine; wall ]
+    honesty
 
 let page: ReactElement = GrepAppsView()

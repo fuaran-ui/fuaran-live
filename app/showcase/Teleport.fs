@@ -1020,83 +1020,87 @@ let private TeleportView (bare: bool) : ReactElement =
 
   // ── Honesty footer ─────────────────────────────────────────────────────
 
-  let honesty =
-    Html.div
-      [ prop.className "tp-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "What actually travels" ]
-            Html.ul
-              [ prop.children
-                  [ (if bare then
-                       Html.li
-                         [ prop.text
-                             "What this page shipped with: a player – the same Fuaran renderer every host runs – plus this demo's wizard controls. What it did NOT ship with is an application: the app you see, its tree and its state, arrived as the bytes in this page's URL fragment, digest-verified on the way in." ]
-                     else
-                       Html.none)
-                    Html.li
-                      [ prop.text
-                          "The QR, the link, and the string are the same few hundred bytes: the whole app – its typed tree and live state – deflate-compressed and digest-signed. Not a pointer to a session; there is no session, anywhere." ]
-                    Html.li
-                      [ prop.text
-                          "The bundle rides the URL fragment, which never leaves your browser – open the network tab and watch: the server only ever serves the player, and has no database to lose. If every server behind this site were wiped tonight, this QR would still resume tomorrow. (Refresh this page – you won't lose your place; the URL is carrying the app right now.)" ]
-                    Html.li
-                      [ prop.text
-                          "Integrity is checked, not promised – flip one byte (try it on the pass) and the bundle refuses to resume rather than resuming something subtly wrong." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "Closures can't ride the wire – by design. Only declarative, wire-survivable actions live again after a hop, and every one still passes the host's "
-                            Html.a
-                              [ prop.href (if bare then "/#/pillar/machine" else "#/pillar/machine")
-                                prop.text "default-deny gate" ]
-                            Html.text
-                              " on the way in. \"Continue on your phone\" isn't a feature here; it falls out of treating the app as data." ] ]
-                    // Two receivers, two different claims — and only the pair
-                    // adds up to "this is a wire format". Naming which is which
-                    // is the point: a vacant host shows the app was not already
-                    // there, and a foreign host shows the bytes are not private
-                    // to the runtime that made them.
-                    Html.li
-                      [ prop.children
-                          [ Html.text "Two receivers demonstrate two different halves of the claim. The "
-                            Html.a [ prop.href (receiverOrigin () + "/receiver.html"); prop.text "bare receiver" ]
-                            Html.text
-                              " is VACANT – it ships a player and no application, so what materializes on it came out of the fragment and nowhere else. The "
-                            Html.a
-                              [ prop.href (receiverOrigin () + "/ts-receiver.html")
-                                prop.text "TypeScript receiver" ]
-                            Html.text
-                              " is FOREIGN – there is no F# on that page at all, and the app it renders was minted by the F# tier. A bundle that only resumes inside its own producer's runtime is a save file; one that resumes in another language's runtime is a wire format." ] ] ] ] ] ]
+  let honestyHeading = "What actually travels"
 
+  let honestyNotes =
+    [ (if bare then
+         Html.li
+           [ prop.text
+               "What this page shipped with: a player – the same Fuaran renderer every host runs – plus this demo's wizard controls. What it did NOT ship with is an application: the app you see, its tree and its state, arrived as the bytes in this page's URL fragment, digest-verified on the way in." ]
+       else
+         Html.none)
+      Html.li
+        [ prop.text
+            "The QR, the link, and the string are the same few hundred bytes: the whole app – its typed tree and live state – deflate-compressed and digest-signed. Not a pointer to a session; there is no session, anywhere." ]
+      Html.li
+        [ prop.text
+            "The bundle rides the URL fragment, which never leaves your browser – open the network tab and watch: the server only ever serves the player, and has no database to lose. If every server behind this site were wiped tonight, this QR would still resume tomorrow. (Refresh this page – you won't lose your place; the URL is carrying the app right now.)" ]
+      Html.li
+        [ prop.text
+            "Integrity is checked, not promised – flip one byte (try it on the pass) and the bundle refuses to resume rather than resuming something subtly wrong." ]
+      Html.li
+        [ prop.children
+            [ Html.text
+                "Closures can't ride the wire – by design. Only declarative, wire-survivable actions live again after a hop, and every one still passes the host's "
+              Html.a
+                [ prop.href (if bare then "/#/pillar/machine" else "#/pillar/machine")
+                  prop.text "default-deny gate" ]
+              Html.text
+                " on the way in. \"Continue on your phone\" isn't a feature here; it falls out of treating the app as data." ] ]
+      // Two receivers, two different claims — and only the pair
+      // adds up to "this is a wire format". Naming which is which
+      // is the point: a vacant host shows the app was not already
+      // there, and a foreign host shows the bytes are not private
+      // to the runtime that made them.
+      Html.li
+        [ prop.children
+            [ Html.text "Two receivers demonstrate two different halves of the claim. The "
+              Html.a [ prop.href (receiverOrigin () + "/receiver.html"); prop.text "bare receiver" ]
+              Html.text
+                " is VACANT – it ships a player and no application, so what materializes on it came out of the fragment and nowhere else. The "
+              Html.a
+                [ prop.href (receiverOrigin () + "/ts-receiver.html")
+                  prop.text "TypeScript receiver" ]
+              Html.text
+                " is FOREIGN – there is no F# on that page at all, and the app it renders was minted by the F# tier. A bundle that only resumes inside its own producer's runtime is a save file; one that resumes in another language's runtime is a wire format." ] ] ]
+
+  let body =
+    [ arrivalBanner
+      savedBanner
+      livePane
+      passView
+      stringDrawer
+      (match pass with
+       | Some(Ok p) ->
+         Html.details
+           [ prop.className "tp-wire-drawer"
+             prop.children
+               [ Html.summary [ prop.text "What's inside – the app tree, human-readable" ]
+                 Html.pre [ prop.className "tp-wire"; prop.text p.TreeJson ] ] ]
+       | _ -> Html.none) ]
+
+  // The bare receiver (receiver.html) deliberately keeps its own chrome – it
+  // shares the tp-page / rcv-page classes with the TypeScript receiver – so
+  // only the showcase page sits on the shared exhibit frame.
   let mainAssembly =
-    Html.div
-      [ prop.className (if bare then "tp-page rcv-page" else "tp-page")
-        prop.children
-          [ (if bare then
-               Html.div [ prop.className "rcv-badge"; prop.text "HOST 2 – an app materialized here" ]
-             else
-               Html.h1 [ prop.className "tp-title"; prop.text "Teleport" ])
-            (if bare then
-               Html.none
-             else
-               Html.p
-                 [ prop.className "tp-lede"
-                   prop.text
-                     "Fill in this app on your laptop. Scan the boarding pass on your phone – same step, mid-interaction. The QR isn't a link to the app; it is the app, re-encoded live as you type." ])
-            arrivalBanner
-            savedBanner
-            livePane
-            passView
-            stringDrawer
-            (match pass with
-             | Some(Ok p) ->
-               Html.details
-                 [ prop.className "tp-wire-drawer"
-                   prop.children
-                     [ Html.summary [ prop.text "What's inside – the app tree, human-readable" ]
-                       Html.pre [ prop.className "tp-wire"; prop.text p.TreeJson ] ] ]
-             | _ -> Html.none)
-            honesty ] ]
+    if bare then
+      Html.div
+        [ prop.className "tp-page rcv-page"
+          prop.children (
+            [ Html.div [ prop.className "rcv-badge"; prop.text "HOST 2 – an app materialized here" ] ]
+            @ body
+            @ [ Html.div
+                  [ prop.className "tp-honesty"
+                    prop.children [ Html.h3 [ prop.text honestyHeading ]; Html.ul [ prop.children honestyNotes ] ] ] ]
+          ) ]
+    else
+      Exhibit.frame
+        "tp"
+        "Teleport"
+        (Exhibit.lede
+          "Fill in this app on your laptop. Scan the boarding pass on your phone – same step, mid-interaction. The QR isn't a link to the app; it is the app, re-encoded live as you type.")
+        body
+        (Exhibit.honesty honestyHeading honestyNotes)
 
   // ── The bare receiver's vacant screen ───────────────────────────────────
   //  What ships before any bytes arrive: a player, a waiting prompt, and an

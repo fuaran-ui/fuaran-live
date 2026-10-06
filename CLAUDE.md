@@ -39,13 +39,15 @@ fuaran-live/
 │   ├── Session.fs          #   in-memory session + closed loop (decode→apply→fold over linked Fuaran.UI.Ops)
 │   ├── App.fs              #   Elmish Model/Msg/update + the chrome + chat/preview/inspector panes + boot
 │   └── showcase/           # the showcase Fable project (own Showcase.fsproj; compiled to app/showcase/output/)
-│       ├── Pillars.fs      #   the four pillars + the page registry
-│       ├── Pages.fs        #   hash routing, stubs, the shared footer
-│       ├── Replay.fs       #   page-agnostic scripted-replay loader (every page's keyless mode)
+│       ├── Pillars.fs      #   the four pillars (titles, slugs, blurbs)
+│       ├── Exhibit.fs      #   the one page frame (title / lede / body / honesty) + the render seams
 │       ├── Conformance.fs  #   the CI conformance panel (honest staleness — grey on stale, never fake green)
+│       ├── …               #   one file per page, compiled by a glob (+ per-page *.ts helpers + app.css)
+│       ├── pyodide.ts      #   the one shared Pyodide loader the three Python pages boot through
+│       ├── Registry.fs     #   the page registry: one entry per page, each loaded as its own chunk
+│       ├── Pages.fs        #   hash routing + navigation + the pillar index, all derived from the registry
 │       ├── App.fs          #   the showcase shell (topbar + pillar nav + routes + footer) + boot
-│       ├── Receiver.fs     #   the vacant receiver page root
-│       └── …               #   one file per capability page (+ per-page *.ts helpers + app.css)
+│       └── Receiver.fs     #   the vacant receiver page root
 ├── app.css (in app/)       # playground chrome styles (the .fl-* classes); showcase chrome rides app/showcase/app.css (.ds-*)
 ├── scripts/fable-app.mjs   # `dotnet fable` wrapper for BOTH projects — tolerates the benign F# 222 diagnostic
 ├── src/                    # remaining TS (NOT the app shell):

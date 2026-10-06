@@ -478,53 +478,46 @@ let private UnitTestView () : ReactElement =
                   "A pixel comparison false-fails the moment you re-theme. The structural suite above ignores the repaint – it asserts what the UI IS, not how it looks." ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "ut-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "Assertions against the living UI" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Every assertion is a real structural read over the same typed tree that renders: node existence, child counts, the typed OnEmpty state slot, and whether a simulated click would dispatch – plus one geometric check fed by the shipped layout observer over a real phone-width probe." ]
-                    Html.li
-                      [ prop.text
-                          "The latency is a genuine wall-clock measurement of the run – structural assertions cost microseconds, which is the whole economic argument: verifying generated UI this way is effectively free." ]
-                    Html.li
-                      [ prop.text
-                          "Break the app and the exact assertion goes red with a real reason and a hint; re-theme it and every assertion stays green. The tests read structure, not pixels – the screenshot-diff illustration shows the alternative that can't tell a re-theme from a regression." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "This is the practitioner's answer to \"how do you trust generated UI?\" – you assert against it, like code. Same lens as "
-                            Html.a [ prop.href "#/pillar/machine"; prop.text "the machine-can-see-the-UI" ]
-                            Html.text " story across the site." ] ] ] ] ] ]
+    Exhibit.honesty
+      "Assertions against the living UI"
+      [ Html.li
+          [ prop.text
+              "Every assertion is a real structural read over the same typed tree that renders: node existence, child counts, the typed OnEmpty state slot, and whether a simulated click would dispatch – plus one geometric check fed by the shipped layout observer over a real phone-width probe." ]
+        Html.li
+          [ prop.text
+              "The latency is a genuine wall-clock measurement of the run – structural assertions cost microseconds, which is the whole economic argument: verifying generated UI this way is effectively free." ]
+        Html.li
+          [ prop.text
+              "Break the app and the exact assertion goes red with a real reason and a hint; re-theme it and every assertion stays green. The tests read structure, not pixels – the screenshot-diff illustration shows the alternative that can't tell a re-theme from a regression." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "This is the practitioner's answer to \"how do you trust generated UI?\" – you assert against it, like code. Same lens as "
+                Html.a [ prop.href "#/pillar/machine"; prop.text "the machine-can-see-the-UI" ]
+                Html.text " story across the site." ] ] ]
 
-  Html.div
-    [ prop.className "ut-page"
-      prop.children
-        [ Html.h1 [ prop.className "ut-title"; prop.text "Unit-Test Your UI" ]
-          Html.p
-            [ prop.className "ut-lede"
-              prop.text
-                "Write an assertion; it runs against the living interface in microseconds. Break the app and watch it catch you – then restyle the whole thing and every test stays green, because they test structure, not pixels." ]
-          probe
-          Html.div
-            [ prop.className "ut-split"
-              prop.children
-                [ Html.div
-                    [ prop.className "ut-app-col"
-                      prop.children
-                        [ Html.h3 [ prop.className "ut-col-title"; prop.text "The app under test" ]
-                          stage
-                          themeControl ] ]
-                  Html.div [ prop.className "ut-suite-col"; prop.children [ suitePanel; editor ] ] ] ]
-          Html.div
-            [ prop.className "ut-break-block"
-              prop.children
-                [ Html.span [ prop.className "ut-break-label"; prop.text "Break it" ]
-                  breakRow ] ]
-          contrastMock
-          honesty ] ]
+  Exhibit.frame
+    "ut"
+    "Unit-Test Your UI"
+    (Exhibit.lede
+      "Write an assertion; it runs against the living interface in microseconds. Break the app and watch it catch you – then restyle the whole thing and every test stays green, because they test structure, not pixels.")
+    [ probe
+      Html.div
+        [ prop.className "ut-split"
+          prop.children
+            [ Html.div
+                [ prop.className "ut-app-col"
+                  prop.children
+                    [ Html.h3 [ prop.className "ut-col-title"; prop.text "The app under test" ]
+                      stage
+                      themeControl ] ]
+              Html.div [ prop.className "ut-suite-col"; prop.children [ suitePanel; editor ] ] ] ]
+      Html.div
+        [ prop.className "ut-break-block"
+          prop.children
+            [ Html.span [ prop.className "ut-break-label"; prop.text "Break it" ]
+              breakRow ] ]
+      contrastMock ]
+    honesty
 
 let page: ReactElement = UnitTestView()

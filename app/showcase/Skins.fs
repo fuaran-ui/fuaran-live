@@ -355,35 +355,28 @@ let private SkinsView () : ReactElement =
             Html.pre [ prop.className "sk-wire"; prop.text treeJson ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "sk-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "Why this works" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The authored app is intent, not CSS – semantic tones (Tone.Brand) and weights, never pixels. A theme is a value; swapping it re-skins the identical tree, and the canonical hash above proves the JSON never moved." ]
-                    Html.li
-                      [ prop.text
-                          "All five looks are genuine theme projections – different palettes, radii, and borders resolved from the same tokens. No CSS filter tricks." ]
-                    Html.li
-                      [ prop.text
-                          "The auditor is the real style observer: it reads the browser's computed colours back from the rendered DOM and runs the shipped WCAG derivation. ContrastBelowAA is a fact the machine checks about the pixels – accessibility as a property of UI-as-data." ] ] ] ] ]
+    Exhibit.honesty
+      "Why this works"
+      [ Html.li
+          [ prop.text
+              "The authored app is intent, not CSS – semantic tones (Tone.Brand) and weights, never pixels. A theme is a value; swapping it re-skins the identical tree, and the canonical hash above proves the JSON never moved." ]
+        Html.li
+          [ prop.text
+              "All five looks are genuine theme projections – different palettes, radii, and borders resolved from the same tokens. No CSS filter tricks." ]
+        Html.li
+          [ prop.text
+              "The auditor is the real style observer: it reads the browser's computed colours back from the rendered DOM and runs the shipped WCAG derivation. ContrastBelowAA is a fact the machine checks about the pixels – accessibility as a property of UI-as-data." ] ]
 
-  Html.div
-    [ prop.className "sk-page"
-      prop.children
-        [ Html.h1 [ prop.className "sk-title"; prop.text "Infinite Skins" ]
-          Html.p
-            [ prop.className "sk-lede"
-              prop.text
-                "One app, re-skinned live across five design systems and any brand you paste in – and it never emitted a single pixel value. Watch the auditor catch a contrast violation the moment you create one." ]
-          Html.div [ prop.className "sk-controls"; prop.children [ themeRail; brandEditor ] ]
-          hashCaption
-          stage
-          auditor
-          wireDrawer
-          honesty ] ]
+  Exhibit.frame
+    "sk"
+    "Infinite Skins"
+    (Exhibit.lede
+      "One app, re-skinned live across five design systems and any brand you paste in – and it never emitted a single pixel value. Watch the auditor catch a contrast violation the moment you create one.")
+    [ Html.div [ prop.className "sk-controls"; prop.children [ themeRail; brandEditor ] ]
+      hashCaption
+      stage
+      auditor
+      wireDrawer ]
+    honesty
 
 let page: ReactElement = SkinsView()

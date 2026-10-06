@@ -10,8 +10,8 @@ module Fuaran.Showcase.GoSessions
 //   1. RECORDED REPLAY (zero setup, no server). A canned recording of the demo
 //      binary's scripted run – the actual resolved-projection frames the Go core
 //      served (first paint -> $state write -> valid op -> a validator reject that
-//      keeps the last good tree) – stepped through THIS renderer. Loaded through
-//      the shared replay-loader seam; labelled as recorded, never live.
+//      keeps the last good tree) – stepped through THIS renderer. Fetched by the page
+//      from its recorded artefact; labelled as recorded, never live.
 //
 //   2. BYOS LIVE-CONNECT. "Run one binary", then the page connects to
 //      http://localhost:14050 and drives the live session end to end: it renders
@@ -67,7 +67,7 @@ let private gStr (o: obj) (k: string) : string =
 // hand-authored. These project its shape to flat values a headless test asserts on
 // and the page consumes.
 
-/// The artefact id the shared replay-loader fetches from ./replays/<id>.json.
+/// The recorded artefact's id; the page fetches it from ./replays/<id>.json itself.
 [<Literal>]
 let replayId = "go-sessions"
 
@@ -247,16 +247,6 @@ let defaultBaseUrl = "http://localhost:14050"
 
 // ─── rendering: decode the resolved wire + fold in $state, draw via the renderer ─
 
-let private renderNode (n: Node<'msg>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
-let private headingNode (id: string) (level: int) (text: string) : Node<unit> =
-  Fuaran.heading
-    id
-    { Level = level
-      Text = TextSource.Literal text
-      Variant = HeadingVariant.Standard }
-
 /// Draw a resolved-projection wire tree through the renderer, folding the given
 /// `$state` values into the binding sources. A decode failure surfaces honestly.
 let private renderResolved (resolvedJson: string) (states: Map<string, obj>) : ReactElement =
@@ -265,7 +255,7 @@ let private renderResolved (resolvedJson: string) (states: Map<string, obj>) : R
     Html.div
       [ prop.className "gs-decode-error"
         prop.children
-          [ renderNode (
+          [ Exhibit.renderStatic (
               Fuaran.callout
                 "gs-decode-err"
                 { Defaults.callout with
@@ -373,9 +363,9 @@ let private ReplayView () : ReactElement =
   )
 
   match load with
-  | ReplayLoad.Loading -> renderNode (Fuaran.markdown "gs-loading" "_Loading the recorded session…_")
+  | ReplayLoad.Loading -> Exhibit.renderStatic (Fuaran.markdown "gs-loading" "_Loading the recorded session…_")
   | ReplayLoad.Missing reason ->
-    renderNode (
+    Exhibit.renderStatic (
       Fuaran.callout
         "gs-missing"
         { Defaults.callout with
@@ -385,7 +375,7 @@ let private ReplayView () : ReactElement =
     )
   | ReplayLoad.Loaded art ->
     if count = 0 then
-      renderNode (Fuaran.markdown "gs-empty" "_The recording has no frames._")
+      Exhibit.renderStatic (Fuaran.markdown "gs-empty" "_The recording has no frames._")
     else
       let atReject = frameIsReject art i
 
@@ -399,7 +389,7 @@ let private ReplayView () : ReactElement =
                     prop.text (sprintf "Frame %d of %d" (i + 1) count) ] ] ]
 
       let narration =
-        renderNode (
+        Exhibit.renderStatic (
           Fuaran.callout
             "gs-narration"
             { Defaults.callout with
@@ -410,7 +400,7 @@ let private ReplayView () : ReactElement =
 
       let rejectBanner =
         if atReject then
-          renderNode (
+          Exhibit.renderStatic (
             Fuaran.callout
               "gs-reject"
               { Defaults.callout with
@@ -534,7 +524,7 @@ let private ByosView () : ReactElement =
                 prop.text (if busy then "Connecting…" else "Connect") ] ] ]
 
   let permissionNote =
-    renderNode (
+    Exhibit.renderStatic (
       Fuaran.callout
         "gs-perm"
         { Defaults.callout with
@@ -549,7 +539,7 @@ let private ByosView () : ReactElement =
     Html.div
       [ prop.className "gs-controls"
         prop.children
-          [ renderNode (
+          [ Exhibit.renderStatic (
               Fuaran.markdown
                 "gs-live-hint"
                 "_Each button sends a real request to your binary; the tree below re-renders from your server's response._"
@@ -573,7 +563,7 @@ let private ByosView () : ReactElement =
   let rejectBanner =
     match reject with
     | Some(code, msg) ->
-      renderNode (
+      Exhibit.renderStatic (
         Fuaran.callout
           "gs-byos-reject"
           { Defaults.callout with
@@ -586,7 +576,7 @@ let private ByosView () : ReactElement =
   let body =
     match conn with
     | Conn.Idle ->
-      renderNode (
+      Exhibit.renderStatic (
         Fuaran.markdown
           "gs-byos-idle"
           "**Getting started** – this page never talks to a hosted service; it becomes the client for a server *you* run. Everything below happens between your browser and your own machine.\n\n\
@@ -596,12 +586,12 @@ let private ByosView () : ReactElement =
 4. **Drive it.** Once connected: write a live `$state` value, apply a valid op, then apply an *invalid* one – the server's validator rejects it with a typed error and keeps the last good tree.\n\n\
 _Not connected yet. Start the binary, then **Connect**._"
       )
-    | Conn.Busy -> renderNode (Fuaran.markdown "gs-byos-busy" "_Talking to the server…_")
+    | Conn.Busy -> Exhibit.renderStatic (Fuaran.markdown "gs-byos-busy" "_Talking to the server…_")
     | Conn.Refused err ->
       Html.div
         [ prop.className "gs-refused"
           prop.children
-            [ renderNode (
+            [ Exhibit.renderStatic (
                 Fuaran.callout
                   "gs-refused-callout"
                   { Defaults.callout with
@@ -632,18 +622,18 @@ let private runItYourself: ReactElement =
     [ prop.className "gs-run"
       prop.children
         [ Html.summary [ prop.text "Run it yourself – one binary" ]
-          renderNode (
+          Exhibit.renderStatic (
             Fuaran.markdown
               "gs-run-intro"
               "The server is one Go binary you run on your own machine. From a checkout of the fuaran-go repository:"
           )
-          renderNode (
+          Exhibit.renderStatic (
             Fuaran.codeBlock
               "gs-run-cmd"
               "powershell"
               "pwsh ./run.ps1 -SkipTests    # builds the core + stages its library\n$env:FUARAN_RS_LIB = (Resolve-Path ..\\fuaran-rs\\target\\release\\fuaran_rs.dll)\ngo run ./cmd/dashboard       # listens on http://localhost:14050"
           )
-          renderNode (
+          Exhibit.renderStatic (
             Fuaran.markdown
               "gs-run-more"
               "It serves the interactive HTML dashboard and the small JSON API this page drives (`/api/v1/session`, `/state`, `/op`). Full start + contract details live in the repository's `README.md` and `docs/BYOS-CONTRACT.md` – this panel links rather than duplicates them, so the instructions never drift."
@@ -661,21 +651,22 @@ let private GoSessionsView () : ReactElement =
         prop.onClick (fun _ -> setMode m)
         prop.text label ]
 
-  Html.div
-    [ prop.className "gs-page"
-      prop.children
-        [ renderNode (headingNode "gs-title" 1 "Go Sessions – bring your own server")
-          renderNode (
-            Fuaran.markdown
-              "gs-wow"
-              "The playground's identity – client-only, no account, no server – extends symmetrically to **bring your own server**: the same static page becomes the client for a session server *you* run locally as one Go binary. Two honest modes below."
-          )
-          Html.div
-            [ prop.className "gs-tabs"
-              prop.children [ tab Mode.Replay "Recorded replay"; tab Mode.Byos "Bring your own server" ] ]
-          (match mode with
-           | Mode.Replay -> ReplayView()
-           | Mode.Byos -> ByosView())
-          runItYourself ] ]
+  Exhibit.frame
+    "gs"
+    "Go Sessions – bring your own server"
+    (Exhibit.ledeWith
+      [ Html.text "The playground's identity – client-only, no account, no server – extends symmetrically to "
+        Html.strong "bring your own server"
+        Html.text ": the same static page becomes the client for a session server "
+        Html.em "you"
+        Html.text " run locally as one Go binary. Two honest modes below." ])
+    [ Html.div
+        [ prop.className "gs-tabs"
+          prop.children [ tab Mode.Replay "Recorded replay"; tab Mode.Byos "Bring your own server" ] ]
+      (match mode with
+       | Mode.Replay -> ReplayView()
+       | Mode.Byos -> ByosView())
+      runItYourself ]
+    Html.none
 
 let page: ReactElement = GoSessionsView()

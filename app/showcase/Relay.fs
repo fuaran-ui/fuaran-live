@@ -48,9 +48,6 @@ let private wireStr (s: string) : PropValue = PropValue.Wire(JStr s)
 let private shortHash (h: string) : string =
   if h.Length > 12 then h.Substring(0, 12) else h
 
-let private renderNode (n: Node<unit>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 // ─── The artefact + the scripted, hash-chained op flow ───────────────────────
 
 let private metricNode (nid: string) (label: string) (value: float) : Node<unit> =
@@ -743,7 +740,9 @@ let private RelayView () : ReactElement =
                             [ Html.span
                                 [ prop.className "rl-delivery-tag"
                                   prop.text "crawlable document (static markup – no client runtime)" ]
-                              Html.div [ prop.className "rl-doc-render"; prop.children [ renderNode (treeAfter 4) ] ] ] ]
+                              Html.div
+                                [ prop.className "rl-doc-render"
+                                  prop.children [ Exhibit.renderStatic (treeAfter 4) ] ] ] ]
                       Html.div
                         [ prop.className "rl-delivery-pane"
                           prop.children
@@ -754,42 +753,35 @@ let private RelayView () : ReactElement =
 
   // ─── Honesty ──────────────────────────────────────────────────────────────
   let honesty =
-    Html.div
-      [ prop.className "rl-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "How honest is this?" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The relay's spine is real: every hand-off is a genuine hash-chained op-record, folded through the shipped apply engine, and the shipped Verify.chain re-runs green over the whole chain. The .NET station's assertion genuinely scans the tree and the placeholder it reports is the one the AI left – the heal op is real repair, not a staged beat." ]
-                    Html.li
-                      [ prop.text
-                          "The parity seal is the genuinely-polyglot part: each station's canonical wire head hash is recomputed by three independent SHA-256 implementations – the F# managed digest and TypeScript's Web Crypto always, Python's hashlib in CPython-on-WebAssembly on demand – and they agree, byte for byte." ]
-                    Html.li
-                      [ prop.text
-                          "What is NOT claimed: the encode / apply / hash-chain engine is the real Fuaran.UI, compiled to JavaScript via Fable – one engine, not four shipped to the browser. The four station source panels are idiomatic per-host projections. The point the relay dramatises is that the wire, the op protocol, and the chain are host-neutral, so the artefact survives crossing runtimes – and the independent hashers prove the bytes really are the same." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "Your teams don't have to agree on a language to collaborate on an application. It is the same "
-                            Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
-                            Html.text " thesis Rosetta shows at rest – here, in motion." ] ] ] ] ] ]
+    Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "The relay's spine is real: every hand-off is a genuine hash-chained op-record, folded through the shipped apply engine, and the shipped Verify.chain re-runs green over the whole chain. The .NET station's assertion genuinely scans the tree and the placeholder it reports is the one the AI left – the heal op is real repair, not a staged beat." ]
+        Html.li
+          [ prop.text
+              "The parity seal is the genuinely-polyglot part: each station's canonical wire head hash is recomputed by three independent SHA-256 implementations – the F# managed digest and TypeScript's Web Crypto always, Python's hashlib in CPython-on-WebAssembly on demand – and they agree, byte for byte." ]
+        Html.li
+          [ prop.text
+              "What is NOT claimed: the encode / apply / hash-chain engine is the real Fuaran.UI, compiled to JavaScript via Fable – one engine, not four shipped to the browser. The four station source panels are idiomatic per-host projections. The point the relay dramatises is that the wire, the op protocol, and the chain are host-neutral, so the artefact survives crossing runtimes – and the independent hashers prove the bytes really are the same." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "Your teams don't have to agree on a language to collaborate on an application. It is the same "
+                Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
+                Html.text " thesis Rosetta shows at rest – here, in motion." ] ] ]
 
-  Html.div
-    [ prop.className "rl-page"
-      prop.children
-        [ Html.h1 [ prop.className "rl-title"; prop.text "The Relay" ]
-          Html.p
-            [ prop.className "rl-lede"
-              prop.text
-                "Watch one app pass through four runtimes – authored in Python, edited by an AI on the TypeScript host, healed on .NET, delivered as a document and an email – and arrive with a verified, unbroken hash chain. Four languages played telephone; nothing was lost." ]
-          controls
-          track
-          ribbon
-          seal
-          Html.div [ prop.className "rl-py-launch"; prop.children [ pythonLaunch ] ]
-          delivery
-          honesty ] ]
+  Exhibit.frame
+    "rl"
+    "The Relay"
+    (Exhibit.lede
+      "Watch one app pass through four runtimes – authored in Python, edited by an AI on the TypeScript host, healed on .NET, delivered as a document and an email – and arrive with a verified, unbroken hash chain. Four languages played telephone; nothing was lost.")
+    [ controls
+      track
+      ribbon
+      seal
+      Html.div [ prop.className "rl-py-launch"; prop.children [ pythonLaunch ] ]
+      delivery ]
+    honesty
 
 let page: ReactElement = RelayView()

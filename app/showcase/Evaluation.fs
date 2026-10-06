@@ -290,9 +290,6 @@ let private parseFeed (raw: string) : FeedState =
 
 // ─── the dashboard body (a Fuaran tree – exhibit zero) ───────────────────────
 
-let private renderNode (n: Node<'msg>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 let private headingNode (id: string) (level: int) (text: string) : Node<unit> =
   Fuaran.heading
     id
@@ -783,42 +780,35 @@ let private EvaluationView () : ReactElement =
 
   let body =
     match state with
-    | FeedState.Loading -> renderNode (Fuaran.markdown "ev-loading" "_Reading the live results feed…_")
-    | FeedState.Awaiting m -> renderNode (awaitingNode m)
-    | FeedState.Failed reason -> renderNode (failedNode reason)
-    | FeedState.Published r -> renderNode (dashboardTree basis r)
+    | FeedState.Loading -> Exhibit.renderStatic (Fuaran.markdown "ev-loading" "_Reading the live results feed…_")
+    | FeedState.Awaiting m -> Exhibit.renderStatic (awaitingNode m)
+    | FeedState.Failed reason -> Exhibit.renderStatic (failedNode reason)
+    | FeedState.Published r -> Exhibit.renderStatic (dashboardTree basis r)
 
-  Html.div
-    [ prop.className "ev-page"
-      prop.children
-        [ Html.h1 [ prop.className "ev-title"; prop.text "Evaluation results" ]
-          Html.p
-            [ prop.className "ev-lede"
-              prop.text
-                "How reliably does the Fuaran orchestrator turn a natural-language prompt into correct, conformant UI? These figures come straight from the evaluation suite – a fixed, public set of prompts scored across providers – and this page reads them live from the published results feed. Nothing here is hand-typed; when a new run publishes, the dashboard updates itself." ]
-          liveStrip
-          Html.div [ prop.className "ev-meta"; prop.children [ provenance; source ] ]
-          body
-          Html.div
-            [ prop.className "ev-honesty"
-              prop.children
-                [ Html.h3 [ prop.text "How honest is this?" ]
-                  Html.ul
-                    [ prop.children
-                        [ Html.li
-                            [ prop.text
-                                "Every number is read live from the published results feed – a static JSON artefact fetched in your browser and polled every 60 seconds. Nothing on this page is hand-entered, and there is no server in the loop." ]
-                          Html.li
-                            [ prop.text
-                                "Until a run publishes, the page shows no figures at all – not placeholders. If the feed can't be read it says so, in grey. It never dresses up a missing or failing result as a pass." ]
-                          Html.li
-                            [ prop.text
-                                "Cost per correct is shown with the publisher's own measurement note and undercount caveat, rendered word for word from the feed. A metric the run did not measure shows an em dash, not a zero." ]
-                          Html.li
-                            [ prop.text
-                                "The link above goes to the public source and methodology, so the numbers are reproducible rather than asserted." ]
-                          Html.li
-                            [ prop.text
-                                "The dashboard you're reading is itself a Fuaran tree, drawn by the same renderer as every demo – the metrics, the per-provider cards, all of it is UI-as-data." ] ] ] ] ] ] ]
+  Exhibit.frame
+    "ev"
+    "Evaluation results"
+    (Exhibit.lede
+      "How reliably does the Fuaran orchestrator turn a natural-language prompt into correct, conformant UI? These figures come straight from the evaluation suite – a fixed, public set of prompts scored across providers – and this page reads them live from the published results feed. Nothing here is hand-typed; when a new run publishes, the dashboard updates itself.")
+    [ liveStrip
+      Html.div [ prop.className "ev-meta"; prop.children [ provenance; source ] ]
+      body ]
+    (Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "Every number is read live from the published results feed – a static JSON artefact fetched in your browser and polled every 60 seconds. Nothing on this page is hand-entered, and there is no server in the loop." ]
+        Html.li
+          [ prop.text
+              "Until a run publishes, the page shows no figures at all – not placeholders. If the feed can't be read it says so, in grey. It never dresses up a missing or failing result as a pass." ]
+        Html.li
+          [ prop.text
+              "Cost per correct is shown with the publisher's own measurement note and undercount caveat, rendered word for word from the feed. A metric the run did not measure shows an em dash, not a zero." ]
+        Html.li
+          [ prop.text
+              "The link above goes to the public source and methodology, so the numbers are reproducible rather than asserted." ]
+        Html.li
+          [ prop.text
+              "The dashboard you're reading is itself a Fuaran tree, drawn by the same renderer as every demo – the metrics, the per-provider cards, all of it is UI-as-data." ] ])
 
 let page: ReactElement = EvaluationView()

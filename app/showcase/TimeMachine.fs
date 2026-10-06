@@ -345,9 +345,6 @@ let mergeLenientJson (bid: string) (k: int) : string =
 
 // ─── View helpers ────────────────────────────────────────────────────────────
 
-let private renderTree (n: Node<unit>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 let private actorLabel (a: Actor) : string =
   match a with
   | Actor.Human _ -> "you"
@@ -427,9 +424,9 @@ let private TimeMachineView () : ReactElement =
   let mergePanel: ReactElement list =
     match merge with
     | None -> []
-    | Some(MergeView.Composed merged) -> [ panel "merged · 3-way, auto-composed" (renderTree merged) ]
+    | Some(MergeView.Composed merged) -> [ panel "merged · 3-way, auto-composed" (Exhibit.renderStatic merged) ]
     | Some(MergeView.Resolved merged) ->
-      [ panel "merged · conflicts settled to the ancestor's value" (renderTree merged) ]
+      [ panel "merged · conflicts settled to the ancestor's value" (Exhibit.renderStatic merged) ]
     | Some(MergeView.Conflicts cs) ->
       let resolve () =
         match activeBranch with
@@ -460,20 +457,20 @@ let private TimeMachineView () : ReactElement =
 
   let stage =
     match activeBranch, stageResult with
-    | None, Ok tree -> Html.div [ prop.className "tm-stage"; prop.children [ renderTree tree ] ]
+    | None, Ok tree -> Html.div [ prop.className "tm-stage"; prop.children [ Exhibit.renderStatic tree ] ]
     | None, Error err -> Html.div [ prop.className "tm-stage"; prop.children [ applyError err ] ]
     | Some(b, _), forkResult ->
       // A fork is staged BESIDE the trunk's head – two live trees, side by side –
       // and the merge result joins them as a third once asked for.
       let forkBody =
         match forkResult with
-        | Ok tree -> renderTree tree
+        | Ok tree -> Exhibit.renderStatic tree
         | Error err -> applyError err
 
       Html.div
         [ prop.className "tm-stage tm-split"
           prop.children (
-            [ panel (sprintf "trunk · head (turn %d)" turnCount) (renderTree trunkFrames[turnCount])
+            [ panel (sprintf "trunk · head (turn %d)" turnCount) (Exhibit.renderStatic trunkFrames[turnCount])
               panel ("branch · " + b.Name) forkBody ]
             @ mergePanel
           ) ]
@@ -601,46 +598,39 @@ let private TimeMachineView () : ReactElement =
                             prop.onClick (fun _ -> forkAt b.Id turn) ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "tm-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "Each frame is replayed, not recorded" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Dragging the scrubber folds the shipped apply engine over the op prefix – the tree at turn n is genuinely reconstructed from the initial tree plus the first n operations, never a stored snapshot or a video frame." ]
-                    Html.li
-                      [ prop.text
-                          "The inspector shows the real canonical encoding of each operation and a real content-addressed hash chain: every hash is sha256 over the previous hash, the encoded op, its sequence number, and its author. Change one op and every hash downstream changes." ]
-                    Html.li
-                      [ prop.text
-                          "Forking replays the trunk up to the chosen frame, then applies an alternative op-set on top – a genuinely divergent app that shares the trunk's history and hash at the branch point. Fork too early and the apply engine returns a real typed error, shown as-is." ]
-                    Html.li
-                      [ prop.text
-                          "Merging runs the shipped structural 3-way merge in the browser – the same engine a server host uses – with the fork frame as the common ancestor. Disjoint changes compose into one tree automatically; a cell both sides rewrote comes back as a real, named conflict, never a silent pick. Fork from the head and the merge is clean by construction; fork earlier and the trunk's later edits meet the branch's." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "The twelve-turn arc is a bundled recording – no key, no server. The same value-not-code property runs through the "
-                            Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
-                            Html.text " story across the site." ] ] ] ] ] ]
+    Exhibit.honesty
+      "Each frame is replayed, not recorded"
+      [ Html.li
+          [ prop.text
+              "Dragging the scrubber folds the shipped apply engine over the op prefix – the tree at turn n is genuinely reconstructed from the initial tree plus the first n operations, never a stored snapshot or a video frame." ]
+        Html.li
+          [ prop.text
+              "The inspector shows the real canonical encoding of each operation and a real content-addressed hash chain: every hash is sha256 over the previous hash, the encoded op, its sequence number, and its author. Change one op and every hash downstream changes." ]
+        Html.li
+          [ prop.text
+              "Forking replays the trunk up to the chosen frame, then applies an alternative op-set on top – a genuinely divergent app that shares the trunk's history and hash at the branch point. Fork too early and the apply engine returns a real typed error, shown as-is." ]
+        Html.li
+          [ prop.text
+              "Merging runs the shipped structural 3-way merge in the browser – the same engine a server host uses – with the fork frame as the common ancestor. Disjoint changes compose into one tree automatically; a cell both sides rewrote comes back as a real, named conflict, never a silent pick. Fork from the head and the merge is clean by construction; fork earlier and the trunk's later edits meet the branch's." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "The twelve-turn arc is a bundled recording – no key, no server. The same value-not-code property runs through the "
+                Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
+                Html.text " story across the site." ] ] ]
 
-  Html.div
-    [ prop.className "tm-page"
-      prop.children
-        [ Html.h1 [ prop.className "tm-title-h"; prop.text "The Time Machine" ]
-          Html.p
-            [ prop.className "tm-lede"
-              prop.text
-                "Scrub through an app's entire life like video – then fork it from any frame. Because the app is a value, its whole history replays on demand." ]
-          stage
-          scrubber
-          Html.div
-            [ prop.className "tm-panels"
-              prop.children
-                [ Html.div [ prop.className "tm-panel-inspect"; prop.children [ inspector ] ]
-                  Html.div [ prop.className "tm-panel-fork"; prop.children [ forkControls ] ] ] ]
-          honesty ] ]
+  Exhibit.frame
+    "tm"
+    "The Time Machine"
+    (Exhibit.lede
+      "Scrub through an app's entire life like video – then fork it from any frame. Because the app is a value, its whole history replays on demand.")
+    [ stage
+      scrubber
+      Html.div
+        [ prop.className "tm-panels"
+          prop.children
+            [ Html.div [ prop.className "tm-panel-inspect"; prop.children [ inspector ] ]
+              Html.div [ prop.className "tm-panel-fork"; prop.children [ forkControls ] ] ] ] ]
+    honesty
 
 let page: ReactElement = TimeMachineView()

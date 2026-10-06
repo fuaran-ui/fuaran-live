@@ -538,39 +538,29 @@ module PatternBank =
                 ", this is what happens before you reach for a model: look up a known-good pattern by its structure, get a real app instantly, then edit or prompt from there." ] ]
 
     let honesty =
-      Html.div
-        [ prop.className "pb-honesty"
-          prop.children
-            [ Html.h3 [ prop.text "How honest is this?" ]
-              Html.ul
-                [ prop.children
-                    [ Html.li
-                        [ prop.text
-                            "The search is the real Fuaran.Core signature-search engine (findBySignature), compiled to JavaScript via Fable – the same engine that powers the shipped Fuaran.UI.FastPath package. It is deterministic and total: a pattern is matched by its structure (the node kind it produces + the holes it requires), never guessed, and it resolves in-memory with no model call and no network." ]
-                      Html.li
-                        [ prop.text
-                            "Each match instantiates into a genuine Fuaran tree, rendered here through the real renderer; the wire JSON is the canonical encoding. Two patterns are compute-bound – their value is a real transform pipeline evaluated client-side, so even a data-driven figure needs no server." ]
-                      Html.li
-                        [ prop.text
-                            "This is composition by lookup, the anti-generative half of AI-built UI: the pattern bank is what the machine consults first, and only when it misses does generation take over. The pattern set here mirrors the public FastPath catalogue; a real consumer (the playground) pulls that package directly." ]
-                      Html.li
-                        [ prop.children
-                            [ Html.text "The interface is structured data a machine can search – the "
-                              Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
-                              Html.text " thesis, applied to composition itself." ] ] ] ] ] ]
+      Exhibit.honesty
+        "How honest is this?"
+        [ Html.li
+            [ prop.text
+                "The search is the real Fuaran.Core signature-search engine (findBySignature), compiled to JavaScript via Fable – the same engine that powers the shipped Fuaran.UI.FastPath package. It is deterministic and total: a pattern is matched by its structure (the node kind it produces + the holes it requires), never guessed, and it resolves in-memory with no model call and no network." ]
+          Html.li
+            [ prop.text
+                "Each match instantiates into a genuine Fuaran tree, rendered here through the real renderer; the wire JSON is the canonical encoding. Two patterns are compute-bound – their value is a real transform pipeline evaluated client-side, so even a data-driven figure needs no server." ]
+          Html.li
+            [ prop.text
+                "This is composition by lookup, the anti-generative half of AI-built UI: the pattern bank is what the machine consults first, and only when it misses does generation take over. The pattern set here mirrors the public FastPath catalogue; a real consumer (the playground) pulls that package directly." ]
+          Html.li
+            [ prop.children
+                [ Html.text "The interface is structured data a machine can search – the "
+                  Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
+                  Html.text " thesis, applied to composition itself." ] ] ]
 
-    Html.div
-      [ prop.className "pb-page"
-        prop.children
-          [ Html.h1 [ prop.className "pb-title"; prop.text "The Pattern Bank" ]
-            Html.p
-              [ prop.className "pb-lede"
-                prop.text
-                  "Describe the shape you want – the bank finds a runnable pattern instantly. No model call, no server, zero latency. Composition by lookup, not by generation." ]
-            queryPanel
-            resultsPanel
-            previewPanel
-            liveNote
-            honesty ] ]
+    Exhibit.frame
+      "pb"
+      "The Pattern Bank"
+      (Exhibit.lede
+        "Describe the shape you want – the bank finds a runnable pattern instantly. No model call, no server, zero latency. Composition by lookup, not by generation.")
+      [ queryPanel; resultsPanel; previewPanel; liveNote ]
+      honesty
 
   let page: ReactElement = PatternBankView()

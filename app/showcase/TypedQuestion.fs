@@ -298,9 +298,6 @@ let private renderLive (node: Node<obj>) : ReactElement =
       Csp = Csp.Permissive }
     node
 
-let private renderStatic (n: Node<'msg>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 // ─── The presenting host's answer capture ────────────────────────────────────
 //  Committed state → one canonical answer object. Classification is by VALUE
 //  (§18.2): a whole-valued number is an integer; the REAL classification and
@@ -781,40 +778,28 @@ let private TypedQuestionView (rounds: Round list) : ReactElement =
                   prop.text (sprintf "\"%s\" still decoded – the mutation missed." f.Chip) ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "tq-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "A real protocol, a real gate" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "The envelope, answer, and outcome codecs are the shipped language-tier implementations (the wire format's elicitation section), running under Fable in this tab – the same module certified against the shared cross-host conformance corpus." ]
-                    Html.li
-                      [ prop.text
-                          "The form you filled in is the DECODED envelope – encoded to canonical bytes, decoded back, then rendered. No closure crossed the wire: the inputs work via the renderer's declarative write-back, and the submit button is a wire-survivable SetState action the page observes." ]
-                    Html.li
-                      [ prop.text
-                          "Every refusal shown is the real typed error, code and path verbatim. An answer that fails the contract never reaches the agent – there is no prose fallback to sneak through." ]
-                    Html.li
-                      [ prop.text
-                          "Honest scope: pairing outcomes with pending questions, policy-gating the dispatch, and journaling for resume are a host runtime's job – this page plays the presenting host in-tab. And per the spec, timeoutMs is data: the page's clock dispatched your TimedOut, not the codec." ] ] ] ] ]
+    Exhibit.honesty
+      "A real protocol, a real gate"
+      [ Html.li
+          [ prop.text
+              "The envelope, answer, and outcome codecs are the shipped language-tier implementations (the wire format's elicitation section), running under Fable in this tab – the same module certified against the shared cross-host conformance corpus." ]
+        Html.li
+          [ prop.text
+              "The form you filled in is the DECODED envelope – encoded to canonical bytes, decoded back, then rendered. No closure crossed the wire: the inputs work via the renderer's declarative write-back, and the submit button is a wire-survivable SetState action the page observes." ]
+        Html.li
+          [ prop.text
+              "Every refusal shown is the real typed error, code and path verbatim. An answer that fails the contract never reaches the agent – there is no prose fallback to sneak through." ]
+        Html.li
+          [ prop.text
+              "Honest scope: pairing outcomes with pending questions, policy-gating the dispatch, and journaling for resume are a host runtime's job – this page plays the presenting host in-tab. And per the spec, timeoutMs is data: the page's clock dispatched your TimedOut, not the codec." ] ]
 
-  Html.div
-    [ prop.className "tq-page"
-      prop.children
-        [ Html.h1 [ prop.className "tq-title"; prop.text "The Typed Question" ]
-          Html.p
-            [ prop.className "tq-lede"
-              prop.text
-                "An agent that needs your decision shouldn't get prose back – prose has to be re-parsed, and re-parsing is where meaning dies. Here the agent asks AS a live form, with a declared, typed answer contract. Fill it in honestly, or try to cheat – the contract decides what reaches the agent." ]
-          askPanel
-          contractPanel
-          verdictPanel
-          ledger
-          cheatPanel
-          forgePanel
-          honesty ] ]
+  Exhibit.frame
+    "tq"
+    "The Typed Question"
+    (Exhibit.lede
+      "An agent that needs your decision shouldn't get prose back – prose has to be re-parsed, and re-parsing is where meaning dies. Here the agent asks AS a live form, with a declared, typed answer contract. Fill it in honestly, or try to cheat – the contract decides what reaches the agent.")
+    [ askPanel; contractPanel; verdictPanel; ledger; cheatPanel; forgePanel ]
+    honesty
 
 let page: ReactElement =
   match roundsResult with
@@ -822,7 +807,7 @@ let page: ReactElement =
   | Error e ->
     // Unreachable in practice – the envelope is authored in-repo – but if the
     // codec ever refuses it, show the honest typed error rather than a blank.
-    renderStatic (
+    Exhibit.renderStatic (
       Fuaran.callout
         "tq-broken"
         { Defaults.callout with

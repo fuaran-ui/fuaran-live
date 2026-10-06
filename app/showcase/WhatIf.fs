@@ -155,9 +155,6 @@ let private opSummary (op: TreeOp<unit>) : string =
 
 // ─── The page ────────────────────────────────────────────────────────────────
 
-let private renderPlan (n: Node<unit>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 type private Column =
   { Key: string
     Title: string
@@ -333,7 +330,7 @@ let private WhatIfView () : ReactElement =
             prop.children
               [ Html.div
                   [ prop.className "wi-plan"
-                    prop.children [ renderPlan (planTree ("c-" + c.Key + "-") c.Assumptions) ] ]
+                    prop.children [ Exhibit.renderStatic (planTree ("c-" + c.Key + "-") c.Assumptions) ] ]
                 (if isBase then Html.none else colActions c) ] ]
 
     let ops =
@@ -369,40 +366,30 @@ let private WhatIfView () : ReactElement =
                           "revenue      = price × units × (1 + fx/100)\ngross_profit = revenue − opex\nmargin       = gross_profit / revenue\n\nA scenario changes ONE assumption; every derived value recomputes.\nThe branch ops are the tree-diff from baseline to the scenario tree." ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "wi-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "Scenario planning is version control in a business suit" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Each column is the same artefact on its own branch – a counterfactual rendered live, side by side. A scenario is a small op-set (open the branch ops), yet its consequences recompute everywhere. Nothing here is a copied spreadsheet." ]
-                    Html.li
-                      [ prop.text
-                          "Combine two universes that touch different assumptions and they compose into a fourth column; two that touch the same assumption genuinely conflict – you cannot hold two prices at once – and the page says so rather than faking a merge." ]
-                    Html.li
-                      [ prop.text
-                          "Adopt a column and it becomes the new baseline; every scenario then re-branches from there. Planning with an audit trail by construction – which what-if you asked, which ops it carried, when you adopted it." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "This is the mirror of the Time Machine: not where the app has been, but where it could go. The "
-                            Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
-                            Html.text " thesis, at the planning layer – no server, a plan is a value." ] ] ] ] ] ]
+    Exhibit.honesty
+      "Scenario planning is version control in a business suit"
+      [ Html.li
+          [ prop.text
+              "Each column is the same artefact on its own branch – a counterfactual rendered live, side by side. A scenario is a small op-set (open the branch ops), yet its consequences recompute everywhere. Nothing here is a copied spreadsheet." ]
+        Html.li
+          [ prop.text
+              "Combine two universes that touch different assumptions and they compose into a fourth column; two that touch the same assumption genuinely conflict – you cannot hold two prices at once – and the page says so rather than faking a merge." ]
+        Html.li
+          [ prop.text
+              "Adopt a column and it becomes the new baseline; every scenario then re-branches from there. Planning with an audit trail by construction – which what-if you asked, which ops it carried, when you adopted it." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "This is the mirror of the Time Machine: not where the app has been, but where it could go. The "
+                Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
+                Html.text " thesis, at the planning layer – no server, a plan is a value." ] ] ]
 
-  Html.div
-    [ prop.className "wi-page"
-      prop.children
-        [ Html.h1 [ prop.className "wi-title"; prop.text "The What-If Machine" ]
-          Html.p
-            [ prop.className "wi-lede"
-              prop.text
-                "Ask “what if we cut price 10%, or grow units 15%?” – and parallel universes of your plan open side by side, each a real live app on its own branch. Pick the future you like; it becomes the plan." ]
-          chipBar
-          combineRow
-          board
-          formula
-          honesty ] ]
+  Exhibit.frame
+    "wi"
+    "The What-If Machine"
+    (Exhibit.lede
+      "Ask “what if we cut price 10%, or grow units 15%?” – and parallel universes of your plan open side by side, each a real live app on its own branch. Pick the future you like; it becomes the plan.")
+    [ chipBar; combineRow; board; formula ]
+    honesty
 
 let page: ReactElement = WhatIfView()

@@ -290,37 +290,30 @@ let private LocaleLensView () : ReactElement =
                         renderThroughLens l.Tag tree ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "ll-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "What is honest here" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Every panel is the one real renderer drawing the identical tree. The only thing that differs is the ambient locale handed to binding resolution – the same single field a real host sets once for its whole app. No panel-specific formatting code exists on this page." ]
-                    Html.li
-                      [ prop.text
-                          "The stored value never changes: open the wire drawer – one epoch number, a bounded dateStyle intent, and the word Ambient. What varies is deep – language, field order, separators, digit shapes in Cairo, even the calendar year in Bangkok and the era in Tokyo – and none of it was authored; the renderer resolves it through the browser's own locale data." ]
-                    Html.li
-                      [ prop.text
-                          "The pinned row is the counter-example: a contract date that must not float with the viewer renders through LocaleSource.Explicit and stays identical in every panel. Ambient by default, pinned when the document demands it – both are one word in the data." ]
-                    Html.li
-                      [ prop.text
-                          "Honest scope: all panels share your device's clock and time zone – this page compares locales, not time zones. The instant itself is the same everywhere on Earth; that is precisely why it can be stored as one number. And the formatting vocabulary is deliberately bounded (a dateStyle, a unit, an ISO code) – semantic intent on the wire, never a raw formatting-options bag." ] ] ] ] ]
+    Exhibit.honesty
+      "What is honest here"
+      [ Html.li
+          [ prop.text
+              "Every panel is the one real renderer drawing the identical tree. The only thing that differs is the ambient locale handed to binding resolution – the same single field a real host sets once for its whole app. No panel-specific formatting code exists on this page." ]
+        Html.li
+          [ prop.text
+              "The stored value never changes: open the wire drawer – one epoch number, a bounded dateStyle intent, and the word Ambient. What varies is deep – language, field order, separators, digit shapes in Cairo, even the calendar year in Bangkok and the era in Tokyo – and none of it was authored; the renderer resolves it through the browser's own locale data." ]
+        Html.li
+          [ prop.text
+              "The pinned row is the counter-example: a contract date that must not float with the viewer renders through LocaleSource.Explicit and stays identical in every panel. Ambient by default, pinned when the document demands it – both are one word in the data." ]
+        Html.li
+          [ prop.text
+              "Honest scope: all panels share your device's clock and time zone – this page compares locales, not time zones. The instant itself is the same everywhere on Earth; that is precisely why it can be stored as one number. And the formatting vocabulary is deliberately bounded (a dateStyle, a unit, an ISO code) – semantic intent on the wire, never a raw formatting-options bag." ] ]
 
-  Html.div
-    [ prop.className "ll-page"
-      prop.children
-        [ Html.h1 [ prop.className "ll-title"; prop.text "The Locale Lens" ]
-          Html.p
-            [ prop.className "ll-lede"
-              prop.text
-                "A date stored as text is an ambush – 03/04/05 means three different days in three countries. A Fuaran tree stores an instant as one unambiguous number and leaves localisation to the renderer. Here is the same value, rendered through many locales at once: different words, orders, digits, even different years – and the data never changes." ]
-          storedValue
-          Html.h3 [ prop.className "ll-section-head"; prop.text "Choose your lenses" ]
-          lensPicker
-          panels
-          honesty ] ]
+  Exhibit.frame
+    "ll"
+    "The Locale Lens"
+    (Exhibit.lede
+      "A date stored as text is an ambush – 03/04/05 means three different days in three countries. A Fuaran tree stores an instant as one unambiguous number and leaves localisation to the renderer. Here is the same value, rendered through many locales at once: different words, orders, digits, even different years – and the data never changes.")
+    [ storedValue
+      Html.h3 [ prop.className "ll-section-head"; prop.text "Choose your lenses" ]
+      lensPicker
+      panels ]
+    honesty
 
 let page: ReactElement = LocaleLensView()

@@ -161,9 +161,6 @@ type private Scenario =
   | Clean
   | Conflict
 
-let private renderTree (n: Node<unit>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 /// `accent` is "" (neutral) or "a" / "b" – tints the tile to match the branch's
 /// colour in the DAG diagram (slightly lighter than the diagram node fill).
 let private appPaneAccented (accent: string) (title: string) (badge: string option) (tree: Node<unit>) : ReactElement =
@@ -181,7 +178,7 @@ let private appPaneAccented (accent: string) (title: string) (badge: string opti
                   (match badge with
                    | Some b -> Html.span [ prop.className "gi-pane-badge"; prop.text b ]
                    | None -> Html.none) ] ]
-          Html.div [ prop.className "gi-pane-app"; prop.children [ renderTree tree ] ] ] ]
+          Html.div [ prop.className "gi-pane-app"; prop.children [ Exhibit.renderStatic tree ] ] ] ]
 
 /// The bottom node's three states: waiting for the combine, contested (the
 /// engine returned a conflict the visitor has not resolved yet), or landed.
@@ -472,40 +469,30 @@ let private GitForInterfacesView () : ReactElement =
       | Scenario.Conflict -> conflictResult
 
   let honesty =
-    Html.div
-      [ prop.className "gi-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "A real merge, not a mock-up" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Both rounds run the shipped structural three-way merge from the language tier – the very same function the server-side host runs, compiled into this page. Nothing about the merge is staged." ]
-                    Html.li
-                      [ prop.text
-                          "Round 1 returns a clean auto-merge because the branches changed different cells; the engine composes them into one tree. Round 2 returns a conflict because both assistants rewrote the same title – detected by comparing that node's canonical encoding across base, A and B, three-way." ]
-                    Html.li
-                      [ prop.text
-                          "Human-primacy is the closing beat: your edit lives in the common ancestor both assistants forked from, so the engine keeps it by default on the one real conflict while the disjoint work merges around it. Your version survived two assistants." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "Nothing here exists in a React app – there is no value to branch. This is the version-control face of the "
-                            Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
-                            Html.text " story." ] ] ] ] ] ]
+    Exhibit.honesty
+      "A real merge, not a mock-up"
+      [ Html.li
+          [ prop.text
+              "Both rounds run the shipped structural three-way merge from the language tier – the very same function the server-side host runs, compiled into this page. Nothing about the merge is staged." ]
+        Html.li
+          [ prop.text
+              "Round 1 returns a clean auto-merge because the branches changed different cells; the engine composes them into one tree. Round 2 returns a conflict because both assistants rewrote the same title – detected by comparing that node's canonical encoding across base, A and B, three-way." ]
+        Html.li
+          [ prop.text
+              "Human-primacy is the closing beat: your edit lives in the common ancestor both assistants forked from, so the engine keeps it by default on the one real conflict while the disjoint work merges around it. Your version survived two assistants." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "Nothing here exists in a React app – there is no value to branch. This is the version-control face of the "
+                Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
+                Html.text " story." ] ] ]
 
-  Html.div
-    [ prop.className "gi-page"
-      prop.children
-        [ Html.h1 [ prop.className "gi-title"; prop.text "Git for Interfaces" ]
-          Html.p
-            [ prop.className "gi-lede"
-              prop.text
-                "Two assistants worked on the same app in parallel, on separate branches. Combine their work – a real structural merge lands both changes, and when they collide, you decide, with your own edit winning by default." ]
-          scenarioTabs
-          branchRow
-          mergeControls
-          resultBlock
-          honesty ] ]
+  Exhibit.frame
+    "gi"
+    "Git for Interfaces"
+    (Exhibit.lede
+      "Two assistants worked on the same app in parallel, on separate branches. Combine their work – a real structural merge lands both changes, and when they collide, you decide, with your own edit winning by default.")
+    [ scenarioTabs; branchRow; mergeControls; resultBlock ]
+    honesty
 
 let page: ReactElement = GitForInterfacesView()

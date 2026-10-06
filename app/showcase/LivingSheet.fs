@@ -44,9 +44,6 @@ let private jsFinite (n: float) : bool = jsNative
 [<Emit("$0.toLocaleString('en-GB',{maximumFractionDigits:0})")>]
 let private locale (n: float) : string = jsNative
 
-let private renderNode (n: Node<unit>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 // ─── The editable source (a tiny sales table) ────────────────────────────────
 
 type private Row =
@@ -360,7 +357,7 @@ let private LivingSheetView () : ReactElement =
     | Ok out when group && (colByName out "region").IsSome ->
       Html.div
         [ prop.className "ls-dash-render"
-          prop.children [ renderNode (dashboardNode out) ] ]
+          prop.children [ Exhibit.renderStatic (dashboardNode out) ] ]
     | Ok out -> sheetTable out
 
   let resultPanel =
@@ -417,39 +414,32 @@ let private LivingSheetView () : ReactElement =
                Html.none) ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "ls-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "How honest is this?" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Every number in the dashboard is computed by the real Fuaran.Compute.DataFrame reference evaluator, compiled to JavaScript via Fable. Editing a source cell or the threshold re-runs the actual pipeline in your browser – there is no server and no separate spreadsheet engine." ]
-                    Html.li
-                      [ prop.text
-                          "The pipeline you toggle is the actual serialisable Transform algebra – derive / filter / groupBy from the shipped v1 verb set. The threshold drives a real pipeline Param, whose reactive edge is derived from the expression, not separately wired." ]
-                    Html.li
-                      [ prop.text
-                          "The JSON in the drawer is the genuine canonical wire the shipped codecs emit for the pipeline and its source – no hand-authored mock. The computation is data: it can be stored, diffed, teleported, and re-run, because it is not code." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "That same evaluator is certified byte-identical across F#, TypeScript, and Python – so the compute travels with the app, the "
-                            Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
-                            Html.text " thesis extended from the view to the computation behind it." ] ] ] ] ] ]
+    Exhibit.honesty
+      "How honest is this?"
+      [ Html.li
+          [ prop.text
+              "Every number in the dashboard is computed by the real Fuaran.Compute.DataFrame reference evaluator, compiled to JavaScript via Fable. Editing a source cell or the threshold re-runs the actual pipeline in your browser – there is no server and no separate spreadsheet engine." ]
+        Html.li
+          [ prop.text
+              "The pipeline you toggle is the actual serialisable Transform algebra – derive / filter / groupBy from the shipped v1 verb set. The threshold drives a real pipeline Param, whose reactive edge is derived from the expression, not separately wired." ]
+        Html.li
+          [ prop.text
+              "The JSON in the drawer is the genuine canonical wire the shipped codecs emit for the pipeline and its source – no hand-authored mock. The computation is data: it can be stored, diffed, teleported, and re-run, because it is not code." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "That same evaluator is certified byte-identical across F#, TypeScript, and Python – so the compute travels with the app, the "
+                Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
+                Html.text " thesis extended from the view to the computation behind it." ] ] ]
 
-  Html.div
-    [ prop.className "ls-page"
-      prop.children
-        [ Html.h1 [ prop.className "ls-title"; prop.text "The Living Sheet" ]
-          Html.p
-            [ prop.className "ls-lede"
-              prop.text
-                "Every number here is computed live by a pipeline that is itself data on the wire. Edit an input and watch it recompute; open the wire and the formulas are right there in the JSON – the computation is a value, not code." ]
-          Html.div [ prop.className "ls-grid"; prop.children [ sourceEditor; pipelinePanel ] ]
-          resultPanel
-          wireDrawer
-          honesty ] ]
+  Exhibit.frame
+    "ls"
+    "The Living Sheet"
+    (Exhibit.lede
+      "Every number here is computed live by a pipeline that is itself data on the wire. Edit an input and watch it recompute; open the wire and the formulas are right there in the JSON – the computation is a value, not code.")
+    [ Html.div [ prop.className "ls-grid"; prop.children [ sourceEditor; pipelinePanel ] ]
+      resultPanel
+      wireDrawer ]
+    honesty
 
 let page: ReactElement = LivingSheetView()

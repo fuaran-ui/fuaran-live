@@ -353,47 +353,39 @@ let private NotarisedView () : ReactElement =
                Html.none) ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "nd-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "Audit-ready by construction" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Every turn is a real hash-chained op-record: the hash is computed over the operation, its sequence, timestamp, and author, linked to the previous hash. The dossier and audit strip read that chain directly." ]
-                    Html.li
-                      [ prop.text
-                          "The tamper genuinely rewrites a historical op's payload and re-runs the shipped Verify.chain – the red link and the error text are the library's actual output, not a staged failure. The doctored replay is refused. Note what the button does: it rewrites one op and leaves the following hashes in place, which is what corruption or a careless edit looks like. Someone with write access to the store would recompute those hashes, so the chain is corruption detection rather than tamper evidence." ]
-                    Html.li
-                      [ prop.text
-                          "Authorship is mixed and accountable: two of the nine turns are human edits, colour-coded throughout. The chain links the record together, but it proves nothing about the cryptographic identity of the author – signing is a separate seam and is not shipped, so this page claims a checkable record rather than an attested one." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "The op-stream is the compliance artefact. The same value-not-code property runs through the "
-                            Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
-                            Html.text " story across the site." ] ] ] ] ] ]
+    Exhibit.honesty
+      "Audit-ready by construction"
+      [ Html.li
+          [ prop.text
+              "Every turn is a real hash-chained op-record: the hash is computed over the operation, its sequence, timestamp, and author, linked to the previous hash. The dossier and audit strip read that chain directly." ]
+        Html.li
+          [ prop.text
+              "The tamper genuinely rewrites a historical op's payload and re-runs the shipped Verify.chain – the red link and the error text are the library's actual output, not a staged failure. The doctored replay is refused. Note what the button does: it rewrites one op and leaves the following hashes in place, which is what corruption or a careless edit looks like. Someone with write access to the store would recompute those hashes, so the chain is corruption detection rather than tamper evidence." ]
+        Html.li
+          [ prop.text
+              "Authorship is mixed and accountable: two of the nine turns are human edits, colour-coded throughout. The chain links the record together, but it proves nothing about the cryptographic identity of the author – signing is a separate seam and is not shipped, so this page claims a checkable record rather than an attested one." ]
+        Html.li
+          [ prop.children
+              [ Html.text "The op-stream is the compliance artefact. The same value-not-code property runs through the "
+                Html.a [ prop.href "#/pillar/value"; prop.text "app-is-a-value" ]
+                Html.text " story across the site." ] ] ]
 
-  Html.div
-    [ prop.className "nd-page"
-      prop.children
-        [ Html.h1 [ prop.className "nd-title"; prop.text "The Notarised Dashboard" ]
-          Html.p
-            [ prop.className "nd-lede"
-              prop.text
-                "Every element of this AI-built dashboard carries its provenance – which op created it, when, by whom. Try to tamper with the history and watch the chain catch you." ]
-          Html.div
-            [ prop.className "nd-built-label"
-              prop.text "Built by AI in 9 turns · 2 human edits" ]
-          Html.div
-            [ prop.className "nd-split"
-              prop.children
-                [ Html.div [ prop.className "nd-stage-col"; prop.children [ stage ] ]
-                  Html.div [ prop.className "nd-dossier-col"; prop.children [ dossier ] ] ] ]
-          banner
-          strip
-          controls
-          honesty ] ]
+  Exhibit.frame
+    "nd"
+    "The Notarised Dashboard"
+    (Exhibit.lede
+      "Every element of this AI-built dashboard carries its provenance – which op created it, when, by whom. Try to tamper with the history and watch the chain catch you.")
+    [ Html.div
+        [ prop.className "nd-built-label"
+          prop.text "Built by AI in 9 turns · 2 human edits" ]
+      Html.div
+        [ prop.className "nd-split"
+          prop.children
+            [ Html.div [ prop.className "nd-stage-col"; prop.children [ stage ] ]
+              Html.div [ prop.className "nd-dossier-col"; prop.children [ dossier ] ] ] ]
+      banner
+      strip
+      controls ]
+    honesty
 
 let page: ReactElement = NotarisedView()

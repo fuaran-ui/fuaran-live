@@ -91,7 +91,6 @@ body {
 
 .ds-landing,
 .ds-pillar-page,
-.ds-demo-page,
 .ds-notfound {
   display: flex;
   flex-direction: column;
@@ -204,13 +203,16 @@ body {
   color: var(--fuaran-color-text-muted, #55606b);
 }
 
-/* ─── replay + wire-JSON drawer ─── */
+/* ─── a page while its chunk loads ─── */
 
-.ds-replay {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.ds-page-loading {
+  min-height: 40vh;
+  padding: 2rem 0;
+  font-size: 0.92rem;
+  color: var(--fuaran-color-text-muted, #55606b);
 }
+
+/* ─── status strip + footer ─── */
 
 /* Holds the conformance card alone — evaluation moved to its own page, since it
    measures model behaviour rather than the page you are on. The flex gap keeps
@@ -232,21 +234,6 @@ body {
   gap: 1rem;
 }
 
-.ds-wire-drawer summary {
-  cursor: pointer;
-  font-size: 0.9rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-}
-
-.ds-wire-json {
-  margin-top: 0.6rem;
-  padding: 0.9rem;
-  border-radius: 0.6rem;
-  background: var(--fuaran-color-code-surface, #f4f4f8);
-  overflow-x: auto;
-  font-size: 0.82rem;
-}
-
 .ds-footer-links {
   display: flex;
   gap: 1rem;
@@ -264,23 +251,6 @@ body {
 }
 
 /* ─── Rosetta (three-host parity theatre) ─── */
-
-.rosetta-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.rosetta-title {
-  margin: 0;
-}
-
-.rosetta-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 46rem;
-}
 
 /* The portability payoff – emphasised after the parity strip proves every host agrees. */
 .rosetta-portability {
@@ -436,8 +406,7 @@ body {
 
 .rosetta-stage,
 .rosetta-parity,
-.rosetta-breakit,
-.rosetta-honesty {
+.rosetta-breakit {
   border: var(--ds-border);
   border-radius: 0.75rem;
   padding: 1.1rem 1.2rem;
@@ -626,36 +595,12 @@ body {
   max-width: 46rem;
 }
 
-.rosetta-honesty h3 {
-  margin: 0;
-}
-
-.rosetta-honesty ul {
-  margin: 0;
-  padding-left: 1.2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
-
 /* ─── Teleport page (the app is a value) ─────────────────────────────────── */
 
 .tp-page {
   display: flex;
   flex-direction: column;
   gap: 1.4rem;
-}
-
-.tp-title {
-  margin: 0;
-}
-
-.tp-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 46rem;
 }
 
 /* Banners */
@@ -1081,23 +1026,6 @@ body {
 
 /* ─── Infinite Skins page (intent, not implementation) ───────────────────── */
 
-.sk-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-
-.sk-title {
-  margin: 0;
-}
-
-.sk-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
-
 .sk-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1273,39 +1201,7 @@ body {
   background: var(--fuaran-color-code-surface, #f5f5f8);
 }
 
-.sk-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.sk-honesty h3 {
-  margin: 0 0 0.5rem;
-}
-.sk-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-size: 0.92rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-}
-
 /* ─── Kintsugi page (the machine can see the UI) ─────────────────────────── */
-
-.k-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-.k-title {
-  margin: 0;
-}
-.k-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 .k-split {
   display: grid;
@@ -1543,23 +1439,6 @@ body {
   color: var(--fuaran-color-success, #2f9e5f);
 }
 
-.k-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.k-honesty h3 {
-  margin: 0 0 0.5rem;
-}
-.k-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-size: 0.92rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-}
-
 /* ─── HOST 2 – the bare receiver (/receiver.html) ────────────────────────── */
 /* A different world on purpose: dark, terminal-toned, visibly un-designed.
    The light app cards materializing inside it read as arrivals from
@@ -1686,20 +1565,6 @@ body.rcv {
 /* ============================================================================
    Time Machine (tm-) – the app is a value: scrub history, fork any frame.
    ========================================================================= */
-.tm-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-.tm-title-h {
-  margin: 0;
-}
-.tm-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 /* The app stage – the tree at the current frame, replayed live. */
 .tm-stage {
@@ -1974,41 +1839,9 @@ body.rcv {
   padding: 0 0.75rem;
 }
 
-.tm-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.tm-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.tm-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    The Blind Surveyor (bs-) – layout is read, not looked at.
    ========================================================================= */
-.bs-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-.bs-title {
-  margin: 0;
-}
-.bs-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 .bs-split {
   display: grid;
@@ -2235,41 +2068,9 @@ body.rcv {
   font-weight: 500;
 }
 
-.bs-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.bs-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.bs-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    The Notarised Dashboard (nd-) – provenance + a real tamper-evident chain.
    ========================================================================= */
-.nd-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.nd-title {
-  margin: 0;
-}
-.nd-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 .nd-built-label {
   align-self: flex-start;
   font-size: 0.75rem;
@@ -2492,41 +2293,9 @@ body.rcv {
   font-weight: 500;
 }
 
-.nd-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.nd-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.nd-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    Unit-Test Your UI (ut-) – assertions against the living UI.
    ========================================================================= */
-.ut-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.ut-title {
-  margin: 0;
-}
-.ut-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 /* The offscreen phone-width probe – the layout observer measures this copy, so
    the geometric assertion is a real 375px reading, never a screenshot. */
@@ -2830,41 +2599,9 @@ body.rcv {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 
-.ut-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.ut-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.ut-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    Git for Interfaces (gi-) – branch, merge, resolve; the app is a value.
    ========================================================================= */
-.gi-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.gi-title {
-  margin: 0;
-}
-.gi-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 .gi-tabs {
   display: flex;
@@ -3163,41 +2900,9 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 
-.gi-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.gi-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.gi-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    The Bouncer (bnc-) – invite the attack; every one bounces off the gate.
    ========================================================================= */
-.bnc-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.bnc-title {
-  margin: 0;
-}
-.bnc-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 /* Scoreboard. */
 .bnc-scoreboard {
@@ -3406,41 +3111,9 @@ polygon.gi-dag-pending {
   justify-content: center;
 }
 
-.bnc-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.bnc-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.bnc-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    The Degradation Ladder (dl-) – same tree, descending fidelity; JS off is fine.
    ========================================================================= */
-.dl-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.dl-title {
-  margin: 0;
-}
-.dl-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 /* The off-screen clean render whose markup feeds the script-disabled iframe. */
 .dl-source {
@@ -3678,41 +3351,9 @@ polygon.gi-dag-pending {
   padding: 0 0.9rem;
 }
 
-.dl-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.dl-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.dl-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    The Pandas Dashboard (pn-) – four lines of Python, a serverless dashboard.
    ========================================================================= */
-.pn-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.pn-title {
-  margin: 0;
-}
-.pn-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 .pn-split {
   display: grid;
@@ -3850,41 +3491,9 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-accent, #3358d4);
 }
 
-.pn-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.pn-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.pn-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    Send Me That App (sm-) – one artefact, three projections.
    ========================================================================= */
-.sm-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.sm-title {
-  margin: 0;
-}
-.sm-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 /* Projection tabs. */
 .sm-tabs {
@@ -4045,41 +3654,9 @@ polygon.gi-dag-pending {
   padding: 0 0.9rem;
 }
 
-.sm-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.sm-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.sm-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    Grep Your Apps (gy-) – structural search over a corpus; results are the apps.
    ========================================================================= */
-.gy-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.gy-title {
-  margin: 0;
-}
-.gy-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 /* Query chips. */
 .gy-chips {
@@ -4202,41 +3779,9 @@ polygon.gi-dag-pending {
   background: rgba(224, 160, 33, 0.1);
 }
 
-.gy-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.gy-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.gy-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    The What-If Machine (wi-) – parallel universes of your plan.
    ========================================================================= */
-.wi-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.wi-title {
-  margin: 0;
-}
-.wi-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 
 /* Scenario chips. */
 .wi-chips {
@@ -4419,41 +3964,9 @@ polygon.gi-dag-pending {
   white-space: pre;
 }
 
-.wi-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.wi-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.wi-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
    The Bazaar (bz-) – compose an app out of apps, capability-gated.
    ========================================================================= */
-.bz-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.bz-title {
-  margin: 0;
-}
-.bz-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 .bz-section {
   margin: 0.3rem 0 -0.3rem;
   font-size: 1rem;
@@ -4624,44 +4137,10 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-accent, #3358d4);
 }
 
-.bz-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.bz-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.bz-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-}
-
 /* ============================================================================
  *  The Relay – one app across four runtimes; colour-by-host is the
  *  visual grammar (Python / TypeScript / .NET / Server). Mobile-first.
  * ========================================================================== */
-.rl-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-}
-.rl-title {
-  margin: 0;
-  font-size: 1.9rem;
-}
-.rl-lede {
-  margin: 0;
-  max-width: 46rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 1rem;
-  line-height: 1.55;
-}
 
 /* Per-host accent tokens. */
 .rl-host-python {
@@ -5035,46 +4514,11 @@ polygon.gi-dag-pending {
   overflow-x: auto;
 }
 
-.rl-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.rl-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.rl-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
 /* ============================================================================
  *  The Living Sheet – a live transform pipeline (Fuaran.Core.DataFrame
  *  evaluator, Fable-compiled) whose formulas serialise as canonical wire.
  *  Mobile-first.
  * ========================================================================== */
-.ls-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-}
-.ls-title {
-  margin: 0;
-  font-size: 1.9rem;
-}
-.ls-lede {
-  margin: 0;
-  max-width: 48rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 1rem;
-  line-height: 1.55;
-}
 
 .ls-grid {
   display: grid;
@@ -5249,45 +4693,10 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
 
-.ls-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.ls-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.ls-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
 /* ============================================================================
  *  The Counterfactual Corner – N isolated live variant branches
  *  (Mount) adopted via the real 3-way merge engine (DAG). Mobile-first.
  * ========================================================================== */
-.cf-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.3rem;
-}
-.cf-title {
-  margin: 0;
-  font-size: 1.9rem;
-}
-.cf-lede {
-  margin: 0;
-  max-width: 48rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 1rem;
-  line-height: 1.55;
-}
 
 /* Your app (the trunk). */
 .cf-trunk {
@@ -5457,45 +4866,10 @@ polygon.gi-dag-pending {
   border-color: rgba(31, 138, 76, 0.5);
 }
 
-.cf-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.cf-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.cf-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
 /* ============================================================================
  *  The Pattern Bank – deterministic signature-search over the
  *  real Fuaran.Core registry. Mobile-first.
  * ========================================================================== */
-.pb-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.3rem;
-}
-.pb-title {
-  margin: 0;
-  font-size: 1.9rem;
-}
-.pb-lede {
-  margin: 0;
-  max-width: 48rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 1rem;
-  line-height: 1.55;
-}
 
 /* Query panel. */
 .pb-query {
@@ -5685,25 +5059,6 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-text, #2a2a34);
 }
 
-.pb-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.pb-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.pb-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
 /* ============================================================================
  *  Fuaran brand – the palette tokens, lockup, and theme toggle now come from
  *  the shared ../brand/fuaran-brand.css (imported before this file). Only the
@@ -5763,19 +5118,6 @@ polygon.gi-dag-pending {
    .ds-dark flips the token set, and the mark swaps to the real Mist asset.) */
 
 /* ── Every Screen (Responsive.fs): one tree, three device widths, zero @media ── */
-.rw-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-.rw-title {
-  margin: 0;
-}
-.rw-lede {
-  margin: 0;
-  max-width: 44rem;
-  color: var(--fuaran-color-text-muted, #5a6472);
-}
 .rw-frames {
   display: flex;
   flex-wrap: wrap;
@@ -5892,19 +5234,6 @@ polygon.gi-dag-pending {
 .rw-wire-toggle:hover {
   border-color: var(--fuaran-color-brand, #1e4754);
 }
-.rw-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-  color: var(--fuaran-color-text-muted, #5a6472);
-  font-size: 0.9rem;
-}
-.rw-honesty h3 {
-  margin: 0 0 0.5rem;
-  color: var(--fuaran-color-text, #1a2026);
-}
-.rw-honesty a {
-  color: var(--fuaran-color-brand, #1e4754);
-}
 @media (max-width: 640px) {
   .rw-grid2 {
     grid-template-columns: 1fr;
@@ -5912,19 +5241,6 @@ polygon.gi-dag-pending {
 }
 
 /* ── Evaluation (Evaluation.fs): live-feed benchmark dashboard ── */
-.ev-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.ev-title {
-  margin: 0;
-}
-.ev-lede {
-  margin: 0;
-  max-width: 48rem;
-  color: var(--fuaran-color-text-muted, #5a6472);
-}
 .ev-strip {
   display: flex;
   flex-wrap: wrap;
@@ -6044,31 +5360,8 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-brand, #1e4754);
   white-space: nowrap;
 }
-.ev-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-  color: var(--fuaran-color-text-muted, #5a6472);
-  font-size: 0.9rem;
-}
-.ev-honesty h3 {
-  margin: 0 0 0.5rem;
-  color: var(--fuaran-color-text, #1a2026);
-}
 
 /* ── Contact (Contact.fs): the form is a Fuaran exhibit; send is client-side mailto ── */
-.ct-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.ct-title {
-  margin: 0;
-}
-.ct-lede {
-  margin: 0;
-  max-width: 48rem;
-  color: var(--fuaran-color-text-muted, #55606b);
-}
 .ct-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -6244,20 +5537,6 @@ polygon.gi-dag-pending {
 .ct-subscribe-link:hover {
   filter: brightness(1.08);
 }
-
-.ct-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-  color: var(--fuaran-color-text-muted, #55606b);
-  font-size: 0.9rem;
-}
-.ct-honesty h3 {
-  margin: 0 0 0.5rem;
-  color: var(--fuaran-color-text, #1a2026);
-}
-.ct-honesty a {
-  color: var(--fuaran-color-brand, #1e4754);
-}
 @media (max-width: 640px) {
   .ct-grid {
     grid-template-columns: 1fr;
@@ -6265,23 +5544,11 @@ polygon.gi-dag-pending {
 }
 
 /* ── The Versioning Envelope (WireVersioning.fs) ── */
-.wv-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-.wv-title,
 .wv-section-title {
   margin: 0;
 }
-.wv-lede {
-  margin: 0;
-  max-width: 50rem;
-  color: var(--fuaran-color-text-muted, #55606b);
-}
 .wv-artefact,
-.wv-evolution,
-.wv-honesty {
+.wv-evolution {
   border: var(--ds-border);
   border-radius: 0.6rem;
   padding: 1rem 1.1rem;
@@ -6418,34 +5685,14 @@ polygon.gi-dag-pending {
   color: var(--fuaran-color-text-muted, #55606b);
   font-size: 0.9rem;
 }
-.wv-honesty h3,
 .wv-evolution h3 {
   margin: 0 0 0.5rem;
 }
-.wv-honesty {
-  color: var(--fuaran-color-text-muted, #55606b);
-  font-size: 0.9rem;
-}
-.wv-honesty a,
 .wv-evolution a {
   color: var(--fuaran-color-brand, #1e4754);
 }
 
 /* ── Chart-as-data ──────────────────────────────────────────── */
-.ch-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.ch-title {
-  margin: 0;
-}
-.ch-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 48rem;
-}
 .ch-split {
   display: grid;
   grid-template-columns: 1fr;
@@ -6626,41 +5873,10 @@ polygon.gi-dag-pending {
   font-size: 0.88rem;
   color: var(--fuaran-color-accent, #3358d4);
 }
-.ch-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.ch-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.ch-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-}
 
 /* ────────────────────────────────────────────────────────────────────────────
    The Typed Question (tq-) – an agent asks as a live form; the answer is
    typed, contract-checked data, never prose. */
-
-.tq-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-}
-.tq-title {
-  margin: 0;
-}
-.tq-lede {
-  margin: 0;
-  font-size: 1.02rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 46rem;
-}
 .tq-muted {
   margin: 0.15rem 0 0.6rem;
   font-size: 0.88rem;
@@ -6922,41 +6138,10 @@ polygon.gi-dag-pending {
 }
 
 /* ── honesty footer ── */
-.tq-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.tq-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.tq-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-}
 
 /* ────────────────────────────────────────────────────────────────────────────
    Hand on the Wheel (how-) – a module declares which of its fields an agent may
    set, by name and typed space; the agent reads that surface and drives them. */
-
-.how-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-}
-.how-title {
-  margin: 0;
-}
-.how-lede {
-  margin: 0;
-  font-size: 1.02rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 46rem;
-}
 .how-muted {
   margin: 0.15rem 0 0.7rem;
   font-size: 0.88rem;
@@ -7109,41 +6294,10 @@ polygon.gi-dag-pending {
 }
 
 /* ── honesty footer ── */
-.how-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.how-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.how-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-}
 
 /* ────────────────────────────────────────────────────────────────────────────
    The Locale Lens (ll-) – one instant stored as one epoch number, rendered
    through many locales at once; the renderer owns localisation. */
-
-.ll-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-}
-.ll-title {
-  margin: 0;
-}
-.ll-lede {
-  margin: 0;
-  font-size: 1.02rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 46rem;
-}
 .ll-muted {
   margin: 0.15rem 0 0.7rem;
   font-size: 0.88rem;
@@ -7269,29 +6423,8 @@ polygon.gi-dag-pending {
 }
 
 /* ── honesty footer ── */
-.ll-honesty {
-  border-top: var(--ds-border);
-  padding-top: 1rem;
-}
-.ll-honesty h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-.ll-honesty ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-}
 
 /* ─── Go sessions page (BYOS) – Phase 653 ────────────────────────────────── */
-.gs-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
 .gs-tabs {
   display: flex;
   gap: 0.5rem;
@@ -7416,19 +6549,6 @@ polygon.gi-dag-pending {
 }
 
 /* ─── Attesor – the reverse of Rosetta ─────────────────────────────────────── */
-.at-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.at-title {
-  margin: 0;
-}
-.at-lede {
-  margin: 0;
-  max-width: 46rem;
-  color: var(--fuaran-color-text-muted, #55555f);
-}
 .at-wire-box {
   border: var(--ds-border);
   border-radius: 0.75rem;
@@ -7523,36 +6643,12 @@ polygon.gi-dag-pending {
   font-size: 0.78rem;
   line-height: 1.5;
 }
-.at-honesty {
-  font-size: 0.85rem;
-  color: var(--fuaran-color-text-muted, #55555f);
-}
-.at-honesty h3 {
-  margin: 0 0 0.4rem;
-  font-size: 0.9rem;
-  color: var(--fuaran-color-text, #1c1c22);
-}
 
 /* ─── The Navigator (Phase 718) ─────────────────────────────────────────────
    Edit a running app through its own wire format. Two columns above the
    breakpoint — the walked tree on the left, what it emitted on the right —
    stacked below it, because the emitted op has to sit BESIDE the action to
    make its point and stacking is the honest fallback when it cannot. */
-
-.nv-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-.nv-title {
-  margin: 0;
-  font-size: 1.6rem;
-}
-.nv-lede {
-  margin: 0;
-  max-width: 62ch;
-  color: var(--fuaran-color-text-muted, #55555f);
-}
 
 /* the guided rail */
 .nv-rail {
@@ -7817,38 +6913,9 @@ polygon.gi-dag-pending {
   text-decoration: none;
 }
 
-.nv-honesty {
-  font-size: 0.85rem;
-  color: var(--fuaran-color-text-muted, #55555f);
-}
-.nv-honesty summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-.nv-honesty li {
-  margin-bottom: 0.35rem;
-  line-height: 1.5;
-}
-
 /* ────────────────────────────────────────────────────────────────────────────
    The Agent-Readable Page (ar-) – a page that advertises its own natural-
    language affordances, beside a live read of what a machine gets back. */
-
-.ar-page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-}
-.ar-title {
-  margin: 0;
-}
-.ar-lede {
-  margin: 0;
-  font-size: 1.02rem;
-  line-height: 1.55;
-  color: var(--fuaran-color-text-muted, #5a5a66);
-  max-width: 52rem;
-}
 .ar-muted {
   margin: 0.15rem 0 0.8rem;
   font-size: 0.88rem;
@@ -8064,20 +7131,6 @@ polygon.gi-dag-pending {
 .ar-facts li {
   margin-bottom: 0.35rem;
 }
-.ar-honesty {
-  font-size: 0.85rem;
-  color: var(--fuaran-color-text-muted, #55555f);
-}
-.ar-honesty h3 {
-  margin: 0 0 0.4rem;
-  font-size: 1rem;
-  color: var(--fuaran-color-text, #21212a);
-}
-.ar-honesty li {
-  margin-bottom: 0.4rem;
-  line-height: 1.55;
-  max-width: 72ch;
-}
 
 /* ══════════════════════════════════════════════════════════════════════════
    The platform-baseline exhibits (Phase 1129)
@@ -8201,6 +7254,19 @@ polygon.gi-dag-pending {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+/* the prose form of the same section (`Exhibit.honesty`): the capability pages'
+   notes, a bulleted list under the page's own heading */
+.px-honesty ul.px-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 1.15rem;
+  list-style: disc;
+}
+.px-notes li {
+  max-width: 82ch;
+  line-height: 1.55;
 }
 .px-claim {
   display: grid;

@@ -180,9 +180,6 @@ type private Probe =
     PlainTok: int
     PlainBlock: int }
 
-let private renderTree (n: Node<unit>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 /// True when a click landed on the modal's dismiss button (×) or on the backdrop
 /// itself – the demo's own runtime for the "dismiss (client-only)" rich tier,
 /// since the exhibit renders through a no-op message sink.
@@ -278,11 +275,11 @@ let private DegradationView () : ReactElement =
                    [ prop.className "dl-reopen"
                      prop.text "Open the dialog"
                      prop.onClick (fun _ -> setModalOpen true) ])
-              renderTree exhibit ] ])
+              Exhibit.renderStatic exhibit ] ])
 
   // The clean source render – off-screen; its markup feeds the iframe.
   let sourceRender =
-    Html.div [ prop.className "dl-source"; prop.children [ renderTree exhibit ] ]
+    Html.div [ prop.className "dl-source"; prop.children [ Exhibit.renderStatic exhibit ] ]
 
   let rung2 =
     rung
@@ -387,40 +384,30 @@ let private DegradationView () : ReactElement =
                Html.none) ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "dl-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "Descent with dignity – really" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Both rungs render the same tree through the shipped renderer. The fidelity contract puts everything deterministic on the wire, so the base render needs no JavaScript – the rich layer (highlighting, the copy button, opening and dismissing the dialog) is declared client-only, layered on top. That's why rung 1 lets you drive the dialog and rung 2 cannot." ]
-                    Html.li
-                      [ prop.text
-                          "Rung 2 is genuinely script-disabled: the same markup is placed in a sandboxed iframe with no allow-scripts, so nothing can run. The equation still typesets with REAL superscripts – native MathML, laid out by the browser with zero JavaScript (an out-of-subset equation stays as its readable LaTeX source) – and the code structure, the dialog in its open state (no portal), and the scroll clipping all still render. The F* and F# blocks are highlighted all the same: their keywords, comments and operators arrive as deterministic class-only token spans the renderer emitted, while the Python block beside them, which has no grammar, stays plain. The page reads the iframe back to confirm zero scripts and zero rich-layer highlight spans reached it, that the F* and F# blocks carry ⟨tok-kw⟩ spans and the Python block none, that genuine ⟨msup⟩ elements are present, that the formal statement's ∀, ⇒ and ≤ arrive as real ⟨mo⟩ operators, and everything else did too." ]
-                    Html.li
-                      [ prop.text
-                          "The wire source is the parity-clean data every conformant host renders. The byte-for-byte cross-host agreement (F#, TypeScript, Python) and the break-the-contract red build are enforced by the conformance gate in CI – a real gate you can run, not a claim this page can prove client-side." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "No SPA can even state this contract, because nothing else separates what the artefact says from how a host renders it. Same "
-                            Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
-                            Html.text " thesis, at the render layer." ] ] ] ] ] ]
+    Exhibit.honesty
+      "Descent with dignity – really"
+      [ Html.li
+          [ prop.text
+              "Both rungs render the same tree through the shipped renderer. The fidelity contract puts everything deterministic on the wire, so the base render needs no JavaScript – the rich layer (highlighting, the copy button, opening and dismissing the dialog) is declared client-only, layered on top. That's why rung 1 lets you drive the dialog and rung 2 cannot." ]
+        Html.li
+          [ prop.text
+              "Rung 2 is genuinely script-disabled: the same markup is placed in a sandboxed iframe with no allow-scripts, so nothing can run. The equation still typesets with REAL superscripts – native MathML, laid out by the browser with zero JavaScript (an out-of-subset equation stays as its readable LaTeX source) – and the code structure, the dialog in its open state (no portal), and the scroll clipping all still render. The F* and F# blocks are highlighted all the same: their keywords, comments and operators arrive as deterministic class-only token spans the renderer emitted, while the Python block beside them, which has no grammar, stays plain. The page reads the iframe back to confirm zero scripts and zero rich-layer highlight spans reached it, that the F* and F# blocks carry ⟨tok-kw⟩ spans and the Python block none, that genuine ⟨msup⟩ elements are present, that the formal statement's ∀, ⇒ and ≤ arrive as real ⟨mo⟩ operators, and everything else did too." ]
+        Html.li
+          [ prop.text
+              "The wire source is the parity-clean data every conformant host renders. The byte-for-byte cross-host agreement (F#, TypeScript, Python) and the break-the-contract red build are enforced by the conformance gate in CI – a real gate you can run, not a claim this page can prove client-side." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "No SPA can even state this contract, because nothing else separates what the artefact says from how a host renders it. Same "
+                Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
+                Html.text " thesis, at the render layer." ] ] ]
 
-  Html.div
-    [ prop.className "dl-page"
-      prop.children
-        [ Html.h1 [ prop.className "dl-title"; prop.text "The Degradation Ladder" ]
-          Html.p
-            [ prop.className "dl-lede"
-              prop.text
-                "Turn JavaScript off. The equation still renders, the code still reads, the open dialog still shows – the app degrades like a photograph, not like a crash." ]
-          ladder
-          sourceRender
-          legendPanel
-          wireDrawer
-          honesty ] ]
+  Exhibit.frame
+    "dl"
+    "The Degradation Ladder"
+    (Exhibit.lede
+      "Turn JavaScript off. The equation still renders, the code still reads, the open dialog still shows – the app degrades like a photograph, not like a crash.")
+    [ ladder; sourceRender; legendPanel; wireDrawer ]
+    honesty
 
 let page: ReactElement = DegradationView()

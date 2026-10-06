@@ -11,9 +11,9 @@ module Fuaran.Showcase.App
 //  data".
 //
 //  The shell: a thesis landing + pillar map, pillar navigation, per-page
-//  routing with coming-soon stubs, the page-agnostic scripted-replay loader
-//  seam (every page's keyless mode), the CI conformance panel (honest
-//  staleness), and a shared footer (wire-JSON drawer + docs + playground exit).
+//  routing over the page registry (each page its own chunk, loaded on first
+//  visit), the CI conformance panel (honest staleness), and a shared footer
+//  (docs + contact + playground exit).
 // ============================================================================
 
 open Fable.Core
@@ -60,28 +60,38 @@ importSideEffects "../icon-glyphs.css"
 let private applyDarkClass (dark: bool) : unit = jsNative
 
 type Model =
-  { Route: Pages.Route
-    Replay: Replay.ReplayState
+  {
+    Route: Pages.Route
+    /// Every page fetched so far this visit, by page key. A page's chunk is
+    /// requested once; a return visit renders the page already in hand.
+    Loads: Map<string, Pages.PageLoad>
     Conformance: Conformance.PanelState
-    Dark: bool }
+    Dark: bool
+  }
 
 type Msg =
   | HashChanged of string
-  | ArtefactResult of Replay.ReplayState
+  | PageLoaded of string * Pages.PageLoad
   | ConformanceResult of Conformance.PanelState
   | ToggleDark
 
-/// The per-route side effects: a demo page with a wired recording kicks the
-/// replay load; every route (re)checks the conformance report lazily via init.
-let private routeCmd (route: Pages.Route) : Cmd<Msg> =
-  match route with
-  | Pages.DemoPage d ->
-    match d.ReplayId with
-    | Some rid ->
-      Replay.loadCmd rid (fun json -> ArtefactResult(Replay.ReplayState.Loaded json)) (fun reason ->
-        ArtefactResult(Replay.ReplayState.Missing reason))
-    | None -> Cmd.ofMsg (ArtefactResult(Replay.ReplayState.Missing "no recording is wired to this page yet"))
-  | _ -> Cmd.none
+/// Enter a route: a page route whose page is not yet in hand starts its chunk
+/// load (marked Loading, so a second visit mid-flight does not request it
+/// twice). A failed load is retried on the next visit to the route.
+let private enterRoute (route: Pages.Route) (model: Model) : Model * Cmd<Msg> =
+  let model = { model with Route = route }
+
+  match Pages.pageKey route with
+  | Some key ->
+    match Map.tryFind key model.Loads, Pages.pageLoader key with
+    | (Some Pages.PageLoad.Loading | Some(Pages.PageLoad.Ready _)), _ -> model, Cmd.none
+    | _, Some load ->
+      { model with
+          Loads = Map.add key Pages.PageLoad.Loading model.Loads },
+      Cmd.OfPromise.either load () (fun page -> PageLoaded(key, Pages.PageLoad.Ready page)) (fun err ->
+        PageLoaded(key, Pages.PageLoad.Failed err.Message))
+    | _, None -> model, Cmd.none
+  | None -> model, Cmd.none
 
 /// Install a debounced MutationObserver that re-runs the client-only KaTeX
 /// pass (`MathEnhance.enhanceDocument` – idempotent, never part of the parity
@@ -104,30 +114,31 @@ let private hashListenerCmd: Cmd<Msg> =
     window.addEventListener ("hashchange", (fun _ -> dispatch (HashChanged window.location.hash))))
 
 let private init () : Model * Cmd<Msg> =
-  let route = Pages.parseHash window.location.hash
   let dark = Brand.initialDark ()
 
-  { Route = route
-    Replay = Replay.ReplayState.Loading
-    Conformance = Conformance.PanelState.Pending
-    Dark = dark },
+  let model, pageCmd =
+    enterRoute
+      (Pages.parseHash window.location.hash)
+      { Route = Pages.Home
+        Loads = Map.empty
+        Conformance = Conformance.PanelState.Pending
+        Dark = dark }
+
+  model,
   Cmd.batch
     [ hashListenerCmd
       mathEnhanceCmd
       Conformance.loadCmd ConformanceResult
-      routeCmd route
+      pageCmd
       Cmd.ofEffect (fun _ -> applyDarkClass dark) ]
 
 let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
   match msg with
-  | HashChanged hash ->
-    let route = Pages.parseHash hash
-
+  | HashChanged hash -> enterRoute (Pages.parseHash hash) model
+  | PageLoaded(key, load) ->
     { model with
-        Route = route
-        Replay = Replay.ReplayState.Loading },
-    routeCmd route
-  | ArtefactResult r -> { model with Replay = r }, Cmd.none
+        Loads = Map.add key load model.Loads },
+    Cmd.none
   | ConformanceResult c -> { model with Conformance = c }, Cmd.none
   | ToggleDark ->
     let dark = not model.Dark
@@ -137,8 +148,6 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
       Brand.persistDark dark
       applyDarkClass dark)
 
-let private renderNode (n: Node<'msg>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
 
 let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
   Html.div
@@ -197,7 +206,7 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
           Pages.pillarNav model.Route
           Html.main
             [ prop.className "ds-main"
-              prop.children [ Pages.renderRoute model.Route model.Replay ] ]
+              prop.children [ Pages.renderRoute model.Route model.Loads ] ]
           // Conformance only. The evaluation card left this strip deliberately:
           // conformance certifies the trees and code on the page you are looking
           // at, so it belongs beside every demo; evaluation measures how reliably
@@ -207,8 +216,8 @@ let private view (model: Model) (dispatch: Msg -> unit) : ReactElement =
           // capability demo diluted it and taxed pages it said nothing about.
           Html.div
             [ prop.className "ds-status-strip"
-              prop.children [ renderNode (Conformance.panel model.Conformance) ] ]
-          Pages.footer (Pages.footerWire model.Route model.Replay) ] ]
+              prop.children [ Exhibit.renderStatic (Conformance.panel model.Conformance) ] ]
+          Pages.footer ] ]
 
 Program.mkProgram init update view
 |> Program.withReactSynchronous "fuaran-showcase-root"

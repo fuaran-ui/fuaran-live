@@ -6,8 +6,9 @@ module Fuaran.Showcase.Pages
 //  Navigation is by hash route (static-hostable, no server rewrites): every link
 //  is a real <a href="#/…">, and App.fs listens for `hashchange`. The page bodies
 //  are Fuaran trees rendered through the F# renderer (the site is exhibit zero);
-//  the surrounding chrome (nav, footer, the wire-JSON drawer) is Feliz Html, the
-//  same mixed shape fuaran-live uses.
+//  the surrounding chrome (nav, footer) is Feliz Html, the same mixed shape the
+//  playground uses. Every page route resolves through the registry (Registry.fs):
+//  the route names a page by its id, and the shell loads the page's chunk.
 // ============================================================================
 
 open Fable.Core.JsInterop
@@ -16,11 +17,6 @@ open Fuaran.UI
 open Fuaran.UI.Types
 open Fuaran.UI.Renderer
 open Fuaran.Showcase
-
-/// Render a Fuaran node. Navigation is via hash links, so the tree never
-/// dispatches – `ignore` is the no-op message sink.
-let private renderNode (n: Node<'msg>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
 
 /// The playground lives on its own origin (D8/D10 – one repo, two origins). The
 /// door + the footer exit both link here. Defined in `Pillars` since Phase 718 —
@@ -33,7 +29,9 @@ let playgroundOrigin: string = Pillars.playgroundOrigin
 type Route =
   | Home
   | PillarPage of Pillars.Pillar
-  | DemoPage of Pillars.Demo
+  /// A registry page, by id. The id rather than the entry, so a route stays a
+  /// plain value the shell can compare.
+  | DemoPage of string
   | EvaluationPage
   | ContactPage
   | NotFound of string
@@ -65,8 +63,8 @@ let parseHash (raw: string) : Route =
       | Some p -> PillarPage p
       | None -> NotFound raw
     | "demo" when parts.Length > 1 ->
-      match Pillars.demoByRoute parts.[1] with
-      | Some d -> DemoPage d
+      match Registry.pageById parts.[1] with
+      | Some d -> DemoPage d.Id
       | None -> NotFound raw
     | _ -> NotFound raw
 
@@ -74,7 +72,7 @@ let homeHash = "#/"
 let evaluationHash = "#/evaluation"
 let contactHash = "#/contact"
 let pillarHash (p: Pillars.Pillar) : string = "#/pillar/" + Pillars.pillarSlug p
-let demoHash (d: Pillars.Demo) : string = "#/demo/" + d.Route
+let demoHash (d: Registry.Page) : string = "#/demo/" + d.Id
 
 // ─── chrome (Feliz) ─────────────────────────────────────────────────────────
 
@@ -137,7 +135,7 @@ let private pillarCard (p: Pillars.Pillar) : ReactElement =
     [ prop.className "ds-pillar-card"
       prop.href (pillarHash p)
       prop.children
-        [ renderNode (
+        [ Exhibit.renderStatic (
             Fuaran.card
               ("ds-pc-" + Pillars.pillarSlug p)
               { Defaults.card with
@@ -155,7 +153,7 @@ let private evaluationTile: ReactElement =
         [ Html.span
             [ prop.className "ds-eval-badge"
               prop.children [ Html.span [ prop.className "ds-eval-dot" ]; Html.text "Live" ] ]
-          renderNode (
+          Exhibit.renderStatic (
             Fuaran.card
               "ds-eval-card"
               { Defaults.card with
@@ -175,7 +173,7 @@ let private playgroundDoor: ReactElement =
       prop.href playgroundOrigin
       prop.children
         [ Html.span [ prop.className "ds-door-kicker"; prop.text "The hands-on door →" ]
-          renderNode (
+          Exhibit.renderStatic (
             Fuaran.card
               "ds-door-card"
               { Defaults.card with
@@ -197,7 +195,7 @@ let private docsDoor: ReactElement =
       prop.rel "noreferrer"
       prop.children
         [ Html.span [ prop.className "ds-door-kicker"; prop.text "The reference door →" ]
-          renderNode (
+          Exhibit.renderStatic (
             Fuaran.card
               "ds-docs-door-card"
               { Defaults.card with
@@ -212,7 +210,7 @@ let landing: ReactElement =
   Html.div
     [ prop.className "ds-landing"
       prop.children
-        [ renderNode header
+        [ Exhibit.renderStatic header
           Html.div
             [ prop.className "ds-pillar-grid"
               prop.children [ for p in Pillars.allPillars -> pillarCard p ] ]
@@ -220,20 +218,18 @@ let landing: ReactElement =
           playgroundDoor
           docsDoor ] ]
 
-// ─── pillar page (its demos) ────────────────────────────────────────────────
+// ─── pillar page (its index, derived from the registry) ─────────────────────
 
-let private demoTeaser (d: Pillars.Demo) : ReactElement =
-  let heading = if d.Live then d.Title else d.Title + " · coming soon"
-
+let private demoTeaser (d: Registry.Page) : ReactElement =
   Html.a
     [ prop.className "ds-demo-teaser"
       prop.href (demoHash d)
       prop.children
-        [ renderNode (
+        [ Exhibit.renderStatic (
             Fuaran.card
               ("ds-dt-" + d.Id)
               { Defaults.card with
-                  Heading = Some(TextSource.Literal heading)
+                  Heading = Some(TextSource.Literal d.Title)
                   Children = [ Fuaran.markdown ("ds-dtw-" + d.Id) d.Wow ] }
           ) ] ]
 
@@ -241,155 +237,88 @@ let pillarPage (p: Pillars.Pillar) : ReactElement =
   Html.div
     [ prop.className "ds-pillar-page"
       prop.children
-        [ renderNode (headingNode "ds-pp-title" 1 (Pillars.pillarTitle p))
-          renderNode (Fuaran.markdown "ds-pp-blurb" (Pillars.pillarBlurb p))
+        [ Exhibit.renderStatic (headingNode "ds-pp-title" 1 (Pillars.pillarTitle p))
+          Exhibit.renderStatic (Fuaran.markdown "ds-pp-blurb" (Pillars.pillarBlurb p))
           Html.div
             [ prop.className "ds-demo-grid"
-              prop.children [ for d in Pillars.demosInPillar p -> demoTeaser d ] ] ] ]
-
-// ─── demo page (stub – consumes the replay-loader seam) ─────────────────────
-
-let private replayView (d: Pillars.Demo) (replay: Replay.ReplayState) : ReactElement =
-  match d.ReplayId with
-  | None -> renderNode (Fuaran.markdown "ds-demo-noreplay" "_No recording is wired to this page yet._")
-  | Some _ ->
-    match replay with
-    | Replay.ReplayState.Loading -> renderNode (Fuaran.markdown "ds-demo-loading" "_Loading the recorded replay…_")
-    | Replay.ReplayState.Missing reason ->
-      renderNode (
-        Fuaran.callout
-          "ds-demo-missing"
-          { Defaults.callout with
-              Tone = ToneVariant.Subdued
-              Heading = Some(TextSource.Literal "Replay unavailable")
-              Body = TextSource.Literal reason }
-      )
-    | Replay.ReplayState.Loaded json ->
-      Html.div
-        [ prop.className "ds-replay"
-          prop.children
-            [ renderNode (
-                Fuaran.markdown
-                  "ds-replay-note"
-                  (sprintf
-                    "Loaded a recorded artefact (%d bytes) through the shared replay-loader – **no API key, no setup.** That keyless mode is the site's reliability floor."
-                    json.Length)
-              )
-              renderNode (Fuaran.codeBlock "ds-replay-json" "json" json) ] ]
-
-let demoPage (d: Pillars.Demo) (replay: Replay.ReplayState) : ReactElement =
-  let status =
-    if d.Live then
-      Html.none
-    else
-      renderNode (
-        Fuaran.callout
-          "ds-demo-status"
-          { Defaults.callout with
-              Tone = ToneVariant.Info
-              Heading = Some(TextSource.Literal "This page is on its way")
-              Body =
-                TextSource.Literal
-                  "The full demo lands soon. Below is the scripted replay it will play back – the same recorded artefact, with no key pasted." }
-      )
-
-  Html.div
-    [ prop.className "ds-demo-page"
-      prop.children
-        [ renderNode (headingNode "ds-demo-title" 1 d.Title)
-          renderNode (Fuaran.markdown "ds-demo-wow" d.Wow)
-          status
-          replayView d replay ] ]
+              prop.children [ for d in Registry.pagesInPillar p -> demoTeaser d ] ] ] ]
 
 let notFoundPage (raw: string) : ReactElement =
   Html.div
     [ prop.className "ds-notfound"
       prop.children
-        [ renderNode (headingNode "ds-nf-title" 1 "Nothing here")
-          renderNode (
+        [ Exhibit.renderStatic (headingNode "ds-nf-title" 1 "Nothing here")
+          Exhibit.renderStatic (
             Fuaran.markdown
               "ds-nf-body"
               (sprintf "No page matches `%s`. Head back to the [home page](%s)." raw homeHash)
           ) ] ]
 
-let renderRoute (route: Route) (replay: Replay.ReplayState) : ReactElement =
+// ─── lazily loaded pages ────────────────────────────────────────────────────
+
+/// Where a lazily loaded page stands. A page is fetched the first time its
+/// route is visited and kept for the rest of the visit.
+[<RequireQualifiedAccess>]
+type PageLoad =
+  | Loading
+  | Ready of ReactElement
+  | Failed of string
+
+/// The key a route's page is loaded under — None for the routes the shell
+/// draws itself.
+let pageKey (route: Route) : string option =
+  match route with
+  | DemoPage id -> Some id
+  | EvaluationPage -> Some "evaluation"
+  | ContactPage -> Some "contact"
+  | Home
+  | PillarPage _
+  | NotFound _ -> None
+
+/// The loader for a page key, from the registry.
+let pageLoader (key: string) : (unit -> Fable.Core.JS.Promise<ReactElement>) option =
+  match key with
+  | "evaluation" -> Some Registry.loadEvaluation
+  | "contact" -> Some Registry.loadContact
+  | id -> Registry.pageById id |> Option.map (fun d -> d.Load)
+
+let private loadingPage: ReactElement =
+  Html.div
+    [ prop.className "ds-page-loading"
+      prop.ariaBusy true
+      prop.text "Loading the page…" ]
+
+let private failedPage (reason: string) : ReactElement =
+  Exhibit.renderStatic (
+    Fuaran.callout
+      "ds-page-failed"
+      { Defaults.callout with
+          Tone = ToneVariant.Critical
+          Heading = Some(TextSource.Literal "This page did not load")
+          Body = TextSource.Literal("The page's code could not be fetched (" + reason + "). Reload to try again.") }
+  )
+
+let renderRoute (route: Route) (loads: Map<string, PageLoad>) : ReactElement =
   match route with
   | Home -> landing
   | PillarPage p -> pillarPage p
-  // Live demo pages own their whole body (their own interactive component);
-  // the replay-stub path serves every page still on its way.
-  | DemoPage d when d.Id = "rosetta" -> Rosetta.page
-  | DemoPage d when d.Id = "attesor" -> Attesor.page
-  | DemoPage d when d.Id = "versioning" -> WireVersioning.page
-  | DemoPage d when d.Id = "teleport" -> Teleport.page
-  | DemoPage d when d.Id = "infinite-skins" -> Skins.page
-  | DemoPage d when d.Id = "every-screen" -> Responsive.page
-  | DemoPage d when d.Id = "kintsugi" -> Kintsugi.page
-  | DemoPage d when d.Id = "time-machine" -> TimeMachine.page
-  | DemoPage d when d.Id = "blind-surveyor" -> BlindSurveyor.page
-  | DemoPage d when d.Id = "notarised" -> Notarised.page
-  | DemoPage d when d.Id = "unit-test" -> UnitTest.page
-  | DemoPage d when d.Id = "git-for-interfaces" -> GitForInterfaces.page
-  | DemoPage d when d.Id = "bouncer" -> Bouncer.page
-  | DemoPage d when d.Id = "degradation" -> Degradation.page
-  | DemoPage d when d.Id = "pandas" -> Pandas.page
-  | DemoPage d when d.Id = "send-me" -> Send.page
-  | DemoPage d when d.Id = "grep-apps" -> GrepApps.page
-  | DemoPage d when d.Id = "what-if" -> WhatIf.page
-  | DemoPage d when d.Id = "bazaar" -> Bazaar.page
-  | DemoPage d when d.Id = "relay" -> Relay.page
-  | DemoPage d when d.Id = "living-sheet" -> LivingSheet.page
-  | DemoPage d when d.Id = "counterfactual" -> Counterfactual.page
-  | DemoPage d when d.Id = "pattern-bank" -> PatternBank.page
-  | DemoPage d when d.Id = "chart-as-data" -> Charts.page
-  | DemoPage d when d.Id = "typed-question" -> TypedQuestion.page
-  | DemoPage d when d.Id = "hand-on-the-wheel" -> HandOnTheWheel.page
-  | DemoPage d when d.Id = "agent-readable" -> AgentReadable.page
-  | DemoPage d when d.Id = "locale-lens" -> LocaleLens.page
-  | DemoPage d when d.Id = "go-sessions" -> GoSessions.page
-  | DemoPage d when d.Id = "navigator" -> Navigator.page
-  // The platform-baseline exhibits (Phase 1129).
-  | DemoPage d when d.Id = "briefing" -> Briefing.page
-  | DemoPage d when d.Id = "embedded" -> Embedded.page
-  | DemoPage d when d.Id = "situation-room" -> Situation.page
-  | DemoPage d when d.Id = "intake" -> Intake.page
-  | DemoPage d when d.Id = "bidi" -> Bidi.page
-  | DemoPage d when d.Id = "invoice" -> Invoice.page
-  | DemoPage d when d.Id = "roster" -> Roster.page
-  | DemoPage d when d.Id = "catalog" -> Catalog.page
-  | DemoPage d when d.Id = "outline" -> Outline.page
-  | DemoPage d when d.Id = "handover" -> Handover.page
-  | DemoPage d when d.Id = "attach" -> Attach.page
-  | DemoPage d -> demoPage d replay
-  | EvaluationPage -> Evaluation.page
-  | ContactPage -> Contact.page
   | NotFound raw -> notFoundPage raw
+  | DemoPage _
+  | EvaluationPage
+  | ContactPage ->
+    match pageKey route |> Option.bind (fun k -> Map.tryFind k loads) with
+    | Some(PageLoad.Ready page) -> page
+    | Some(PageLoad.Failed reason) -> failedPage reason
+    | Some PageLoad.Loading
+    | None -> loadingPage
 
-// ─── shared footer (wire-JSON drawer + docs + fuaran-live exit) ─────────────
+// ─── shared footer (docs + contact + playground exit) ───────────────────────
 
-/// The wire JSON of "what you just saw" – the loaded replay artefact on a demo
-/// page. None elsewhere (the drawer only appears once there is a tree to show).
-let footerWire (route: Route) (replay: Replay.ReplayState) : string option =
-  match route with
-  | DemoPage _ ->
-    match replay with
-    | Replay.ReplayState.Loaded json -> Some json
-    | _ -> None
-  | _ -> None
-
-let footer (wireJson: string option) : ReactElement =
+let footer: ReactElement =
   Html.footer
     [ prop.className "ds-footer"
       prop.children
-        [ (match wireJson with
-           | Some json ->
-             Html.details
-               [ prop.className "ds-wire-drawer"
-                 prop.children
-                   [ Html.summary [ prop.text "Wire JSON – what you just saw" ]
-                     Html.pre [ prop.className "ds-wire-json"; prop.text json ] ] ]
-           | None -> Html.none)
-          Html.div
+        [ Html.div
             [ prop.className "ds-footer-links"
               prop.children
                 [ Html.a

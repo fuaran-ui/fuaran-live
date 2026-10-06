@@ -256,43 +256,36 @@ let private BouncerView () : ReactElement =
                       Html.span [ prop.className "bnc-defence-text"; prop.text layer ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "bnc-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "Real attacks, a real gate" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Every verdict is the shipped decoder’s actual output: each attack is a hostile wire payload run through the language tier’s decode gate, and the code and message shown are the real typed DecodeError – nothing staged." ]
-                    Html.li
-                      [ prop.text
-                          "The security is structural: because the wire vocabulary is closed data, a “call an arbitrary tool” or “exfiltrate the data” intent has no case to encode – it is refused before it can ever become a node, not filtered after the fact." ]
-                    Html.li
-                      [ prop.text
-                          "The last attack is legal wire – a string is a string – so the sanitizer floor catches it instead: the script is rendered as inert text and the page reads back zero executable scripts in the sandbox." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "The dispatch-time policy gate and deny telemetry are a server-side runtime concern; here that guarantee shows up as the closed-DU decode-reject. Same "
-                            Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
-                            Html.text " lens, its safety face." ] ] ] ] ] ]
+    Exhibit.honesty
+      "Real attacks, a real gate"
+      [ Html.li
+          [ prop.text
+              "Every verdict is the shipped decoder’s actual output: each attack is a hostile wire payload run through the language tier’s decode gate, and the code and message shown are the real typed DecodeError – nothing staged." ]
+        Html.li
+          [ prop.text
+              "The security is structural: because the wire vocabulary is closed data, a “call an arbitrary tool” or “exfiltrate the data” intent has no case to encode – it is refused before it can ever become a node, not filtered after the fact." ]
+        Html.li
+          [ prop.text
+              "The last attack is legal wire – a string is a string – so the sanitizer floor catches it instead: the script is rendered as inert text and the page reads back zero executable scripts in the sandbox." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "The dispatch-time policy gate and deny telemetry are a server-side runtime concern; here that guarantee shows up as the closed-DU decode-reject. Same "
+                Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
+                Html.text " lens, its safety face." ] ] ]
 
-  Html.div
-    [ prop.className "bnc-page"
-      prop.children
-        [ Html.h1 [ prop.className "bnc-title"; prop.text "The Bouncer" ]
-          Html.p
-            [ prop.className "bnc-lede"
-              prop.text
-                "Try to make the interface do something malicious. Go on. Every attempt bounces off the structural gate – and you see exactly what was refused, and why." ]
-          scoreboard
-          chips
-          verdictPanel
-          sandbox
-          logView
-          Html.h3 [ prop.className "bnc-defence-title"; prop.text "The layered defence" ]
-          defenceFooter
-          honesty ] ]
+  Exhibit.frame
+    "bnc"
+    "The Bouncer"
+    (Exhibit.lede
+      "Try to make the interface do something malicious. Go on. Every attempt bounces off the structural gate – and you see exactly what was refused, and why.")
+    [ scoreboard
+      chips
+      verdictPanel
+      sandbox
+      logView
+      Html.h3 [ prop.className "bnc-defence-title"; prop.text "The layered defence" ]
+      defenceFooter ]
+    honesty
 
 let page: ReactElement = BouncerView()

@@ -221,39 +221,31 @@ let private PandasView () : ReactElement =
               Html.pre [ prop.className "wire-json"; prop.children [ Html.code [ prop.text wire ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "pn-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "Four lines, no server" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Everything runs in your browser: real CPython and pandas via Pyodide compute over the bundled CSV, the published fuaran-ui package — installed here with micropip, the same release you get from PyPI — authors a Fuaran tree, and the F# host decodes the canonical wire and renders it. No server re-runs your script; Streamlit's model is exactly the thing this replaces." ]
-                    Html.li
-                      [ prop.text
-                          "Re-run with a change and the page derives the real structural tree-diff between the old tree and the new one, then shows the op ticker: the UI is patched with a handful of typed operations, not re-rendered. That is the difference between an artefact that is data and a script that re-executes." ]
-                    Html.li
-                      [ prop.text
-                          "Honest limits: Pyodide's cold start and heavy pandas workloads are slow in-browser, so this demo sizes its data to feel instant. Neither limit is the language's — run pip install fuaran-ui in your own environment and these same four lines author the same tree over as much data as your machine will hold." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "The wire the cell emitted is your app – the same bytes any conformant host renders, the "
-                            Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
-                            Html.text " thesis, authored from a notebook." ] ] ] ] ] ]
+    Exhibit.honesty
+      "Four lines, no server"
+      [ Html.li
+          [ prop.text
+              "Everything runs in your browser: real CPython and pandas via Pyodide compute over the bundled CSV, the published fuaran-ui package — installed here with micropip, the same release you get from PyPI — authors a Fuaran tree, and the F# host decodes the canonical wire and renders it. No server re-runs your script; Streamlit's model is exactly the thing this replaces." ]
+        Html.li
+          [ prop.text
+              "Re-run with a change and the page derives the real structural tree-diff between the old tree and the new one, then shows the op ticker: the UI is patched with a handful of typed operations, not re-rendered. That is the difference between an artefact that is data and a script that re-executes." ]
+        Html.li
+          [ prop.text
+              "Honest limits: Pyodide's cold start and heavy pandas workloads are slow in-browser, so this demo sizes its data to feel instant. Neither limit is the language's — run pip install fuaran-ui in your own environment and these same four lines author the same tree over as much data as your machine will hold." ]
+        Html.li
+          [ prop.children
+              [ Html.text "The wire the cell emitted is your app – the same bytes any conformant host renders, the "
+                Html.a [ prop.href "#/pillar/wire"; prop.text "one-wire-many-worlds" ]
+                Html.text " thesis, authored from a notebook." ] ] ]
 
-  Html.div
-    [ prop.className "pn-page"
-      prop.children
-        [ Html.h1 [ prop.className "pn-title"; prop.text "The Pandas Dashboard" ]
-          Html.p
-            [ prop.className "pn-lede"
-              prop.text
-                "A data scientist types a few lines of Python. A live, interactive dashboard appears beside the cell – no JavaScript written, and no server running." ]
-          Html.div [ prop.className "pn-split"; prop.children [ cellPane; renderedPane ] ]
-          ticker
-          wireDrawer
-          honesty ] ]
+  Exhibit.frame
+    "pn"
+    "The Pandas Dashboard"
+    (Exhibit.lede
+      "A data scientist types a few lines of Python. A live, interactive dashboard appears beside the cell – no JavaScript written, and no server running.")
+    [ Html.div [ prop.className "pn-split"; prop.children [ cellPane; renderedPane ] ]
+      ticker
+      wireDrawer ]
+    honesty
 
 let page: ReactElement = PandasView()

@@ -147,9 +147,6 @@ let private gate (manifest: string list) (granted: Set<string>) (req: string) : 
 
 // ─── The page ────────────────────────────────────────────────────────────────
 
-let private renderTree (n: Node<unit>) : ReactElement =
-  Render.renderWithSources BindingResolver.empty ignore n
-
 type private Mounted = { Instance: int; Stall: Stall }
 
 [<ReactComponent>]
@@ -226,7 +223,7 @@ let private BazaarView () : ReactElement =
                         prop.onClick (fun _ -> removeMount m.Instance) ] ] ]
             Html.div
               [ prop.className "bz-guest"
-                prop.children [ renderTree (m.Stall.Tree(sprintf "g%d-" m.Instance)) ] ]
+                prop.children [ Exhibit.renderStatic (m.Stall.Tree(sprintf "g%d-" m.Instance)) ] ]
             Html.div
               [ prop.className "bz-gate"
                 prop.children
@@ -277,40 +274,33 @@ let private BazaarView () : ReactElement =
                   prop.children [ Html.code [ prop.text workspaceJson ] ] ] ] ]
 
   let honesty =
-    Html.div
-      [ prop.className "bz-honesty"
-        prop.children
-          [ Html.h3 [ prop.text "An app composed out of apps" ]
-            Html.ul
-              [ prop.children
-                  [ Html.li
-                      [ prop.text
-                          "Each stall is a real little Fuaran app that runs live in its own scope, plus a capability manifest in the shipped tag vocabulary – its permissions worn on its sleeve, before you mount it." ]
-                    Html.li
-                      [ prop.text
-                          "Every guest is default-deny: a capability it declared is blocked until you grant it explicitly, and you watch exactly that one channel open. A capability it never declared is refused outright – over-asking and over-reaching are different, and the gate treats them so." ]
-                    Html.li
-                      [ prop.text
-                          "The composed workspace is itself an app – export its wire JSON and it is a value like any other. Curated stalls today; a public submission store is the signing-and-trust productisation step, not a claim this demo makes." ]
-                    Html.li
-                      [ prop.children
-                          [ Html.text
-                              "Discover by structure, install by mounting, trust by capability, ship by export – an app marketplace falling out of the "
-                            Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
-                            Html.text " substrate. No server; a composition is a value." ] ] ] ] ] ]
+    Exhibit.honesty
+      "An app composed out of apps"
+      [ Html.li
+          [ prop.text
+              "Each stall is a real little Fuaran app that runs live in its own scope, plus a capability manifest in the shipped tag vocabulary – its permissions worn on its sleeve, before you mount it." ]
+        Html.li
+          [ prop.text
+              "Every guest is default-deny: a capability it declared is blocked until you grant it explicitly, and you watch exactly that one channel open. A capability it never declared is refused outright – over-asking and over-reaching are different, and the gate treats them so." ]
+        Html.li
+          [ prop.text
+              "The composed workspace is itself an app – export its wire JSON and it is a value like any other. Curated stalls today; a public submission store is the signing-and-trust productisation step, not a claim this demo makes." ]
+        Html.li
+          [ prop.children
+              [ Html.text
+                  "Discover by structure, install by mounting, trust by capability, ship by export – an app marketplace falling out of the "
+                Html.a [ prop.href "#/pillar/machine"; prop.text "machine-can-see-the-UI" ]
+                Html.text " substrate. No server; a composition is a value." ] ] ]
 
-  Html.div
-    [ prop.className "bz-page"
-      prop.children
-        [ Html.h1 [ prop.className "bz-title"; prop.text "The Bazaar" ]
-          Html.p
-            [ prop.className "bz-lede"
-              prop.text
-                "Browse a marketplace of apps, mount one into your workspace, and it runs there – sandboxed, capability-gated, live. You just composed an application out of applications." ]
-          Html.h3 [ prop.className "bz-section"; prop.text "The stalls" ]
-          stallWall
-          workspace
-          export
-          honesty ] ]
+  Exhibit.frame
+    "bz"
+    "The Bazaar"
+    (Exhibit.lede
+      "Browse a marketplace of apps, mount one into your workspace, and it runs there – sandboxed, capability-gated, live. You just composed an application out of applications.")
+    [ Html.h3 [ prop.className "bz-section"; prop.text "The stalls" ]
+      stallWall
+      workspace
+      export ]
+    honesty
 
 let page: ReactElement = BazaarView()

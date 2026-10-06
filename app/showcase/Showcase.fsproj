@@ -4,11 +4,12 @@
     The showcase (F#) – the zero-egress half of the site.
 
     Every page is a Fuaran app rendered through the F# `Fuaran.UI.Renderer` – the
-    site is exhibit zero for "UI as typed data". The language tier is consumed by
-    direct ProjectReference into the sibling ../../../fuaran-dotnet checkout (the same
-    workspace-checkout binding the playground app uses); the Fable stack versions
-    are pinned here since this project sits outside fuaran's central package
-    management. Compiled only via `dotnet fable`, never `dotnet build`.
+    site is exhibit zero for "UI as typed data". Unlike the playground, the
+    language tier is consumed by SOURCE: a ProjectReference into the sibling
+    ../../../fuaran-dotnet checkout, which CI checks out at the tier ref held
+    equal to `FuaranUIVersion` in ../../Directory.Build.props (the reason is at
+    the references below). Every package version here reads that file.
+    Compiled only via `dotnet fable`, never `dotnet build`.
 
     A separate project from the playground (../FuaranLive.fsproj) on purpose:
     the two entries ship as separate artifacts, and this one must contain no
@@ -19,7 +20,6 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
-    <ImportDirectoryBuildProps>false</ImportDirectoryBuildProps>
     <ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <DefineConstants Condition="'$(Configuration)' != 'Release'">FABLE_COMPILER;DEBUG</DefineConstants>
@@ -103,50 +103,50 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Typed tree + the renderer (transitively pulls Fuaran.UI). The renderer
-         carries the parity-locked class vocabulary + reference-CSS contract. -->
+    <!-- WHY THIS PROJECT BINDS THE TIER BY SOURCE when the playground and the
+         parity host take published packages (Phase 2079): the Git for
+         Interfaces page runs the real structural 3-way merge engine,
+         Fuaran.UI.OpStream.Dag.Merge, in the browser, and that package is
+         published for .NET hosts only - it ships no fable/ sources, by the
+         language tier's own recorded decision (Phase 2128) - so Fable cannot
+         compile it from the registry. And the binding cannot be mixed: a
+         ProjectReference substitutes a project for the packaged family's copy
+         of the same id while Fable extracts the rest from packages, and the
+         compile dies (the playground's project file records that failure). So
+         the whole tier is source-bound here, at the CI ref the restore-graph
+         suite holds equal to FuaranUIVersion. It WAITS on Dag.Merge's Fable
+         packaging: the language tier has decided to ship the merge engine with
+         its fable/ sources, and this project moves to packages at the first
+         release that carries them. docs/tier-pin.md has the history. -->
     <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI\Fuaran.UI.fsproj" />
     <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
-    <!-- Rosetta's F# host runs the real canonical encoder (CanonicalJson.encodeNode)
-         + the Fable-safe SHA-256 – the byte-parity oracle the TS/Python hosts match. -->
+    <!-- Rosetta's F# host: the canonical encoder + the Fable-safe SHA-256. -->
     <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\Fuaran.UI.OpStream.Abstractions.fsproj" />
-    <!-- Infinite Skins' contrast auditor runs the shipped manifest-free WCAG
-         derivation (Fuaran.UI.StyleObserver.Flags) over real computed DOM colours.
-         The Abstractions project is FSharp.Core-only – Fable-safe. -->
+    <!-- Infinite Skins' contrast auditor (the manifest-free WCAG derivation). -->
     <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.StyleObserver.Abstractions\Fuaran.UI.StyleObserver.Abstractions.fsproj" />
-    <!-- Kintsugi's "senses" panel also runs the shipped manifest-free LayoutObserver
-         overflow derivation over real DOM geometry. FSharp.Core-only – Fable-safe. -->
+    <!-- Kintsugi's "senses" panel (the manifest-free overflow derivation). -->
     <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.LayoutObserver.Abstractions\Fuaran.UI.LayoutObserver.Abstractions.fsproj" />
-    <!-- Git for Interfaces runs the real shipped structural 3-way merge engine
-         (Fuaran.UI.OpStream.Dag.Merge – TreeMerge.merge3Way / merge3WayWithAuthor)
-         in the browser; the engine is Fable-portable (the .NET-only
-         Stopwatch/telemetry + DAG-verify paths are guarded). Pulls Fuaran.UI.Ops
-         + OpStream.{Abstractions,Replay} + Dag.Abstractions. -->
+    <!-- Git for Interfaces: TreeMerge.merge3Way / merge3WayWithAuthor - the
+         reference that keeps this project source-bound (above). -->
     <ProjectReference Include="..\..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Dag.Merge\Fuaran.UI.OpStream.Dag.Merge.fsproj" />
-    <!-- The Pattern Bank runs the real Fuaran.Core signature-search engine
-         (FunctionRegistry.findBySignature) – the same engine powering the shipped
-         Fuaran.UI.FastPath package. A Fable-source-packed feed package (branch-
-         independent); the page defines its own pattern set over it. -->
-    <PackageReference Include="Fuaran.Core.Function" Version="0.34.0" />
-    <!-- The Versioning Envelope page runs the real Fuaran.Core.Wire.Versioning
-         negotiation + tolerant-decode substrate (envelope encode/parse, negotiate,
-         decodeTolerant/reencode, classify/bump). -->
-    <PackageReference Include="Fuaran.Core.Wire" Version="0.34.0" />
+    <!-- The Pattern Bank's signature search and the Versioning Envelope page's
+         negotiation substrate. Fable-source-packed; at FuaranCoreVersion, the
+         Core version the tier declares. -->
+    <PackageReference Include="Fuaran.Core.Function" Version="$(FuaranCoreVersion)" />
+    <PackageReference Include="Fuaran.Core.Wire" Version="$(FuaranCoreVersion)" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Explicit versions (matched to fuaran-dotnet/Directory.Packages.props + the
-         playground app project), since this sits outside central package
-         management. -->
-    <!-- The portable AI-connector wire substrate (Phase 1698) - the JsonValue /
-         JsonHost model the source projector walks. See the note above the
-         projector's Compile entry for why referencing the whole package leaves
-         this entry's no-key-egress guarantee intact. -->
-    <PackageReference Include="Fuaran.UI.AiWire" Version="0.81.0" />
-    <PackageReference Include="Fable.Core" Version="5.0" />
-    <PackageReference Include="Fable.Elmish" Version="5.0.2" />
-    <PackageReference Include="Fable.Elmish.React" Version="5.6" />
-    <PackageReference Include="Feliz" Version="3.3.3" />
+    <!-- The portable AI-connector wire substrate the source projector walks
+         (Phase 1698). Released with the tier, so it reads the tier's version -
+         the same package, at the same version, that the playground compiles
+         Projection.fs against. It carries no egress code (see the note above
+         the projector's Compile entry). -->
+    <PackageReference Include="Fuaran.UI.AiWire" Version="$(FuaranUIVersion)" />
+    <PackageReference Include="Fable.Core" Version="$(FableCoreVersion)" />
+    <PackageReference Include="Fable.Elmish" Version="$(FableElmishVersion)" />
+    <PackageReference Include="Fable.Elmish.React" Version="$(FableElmishReactVersion)" />
+    <PackageReference Include="Feliz" Version="$(FelizVersion)" />
   </ItemGroup>
 
 </Project>

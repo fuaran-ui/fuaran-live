@@ -26,13 +26,13 @@
 //  would have pinned a name that merely looked right, and nothing in this repo
 //  would have objected. See the `## Dependencies` section of `CLAUDE.md`.
 //
-//  REGISTRY EVIDENCE (re-checked 2026-10-04 against the public flat-container
+//  REGISTRY EVIDENCE (re-checked 2026-10-04, AiWire 2026-10-06 against the public flat-container
 //  index; recorded here rather than fetched by the test, which stays offline
 //  and deterministic). Every id+version below was served:
 //    Fuaran.UI 0.91.0 · Fuaran.UI.Renderer 0.91.0 · Fuaran.UI.Ops 0.91.0
 //    Fuaran.UI.OpStream.Abstractions 0.91.0 · Fuaran.UI.OpStream.Replay 0.91.0
 //    Fuaran.UI.ServerDriven 0.91.0 · Fuaran.UI.Program 0.91.0
-//    Fuaran.UI.AiWire 0.85.0
+//    Fuaran.UI.AiWire 0.91.0 (re-checked 2026-10-06, Phase 2079: one version with the family)
 //    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.34.0
 //    Fuaran.Program.Runtime 0.7.1
 //  The program loop's UI adapter is a member of the UI family since Phase 2016:
@@ -155,8 +155,39 @@ function parsePins(text: string, project: string): Pin[] {
   return pins;
 }
 
+/**
+ * The version properties `Directory.Build.props` declares (Phase 2079): the
+ * ONE place this repo binds what it consumes, one property per producer.
+ */
+function parseVersionProps(text: string): Map<string, string> {
+  const props = new Map<string, string>();
+  const re = /<([A-Za-z][A-Za-z0-9]*Version)>([^<]+)<\/\1>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) props.set(m[1]!, m[2]!.trim());
+  return props;
+}
+
+/** `$(Name)` when the whole version is one property reference, else null. */
+function propertyName(version: string | null): string | null {
+  const m = /^\$\(([A-Za-z][A-Za-z0-9]*)\)$/.exec(version ?? '');
+  return m?.[1] ?? null;
+}
+
+const versionProps = parseVersionProps(
+  readFileSync(join(repoRoot, 'Directory.Build.props'), 'utf8'),
+);
 const projects = findProjects(repoRoot);
 const pins = projects.flatMap((p) => parsePins(readFileSync(p, 'utf8'), p));
+
+/** The six-plus workflows' language-tier checkout refs, file by file. */
+const workflowDir = join(repoRoot, '.github', 'workflows');
+const tierRefs = readdirSync(workflowDir)
+  .filter((f) => f.endsWith('.yml'))
+  .flatMap((f) => {
+    const text = readFileSync(join(workflowDir, f), 'utf8');
+    const re = /repository:\s*fuaran-ui\/fuaran-dotnet\s*\n\s*ref:\s*(\S+)/g;
+    return [...text.matchAll(re)].map((m) => ({ file: f, ref: m[1]! }));
+  });
 
 describe('NuGet restore-graph lock', () => {
   it('finds the repo projects at all (the guard is observing something)', () => {
@@ -191,6 +222,49 @@ describe('NuGet restore-graph lock', () => {
   it('gives every pin a concrete version', () => {
     const floating = pins.filter((p) => p.version === null || p.version.trim() === '');
     expect(floating.map((p) => `${p.id} (${p.project.slice(repoRoot.length + 1)})`)).toEqual([]);
+  });
+
+  it('binds every pin through a Directory.Build.props property that resolves (Phase 2079)', () => {
+    // One property per producer, read by every project: a literal number in a
+    // project file is a second binding able to drift from the first, and a
+    // property the file does not declare restores as an empty version.
+    const unbound = pins.filter((p) => {
+      const name = propertyName(p.version);
+      return name === null || !versionProps.has(name);
+    });
+    expect(
+      unbound.map((p) => `${p.id} = ${p.version} (${p.project.slice(repoRoot.length + 1)})`),
+      'Every PackageReference reads its version from a property Directory.Build.props declares.',
+    ).toEqual([]);
+  });
+
+  it('binds each producer family to ONE property', () => {
+    const family = (id: string) =>
+      id.startsWith('Fuaran.UI')
+        ? 'FuaranUIVersion'
+        : id.startsWith('Fuaran.Core.')
+          ? 'FuaranCoreVersion'
+          : id.startsWith('Fuaran.Program.')
+            ? 'FuaranProgramVersion'
+            : null;
+    const crossed = pins.filter((p) => {
+      const want = family(p.id);
+      return want !== null && propertyName(p.version) !== want;
+    });
+    expect(crossed.map((p) => `${p.id} = ${p.version}`)).toEqual([]);
+  });
+
+  it('holds the CI tier checkout ref equal to the packaged tier version', () => {
+    // The showcase compiles the tier by SOURCE at this ref; the playground and
+    // the parity host compile it as packages at FuaranUIVersion. Projection.fs
+    // compiles into both, so the two must name one tier version — see
+    // docs/tier-pin.md for why the showcase cannot take packages yet.
+    expect(
+      tierRefs.length,
+      'no workflow checks the tier out; the probe saw nothing',
+    ).toBeGreaterThan(0);
+    const want = `v${versionProps.get('FuaranUIVersion')}`;
+    expect(tierRefs.filter((r) => r.ref !== want)).toEqual([]);
   });
 
   it('keeps the retired vendored wire copy deleted', () => {
@@ -236,6 +310,16 @@ describe('NuGet restore-graph lock — go-red self-test', () => {
     const got = parsePins(intruder, 'synthetic.fsproj');
     expect(got).toHaveLength(1);
     expect(ALLOWED_PACKAGE_IDS.includes(got[0]!.id)).toBe(false);
+  });
+
+  it('a property-bound pin resolves, and an undeclared or literal one does not', () => {
+    const props = parseVersionProps(
+      '<PropertyGroup><FooVersion>1.2.3</FooVersion></PropertyGroup>',
+    );
+    expect(props.get('FooVersion')).toBe('1.2.3');
+    expect(propertyName('$(FooVersion)')).toBe('FooVersion');
+    expect(propertyName('1.2.3')).toBeNull();
+    expect(props.has(propertyName('$(BarVersion)')!)).toBe(false);
   });
 
   it('a version-less pin is caught', () => {

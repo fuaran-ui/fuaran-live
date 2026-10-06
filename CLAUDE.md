@@ -28,7 +28,7 @@ fuaran-live/
 ├── vite.config.ts          # port 24070, base './', per-entry CSP plugin; VITE_SITE=showcase builds the
 │                           #   showcase artifact (dist-showcase/, entry renamed index.html); VITE_DUAL_HOST parity pages
 ├── app/                    # the playground Fable project (compiled to app/output/, gitignored)
-│   ├── FuaranLive.fsproj   #   ProjectRefs Fuaran.UI + Renderer; LINKS the Fable-safe Ops apply engine
+│   ├── FuaranLive.fsproj   #   the language tier as published packages, versions from ../Directory.Build.props
 │   ├── shared/Brand.fs     #   the SHARED brand module (palette theme + persisted light/dark preference)
 │   ├── Ports.fs            #   IAIProvider + EffectPorts seams (port of the former ports.ts)
 │   ├── Byok.fs             #   memory key store + browser effect ports + the Anthropic `fetch` provider

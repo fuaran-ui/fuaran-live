@@ -8,90 +8,31 @@
     `Fuaran.UI.Renderer`. Loaded inside an iframe by the preview pane's
     host-switch; the same wire JSON also renders through the TS
     `@fuaran-ui/renderer` in a sibling iframe, proving behavioural parity
-    between the two conformant hosts.
+    between the two conformant hosts. QueryPortalBridge.fs exports the typed
+    query core to the TS shell from the same compile.
 
-    Posture (mirrors tests/projection-conformance/fsharp-harness): the F#
-    language tier is consumed by direct ProjectReference into the sibling
-    `../fuaran-dotnet` checkout, NOT via the published packs – the same workspace-
-    checkout binding the @fuaran-ui/* link bridge uses on the TS side. This
-    keeps the Fable host always in step with the exact source that defines
-    the canonical contract, with no pack-version staleness window.
-
-    Decoder source – linked, not ProjectReferenced. The canonical wire
-    decoder lives in `Fuaran.UI.Ops/JsonDecode.fs` and is explicitly Fable-
-    compatible (hand-rolled parser, no System.Text.Json). `Apply.fs` and
-    `ErrorRender.fs` are Fable-compatible too – ErrorRender.fs's
-    `#if !FABLE_COMPILER` Utf8JsonWriter path has a complete `#else` arm, so a
-    ProjectReference to `Fuaran.UI.Ops` would compile. It is still linked
-    rather than referenced because this parity host only needs the decoder:
-    linking exactly one file keeps the host's Fable graph minimal instead of
-    dragging the whole apply engine through it. The `Fuaran.UI.Ops.Types` module
-    (TreeOp/Spec + the WireTree marker) moved to Fuaran.UI.Ops.Abstractions and
-    reaches this compile transitively through the Fuaran.UI.Renderer
-    ProjectReference (Renderer → Telemetry.Abstractions → Ops.Abstractions), so it
-    is no longer linked. Per WIRE_FORMAT.md §11 forward-coupling, if the decoder
-    grows a dependency on a third Ops file, link it here in the same change-set.
+    The language tier is consumed as PUBLISHED packages at the one version
+    `Directory.Build.props` binds (Phase 2079), exactly as the playground
+    consumes it, so both sides of the parity view are what a stranger can
+    restore. Compiled only via `dotnet fable`, never `dotnet build`. Why each
+    project binds the tier as it does is in docs/tier-pin.md.
   -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
-    <!-- Self-contained: do not inherit any Directory.Build.props / central
-         package management that may sit above fuaran-live. -->
-    <ImportDirectoryBuildProps>false</ImportDirectoryBuildProps>
     <ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-    <!-- Fable client convention (mirrors fuaran-dotnet/samples/demo + catalog): gate
-         Fable-only files via FABLE_COMPILER so Fable transpiles them; DEBUG in
-         non-Release. The host is never `dotnet build`-compiled to IL – it only
-         ever goes through `dotnet fable` – but the constants keep parity with
-         the sample projects. -->
     <DefineConstants Condition="'$(Configuration)' != 'Release'">FABLE_COMPILER;DEBUG</DefineConstants>
     <DefineConstants Condition="'$(Configuration)' == 'Release'">FABLE_COMPILER</DefineConstants>
     <!-- Feliz 3.x + Fable.React are pre-F#-10-nullness libraries; the renderer
-         and both samples disable nullness for the same reason. -->
+         disables nullness for the same reason. -->
     <Nullable>disable</Nullable>
     <WarningLevel>0</WarningLevel>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Canonical wire decoder – linked Fable-safe Ops source (see header).
-         The `Fuaran.UI.Ops.Types` module (TreeOp / Spec / the WireTree marker) is
-         NOT linked: it moved to Fuaran.UI.Ops.Abstractions and now reaches this
-         compile transitively via the Fuaran.UI.Renderer ProjectReference
-         (Renderer → Telemetry.Abstractions → Ops.Abstractions). -->
-    <!-- The decoder's repair vocabulary – self-contained, no opens. JsonDecode.fs
-         names `Repair.RepairId.*` in its [<Literal>] counter ids since tier
-         v0.90.0, so without this link the host fails to Fable-compile with
-         FS0039 'Repair is not defined'. Ordered before JsonDecode.fs, as in the
-         tier's own Fuaran.UI.Ops.fsproj. -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Repair.fs">
-      <Link>linked\Repair.fs</Link>
-    </Compile>
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\JsonDecode.fs">
-      <Link>linked\JsonDecode.fs</Link>
-    </Compile>
-    <!-- Reflection-free shape helpers – the THIRD linked Ops file the header's
-         forward-coupling note anticipated. CanonicalJson.fs below calls
-         `Introspect.canonicalForm` / `canonicalFormKind`: since the tier's
-         hand-written node encoder was deleted in favour of the generated one,
-         the §16 canonical-form projection runs ABOVE the structural encoder
-         rather than inline. Without this link the host fails to Fable-compile
-         with FS0039 'Introspect is not defined' — which is exactly how it
-         surfaced. Ordered before CanonicalJson.fs (its consumer) and, like the
-         app project's link list, needs nothing from JsonDecode.fs. -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.Ops\Introspect.fs">
-      <Link>linked\Introspect.fs</Link>
-    </Compile>
-    <!-- Canonical wire ENCODER – linked Fable-safe (a self-contained structural
-         hand-walk, no System.Text.Json). The host re-encodes the tree it decoded
-         so the parent's parity view can assert `encode(decode(wire))` is byte-
-         identical to the sibling TS host's. Ordered after JsonDecode.fs; depends
-         on the linked Ops Types + Introspect + Fuaran.Core + Fuaran.UI.Types. -->
-    <Compile Include="..\..\fuaran-dotnet\src\Fuaran.UI.OpStream.Abstractions\CanonicalJson.fs">
-      <Link>linked\CanonicalJson.fs</Link>
-    </Compile>
     <!-- Phase 324/325 – the typed-data core bridge: exports Fuaran.UI.QueryBinding
          / RetrievalSource to the TS shell as callable JS (string/JSON boundary).
          A pure function module (no Program.run), so importing its Fable output
@@ -102,21 +43,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Typed tree + the renderer (transitively pulls Fuaran.UI). The renderer
-         carries the parity-locked class vocabulary + reference-CSS contract
-         this host renders against. -->
-    <ProjectReference Include="..\..\fuaran-dotnet\src\Fuaran.UI\Fuaran.UI.fsproj" />
-    <ProjectReference Include="..\..\fuaran-dotnet\src\Fuaran.UI.Renderer\Fuaran.UI.Renderer.fsproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Explicit versions: this project sits outside fuaran's central package
-         management, so it pins the Fable-stack versions itself (matched to
-         fuaran-dotnet/Directory.Packages.props). -->
-    <PackageReference Include="Fable.Core" Version="5.0" />
-    <PackageReference Include="Fable.Elmish" Version="5.0.2" />
-    <PackageReference Include="Fable.Elmish.React" Version="5.6" />
-    <PackageReference Include="Feliz" Version="3.3.3" />
+    <!-- Typed tree + the renderer (the parity-locked class vocabulary +
+         reference-CSS contract), the canonical wire decoder (Fuaran.UI.Ops) and
+         the canonical encoder (Fuaran.UI.OpStream.Abstractions). -->
+    <PackageReference Include="Fuaran.UI" Version="$(FuaranUIVersion)" />
+    <PackageReference Include="Fuaran.UI.Renderer" Version="$(FuaranUIVersion)" />
+    <PackageReference Include="Fuaran.UI.Ops" Version="$(FuaranUIVersion)" />
+    <PackageReference Include="Fuaran.UI.OpStream.Abstractions" Version="$(FuaranUIVersion)" />
+    <PackageReference Include="Fable.Core" Version="$(FableCoreVersion)" />
+    <PackageReference Include="Fable.Elmish" Version="$(FableElmishVersion)" />
+    <PackageReference Include="Fable.Elmish.React" Version="$(FableElmishReactVersion)" />
+    <PackageReference Include="Feliz" Version="$(FelizVersion)" />
   </ItemGroup>
 
 </Project>

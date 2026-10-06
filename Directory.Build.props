@@ -1,0 +1,49 @@
+<Project>
+
+  <!--
+    The ONE place this repository binds the versions of what it consumes.
+
+    Every F# project here (the playground app, the showcase and the parity
+    render host) reads its package versions from the properties below rather
+    than spelling a number of its own. There is one property per PRODUCING
+    repository, because a producer releases its packages together: a project
+    that pinned two members of one family at two versions would be asking for
+    a combination nobody released, and a single property makes that
+    unspellable.
+
+    Why the number is what it is, and what raising it involves, is in
+    docs/tier-pin.md. The short form: every id below must be served by the
+    public registry at exactly this version (test/restoreGraphPublic.test.ts
+    is the lock), and the language-tier ref the CI workflows check the sibling
+    source out at is held EQUAL to FuaranUIVersion by that same suite, so the
+    showcase's source-bound tier and the playground's packaged tier are one
+    tier version.
+
+    Being the nearest Directory.Build.props, this file also ends MSBuild's
+    upward search: nothing above this repository is imported into its
+    projects, which is the self-containment the projects used to ask for with
+    an ImportDirectoryBuildProps=false that, set in a project body, was read
+    after the import it meant to suppress and so never did anything.
+  -->
+
+  <PropertyGroup>
+    <!-- The Fuaran UI language tier (Fuaran.UI.*, including Fuaran.UI.AiWire
+         and the program loop's UI adapter Fuaran.UI.Program). -->
+    <FuaranUIVersion>0.91.0</FuaranUIVersion>
+    <!-- The shared substrate spine (Fuaran.Core.*). It moves WITH the tier:
+         these are direct pins on packages the tier also depends on, so this
+         must equal the Core version the tier's nuspec declares — a lower
+         number downgrades the tier's own dependency (NU1605), and one NU160x
+         line kills the Fable project cracker. -->
+    <FuaranCoreVersion>0.34.0</FuaranCoreVersion>
+    <!-- The program/logic domain's domain-generic runtime
+         (Fuaran.Program.Runtime). Its floor is set by the UI adapter above. -->
+    <FuaranProgramVersion>0.7.1</FuaranProgramVersion>
+    <!-- The Fable / Elmish / Feliz toolchain, one producer each. -->
+    <FableCoreVersion>5.0</FableCoreVersion>
+    <FableElmishVersion>5.0.2</FableElmishVersion>
+    <FableElmishReactVersion>5.6</FableElmishReactVersion>
+    <FelizVersion>3.3.3</FelizVersion>
+  </PropertyGroup>
+
+</Project>

@@ -35,7 +35,7 @@ columns, per operator direction.
 The TS column is emitted **per-kind against the real `@fuaran-ui/ui` authoring
 surface** (`fuaran.*` ctors, `binding.*` / `action.*` / `format.*` /
 `formFieldKind.*` / `filterKind.*` builders), and a re-authored conformance
-harness at [`tests/projection-conformance/`](../tests/projection-conformance/)
+harness at [`gates/projection-conformance/`](../gates/projection-conformance/)
 keeps it honest: for every Node fixture in the shared corpus it projects the
 wire JSON to TS source, **executes** the generated source against the real
 packages, re-encodes via the canonical encoder, and asserts the result is
@@ -109,7 +109,7 @@ file's earlier counts had outlived their cause by the time anyone checked.
 
 None of that is projector lag and none of it is fixable in this repo. Since Phase
 1584 EVERY arm reads ONE quarantine table
-([`tests/projection-conformance/quarantine.ts`](../tests/projection-conformance/quarantine.ts))
+([`gates/projection-conformance/quarantine.ts`](../gates/projection-conformance/quarantine.ts))
 — three of them since `fuaran#1657` —
 keyed by fixture id, each entry naming the `arm` it belongs to (`typescript` |
 `python` | `fsharp`), the `construct` it needs **as a machine-readable token**, and

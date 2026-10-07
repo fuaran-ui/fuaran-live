@@ -29,7 +29,7 @@
 //
 // This suite is deliberately about the PROJECTOR alone. The byte-identical
 // re-encode against the real `@fuaran-ui/*` packages is the conformance harness's
-// job (`tests/projection-conformance/`), and that arm additionally depends on the
+// job (`gates/projection-conformance/`), and that arm additionally depends on the
 // pinned host — see `the pinned host has released the rename` at the foot of this
 // file.
 //

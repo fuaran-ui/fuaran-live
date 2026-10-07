@@ -35,7 +35,7 @@ export default defineConfig({
   webServer: {
     command: `vite preview --port ${PORT} --strictPort`,
     // Playwright spawns the command with cwd = this config file's directory
-    // (tests/parity), where vite preview finds no dist/ and dies — pin the
+    // (gates/parity), where vite preview finds no dist/ and dies — pin the
     // repo root so a cold `pnpm run parity` (and CI) actually starts the server.
     cwd: fileURLToPath(new URL('../..', import.meta.url)),
     url: `http://localhost:${PORT}/ts-host.html`,

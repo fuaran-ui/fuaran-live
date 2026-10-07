@@ -59,6 +59,7 @@ fuaran-live/
 │   └── byok/origins.ts     #   provider-origin constants (imported by vite.config.ts for the CSP)
 ├── fable-host/             # the F# (Fable) parity render host + the query-portal bridge (QueryPortalBridge.fs)
 ├── test/queryPortal.test.ts   # vitest — the F#↔TS query-portal gate (the shell-coupled tests were retired with the shell)
+├── gates/                  # the conformance suite (projection-conformance/, its own vitest config) + the opt-in Playwright gates (parity/, measure/); `test/` is the unit suite
 ├── run.ps1                 # Stage-1 launcher (dotnet tool restore + Invoke-Pnpm)
 └── .github/workflows/      # ci.yml + pages.yml + azure-static-web-apps.yml
 ```
@@ -86,7 +87,7 @@ typecheck gate.
 
 **Test gate — `pnpm test` runs BOTH vitest suites, and both are required before any commit.** It
 chains `test:unit` (`vitest.config.ts`, the `test/` suite) and `conformance`
-(`vitest.conformance.config.ts`, the `tests/projection-conformance/` harness, which executes the
+(`vitest.conformance.config.ts`, the `gates/projection-conformance/` harness, which executes the
 Fable-compiled projector's generated source against the real `@fuaran-ui/*` packages and asserts a
 byte-identical re-encode over every Node fixture in the sibling `../wire-format-fixtures` corpus).
 The split exists because a projection change can break the byte round-trip while the entire unit

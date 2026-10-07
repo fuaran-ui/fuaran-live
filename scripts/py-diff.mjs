@@ -24,7 +24,7 @@ const wires = new Map(
 );
 const cases = fixtures.map((f) => ({ id: f.id, expr: projectPythonExpr(wires.get(f.id)) }));
 
-const proc = spawnSync(py, [resolve(repoRoot, 'tests/projection-conformance/python_exec.py')], {
+const proc = spawnSync(py, [resolve(repoRoot, 'gates/projection-conformance/python_exec.py')], {
   input: JSON.stringify({ cases }),
   encoding: 'utf8',
   maxBuffer: 64 * 1024 * 1024,

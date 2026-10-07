@@ -15,7 +15,7 @@ module Fuaran.Live.Projection
 //
 //  Fidelity is per-leg (see docs/PROJECTION_FIDELITY.md). The **TypeScript**
 //  leg is a **verified byte-round-trip**: it is emitted per-kind against the
-//  real `@fuaran-ui/ui` authoring surface, and `tests/projection-conformance/`
+//  real `@fuaran-ui/ui` authoring surface, and `gates/projection-conformance/`
 //  executes the generated source and asserts byte-identity with the
 //  `wire-format-fixtures/` corpus – restoring the guarantee the pre-rebuild
 //  TS-shell projectors carried. The **Python / F# / C# / VB** legs remain
@@ -616,7 +616,7 @@ and private vbNodeRaw (depth: int) (v: JsonValue) : string =
 //
 // The TypeScript leg is emitted per-kind against the real `@fuaran-ui/ui`
 // authoring surface and carries the verified byte-round-trip guarantee: the
-// `tests/projection-conformance/` harness executes the generated source against
+// `gates/projection-conformance/` harness executes the generated source against
 // the real packages and asserts the re-encoded canonical JSON is byte-identical
 // to the shared wire-format corpus. (The Python / F# / C# / VB legs remain the
 // illustrative generic walk above.) Two consequences shape the emitter,
@@ -696,7 +696,7 @@ let private tsInline (fields: (string * string) list) : string =
 //                                      project. It stays TOTAL — the projector
 //                                      never crashes on a tree it does not
 //                                      understand — but every absence is RECORDED
-//                                      BY NAME and `tests/projection-conformance/`
+//                                      BY NAME and `gates/projection-conformance/`
 //                                      asserts the record stays EMPTY over the
 //                                      canonical node corpus. A fixture that later
 //                                      omits one fails there, by name, instead of
@@ -3368,7 +3368,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
 // with the compute layer as `cp`) for the records those namespaces do not reach.
 // Executing the emitted expression and passing the result to `fuaran_ui.ui.encode`
 // re-encodes byte-identically to the wire fixture; the Python arm under
-// `tests/projection-conformance/` is the gate.
+// `gates/projection-conformance/` is the gate.
 //
 // ON THE TWO NAMES BELOW. The import package is `fuaran_ui` and the PyPI
 // distribution is `fuaran-ui` from 0.6.0 — Phase 1694 renamed both. The
@@ -5719,7 +5719,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
 //
 // **What keeps the tables honest.** They are committed source and the pinned
 // `Fuaran.UI` can move under them. That is exactly what
-// `tests/projection-conformance/fsharp.test.ts` is for: it emits every node
+// `gates/projection-conformance/fsharp.test.ts` is for: it emits every node
 // fixture in the corpus, writes ONE generated F# file, compiles it ONCE against
 // the pinned package, executes it, and requires the re-encode to be
 // byte-identical to the fixture. A schema drift is a red gate on the next run,
@@ -7636,7 +7636,7 @@ and private fsNodeExprRaw (depth: int) (nodeV: JsonValue) : string =
         "ExtraAttributes = Option.None" ]
 
 /// The bare projected F# expression (no header) – the input of the
-/// `tests/projection-conformance/` F# arm, which compiles it against the pinned
+/// `gates/projection-conformance/` F# arm, which compiles it against the pinned
 /// `Fuaran.UI` package, executes it, and asserts a byte-identical canonical
 /// re-encode.
 let private fsExprWalk (wireJson: string) : string =
@@ -8104,17 +8104,17 @@ let private walkFor (target: Target) (wireJson: string) : string =
   | Target.Swift -> header "Swift (FuaranUI – decode-only host)" + project swiftSpec wireJson
 
 /// The bare projected TypeScript expression (no header) – the input of the
-/// `tests/projection-conformance/` harness, which executes it against the real
+/// `gates/projection-conformance/` harness, which executes it against the real
 /// `@fuaran-ui/ui` surface and asserts a byte-identical canonical re-encode.
 let projectTypeScriptExpr (wireJson: string) : string = tsExprWalk wireJson
 
 /// The bare projected Python expression (no header) – the input of the
-/// `tests/projection-conformance/` Python arm, which executes it against the
+/// `gates/projection-conformance/` Python arm, which executes it against the
 /// real `fuaran_ui.ui` surface and asserts a byte-identical canonical re-encode.
 let projectPythonExpr (wireJson: string) : string = pyExprWalk wireJson
 
 /// The bare projected F# expression (no header) – the input of the
-/// `tests/projection-conformance/` F# arm, which emits every node fixture into
+/// `gates/projection-conformance/` F# arm, which emits every node fixture into
 /// ONE generated file, compiles it ONCE against the pinned `Fuaran.UI` package,
 /// executes it, and asserts a byte-identical canonical re-encode.
 let projectFSharpExpr (wireJson: string) : string = fsExprWalk wireJson

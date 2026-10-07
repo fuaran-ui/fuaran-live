@@ -168,14 +168,30 @@ const showcaseSite = process.env.VITE_SITE === 'showcase';
 // worse outcome than no measurement at all.
 const measureSite = process.env.VITE_MEASURE === '1' || process.env.VITE_MEASURE === 'true';
 
-// `index.html` is the entirely-F#/Fable app (it loads app/output/App.js, the
-// Fable-compiled Fuaran.Live.App). The optional VITE_DUAL_HOST flag additionally
-// emits the two wire-format parity render-host pages (ts-host.html + fable-host.html).
-const buildInputs: Record<string, string> = { main: 'index.html' };
-if (dualHost) {
-  buildInputs.tsHost = 'ts-host.html';
-  buildInputs.fableHost = 'fable-host.html';
-}
+// The one table of HTML entries. `index.html` is the entirely-F#/Fable app (it
+// loads app/output/App.js); the optional VITE_DUAL_HOST flag additionally emits
+// the two wire-format parity render-host pages. Both the build's inputs and the
+// dependency optimiser's scan list below are read from these sets.
+const pages = {
+  index: 'index.html',
+  showcase: 'showcase.html',
+  receiver: 'receiver.html',
+  tsReceiver: 'ts-receiver.html',
+  tsHost: 'ts-host.html',
+  fableHost: 'fable-host.html',
+  measure: 'measure.html',
+};
+const showcaseInputs: Record<string, string> = {
+  main: pages.showcase,
+  receiver: pages.receiver,
+  tsReceiver: pages.tsReceiver,
+};
+const dualInputs: Record<string, string> = {
+  main: pages.index,
+  tsHost: pages.tsHost,
+  fableHost: pages.fableHost,
+};
+const measureInputs: Record<string, string> = { measure: pages.measure };
 
 // The sha256 source expressions for every inline <script> in a page, computed
 // from the page bytes the browser will hash — so the pre-paint theme script
@@ -267,24 +283,8 @@ function showcaseIndexPlugin(): Plugin {
   };
 }
 
-// Port allocation, declared in this repo's own `ports.json` and validated by the
-// workspace port registry: Vite dev band 24070–24079, server band 14070–14079.
-// The app is static (no server tier), so only the dev port (24070) and preview
-// (14070) are wired.
-//
-// Preview moved 14040 → 14070 on 2026-09-08. 14040 is formally claimed by another
-// app in this band, and this repo's manifest declared no server band at all — so
-// the registry read green while the two overlapped, because an undeclared port
-// cannot clash with anything. Declaring the band is what makes the check real.
-//
-// The DEV band then moved 24040–24049 → 24070–24079 (roadmap-engine Phase 423), so
-// the two halves share one slot INDEX: `1407x` with `2407x`. That phase made paired
-// allocation the default in `roadmapctl ports claim` and added RM-PORT-UNPAIRED
-// (Info), which named this claim — the 2026-09-08 move had left the server half at
-// index 7 against a client half at index 4, two numbers to remember where a paired
-// slot is one. Four claims in this band sat on a four-CYCLE of such pairs, so all
-// four had to move together: no single one of them could be paired on its own,
-// because each one's target was held by the next.
+// Ports are declared in this repo's `ports.json`: dev 24070, preview 14070. The
+// app is static (no server tier), so only those two are wired.
 //
 // `base: './'` emits relative asset URLs so the build runs from a plain static
 // host AND directly from file://.
@@ -305,22 +305,17 @@ export default defineConfig({
     // real entry keeps default dev/build from depending on a built fuaran-ts;
     // dual-host mode adds the host pages back explicitly.
     entries: measureSite
-      ? ['measure.html']
-      : dualHost
-        ? [
-            'index.html',
-            'showcase.html',
-            'receiver.html',
-            'ts-receiver.html',
-            'ts-host.html',
-            'fable-host.html',
-          ]
-        : ['index.html', 'showcase.html', 'receiver.html', 'ts-receiver.html'],
+      ? Object.values(measureInputs)
+      : [
+          pages.index,
+          ...Object.values(showcaseInputs),
+          ...(dualHost ? [pages.tsHost, pages.fableHost] : []),
+        ],
   },
   build: measureSite
     ? {
         outDir: 'dist-measure',
-        rollupOptions: { input: { measure: 'measure.html' } },
+        rollupOptions: { input: measureInputs },
       }
     : showcaseSite
       ? {
@@ -330,15 +325,11 @@ export default defineConfig({
             // (HOST 2). The receiver is deliberately a separate, visibly vacant
             // page, self-contained so it can be deployed to a second origin
             // unchanged. The CSP plugin's transformIndexHtml applies to both.
-            input: {
-              main: 'showcase.html',
-              receiver: 'receiver.html',
-              tsReceiver: 'ts-receiver.html',
-            },
+            input: showcaseInputs,
           },
         }
       : dualHost
-        ? { rollupOptions: { input: buildInputs } }
+        ? { rollupOptions: { input: dualInputs } }
         : {},
   server: {
     port: 24070,

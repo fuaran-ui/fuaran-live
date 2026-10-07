@@ -20,7 +20,7 @@ table was four rows of `pending`. This one captures.
 | `Baseline.fs`                  | the perf-baseline artefact shape and its emitter                                              | no               |
 | `Capture.fs`                   | the driver: decode once, render many, force layout, stamp the host                            | **yes**          |
 | `render-latency-baseline.json` | the committed capture (see the run record below)                                              | —                |
-| `../../tests/measure/`         | the Playwright spec + config that opens the page and runs the capture                         | **yes**          |
+| `../../gates/measure/`         | the Playwright spec + config that opens the page and runs the capture                         | **yes**          |
 
 The pure/browser split is deliberate: everything except `Capture.fs` runs in the ordinary unit
 suite (`test/measure.test.ts`), so most of the harness is checked on every push without a

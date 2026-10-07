@@ -65,7 +65,7 @@ const omniscient = (tokens: Iterable<string>): CapabilityManifest => ({
   host: 'synthetic',
   hostVersion: '1.0.0',
   corpusAuthority: null,
-  generator: 'tests/projection-conformance/host-capability.test.ts',
+  generator: 'gates/projection-conformance/host-capability.test.ts',
   families: {
     kinds: { covered: true },
     kindFields: { covered: true },

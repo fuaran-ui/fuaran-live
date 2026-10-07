@@ -109,7 +109,7 @@ relative pages (`base: './'`), and the CSP carries `frame-src 'self'` for them.
 
 ## Parity regression gate
 
-`tests/parity/parity.spec.ts` (Playwright) is the regression guard over the
+`gates/parity/parity.spec.ts` (Playwright) is the regression guard over the
 [Phase 77](../../roadmap/phases/77-fuaran-renderer.md) reference-CSS byte-copy + parity-locked
 class vocabulary, exercised on real `wire-format-fixtures/` corpus trees. For each fixture in
 the primitive matrix it posts the wire JSON to both host pages and asserts their rendered

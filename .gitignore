@@ -50,7 +50,7 @@ public/conformance/report.generated.json
 # Playwright (parity test) artefacts
 test-results/
 playwright-report/
-tests/parity/.cache/
+gates/parity/.cache/
 
 # TypeScript
 *.tsbuildinfo
@@ -73,7 +73,7 @@ vite.config.ts.timestamp-*
 .vscode-test
 
 # The Python conformance arm's local interpreter (see
-# tests/projection-conformance/python.test.ts). Created with
+# gates/projection-conformance/python.test.ts). Created with
 # `python -m venv .venv` then `pip install fuaran-ui==0.7.0` — the pin the
 # workflows install and `docs/PROJECTION_FIDELITY.md` documents; keep the three
 # in step, since the arm executes against exactly that release.
@@ -89,6 +89,6 @@ dist-measure/
 # temp path so the relative `nuget.config` walk still finds this repo's feed
 # configuration — and so a gate run leaves the tree clean, which is what lets a
 # later fold reuse the run instead of paying for a second one.
-tests/projection-conformance/.fsharp-exec/
-tests/projection-conformance/.fsharp-probe/
-tests/projection-conformance/.fsharp-i18n-probe/
+gates/projection-conformance/.fsharp-exec/
+gates/projection-conformance/.fsharp-probe/
+gates/projection-conformance/.fsharp-i18n-probe/

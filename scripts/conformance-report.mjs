@@ -1,6 +1,6 @@
 // Publish the conformance-gate report the showcase's status panel renders.
 //
-// Runs the projection-conformance gate (tests/projection-conformance/, the same
+// Runs the projection-conformance gate (gates/projection-conformance/, the same
 // suite `pnpm conformance` runs) through vitest's JSON reporter, then distils the
 // counts into public/conformance/report.generated.json. `vite build` copies
 // public/ into the artifact, so the published site serves the report beside the

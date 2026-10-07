@@ -1,7 +1,7 @@
 // Phase 1628 — the render-latency harness's pure half, checked without a browser.
 //
 // `Capture.fs` needs a DOM and is exercised by the Playwright spec in
-// tests/measure/. Everything else — the corpus, the aggregation, the metric
+// gates/measure/. Everything else — the corpus, the aggregation, the metric
 // ids, the browser-identity reader and the artefact emitter — is deliberately
 // free of the DOM so that most of the harness is covered by the ordinary unit
 // suite, which runs on every push and needs no browser at all.

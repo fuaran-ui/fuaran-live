@@ -2,7 +2,7 @@
 // headlessly over the Fable output. Projection.fs walks the canonical wire tree
 // (the Fuaran.UI.AiWire JsonValue model) and emits builder source per
 // language; `projectByName` is the flat surface. The TypeScript, Python and F#
-// legs are verified byte-round-trips (see tests/projection-conformance/ + the
+// legs are verified byte-round-trips (see gates/projection-conformance/ + the
 // fidelity doc); the C# / VB legs are illustrative. The projector must
 // never crash on any decodable tree (generic fallback for uncovered kinds) and
 // produce recognizably per-language output.

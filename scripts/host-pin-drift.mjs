@@ -91,7 +91,7 @@ const npmSubjects = () => {
   );
 
   const armDir = resolve(repoRoot, 'tests', 'projection-conformance');
-  const listed = spawnSync('git', ['-C', repoRoot, 'ls-files', 'tests/projection-conformance'], {
+  const listed = spawnSync('git', ['-C', repoRoot, 'ls-files', 'gates/projection-conformance'], {
     encoding: 'utf8',
   });
   const imported = new Set();
@@ -210,7 +210,7 @@ const main = async () => {
 
   const { inScope, outOfScope } = npmSubjects();
   if (inScope.length === 0) {
-    say('UNMEASURABLE: no @fuaran-ui/* import found under tests/projection-conformance/,');
+    say('UNMEASURABLE: no @fuaran-ui/* import found under gates/projection-conformance/,');
     say('so the in-scope host set derived empty. Either the arms moved, or this check');
     say('is reading the wrong tree — it is NOT evidence that the pins are current.');
     return 0;

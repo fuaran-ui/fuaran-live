@@ -35,7 +35,8 @@
          must equal the Core version the tier's nuspec declares — a lower
          number downgrades the tier's own dependency (NU1605), and one NU160x
          line kills the Fable project cracker. -->
-    <FuaranCoreVersion>0.34.0</FuaranCoreVersion>
+    <!-- Phase 2158: raised 0.34.0 -> 0.35.2. The language tier built from source (the showcase project-references it) now declares 0.35.2, so the old pin was a downgrade (NU1605) and the showcase Fable build could not restore. 0.35.2 is published on nuget.org. -->
+    <FuaranCoreVersion>0.35.2</FuaranCoreVersion>
     <!-- The program/logic domain's domain-generic runtime
          (Fuaran.Program.Runtime). Its floor is set by the UI adapter above. -->
     <FuaranProgramVersion>0.7.1</FuaranProgramVersion>

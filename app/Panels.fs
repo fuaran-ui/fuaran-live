@@ -73,9 +73,6 @@ type PanelStore =
 
 let empty: PanelStore = { Panels = Map.empty; Order = [] }
 
-let panelsInOrder (store: PanelStore) : Panel list =
-  store.Order |> List.choose (fun id -> Map.tryFind id store.Panels)
-
 /// The renderer scope a panel renders under – each panel keeps its reactive
 /// `Binding.State` keys in its own isolated `StateStore.forScope` instance, so
 /// two panels (or a panel and the main preview) can never collide on a key.

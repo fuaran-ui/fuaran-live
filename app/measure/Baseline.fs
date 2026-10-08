@@ -103,7 +103,7 @@ let metricsOf (stats: Timing.RenderStat seq) : PerfMetric list =
 /// Serialise the artefact. Keys are emitted in declaration order rather than
 /// through an anonymous record (whose fields F# sorts alphabetically), so the
 /// committed file reads in the same order as every sibling baseline.
-let private json (status: string) (capturedAtUtc: string) (runtime: RuntimeInfo) (metrics: PerfMetric list) : string =
+let internal json (status: string) (capturedAtUtc: string) (runtime: RuntimeInfo) (metrics: PerfMetric list) : string =
   let rows =
     metrics
     |> List.map (fun m ->
@@ -131,19 +131,3 @@ let private json (status: string) (capturedAtUtc: string) (runtime: RuntimeInfo)
 /// The captured artefact: every declared metric carries a number.
 let captured (stats: Timing.RenderStat seq) (capturedAtUtc: string) (runtime: RuntimeInfo) : string =
   json "captured" capturedAtUtc runtime (metricsOf stats)
-
-/// The pending template: every metric declared, every value null. Emitted by
-/// nothing in the ordinary path — it exists so that "what does this artefact
-/// look like before it is captured" has one answer, and so a harness that
-/// produced no usable sample cannot present as a captured run.
-let pendingTemplate () : string =
-  json
-    "pending"
-    ""
-    { Dotnet = ""; Os = ""; Cpu = "" }
-    (catalogue ()
-     |> List.map (fun (id, unit, note) ->
-       { Id = id
-         Value = None
-         Unit = unit
-         Note = note }))

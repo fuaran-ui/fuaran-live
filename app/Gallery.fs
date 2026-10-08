@@ -19,7 +19,8 @@ module Fuaran.Live.Gallery
 //  real `Fuaran.*` smart constructors over the typed `NodeKind` and frozen to
 //  wire JSON by the reference `CanonicalJson` encoder, so it is canon by
 //  construction – the emitter-lock convention in CLAUDE.md excludes exactly this
-//  shape, because the reference encoder is its own oracle. `exampleWires` is the
+//  shape, because the reference encoder is its own oracle. `exampleWires` (in
+//  `testing/GalleryProbes.fs`) is the
 //  cross-boundary surface `test/permalinkGallery.test.ts` certifies: every entry
 //  is strictly decodable by `@fuaran-ui/ops`, already canonical (decode then
 //  re-encode is the identity), and permalink-shareable.
@@ -946,14 +947,3 @@ let examples: Example list =
 /// Every distinct feature area, in the display order of the examples that lead
 /// them — the gallery's grouping key, derived rather than restated.
 let features: string list = examples |> List.map _.Feature |> List.distinct
-
-/// The canonical wire JSON of each example, as a JS array – the cross-boundary
-/// surface the gallery test uses to assert every example is valid + shareable.
-let exampleWires (unit: unit) : string[] =
-  examples |> List.map (fun e -> Canon.encodeNode e.Tree) |> List.toArray
-
-/// The `(title, feature)` pairs, as a JS array of two-element arrays — the
-/// cross-boundary surface the gallery test reads to assert every entry is
-/// feature-tagged and that no two entries collide on a title.
-let exampleTags (unit: unit) : string[][] =
-  examples |> List.map (fun e -> [| e.Title; e.Feature |]) |> List.toArray

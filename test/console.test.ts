@@ -33,16 +33,24 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { empty, ingestResult } from '../app/output/Session.js';
+import {
+  empty,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/Session.js';
 // @ts-expect-error untyped Fable output
 import { accepted, examples } from '../app/output/Console.js';
 // @ts-expect-error untyped Fable output
 import { parseFlat, runLine } from '../app/output/testing/ConsoleProbes.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
+import {
+  opLog,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/PropertyEditorProbes.js)
+} from '../app/output/testing/PropertyEditorProbes.js';
 // The session's op list is an F# list across the boundary; the navigator's own
 // flat projection is the established way to count it from a test.
-// @ts-expect-error untyped Fable output
-import { opLog } from '../app/output/navigator/PropertyEditor.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 

@@ -42,10 +42,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import * as ops from '@fuaran-ui/ops';
+import {
+  projectByName,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/ProjectionProbes.js)
+} from '../app/output/testing/ProjectionProbes.js';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { projectByName } from '../app/output/Projection.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const corpusDir = resolve(here, '../../wire-format-fixtures');

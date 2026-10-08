@@ -104,6 +104,12 @@
          compile order; the files named in Exclude are the shell, compiled
          explicitly around it. -->
     <Compile Include="*.fs" Exclude="Pillars.fs;Exhibit.fs;Conformance.fs;Registry.fs;Pages.fs;App.fs;Receiver.fs" />
+    <!-- Test-only probes (headless surfaces the vitest suite imports). They read
+         the pages above and nothing reads them, so they sit after the pages and
+         before the registry; the page glob does not reach this folder. -->
+    <Compile Include="testing\AgentReadableProbes.fs" />
+    <Compile Include="testing\TeleportProbes.fs" />
+    <Compile Include="testing\TimeMachineProbes.fs" />
     <!-- The page registry: after the pages, because it names each page's value;
          it loads each one as its own chunk. -->
     <Compile Include="Registry.fs" />

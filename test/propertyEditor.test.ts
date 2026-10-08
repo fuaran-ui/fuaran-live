@@ -20,17 +20,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { empty, ingestResult, treeJson } from '../app/output/Session.js';
 import {
-  fieldSummary,
-  editablePaths,
-  readOnlyReason,
-  choiceOptions,
-  commitAt,
-  opLog,
+  empty,
+  treeJson,
   // @ts-expect-error untyped Fable output
-} from '../app/output/navigator/PropertyEditor.js';
+} from '../app/output/Session.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -66,6 +60,19 @@ function rowOf(s: any, nodeId: string, path: string): string | undefined {
 // Reach it the same way the navigator does: through the introspection surface.
 // The packaged language tier — see test/tierOutput.ts.
 import { findNode, NodeId } from './tierOutput.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
+import {
+  fieldSummary,
+  editablePaths,
+  readOnlyReason,
+  choiceOptions,
+  commitAt,
+  opLog,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/PropertyEditorProbes.js)
+} from '../app/output/testing/PropertyEditorProbes.js';
 
 function findNodeJson(s: any, nodeId: string) {
   const found = findNode(new NodeId(nodeId), s.Tree);

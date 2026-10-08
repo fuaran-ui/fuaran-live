@@ -604,7 +604,11 @@ let runPanelProbe
              | AgentContentBlock.Text t -> t.Contains "did NOT apply"
              | _ -> false))
 
-    let panels = Panels.panelsInOrder lastPanels.Value
+    // The panels in display order (the store keeps the order beside the map).
+    let panels =
+      lastPanels.Value.Order
+      |> List.choose (fun id -> Map.tryFind id lastPanels.Value.Panels)
+
     let panel = List.tryHead panels
 
     let verifyReport = panel |> Option.map Panels.verify

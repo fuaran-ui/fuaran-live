@@ -26,8 +26,19 @@
 import { describe, it, expect } from 'vitest';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { empty, ingestResult } from '../app/output/Session.js';
+import {
+  canUndoMove,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/navigator/SiteView.js';
+import {
+  canonicalTree,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/navigator/OpLog.js';
+import { decodeNode, encodeNode } from '@fuaran-ui/ops';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
 import {
   loadResult,
   pageNames,
@@ -36,21 +47,18 @@ import {
   switchResult,
   moveResult,
   undoMoveResult,
-  canUndoMove,
   noticeKind,
   noticeLine,
   stateKeysAt,
-  // @ts-expect-error untyped Fable output
-} from '../app/output/navigator/SiteView.js';
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SiteViewProbes.js)
+} from '../app/output/testing/SiteViewProbes.js';
 import {
-  canonicalTree,
   originIds,
   logKinds,
   appliedOps,
   verifyResult,
-  // @ts-expect-error untyped Fable output
-} from '../app/output/navigator/OpLog.js';
-import { decodeNode, encodeNode } from '@fuaran-ui/ops';
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/OpLogProbes.js)
+} from '../app/output/testing/OpLogProbes.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 

@@ -22,8 +22,10 @@
 import { describe, it, expect } from 'vitest';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { empty, ingestResult } from '../app/output/Session.js';
+import {
+  empty,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/Session.js';
 import {
   atRoot,
   next,
@@ -33,7 +35,6 @@ import {
   jumpToText,
   reresolve,
   position,
-  walkIds,
   cursorIds,
   focusedText,
   focusedNode,
@@ -41,6 +42,14 @@ import {
 } from '../app/output/navigator/Cursor.js';
 // @ts-expect-error untyped Fable output
 import { propSummary } from '../app/output/navigator/Navigator.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
+import {
+  walkIds,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/CursorProbes.js)
+} from '../app/output/testing/CursorProbes.js';
 
 // nav-root ▸ nav-card ▸ (nav-a, nav-b), then nav-c – five nodes, DFS pre-order.
 const baseTree =

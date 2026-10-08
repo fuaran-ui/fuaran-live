@@ -15,8 +15,15 @@ import { describe, it, expect } from 'vitest';
 import { corpus, SpineDepth } from '../app/output/measure/Corpus.js';
 // @ts-expect-error untyped Fable output
 import { aggregate, browserId, ttfpMetric, fullMetric } from '../app/output/measure/Timing.js';
-// @ts-expect-error untyped Fable output
-import { catalogue, captured, pendingTemplate } from '../app/output/measure/Baseline.js';
+import {
+  catalogue,
+  captured,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/measure/Baseline.js';
+import {
+  pendingTemplate,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/BaselineProbes.js)
+} from '../app/output/testing/BaselineProbes.js';
 
 interface CorpusTree {
   Label: string;

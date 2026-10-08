@@ -26,16 +26,28 @@ import { describe, it, expect } from 'vitest';
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 import {
   empty,
-  ingestResult,
   // @ts-expect-error untyped Fable output
 } from '../app/output/Session.js';
-// @ts-expect-error untyped Fable output
-import { commitAt } from '../app/output/navigator/PropertyEditor.js';
 import {
   cursor,
   recorded,
   canUndo,
   canRedo,
+  canonicalTree,
+  exportJson,
+  exportFilename,
+  download,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/navigator/OpLog.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
+import {
+  commitAt,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/PropertyEditorProbes.js)
+} from '../app/output/testing/PropertyEditorProbes.js';
+import {
   undoN,
   redoN,
   originKinds,
@@ -44,15 +56,11 @@ import {
   logHashes,
   appliedOps,
   snapshotCount,
-  canonicalTree,
-  exportJson,
   exportedTree,
   replayExport,
   verifyResult,
-  exportFilename,
-  download,
-  // @ts-expect-error untyped Fable output
-} from '../app/output/navigator/OpLog.js';
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/OpLogProbes.js)
+} from '../app/output/testing/OpLogProbes.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 

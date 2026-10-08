@@ -2,9 +2,10 @@
 // The typed arm is verifiably valid or rejected by the app's own decode/apply loop.
 
 import { describe, it, expect } from 'vitest';
-
-// @ts-expect-error untyped Fable output
-import { fuaranValidates } from '../app/output/Compare.js';
+import {
+  fuaranValidates,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/CompareProbes.js)
+} from '../app/output/testing/CompareProbes.js';
 
 const metricNode =
   '{"id":"metric-1","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"label":"Revenue","tone":"Brand","value":{"$type":"Static","value":1234.5}}}';

@@ -34,14 +34,6 @@ type CompareResult =
     Fuaran: ArmResult
     Conventional: ArmResult }
 
-/// Is `text` a valid Fuaran emission? Reuses the app's own loop – it decodes +
-/// applies into a typed tree, or it is a typed, named failure. (Exposed flat for
-/// the comparison test.)
-let fuaranValidates (text: string) : bool =
-  match Session.ingest Session.empty text with
-  | Session.Ingested _ -> true
-  | Session.IngestFailed _ -> false
-
 let private fuaranValidity (text: string) : bool * string =
   match Session.ingest Session.empty text with
   | Session.Ingested(mode, _) -> true, "decoded + applied as a " + mode

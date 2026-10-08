@@ -8,8 +8,16 @@
 
 import { describe, it, expect } from 'vitest';
 
-// @ts-expect-error untyped Fable output
-import { encodeSignal, signalKind, signalSdp, signalRoundTrips } from '../app/output/WebRtc.js';
+import {
+  encodeSignal,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/WebRtc.js';
+import {
+  signalKind,
+  signalSdp,
+  signalRoundTrips,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/WebRtcProbes.js)
+} from '../app/output/testing/WebRtcProbes.js';
 
 // A minimal but structurally-valid SDP body (starts with the version line `v=0`,
 // which the codec requires as a cheap "this really is SDP" guard).

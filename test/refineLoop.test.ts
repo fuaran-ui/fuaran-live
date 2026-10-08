@@ -33,30 +33,38 @@ import { describe, it, expect } from 'vitest';
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 import {
   empty,
-  ingestResult,
   refinePrompt,
   refineSystemSuffix,
   correctionLineArray,
   humanOpCount,
-  correctionBudget,
   lastMessageContent,
-  allMessageContents,
   withTurn,
   // @ts-expect-error untyped Fable output
 } from '../app/output/Session.js';
 // @ts-expect-error untyped Fable output
-import { commitAt } from '../app/output/navigator/PropertyEditor.js';
-// @ts-expect-error untyped Fable output
 import { ProviderRole } from '../app/output/Ports.js';
 import {
   baselineOf,
-  changeLines,
-  retainedIds,
-  overwrittenIds,
   stage,
   stageLabel,
   // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/Refine.js';
+import {
+  ingestResult,
+  correctionBudget,
+  allMessageContents,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
+import {
+  commitAt,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/PropertyEditorProbes.js)
+} from '../app/output/testing/PropertyEditorProbes.js';
+import {
+  changeLines,
+  retainedIds,
+  overwrittenIds,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/RefineProbes.js)
+} from '../app/output/testing/RefineProbes.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 

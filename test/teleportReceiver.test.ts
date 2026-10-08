@@ -24,8 +24,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-// @ts-expect-error untyped Fable output (no .d.ts is generated for it)
-import { mountReport, sampleBundles, tamperReport } from '../app/showcase/output/Teleport.js';
+import {
+  mountReport,
+  sampleBundles,
+  tamperReport,
+  // @ts-expect-error untyped Fable output (no .d.ts is generated for it)
+} from '../app/showcase/output/testing/TeleportProbes.js';
 
 interface Bundles {
   exemplar: string;

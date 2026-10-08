@@ -18,10 +18,12 @@
 // nothing. Run them against `app/output/` (`pnpm run fable:app`).
 
 import { describe, expect, it } from 'vitest';
+import {
+  projectByName,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/ProjectionProbes.js)
+} from '../app/output/testing/ProjectionProbes.js';
 
 // Fable-generated JS — no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { projectByName } from '../app/output/Projection.js';
 
 // wire-format-fixtures/nodes/tabs-1 — a `Tabs` whose active index is the
 // identity, so the canonical wire carries no `activeIndex` key.

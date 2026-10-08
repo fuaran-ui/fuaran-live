@@ -27,9 +27,11 @@ import { describe, it, expect } from 'vitest';
 // — one per IMPORT, never one per name (a per-name directive suppresses nothing
 // and is itself reported unused, TS2578).
 // @ts-expect-error untyped Fable output
-import * as P from '../app/output/Projection.js';
-// @ts-expect-error untyped Fable output
 import * as Sess from '../app/output/Session.js';
+// @ts-expect-error untyped Fable output
+import * as PP from '../app/output/testing/ProjectionProbes.js';
+// @ts-expect-error untyped Fable output
+import * as SP from '../app/output/testing/SessionProbes.js';
 
 // Every language the Output box projects. The sync pane defaults to three of
 // them, but the side map is not allowed to be a three-language feature — a tab
@@ -70,7 +72,7 @@ const fence = (json: string) => '```json\n' + json + '\n```';
 
 /** Ingest a wire document, asserting it decoded, and hand back the session. */
 const sessionOf = (json: string) => {
-  const r = Sess.ingestResult(Sess.empty, fence(json));
+  const r = SP.ingestResult(Sess.empty, fence(json));
   expect(r.Ok).toBe(true);
   return r.Next;
 };
@@ -78,7 +80,7 @@ const sessionOf = (json: string) => {
 describe('the projection side map', () => {
   it('leaves the projected text byte-identical – the span sentinels never escape', () => {
     for (const lang of LANGS) {
-      const out = P.projectByName(lang, baseTree);
+      const out = PP.projectByName(lang, baseTree);
       // U+0001..U+0003 are the marker characters. The plain path never marks
       // and the mapped path strips, so neither may leak one — and a leak would
       // corrupt every projection invisibly, hence the explicit assertion.
@@ -89,7 +91,7 @@ describe('the projection side map', () => {
 
   it('maps every node of the tree, in every language', () => {
     for (const lang of LANGS) {
-      expect(Array.from(P.spanIdsByName(lang, baseTree)), lang).toEqual([
+      expect(Array.from(PP.spanIdsByName(lang, baseTree)), lang).toEqual([
         'nav-root',
         'nav-card',
         'nav-a',
@@ -100,7 +102,7 @@ describe('the projection side map', () => {
 
   it('a span covers its own node and nothing of its sibling', () => {
     for (const lang of LANGS) {
-      const a = P.spanTextByName(lang, baseTree, 'nav-a');
+      const a = PP.spanTextByName(lang, baseTree, 'nav-a');
       expect(a, lang).toContain('nav-a');
       expect(a, lang).toContain('Alpha');
       expect(a, lang).not.toContain('nav-b');
@@ -110,11 +112,11 @@ describe('the projection side map', () => {
 
   it("a parent's span encloses its children's", () => {
     for (const lang of LANGS) {
-      const card = P.spanTextByName(lang, baseTree, 'nav-card');
+      const card = PP.spanTextByName(lang, baseTree, 'nav-card');
       expect(card, lang).toContain('nav-a');
       expect(card, lang).toContain('nav-b');
       // …and is a genuine substring of the text, at the offsets reported.
-      expect(P.projectByName(lang, baseTree), lang).toContain(card);
+      expect(PP.projectByName(lang, baseTree), lang).toContain(card);
     }
   });
 
@@ -142,35 +144,35 @@ describe('the projection side map', () => {
         // that reads it — the compiler's own error rendering, a diff, an editor
         // — and `` decodes to the same character, which that arm proves by
         // re-encoding this payload's corpus sibling byte-identically.
-        expect(P.projectByName(lang, hostile), lang).toContain('before\\u0001after');
+        expect(PP.projectByName(lang, hostile), lang).toContain('before\\u0001after');
         // So its emission carries no marker byte, the strip pass has nothing to
         // trip over, and the span it reports is a REAL one over byte-exact text.
         // The guard below stands down for the legs that need it, not for this one.
-        expect(Array.from(P.spanIdsByName(lang, hostile)), lang).toEqual(['root']);
+        expect(Array.from(PP.spanIdsByName(lang, hostile)), lang).toEqual(['root']);
         continue;
       }
       // The content survives the projection untouched…
-      expect(P.projectByName(lang, hostile), lang).toContain(marker);
+      expect(PP.projectByName(lang, hostile), lang).toContain(marker);
       // …and no span is claimed over it.
-      expect(Array.from(P.spanIdsByName(lang, hostile)), lang).toEqual([]);
+      expect(Array.from(PP.spanIdsByName(lang, hostile)), lang).toEqual([]);
     }
 
     // JSON is unaffected: its spans come from a brace scan over the rendered
     // text, which is indifferent to what the strings inside it contain (and the
     // host encoder escapes the control character there anyway).
-    expect(Array.from(P.spanIdsByName('json', hostile))).toEqual(['root']);
+    expect(Array.from(PP.spanIdsByName('json', hostile))).toEqual(['root']);
   });
 
   it('an id the tree does not carry maps to nothing', () => {
-    expect(P.spanTextByName('fsharp', baseTree, 'no-such-node')).toBe('');
-    expect(P.spanPathTextByName('fsharp', baseTree, ['no-such-node'])).toBe('');
-    expect(Array.from(P.spanPathLinesByName('fsharp', baseTree, ['no-such-node']))).toEqual([]);
+    expect(PP.spanTextByName('fsharp', baseTree, 'no-such-node')).toBe('');
+    expect(PP.spanPathTextByName('fsharp', baseTree, ['no-such-node'])).toBe('');
+    expect(Array.from(PP.spanPathLinesByName('fsharp', baseTree, ['no-such-node']))).toEqual([]);
   });
 
   it('reports a 1-based line range inside the projection', () => {
-    const text: string = P.projectByName('python', baseTree);
+    const text: string = PP.projectByName('python', baseTree);
     const range = Array.from(
-      P.spanPathLinesByName('python', baseTree, ['nav-root', 'nav-card', 'nav-b']),
+      PP.spanPathLinesByName('python', baseTree, ['nav-root', 'nav-card', 'nav-b']),
     ) as number[];
 
     expect(range).toHaveLength(2);
@@ -201,8 +203,8 @@ describe('nearest-enclosing resolution', () => {
     // modifier for that trait — exactly as the TypeScript leg does, where the
     // generic walker folded it into the parent construct.
     for (const lang of ['json', 'typescript', 'python', 'fsharp']) {
-      expect(P.spanPathIdByName(lang, stateSlotTree, ['root', 'spinner']), lang).toBe('spinner');
-      expect(P.spanPathTextByName(lang, stateSlotTree, ['root', 'spinner']), lang).toContain(
+      expect(PP.spanPathIdByName(lang, stateSlotTree, ['root', 'spinner']), lang).toBe('spinner');
+      expect(PP.spanPathTextByName(lang, stateSlotTree, ['root', 'spinner']), lang).toContain(
         'Loading',
       );
     }
@@ -216,12 +218,12 @@ describe('nearest-enclosing resolution', () => {
     for (const lang of ['csharp', 'vb', 'go', 'kotlin', 'rust', 'swift']) {
       // The state slot is folded into the parent construct, so `spinner` has no
       // span of its own here…
-      expect(Array.from(P.spanIdsByName(lang, stateSlotTree)), lang).toEqual(['root']);
-      expect(P.spanTextByName(lang, stateSlotTree, 'spinner'), lang).toBe('');
+      expect(Array.from(PP.spanIdsByName(lang, stateSlotTree)), lang).toEqual(['root']);
+      expect(PP.spanTextByName(lang, stateSlotTree, 'spinner'), lang).toBe('');
       // …and the cursor path resolves to the construct that contains it rather
       // than to nothing at all.
-      expect(P.spanPathIdByName(lang, stateSlotTree, ['root', 'spinner']), lang).toBe('root');
-      expect(P.spanPathTextByName(lang, stateSlotTree, ['root', 'spinner']), lang).toContain(
+      expect(PP.spanPathIdByName(lang, stateSlotTree, ['root', 'spinner']), lang).toBe('root');
+      expect(PP.spanPathTextByName(lang, stateSlotTree, ['root', 'spinner']), lang).toContain(
         'root',
       );
     }
@@ -241,9 +243,9 @@ describe('edit sync – an applied op moves the highlight with the node', () => 
 
   it('re-derives the projections and lands the span on the new text', () => {
     const before = sessionOf(baseTree);
-    expect(P.spanTextByName('fsharp', Sess.treeJson(before), 'nav-a')).toContain('Alpha');
+    expect(PP.spanTextByName('fsharp', Sess.treeJson(before), 'nav-a')).toContain('Alpha');
 
-    const applied = Sess.ingestResult(before, fence(relabel('nav-a', 'Renamed')));
+    const applied = SP.ingestResult(before, fence(relabel('nav-a', 'Renamed')));
     expect(applied.Ok).toBe(true);
     // A real op through the real engine, not a swapped tree.
     expect(applied.Mode).toBe('op');
@@ -251,22 +253,22 @@ describe('edit sync – an applied op moves the highlight with the node', () => 
     const after = Sess.treeJson(applied.Next);
 
     for (const lang of LANGS) {
-      const span = P.spanTextByName(lang, after, 'nav-a');
+      const span = PP.spanTextByName(lang, after, 'nav-a');
       // Same id, same cursor – the construct now reads the new label.
       expect(span, lang).toContain('nav-a');
       expect(span, lang).toContain('Renamed');
       expect(span, lang).not.toContain('Alpha');
       // The untouched sibling is untouched.
-      expect(P.spanTextByName(lang, after, 'nav-b'), lang).toContain('Bravo');
+      expect(PP.spanTextByName(lang, after, 'nav-b'), lang).toContain('Bravo');
     }
   });
 
   it('keeps every other node mapped after the edit', () => {
-    const applied = Sess.ingestResult(sessionOf(baseTree), fence(relabel('nav-b', 'Charlie')));
+    const applied = SP.ingestResult(sessionOf(baseTree), fence(relabel('nav-b', 'Charlie')));
     expect(applied.Ok).toBe(true);
 
     for (const lang of LANGS) {
-      expect(Array.from(P.spanIdsByName(lang, Sess.treeJson(applied.Next))), lang).toEqual([
+      expect(Array.from(PP.spanIdsByName(lang, Sess.treeJson(applied.Next))), lang).toEqual([
         'nav-root',
         'nav-card',
         'nav-a',
@@ -277,17 +279,17 @@ describe('edit sync – an applied op moves the highlight with the node', () => 
 
   it('survives a node vanishing – the cursor path resolves to the surviving ancestor', () => {
     const removal = '{"$type":"RemoveNode","target":"nav-a"}';
-    const applied = Sess.ingestResult(sessionOf(baseTree), fence(removal));
+    const applied = SP.ingestResult(sessionOf(baseTree), fence(removal));
     expect(applied.Ok).toBe(true);
 
     const after = Sess.treeJson(applied.Next);
 
     for (const lang of LANGS) {
       // nav-a is gone from the projection entirely…
-      expect(P.spanTextByName(lang, after, 'nav-a'), lang).toBe('');
+      expect(PP.spanTextByName(lang, after, 'nav-a'), lang).toBe('');
       // …and a cursor still carrying it lands on its parent's construct, which
       // is the same answer the Navigator's own re-resolution gives.
-      expect(P.spanPathIdByName(lang, after, ['nav-root', 'nav-card', 'nav-a']), lang).toBe(
+      expect(PP.spanPathIdByName(lang, after, ['nav-root', 'nav-card', 'nav-a']), lang).toBe(
         'nav-card',
       );
     }

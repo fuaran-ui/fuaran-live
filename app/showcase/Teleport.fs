@@ -36,7 +36,7 @@ open Fuaran.UI.OpStream.Abstractions
 
 // ─── The exemplar wizard state ──────────────────────────────────────────────
 
-type private Wizard =
+type internal Wizard =
   { Step: int
     Name: string
     Email: string
@@ -55,7 +55,7 @@ let private teamSizeOptions = [ "Just me"; "2–10"; "11–50"; "51+" ]
 
 /// Starts on step 1 with the details pre-filled – there is visible state to
 /// carry from the very first frame, without dropping the visitor mid-flow.
-let private seed: Wizard =
+let internal seed: Wizard =
   { Step = 0
     Name = "Ada Lovelace"
     Email = "ada@analytical.engine"
@@ -160,7 +160,7 @@ let private fieldLine (label: string) (value: string) : string =
 
   "**" + label + ":** " + shown
 
-let private exemplarTree (w: Wizard) : Node<unit> =
+let internal exemplarTree (w: Wizard) : Node<unit> =
   let progress =
     sprintf "_Step %d of %d – %s_" (w.Step + 1) stepCount stepTitles.[clampStep w.Step]
 
@@ -214,7 +214,7 @@ let private jint (m: Map<string, JVal>) (k: string) : int =
   | Some(JFloat f) -> int f
   | _ -> 0
 
-let private wizardOfState (m: Map<string, JVal>) : Wizard =
+let internal wizardOfState (m: Map<string, JVal>) : Wizard =
   { Step = clampStep (jint m "step")
     Name = jstr m "name"
     Email = jstr m "email"
@@ -222,14 +222,14 @@ let private wizardOfState (m: Map<string, JVal>) : Wizard =
     Referral = jstr m "referral"
     TeamSize = jstr m "teamSize" }
 
-let private encodeWizard (w: Wizard) : Result<string, TeleportError> =
+let internal encodeWizard (w: Wizard) : Result<string, TeleportError> =
   Teleport.encode
     { Tree = exemplarTree w
       State = captureWizard w
       History = []
       ChainHead = None }
 
-let private errorText (e: TeleportError) : string =
+let internal errorText (e: TeleportError) : string =
   match e with
   | TeleportError.Oversize(_, msg) -> "Too large to teleport – " + msg
   | TeleportError.InvalidFormat msg -> "Not a teleport bundle – " + msg
@@ -261,50 +261,12 @@ type Mount =
     Digest: string
     Foreign: bool }
 
-let private mountOf (d: DecodedTeleport) : Mount =
+let internal mountOf (d: DecodedTeleport) : Mount =
   let ownTree = CanonicalJson.encodeNode (exemplarTree (wizardOfState d.State))
 
   { Tree = d.Tree
     Digest = d.Digest
     Foreign = CanonicalJson.encodeNode d.Tree <> ownTree }
-
-/// The receive path, headless: decode a bundle exactly as this page's hosts
-/// do and report what it mounts. `test/teleportReceiver.test.ts` certifies
-/// the decision against real bundles – this page's own, and a foreign host's.
-let mountReport (encoded: string) : obj =
-  match Teleport.decode encoded with
-  | Ok d ->
-    let m = mountOf d
-
-    createObj
-      [ "ok" ==> true
-        "digest" ==> m.Digest
-        "foreign" ==> m.Foreign
-        "mountedTreeJson" ==> CanonicalJson.encodeNode m.Tree ]
-  | Error e -> createObj [ "ok" ==> false; "error" ==> errorText e ]
-
-/// A foreign app: a tree this page never authors, standing in for whatever a
-/// different conformant host encodes and sends here.
-let private foreignSample: Node<obj> =
-  Fuaran.card
-    "guest-app"
-    { Defaults.card with
-        Heading = Some(TextSource.Literal "Arrived from another host")
-        Children = [ Fuaran.markdown "guest-line" "This tree was built somewhere else." ] }
-
-/// Bundles for the receiver lock: this page's own exemplar app, and the
-/// foreign app above, both encoded by the one codec the wire format defines.
-let sampleBundles: obj =
-  let orEmpty (r: Result<string, TeleportError>) =
-    match r with
-    | Ok s -> s
-    | Error _ -> ""
-
-  createObj
-    [ "exemplar" ==> orEmpty (encodeWizard seed)
-      "exemplarTreeJson" ==> CanonicalJson.encodeNode (exemplarTree seed)
-      "foreign" ==> orEmpty (Teleport.encode (TeleportBundle.ofTree foreignSample))
-      "foreignTreeJson" ==> CanonicalJson.encodeNode foreignSample ]
 
 let private sizeText (bytes: int) : string =
   if bytes < 1024 then
@@ -327,7 +289,7 @@ let private ticketStub (s: string) : string =
 /// its readable copy; any other app (one that arrived from another host, which
 /// this page cannot know the content of) has the first character of its first
 /// node id flipped instead – equally one byte, equally valid, equally refused.
-let private tamperOneByte (encoded: string) : Result<string * string, string> =
+let internal tamperOneByte (encoded: string) : Result<string * string, string> =
   let flipFirstId (envelope: string) : Result<string * string, string> =
     let marker = "\"id\":\""
     let i = envelope.IndexOf marker
@@ -370,7 +332,7 @@ let private tamperOneByte (encoded: string) : Result<string * string, string> =
       Teleport.FormatPrefix
       + Base64Url.encode (Deflate.compress (Utf8.encode tampered)))
 
-let private tamperRefusal (e: TeleportError) : string =
+let internal tamperRefusal (e: TeleportError) : string =
   match e with
   | TeleportError.DigestMismatch(recomputed, carried) ->
     sprintf
@@ -378,29 +340,6 @@ let private tamperRefusal (e: TeleportError) : string =
       (carried.Substring(0, 8))
       (recomputed.Substring(0, 8))
   | other -> errorText other
-
-/// The tamper vignette, headless: stage the one-byte flip and report what the
-/// decoder did with the result. Locked by `test/teleportReceiver.test.ts` over
-/// BOTH staging paths – the exemplar's readable heading swap and the node-id
-/// flip any other host's app takes – because a vignette that cannot stage, or
-/// that trips a parse error instead of the digest check, quietly stops making
-/// the claim it is on the page to make.
-let tamperReport (encoded: string) : obj =
-  match tamperOneByte encoded with
-  | Ok(what, bad) ->
-    match Teleport.decode bad with
-    | Ok _ -> createObj [ "staged" ==> true; "what" ==> what; "refused" ==> false ]
-    | Error e ->
-      createObj
-        [ "staged" ==> true
-          "what" ==> what
-          "refused" ==> true
-          "digestMismatch"
-          ==> (match e with
-               | TeleportError.DigestMismatch _ -> true
-               | _ -> false)
-          "refusal" ==> tamperRefusal e ]
-  | Error why -> createObj [ "staged" ==> false; "why" ==> why ]
 
 // ─── Live pass + arrival state ──────────────────────────────────────────────
 

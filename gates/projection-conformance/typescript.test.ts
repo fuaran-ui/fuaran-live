@@ -50,12 +50,15 @@ const { encodeNode } = ops;
 const { fuaran, binding, action, format, formFieldKind, nodeId, iconSource } = ui;
 
 // Fable-generated JS — no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
 import {
   projectTypeScriptExpr,
-  projectByName,
   absentRequiredMembers,
+  // @ts-expect-error untyped Fable output
 } from '../../app/output/Projection.js';
+import {
+  projectByName,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/ProjectionProbes.js)
+} from '../../app/output/testing/ProjectionProbes.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const corpusDir = resolve(here, '../../../wire-format-fixtures');

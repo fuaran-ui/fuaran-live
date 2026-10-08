@@ -8,12 +8,20 @@ import { describe, it, expect } from 'vitest';
 
 // @ts-expect-error untyped Fable output
 import { value as systemPrompt } from '../app/output/SystemPrompt.js';
-// @ts-expect-error untyped Fable output
-import { exampleWires } from '../app/output/Gallery.js';
-// @ts-expect-error untyped Fable output
-import { empty, ingestResult } from '../app/output/Session.js';
+import {
+  empty,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/Session.js';
 // @ts-expect-error untyped Fable output
 import { roundTrips } from '../app/output/Permalink.js';
+import {
+  exampleWires,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/GalleryProbes.js)
+} from '../app/output/testing/GalleryProbes.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
 
 /** The canonical wire of the gallery docs/tutorial page (root id `ex-docs`). */
 const docsWire = (): string => {

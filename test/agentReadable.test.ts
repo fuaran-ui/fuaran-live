@@ -31,7 +31,7 @@
 import { describe, expect, it } from 'vitest';
 
 // @ts-expect-error untyped Fable output (no .d.ts is generated for it)
-import { annotationsJson } from '../app/showcase/output/AgentReadable.js';
+import { annotationsJson } from '../app/showcase/output/testing/AgentReadableProbes.js';
 
 const SHAPES = ['text', 'number', 'boolean', 'choice', 'unknown'];
 const EFFECTS = ['read', 'write', 'navigate', 'invoke'];

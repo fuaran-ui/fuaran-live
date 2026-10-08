@@ -10,10 +10,12 @@
 // Requires `pnpm run fable:app` (the app build) to have produced app/output/.
 
 import { describe, it, expect } from 'vitest';
+import {
+  projectByName,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/ProjectionProbes.js)
+} from '../app/output/testing/ProjectionProbes.js';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { projectByName } from '../app/output/Projection.js';
 
 // wire-format-fixtures/nodes/metric-1, VERBATIM – a bare-string text source
 // (§3.6), Static bindings, and nested $type-tagged format objects.

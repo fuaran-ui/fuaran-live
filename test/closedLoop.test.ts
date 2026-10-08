@@ -9,10 +9,18 @@
 import { describe, it, expect } from 'vitest';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { empty, ingestResult, treeJson, lastMessageContent } from '../app/output/Session.js';
+import {
+  empty,
+  treeJson,
+  lastMessageContent,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/Session.js';
 // @ts-expect-error untyped Fable output
 import { value as systemPrompt } from '../app/output/SystemPrompt.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
 
 // A corpus-valid full-tree emission (wire-format-fixtures/nodes/metric-1 – the
 // canonical flat shape the F# decoder certifies against), fenced as a model emits it.

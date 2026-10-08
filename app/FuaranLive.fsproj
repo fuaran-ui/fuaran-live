@@ -137,6 +137,20 @@
     <Compile Include="testing\ConsoleProbes.fs" />
     <Compile Include="testing\ContributeProbes.fs" />
     <Compile Include="testing\PatternBankProbes.fs" />
+    <Compile Include="testing\CursorProbes.fs" />
+    <Compile Include="testing\RefineProbes.fs" />
+    <Compile Include="testing\GalleryProbes.fs" />
+    <Compile Include="testing\WebRtcProbes.fs" />
+    <Compile Include="testing\BaselineProbes.fs" />
+    <Compile Include="testing\LiveProbes.fs" />
+    <Compile Include="testing\CompareProbes.fs" />
+    <Compile Include="testing\SessionProbes.fs" />
+    <Compile Include="testing\ProjectionProbes.fs" />
+    <Compile Include="testing\OpLogProbes.fs" />
+    <Compile Include="testing\PropertyEditorProbes.fs" />
+    <Compile Include="testing\StructuralEditProbes.fs" />
+    <Compile Include="testing\SiteViewProbes.fs" />
+    <Compile Include="testing\A11yWalkProbes.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
 

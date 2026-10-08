@@ -91,12 +91,12 @@ let private initialTree: Node<unit> =
 /// A turn's provenance tag – surfaced so the "mistake, then self-correction"
 /// beat reads on the timeline. Narration only; the op itself is the substrate.
 [<RequireQualifiedAccess>]
-type private Tag =
+type internal Tag =
   | Normal
   | Mistake
   | Fix
 
-type private Turn =
+type internal Turn =
   { Op: TreeOp<unit>
     Actor: Actor
     Label: string
@@ -107,7 +107,7 @@ let private human = Actor.Human "you"
 
 let private wireStr (s: string) : PropValue = PropValue.Wire(JStr s)
 
-let private turns: Turn list =
+let internal turns: Turn list =
   [ { Op = TreeOp.InsertChild(nid "tm-root", metricCard "tm-m-rev" "Revenue" "£0")
       Actor = agent
       Label = "Add a Revenue metric"
@@ -166,11 +166,11 @@ let private turns: Turn list =
       Label = "You take over – finalise the title"
       Tag = Tag.Normal } ]
 
-let private turnCount = List.length turns
+let internal turnCount = List.length turns
 
 // ─── Genuine reconstruction: fold the shipped apply engine over a prefix ─────
 
-let private describeError (e: 'e) : string = sprintf "%A" e
+let internal describeError (e: 'e) : string = sprintf "%A" e
 
 /// Fold `Apply.apply` over `ops` starting from `start`. Ok tree, or the first
 /// real `ApplyError` (surfaced verbatim – an early fork can genuinely fail
@@ -185,7 +185,7 @@ let private foldApply (start: Node<unit>) (ops: TreeOp<unit> list) : Result<Node
 
 /// The trunk frames 0..N – the tree at each turn. Precomputed once (folding 12
 /// ops is trivial); the trunk never errors.
-let private trunkFrames: Node<unit> array =
+let internal trunkFrames: Node<unit> array =
   [| for n in 0..turnCount ->
        match foldApply initialTree (turns |> List.truncate n |> List.map (fun t -> t.Op)) with
        | Ok t -> t
@@ -220,13 +220,13 @@ let private shortHash (h: string) : string =
 
 // ─── Fork branches – canned alternative op-sets off the trunk ────────────────
 
-type private Branch =
+type internal Branch =
   { Id: string
     Name: string
     Blurb: string
     Ops: TreeOp<unit> list }
 
-let private branches: Branch list =
+let internal branches: Branch list =
   [ { Id = "region"
       Name = "Split by region"
       Blurb = "Break the accounts grid out by geography."
@@ -263,85 +263,31 @@ let private branches: Branch list =
 
 // ─── Branch reconstruction + the 3-way merge (the real engine) ───────────────
 
-let private tryBranch (bid: string) : Branch option =
+let internal tryBranch (bid: string) : Branch option =
   branches |> List.tryFind (fun b -> b.Id = bid)
 
 /// The tree a branch reaches when forked at trunk frame `k`: the trunk prefix,
 /// then the branch's op-set, through the apply engine. `Error` is a real typed
 /// `ApplyError` (the branch edits a node that frame does not hold yet).
-let private branchTree (b: Branch) (k: int) : Result<Node<unit>, string> = foldApply trunkFrames[k] b.Ops
+let internal branchTree (b: Branch) (k: int) : Result<Node<unit>, string> = foldApply trunkFrames[k] b.Ops
 
 /// Fold a fork back into the trunk HEAD with the shipped 3-way merge. The common
 /// ancestor is the frame the branch forked from; "ours" is what the trunk did
 /// after that frame; "theirs" is the branch. Outer `Error` = the fork itself
 /// failed to apply; inner `Ok` = a clean auto-compose; inner `Error` = real
 /// `MergeConflict`s naming the contended cells.
-let private mergeBranch (b: Branch) (k: int) : Result<Result<Node<unit>, MergeConflict list>, string> =
+let internal mergeBranch (b: Branch) (k: int) : Result<Result<Node<unit>, MergeConflict list>, string> =
   branchTree b k
   |> Result.map (fun theirs -> TreeMerge.merge3Way trunkFrames[k] trunkFrames[turnCount] theirs)
 
 /// The lenient resolution of the same merge: every conflict falls back to the
 /// ancestor's value, so a tree always comes back.
-let private mergeBranchLenient (b: Branch) (k: int) : Result<Node<unit>, string> =
+let internal mergeBranchLenient (b: Branch) (k: int) : Result<Node<unit>, string> =
   branchTree b k
   |> Result.map (fun theirs -> TreeMerge.merge3WayLenient trunkFrames[k] trunkFrames[turnCount] theirs)
 
-let private conflictIds (cs: MergeConflict list) : string list =
+let internal conflictIds (cs: MergeConflict list) : string list =
   cs |> List.map (fun c -> c.NodeId) |> List.distinct
-
-// ─── Headless surface – the verification gate drives these from vitest ──────
-//
-// Flat string projections across the Fable boundary (the Phase 710-713 pattern):
-// every tree crosses as its canonical wire JSON, so the test compares bytes the
-// real encoder produced and never a hand-waved shape.
-
-/// The number of recorded turns (frames run 0..turnTotal).
-let turnTotal: int = turnCount
-
-/// Canonical JSON of trunk frame `n` – the tree the scrubber shows at turn n.
-let frameJson (n: int) : string = CJson.encodeNode trunkFrames[n]
-
-/// Frame `n` re-derived ONE step from frame n-1 through the apply engine – the
-/// replay claim, checkable against `frameJson n` byte-for-byte.
-let stepJson (n: int) : string =
-  match Apply.apply (List.item (n - 1) turns).Op trunkFrames[n - 1] with
-  | Ok t -> CJson.encodeNode t
-  | Error e -> "error:" + describeError e
-
-/// The fork branches on offer, by id.
-let branchIds: string array = branches |> List.map (fun b -> b.Id) |> Array.ofList
-
-/// `ok:<json>` for the branch's tree when forked at frame `k`, or `error:<msg>`
-/// carrying the real apply error.
-let forkJson (bid: string) (k: int) : string =
-  match tryBranch bid with
-  | None -> "error:unknown branch " + bid
-  | Some b ->
-    match branchTree b k with
-    | Ok t -> "ok:" + CJson.encodeNode t
-    | Error e -> "error:" + e
-
-/// `merged:<json>` for a clean 3-way merge of the branch (forked at `k`) into
-/// the trunk head, `conflict:<id,id,…>` naming the contended nodes, or
-/// `error:<msg>` when the fork itself cannot apply.
-let mergeJson (bid: string) (k: int) : string =
-  match tryBranch bid with
-  | None -> "error:unknown branch " + bid
-  | Some b ->
-    match mergeBranch b k with
-    | Error e -> "error:" + e
-    | Ok(Ok merged) -> "merged:" + CJson.encodeNode merged
-    | Ok(Error cs) -> "conflict:" + String.concat "," (conflictIds cs)
-
-/// `merged:<json>` for the lenient resolution (conflicts fall back to the
-/// ancestor's value), or `error:<msg>`.
-let mergeLenientJson (bid: string) (k: int) : string =
-  match tryBranch bid with
-  | None -> "error:unknown branch " + bid
-  | Some b ->
-    match mergeBranchLenient b k with
-    | Ok merged -> "merged:" + CJson.encodeNode merged
-    | Error e -> "error:" + e
 
 // ─── View helpers ────────────────────────────────────────────────────────────
 

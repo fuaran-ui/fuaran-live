@@ -33,10 +33,15 @@ import { decodeNode, encodeNode } from '@fuaran-ui/ops';
 
 // @ts-expect-error untyped Fable output
 import { roundTrips } from '../app/output/Permalink.js';
-// @ts-expect-error untyped Fable output
-import { exampleWires, exampleTags } from '../app/output/Gallery.js';
-// @ts-expect-error untyped Fable output
-import { projectByName } from '../app/output/Projection.js';
+import {
+  exampleWires,
+  exampleTags,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/GalleryProbes.js)
+} from '../app/output/testing/GalleryProbes.js';
+import {
+  projectByName,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/ProjectionProbes.js)
+} from '../app/output/testing/ProjectionProbes.js';
 
 const metricNode =
   '{"id":"metric-1","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"label":"Revenue","tone":"Brand","value":{"$type":"Static","value":1234.5}}}';

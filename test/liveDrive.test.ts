@@ -8,14 +8,20 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  empty,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/Session.js';
+import {
   deltaEnvelopes,
   envelopeKind,
   envelopePayload,
   envelopeRoundTrips,
-  // @ts-expect-error untyped Fable output (no .d.ts for app/output/Live.js)
-} from '../app/output/Live.js';
-// @ts-expect-error untyped Fable output
-import { empty, ingestResult } from '../app/output/Session.js';
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/LiveProbes.js)
+} from '../app/output/testing/LiveProbes.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
 
 // A first emission: a dashboard-role Box holding one Metric.
 //

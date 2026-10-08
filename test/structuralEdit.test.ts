@@ -24,8 +24,19 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
-// @ts-expect-error untyped Fable output
-import { empty, ingestResult } from '../app/output/Session.js';
+import {
+  empty,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/Session.js';
+import { decodeNode, encodeNode } from '@fuaran-ui/ops';
+import {
+  canonicalTree,
+  // @ts-expect-error untyped Fable output
+} from '../app/output/navigator/OpLog.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
 import {
   paletteKinds,
   insertAt,
@@ -39,19 +50,17 @@ import {
   lastOpJson,
   schemaKinds,
   defaultWireFor,
-  // @ts-expect-error untyped Fable output
-} from '../app/output/navigator/StructuralEdit.js';
-import { decodeNode, encodeNode } from '@fuaran-ui/ops';
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/StructuralEditProbes.js)
+} from '../app/output/testing/StructuralEditProbes.js';
 import {
   undoN,
   redoN,
-  canonicalTree,
   originKinds,
   originIds,
   logKinds,
   verifyResult,
-  // @ts-expect-error untyped Fable output
-} from '../app/output/navigator/OpLog.js';
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/OpLogProbes.js)
+} from '../app/output/testing/OpLogProbes.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 

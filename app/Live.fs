@@ -122,32 +122,3 @@ let isAudience () : bool = audienceProbe ()
 /// presenter drives). No-op-safe headless.
 [<Emit("{ if (typeof window !== 'undefined') window.open(window.location.pathname + '?live=audience', '_blank'); }")>]
 let openAudienceWindow () : unit = jsNative
-
-// ─── flat diagnostic surface (cross-boundary friendly – used by the tests) ────
-//
-// `liveDriveDelta` returns an F# list of a DU, both awkward to assert on from the
-// TS side of the Fable boundary. These project the same logic to flat values.
-
-/// The present→audience delta as encoded channel envelope strings (a JS array).
-let deltaEnvelopes (previous: Session.SessionState) (next: Session.SessionState) : string[] =
-  liveDriveDelta previous next |> List.map encodeMessage |> List.toArray
-
-/// The kind an envelope decodes to ("tree" / "op"), or "" if it is not valid.
-let envelopeKind (envelope: string) : string =
-  match decodeMessage envelope with
-  | Some(LiveDriveMessage.FullTree _) -> "tree"
-  | Some(LiveDriveMessage.Op _) -> "op"
-  | None -> ""
-
-/// The wire payload an envelope carries (the tree/op JSON), or "" if invalid.
-let envelopePayload (envelope: string) : string =
-  match decodeMessage envelope with
-  | Some(LiveDriveMessage.FullTree j) -> j
-  | Some(LiveDriveMessage.Op j) -> j
-  | None -> ""
-
-/// Does an envelope survive a decode → re-encode round-trip byte-identically?
-let envelopeRoundTrips (envelope: string) : bool =
-  match decodeMessage envelope with
-  | Some m -> encodeMessage m = envelope
-  | None -> false

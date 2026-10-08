@@ -205,27 +205,6 @@ let retention (session: Session.SessionState) (baseline: Baseline option) : (str
   | None -> []
   | Some b -> retentionOf b (changes session baseline)
 
-// ─── flat diagnostic surface (cross-boundary friendly) ───────────────────────
-//
-// The same projection-to-plain-values discipline as `Session.ingestResult` and
-// the Phase 710–712 helpers: F# lists and DUs are awkward to assert on from the
-// JS side of the Fable boundary, so the loop's claims are also available as
-// arrays and flat records.
-
-let changeLines (session: Session.SessionState) (baseline: Baseline option) : string array =
-  changes session baseline |> List.map changeLine |> Array.ofList
-
-/// The edited ids the re-emission left untouched.
-let retainedIds (session: Session.SessionState) (baseline: Baseline option) : string array =
-  retention session baseline |> List.filter snd |> List.map fst |> Array.ofList
-
-/// The edited ids the re-emission changed anyway — the honest half.
-let overwrittenIds (session: Session.SessionState) (baseline: Baseline option) : string array =
-  retention session baseline
-  |> List.filter (snd >> not)
-  |> List.map fst
-  |> Array.ofList
-
 // ─── the pane ────────────────────────────────────────────────────────────────
 
 /// The comparison readout — shown only once a refinement has come back.

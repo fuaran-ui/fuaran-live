@@ -164,16 +164,10 @@ let position (root: Node<'Msg>) (cursor: NavCursor) : int * int =
 
   idx + 1, List.length paths
 
-// ─── flat diagnostic surface (cross-boundary friendly) ───────────────────────
+// ─── the cursor as plain strings ─────────────────────────────────────────────
 //
-// `NodeId` is a single-case DU and the walk is an F# list — both awkward to
-// assert on from the JS side of the Fable boundary. These project the same
-// values to plain string arrays, exactly as `Session.ingestResult` does for the
-// closed loop, so the cursor model is testable headlessly over the Fable output.
-
-/// Every node id in the tree, DFS pre-order — the walk, as plain strings.
-let walkIds (root: Node<'Msg>) : string array =
-  allPaths root |> List.choose List.tryLast |> List.map idText |> Array.ofList
+// `NodeId` is a single-case DU and the path is an F# list; these project them
+// to plain strings for the places that key on text.
 
 /// The cursor's id-path, root → focused, as plain strings.
 let cursorIds (cursor: NavCursor) : string array =

@@ -395,36 +395,7 @@ let treeJson (session: SessionState) : string =
   | None -> ""
   | Some tree -> prettyJson (Canon.encodeNode tree)
 
-// ─── flat diagnostic surface (cross-boundary friendly – used by the loop tests) ──
-//
-// `ingest` returns an F# DU and `buildMessages` an F# list, both awkward to assert
-// on from the JS/TS side of the Fable boundary. These thin helpers project the same
-// logic to flat values (an anonymous record / a string), so the closed loop is
-// testable headlessly via vitest over the Fable output – and they double as a
-// host-language-agnostic diagnostic surface.
-
-/// `ingest`, projected to a flat record: `Ok` + the `Mode` ("tree" / "op") on
-/// success, or `Error` (the failure kind) otherwise, with the resulting `Next`
-/// session (the input session unchanged on failure).
-let ingestResult
-  (session: SessionState)
-  (raw: string)
-  : {| Ok: bool
-       Mode: string
-       Error: string
-       Next: SessionState |}
-  =
-  match ingest session raw with
-  | Ingested(mode, next) ->
-    {| Ok = true
-       Mode = mode
-       Error = ""
-       Next = next |}
-  | IngestFailed e ->
-    {| Ok = false
-       Mode = ""
-       Error = e.Kind
-       Next = session |}
+// ─── the message the loop injects ────────────────────────────────────────────
 
 /// The content of the final (latest user) message `buildMessages` produces – the
 /// closed-loop injection point, as a plain string.
@@ -433,12 +404,6 @@ let lastMessageContent (session: SessionState) (prompt: string) : string =
   | Some m -> m.Content
   | None -> ""
 
-/// EVERY message `buildMessages` produces, as a plain array — the accumulated
-/// conversation as the provider would receive it. `lastMessageContent` answers
-/// "what is injected"; this answers "what else is carried", which is the
-/// question the refine loop turns on.
-let allMessageContents (session: SessionState) (prompt: string) : string array =
-  buildMessages session prompt |> List.map _.Content |> Array.ofList
 
 // ─── "refine from here" — the EDITED tree as the next emission's context ─────
 //
@@ -619,7 +584,7 @@ let refineSystemSuffix (session: SessionState) : string =
 let refinePrompt (session: SessionState) (userPrompt: string) : string =
   lastMessageContent { session with History = [] } userPrompt
 
-// ─── flat diagnostic surface for the refine loop ─────────────────────────────
+// ─── plain-array readouts the refine panel reads ─────────────────────────────
 
 /// The correction lines as a plain array (an F# list has no `.length` across
 /// the Fable boundary).
@@ -629,11 +594,3 @@ let correctionLineArray (session: SessionState) : string array = correctionLines
 /// human ops)" readout, and the test's handle on the trail.
 let humanOpCount (session: SessionState) : int =
   humanOpsSinceEmission session |> List.length
-
-/// The budget constants as READABLE values. A `[<Literal>]` is inlined at every
-/// use site and never reaches the module's exports, so a test that imported the
-/// literal directly would silently receive `undefined` and assert nothing — the
-/// budget check would pass whatever the budget was.
-let correctionBudget: int = correctionBudgetChars
-
-let correctionValueCap: int = correctionValueChars

@@ -2,7 +2,7 @@
 // merge round-trip through the DAG, exercised headlessly over the Fable output.
 //
 // The page lives in app/showcase/TimeMachine.fs and compiles to
-// app/showcase/output/TimeMachine.js; this drives its headless surface in node
+// app/showcase/output/testing/TimeMachineProbes.js; this drives its headless surface in node
 // via vitest, following the Phase 710-713 pattern: every tree crosses the Fable
 // boundary as the canonical wire JSON the REAL encoder produced, so each claim
 // below is a byte comparison and never a hand-waved shape.
@@ -25,7 +25,7 @@ import { describe, expect, it } from 'vitest';
 
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 // @ts-expect-error untyped Fable output
-import * as TM from '../app/showcase/output/TimeMachine.js';
+import * as TM from '../app/showcase/output/testing/TimeMachineProbes.js';
 
 const total: number = TM.turnTotal;
 const branches: string[] = Array.from(TM.branchIds as string[]);

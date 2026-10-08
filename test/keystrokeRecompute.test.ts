@@ -94,7 +94,9 @@ async function harness() {
   // @ts-expect-error untyped Fable output
   const Sess: any = await import('../app/output/Session.js');
   // @ts-expect-error untyped Fable output
-  const PE: any = await import('../app/output/navigator/PropertyEditor.js');
+  const SP: any = await import('../app/output/testing/SessionProbes.js');
+  // @ts-expect-error untyped Fable output
+  const PE: any = await import('../app/output/testing/PropertyEditorProbes.js');
   // @ts-expect-error untyped Fable output
   const R: any = await import('../app/output/navigator/Refine.js');
   // @ts-expect-error untyped Fable output
@@ -107,7 +109,7 @@ async function harness() {
   const P: any = await import('../app/output/Projection.js');
 
   const ingest = (s: unknown, json: string) => {
-    const r = Sess.ingestResult(s, fence(json));
+    const r = SP.ingestResult(s, fence(json));
     if (!r.Ok) throw new Error(`fixture did not ingest: ${r.Error}`);
     return r.Next;
   };

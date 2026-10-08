@@ -112,27 +112,6 @@ let decodeSignal (token: string) : (string * string) option =
     else
       Some(string m?kind, string m?sdp)
 
-// ─── flat diagnostic surface (cross-boundary friendly – used by the tests) ────
-
-/// The `kind` a signal token decodes to ("offer" / "answer"), or "" if invalid –
-/// the codec projected to a flat string the headless tests assert on.
-let signalKind (token: string) : string =
-  match decodeSignal token with
-  | Some(k, _) -> k
-  | None -> ""
-
-/// The SDP a signal token carries, or "" if invalid.
-let signalSdp (token: string) : string =
-  match decodeSignal token with
-  | Some(_, sdp) -> sdp
-  | None -> ""
-
-/// Does a signal token survive a decode → re-encode round-trip byte-identically?
-let signalRoundTrips (token: string) : bool =
-  match decodeSignal token with
-  | Some(k, sdp) -> encodeSignal k sdp = token
-  | None -> false
-
 // ─── the join link (2026-07-30) ──────────────────────────────────────────────
 //
 // The presenter's QR used to encode the RAW offer token, so scanning it with a

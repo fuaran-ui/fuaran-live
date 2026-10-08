@@ -30,33 +30,42 @@ import { describe, it, expect } from 'vitest';
 // Fable-generated JS – no .d.ts; vitest runs it via esbuild (no typecheck).
 import {
   empty,
-  ingestResult,
   // @ts-expect-error untyped Fable output
 } from '../app/output/Session.js';
 import {
-  flagSummary,
   flaggedIds,
-  flagCount,
   summary,
-  flagsAt,
-  ariaAt,
   declaredTrait,
-  nextFlagText,
-  prevFlagText,
-  quickFixAt,
   // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/A11yWalk.js';
 import {
   undo,
-  originKinds,
-  originIds,
-  logKinds,
   canonicalTree,
   // @ts-expect-error untyped Fable output
 } from '../app/output/navigator/OpLog.js';
 // The packaged language tier — see test/tierOutput.ts for why the path is
 // centralised there rather than spelled out here.
 import { findNode, NodeId } from './tierOutput.js';
+import {
+  ingestResult,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/SessionProbes.js)
+} from '../app/output/testing/SessionProbes.js';
+import {
+  flagCount,
+  flagSummary,
+  flagsAt,
+  ariaAt,
+  nextFlagText,
+  prevFlagText,
+  quickFixAt,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/A11yWalkProbes.js)
+} from '../app/output/testing/A11yWalkProbes.js';
+import {
+  originKinds,
+  originIds,
+  logKinds,
+  // @ts-expect-error untyped Fable output (no .d.ts for app/output/testing/OpLogProbes.js)
+} from '../app/output/testing/OpLogProbes.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 //

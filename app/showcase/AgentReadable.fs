@@ -241,11 +241,11 @@ let private ariaDescription (field: FieldAffordance) : string =
   | [] -> ""
   | xs -> "You can say: " + String.concat "; " xs + "."
 
-type private Annotation =
+type internal Annotation =
   { FieldId: string
     Attributes: (string * string) list }
 
-let private annotationFor (field: FieldAffordance) : Annotation =
+let internal annotationFor (field: FieldAffordance) : Annotation =
   let attributes =
     [ "data-fuaran-module", moduleId
       "data-fuaran-field", field.Id
@@ -268,20 +268,7 @@ let private annotationFor (field: FieldAffordance) : Annotation =
   { FieldId = field.Id
     Attributes = attributes }
 
-let private annotations: Annotation list = declaredFields |> List.map annotationFor
-
-/// The whole annotation set as one canonical JSON document. Exported so the
-/// repository's own test suite can certify the payloads this page hangs on its
-/// controls – the shapes are a contract a reader relies on, so they are pinned
-/// rather than trusted.
-let annotationsJson: string =
-  Canon.render (
-    JArr
-      [ for a in annotations ->
-          JObj
-            [ "field", JStr a.FieldId
-              "attributes", JObj [ for name, value in a.Attributes -> name, JStr value ] ] ]
-  )
+let internal annotations: Annotation list = declaredFields |> List.map annotationFor
 
 // ─── Publishing: onto the DOM, and into the affordance registry ──────────────
 

@@ -33,7 +33,8 @@
 //    Fuaran.UI.OpStream.Abstractions 0.91.0 · Fuaran.UI.OpStream.Replay 0.91.0
 //    Fuaran.UI.ServerDriven 0.91.0 · Fuaran.UI.Program 0.91.0
 //    Fuaran.UI.AiWire 0.91.0 (re-checked 2026-10-06, Phase 2079: one version with the family)
-//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.34.0
+//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.36.0 (re-checked 2026-10-09, Phase 2184;
+//    a floor, not the tier's declared 0.34.0 — see Directory.Build.props)
 //    Fuaran.Program.Runtime 0.7.1
 //  The program loop's UI adapter is a member of the UI family since Phase 2016:
 //  it ships from the language tier as `Fuaran.UI.Program` (it was

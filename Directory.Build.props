@@ -30,13 +30,19 @@
     <!-- The Fuaran UI language tier (Fuaran.UI.*, including Fuaran.UI.AiWire
          and the program loop's UI adapter Fuaran.UI.Program). -->
     <FuaranUIVersion>0.91.0</FuaranUIVersion>
-    <!-- The shared substrate spine (Fuaran.Core.*). It moves WITH the tier:
-         these are direct pins on packages the tier also depends on, so this
-         must equal the Core version the tier's nuspec declares — a lower
-         number downgrades the tier's own dependency (NU1605), and one NU160x
-         line kills the Fable project cracker. -->
-    <!-- Phase 2158: raised 0.34.0 -> 0.35.2. The language tier built from source (the showcase project-references it) now declares 0.35.2, so the old pin was a downgrade (NU1605) and the showcase Fable build could not restore. 0.35.2 is published on nuget.org. -->
-    <FuaranCoreVersion>0.35.2</FuaranCoreVersion>
+    <!-- The shared substrate spine (Fuaran.Core.*). These are DIRECT pins on
+         packages the tier also depends on, so this is a FLOOR: it must be at or
+         above the Core version of EVERY tier this repo compiles, because a lower
+         number downgrades that tier's own dependency (NU1605) and one NU160x
+         line kills the Fable project cracker. It is deliberately NOT derived
+         from any one tier checkout, because the repository compiles more than
+         one: the CI workflows check the sibling source out at the v$(FuaranUIVersion)
+         ref (Core 0.34.0) and the packaged tier is the same release, while a
+         local `pnpm run fable:app` compiles whatever the sibling checkout holds
+         (the language tier's main, Core 0.36.0). Raising it is safe for the
+         older tier and required for the newer, so it tracks the highest. -->
+    <!-- Phase 2184: raised 0.35.2 -> 0.36.0 so a local showcase build against the sibling's main restores. Verified green in both shapes: the sibling at main (local) and the sibling at v0.91.0 (CI). 0.36.0 is published on nuget.org. -->
+    <FuaranCoreVersion>0.36.0</FuaranCoreVersion>
     <!-- The program/logic domain's domain-generic runtime
          (Fuaran.Program.Runtime). Its floor is set by the UI adapter above. -->
     <FuaranProgramVersion>0.7.1</FuaranProgramVersion>

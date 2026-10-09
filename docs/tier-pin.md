@@ -216,7 +216,8 @@ source migration (above) and the package checklist below.
 
 1. `FuaranUIVersion` in `Directory.Build.props`, and the six workflow `ref:`s;
 2. **`FuaranCoreVersion` beside it** — read the new tier's nuspec from the
-   registry and match its declared Core version. These are DIRECT pins on
+   registry and make this AT LEAST its declared Core version (a floor; see
+   "Why Core is a floor" below). These are DIRECT pins on
    packages the tier also depends on, so a number left behind does not hold
    Core back, it downgrades the tier's own dependency and emits NU1605, and one
    NU160x line on msbuild's stdout kills the Fable project cracker outright
@@ -284,3 +285,24 @@ source migration (above) and the package checklist below.
   open `Fuaran.Core` (the Pattern Bank's signature search and the op-stream
   chain among them) — and being direct, they must match the tier's declared
   Core version (point 2).
+
+### Why Core is a floor, and is not derived (Phase 2184)
+
+`FuaranCoreVersion` is carried as its own property, not computed from the tier
+checkout, and it is a floor rather than an equality. Evidence: the six workflows
+all check the tier out at `v0.91.0`, whose `Directory.Packages.props` declares
+Core 0.34.0, and the packaged tier is the same release; yet the pin has stood at
+0.35.2 and CI stayed green, because a direct pin ABOVE what a tier declares only
+raises it. The pin must never be below any tier the repository compiles, and the
+repository compiles two: CI builds the showcase against the sibling at the `ref:`,
+while a local `pnpm run fable:app` builds it against whatever the sibling
+checkout holds (the language tier's main, Core 0.36.0), where a lower pin is
+NU1605. So it tracks the highest, and 0.36.0 (published) was verified green
+against both the main sources and a `v0.91.0` source archive.
+
+Deriving it from the sibling's sources was rejected: the playground and the
+parity host restore published packages with no checkout beside them, so a derived
+value would give them a different answer from the showcase, and in CI it would
+read the `ref:` tier's number, which is the lower bound rather than the one a
+local build needs. Making the workflows pass it in is a workflow change, which
+is an operator act, and would buy nothing the floor does not already guarantee.

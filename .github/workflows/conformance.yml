@@ -8,9 +8,10 @@ name: Projection conformance
 # verified TypeScript AND Python projections honest (see docs/PROJECTION_FIDELITY.md;
 # the F# / C# / VB legs are demo-grade pending their re-authored arms).
 #
-# This gate assembles a multi-repo layout because the Fable app build
-# project-references the sibling F# tier (the @fuaran-ui/* npm packages
-# themselves resolve from the registry). Every checked-out repo is public —
+# This gate assembles a multi-repo layout because the Fable app build compiles the
+# showcase project, which project-references the sibling F# tier (the playground
+# and the Fable host take the tier as packages, and the @fuaran-ui/* npm packages
+# resolve from the registry; docs/tier-pin.md). Every checked-out repo is public —
 # no token needed.
 
 on:
@@ -30,7 +31,7 @@ jobs:
     steps:
       # Assemble the workspace layout:
       #   <root>/wire-format-fixtures   (fuaran-ui-specification)
-      #   <root>/fuaran                 (F# tier — F# arm project reference)
+      #   <root>/fuaran                 (F# tier — the showcase's project reference)
       #   <root>/fuaran-live            (this repo)
       - name: Checkout the wire-format corpus (fuaran-ui-specification)
         uses: actions/checkout@v4

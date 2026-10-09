@@ -9,10 +9,11 @@ name: Cross-host parity
 # regression guard over the Phase 77 reference-CSS byte-copy + parity-locked
 # class names.
 #
-# Like conformance.yml, this gate assembles a multi-repo layout because the
-# Fable host project-references the sibling F# tier (the @fuaran-ui/* npm
-# packages resolve from the registry). Every checked-out repo is public —
-# no token needed.
+# Like conformance.yml, this gate assembles a multi-repo layout. The Fable host
+# takes the F# tier as published packages (the @fuaran-ui/* npm packages also
+# resolve from the registry); the sibling F# checkout is there for the showcase
+# project that the app build compiles, which still project-references it
+# (docs/tier-pin.md). Every checked-out repo is public — no token needed.
 
 on:
   push:
@@ -31,7 +32,7 @@ jobs:
     steps:
       # Assemble the workspace layout:
       #   <root>/wire-format-fixtures   (fuaran-ui-specification — the parity fixtures)
-      #   <root>/fuaran                 (F# tier — Fable host project reference)
+      #   <root>/fuaran                 (F# tier — the showcase's project reference)
       #   <root>/fuaran-live            (this repo)
       - name: Checkout the wire-format corpus (fuaran-ui-specification)
         uses: actions/checkout@v4

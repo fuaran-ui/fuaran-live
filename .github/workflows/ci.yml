@@ -1,9 +1,11 @@
 name: CI
 
 # The @fuaran-ui/* packages resolve from the public npm registry; the committed
-# pnpm-lock.yaml is authoritative (installs are --frozen-lockfile). The F#/Fable
-# app project-references the sibling F# tier, and the conformance gate reads the
-# shared wire-format corpus, so both public repos are checked out as siblings.
+# pnpm-lock.yaml is authoritative (installs are --frozen-lockfile). The playground
+# and the Fable host take the F# language tier as published packages; only the
+# showcase project-references the sibling F# tier (until it moves to packages,
+# docs/tier-pin.md). The conformance gate reads the shared wire-format corpus, so
+# both public repos are checked out as siblings.
 # Local verification: clone fuaran-dotnet as ../fuaran-dotnet and fuaran-ui-specification
 # as ../wire-format-fixtures, then `pnpm install && pnpm run build && pnpm test`.
 
@@ -29,13 +31,14 @@ jobs:
         with:
           path: fuaran-live
 
-      # Sibling checkouts (both repos are public — no token needed): the Fable
-      # app project-references ../fuaran-dotnet; the conformance gate reads
+      # Sibling checkouts (both repos are public — no token needed): the showcase
+      # project-references ../fuaran-dotnet (the playground and the Fable host
+      # take the same release as packages); the conformance gate reads
       # ../wire-format-fixtures.
       #
       # The two are deliberately pinned DIFFERENTLY, and that asymmetry is the
-      # point: the tier is consumed by project reference, so its source is part
-      # of this app's compile and floating it lets an upstream push redden this
+      # point: the showcase consumes the tier by project reference, so its source
+      # is part of that compile and floating it lets an upstream push redden this
       # repo with no commit here (it did, on 2026-07-27); the corpus is the
       # shared conformance gate every host certifies against, and pinning it
       # would reintroduce exactly the drift that giving it one home bought out.

@@ -10,14 +10,14 @@ import { encodeNode } from '@fuaran-ui/ops';
 
 import { tryLocalRefine } from '../src/query-portal/refine';
 import type { ColumnarResult } from '../src/query-portal/sources';
-import type { ResultSchema } from '../src/query-portal/core';
+import type { ColumnType, ResultSchema } from '../src/query-portal/core';
 
-// The portal's TS `ColumnType` union predates the `decimal` tag; the F# schema
-// parser accepts it, so the fixture states the schema the bridge actually reads.
-const schema = [
+// `ColumnType` names `decimal`, so the schema the bridge actually reads type-checks
+// as written: no cast. `typecheck` fails here if the union ever drops the tag.
+const schema: ResultSchema = [
   { name: 'price', type: 'decimal' },
   { name: 'label', type: 'string' },
-] as unknown as ResultSchema;
+];
 
 const current: ColumnarResult = {
   schema,
@@ -36,6 +36,15 @@ const dashboard = encodeNode(fuaran.metric({ id: 'm1', label: 'Fixed', value: 1 
 const sortBy = (col: string) => JSON.stringify([{ $type: 'sort', by: [{ col, dir: 'asc' }] }]);
 
 describe('the query bridge – decimal cells', () => {
+  it('names decimal in ColumnType (type-level: a decimal schema needs no cast)', () => {
+    const tag: ColumnType = 'decimal';
+    const typed: ResultSchema = [{ name: 'price', type: tag }];
+    expect(typed[0]?.type).toBe('decimal');
+    // @ts-expect-error -- a tag the union does not name is still rejected.
+    const bad: ColumnType = 'money';
+    expect(bad).toBe('money');
+  });
+
   it('round-trips decimal text exactly (canonicalised), widens an int, nulls non-decimal text', () => {
     const out = tryLocalRefine(current, sortBy('label'), dashboard);
     expect(out.kind).toBe('refined');

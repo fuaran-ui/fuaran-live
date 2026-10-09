@@ -16,9 +16,10 @@
 //  from this file, fully typed.
 // ============================================================================
 
-// The six Arrow-aligned scalar types a result column ranges over – the tags the
+// The seven scalar types a result column ranges over (the Arrow-aligned six plus
+// `decimal`, carried as canonical decimal text) – the tags the
 // F# `Fuaran.Core.ColumnType` serialises to.
-export type ColumnType = 'int' | 'float' | 'bool' | 'string' | 'date' | 'timestamp';
+export type ColumnType = 'int' | 'float' | 'bool' | 'string' | 'date' | 'timestamp' | 'decimal';
 
 export interface SchemaColumn {
   readonly name: string;

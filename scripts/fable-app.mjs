@@ -1,20 +1,22 @@
-// Build the entirely-F#/Fable app (`app/`) and tolerate the known, benign F# 222
-// app-shape diagnostic.
+// Build the entirely-F#/Fable apps: the playground (`app/`) and the showcase
+// (`app/showcase/`), as two separate Fable projects.
 //
-// `app/` LINKS the Fable-safe slice of `Fuaran.UI.Ops` (Apply / JsonDecode /
-// CanonicalJson) — a ProjectReference would also pull the .NET-only ErrorRender.fs
-// and break the Fable compile, so linking is the documented pattern (the parity
-// fable-host does the same). With linked sources in an application that has a
-// top-level `Program.run`, FCS emits a spurious error 222 ("only the last source
-// file may omit a module declaration") and `dotnet fable` exits non-zero — even
-// though it transpiles every file correctly. The fable-host simply tolerates it.
+// How each binds the F# language tier is recorded in docs/tier-pin.md (Phase 2079):
+// the playground takes the tier as published packages, so Fable extracts its
+// sources under `app/output/fable_modules/<PackageId>.<Version>/` (the `required`
+// paths below name that version); the showcase still takes the tier as source,
+// through project references into the sibling `fuaran-dotnet` checkout, until the
+// release that ships the merge engine's Fable sources lets it move to packages.
+// The parity render host (`fable-host/`, built by `pnpm run fable`) takes packages
+// too. Neither project here links tier sources any more, so no diagnostic is
+// tolerated: every compiler ERROR fails the build.
 //
-// The gate is therefore TWO checks, both required:
-//  1. Every other compiler ERROR fails the build. File existence is NOT enough:
-//     Fable re-emits modules containing `throw` placeholders for expressions it
-//     could not compile, so a page can "emit completely" and still be dead at
-//     runtime (discovered 2026-07-23 — an overload error shipped a blank
-//     showcase with this script reporting success).
+// The gate is TWO checks, both required:
+//  1. Every compiler ERROR fails the build. File existence is NOT enough: Fable
+//     re-emits modules containing `throw` placeholders for expressions it could
+//     not compile, so a page can "emit completely" and still be dead at runtime
+//     (discovered 2026-07-23 — an overload error shipped a blank showcase with
+//     this script reporting success).
 //  2. The required JS artefacts exist (a compile that prevents emission
 //     entirely still fails even if its error text slipped past check 1).
 
@@ -40,9 +42,6 @@ function ensureLocalFeedFolder() {
 }
 ensureLocalFeedFolder();
 
-// The one tolerated diagnostic: the F# 222 app-shape artefact of source linking.
-const TOLERATED = /\(code 222\)|error FS0?222|only the last source file/i;
-
 function runFable(args) {
   const r = spawnSync('dotnet', ['fable', ...args], { encoding: 'utf8' });
   const out = (r.stdout ?? '') + (r.stderr ?? '');
@@ -57,8 +56,7 @@ function runFable(args) {
   }
   return out
     .split(/\r?\n/)
-    .filter((l) => /\berror\b/i.test(l) && /error (FSHARP|FABLE|FS\d+)/i.test(l))
-    .filter((l) => !TOLERATED.test(l));
+    .filter((l) => /\berror\b/i.test(l) && /error (FSHARP|FABLE|FS\d+)/i.test(l));
 }
 
 // NOTE ON THE DEVELOPMENT-ONLY IN-PAGE SURFACE.
@@ -90,10 +88,7 @@ const errors = [
 
 if (errors.length > 0) {
   console.error(
-    '[fable-app] compile FAILED — ' +
-      errors.length +
-      ' error(s) beyond the tolerated F# 222 diagnostic:\n  ' +
-      errors.join('\n  '),
+    '[fable-app] compile FAILED — ' + errors.length + ' error(s):\n  ' + errors.join('\n  '),
   );
   process.exit(1);
 }
@@ -124,5 +119,5 @@ if (missing.length > 0) {
   console.error('[fable-app] emission incomplete — missing:\n  ' + missing.join('\n  '));
   process.exit(1);
 }
-console.log('[fable-app] Fable emission complete (F# 222 app-shape diagnostic tolerated).');
+console.log('[fable-app] Fable emission complete.');
 process.exit(0);

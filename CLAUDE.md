@@ -52,7 +52,7 @@ fuaran-live/
 │       ├── App.fs          #   the showcase shell (topbar + pillar nav + routes + footer) + boot
 │       └── Receiver.fs     #   the vacant receiver page root
 ├── app.css (in app/)       # playground chrome styles (the .fl-* classes); showcase chrome rides app/showcase/app.css (.ds-*)
-├── scripts/fable-app.mjs   # `dotnet fable` wrapper for BOTH projects — tolerates the benign F# 222 diagnostic
+├── scripts/fable-app.mjs   # `dotnet fable` wrapper for BOTH projects — any compiler error fails the build; asserts the required artefacts exist
 ├── src/                    # remaining TS (NOT the app shell):
 │   ├── query-portal/       #   the Phase 324/325 Fable↔TS bridge facade (core.ts + sources.ts)
 │   ├── hosts/              #   the wire-format parity render-host iframes (ts/fable) + protocol

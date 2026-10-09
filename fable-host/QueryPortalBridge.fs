@@ -15,7 +15,7 @@ module Fuaran.Live.QueryPortalBridge
 //  Boundary discipline: string/JSON in, plain JS object out. The check needs
 //  only the schema (name + ColumnType pairs) – NO row data crosses here, which
 //  is also exactly the schema-only privacy path. Schema JSON shape:
-//    [ { "name": "revenue", "type": "float" }, … ]   (type ∈ the 6 ColumnType tags)
+//    [ { "name": "revenue", "type": "float" }, … ]   (type ∈ the ColumnType tags)
 //  Dashboard: a canonical Fuaran wire-format JSON string (the same the LLM emits
 //  and the renderer consumes).
 //
@@ -121,6 +121,10 @@ let private cellOf (ty: ColumnType) (v: JVal option) : Cell =
   | FloatType, Some(JInt i) -> Float(float i)
   | BoolType, Some(JBool b) -> Bool b
   | StringType, Some(JStr s) -> Str s
+  // A decimal is carried as its canonical TEXT (a JSON string); `Int -> Decimal` is the
+  // tier's lossless promotion. Text that is not decimal text is `Null`, like any mismatch.
+  | DecimalType, Some(JStr s) -> Cell.decimal s |> Option.defaultValue Null
+  | DecimalType, Some(JInt i) -> Cell.decimal (string i) |> Option.defaultValue Null
   | DateType, Some(JStr s) -> Date s
   | TimestampType, Some(JStr s) -> Timestamp s
   | _ -> Null
@@ -132,6 +136,7 @@ let private cellToJs (c: Cell) : obj =
   | Float f -> box f
   | Bool b -> box b
   | Str s -> box s
+  | Decimal s -> box s // canonical decimal text, never a JS number (exactness)
   | Date s -> box s
   | Timestamp s -> box s
   | Null -> null

@@ -38,6 +38,11 @@ jobs:
         with:
           repository: fuaran-ui/fuaran-ui-specification
           path: workspace/wire-format-fixtures
+          # Pinned to the last specification commit before Phase 2177 (Checkbox/Toggle onToggle -> onChange).
+          # The hosts this repo restores (npm, PyPI, nuget.org) have not released 2177 yet, and the
+          # projection emits the pinned tier's spelling, so the corpus at main is ahead of every tier
+          # pinned here. Phase 2215 raises the pins and removes this ref.
+          ref: 055358aa18bc05d6b9fae449d46b2348d8415214
 
       - name: Checkout fuaran (F# tier)
         uses: actions/checkout@v4

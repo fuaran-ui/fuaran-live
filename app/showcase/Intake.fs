@@ -108,37 +108,35 @@ let private submission: Node<obj> =
               "intake-title"
               "Talk title"
               ""
-              (FormFieldKind.Text(Some(Binding.State(kTitle, Some "Wire formats are a design decision")), None))
+              (FormFieldKind.textDeclarative (Binding.State(kTitle, Some "Wire formats are a design decision")))
             field
               "intake-track"
               "Track"
               "A closed shortlist you can type into — and one that admits a value outside it, because a proposal that fits no published track is a real thing to be able to say."
-              (FormFieldKind.Combobox(true, None, Binding.Static(Some tracks), Some(Binding.State(kTrack, Some ""))))
+              (FormFieldKind.comboboxDeclarative (Binding.Static(Some tracks)) (Binding.State(kTrack, Some "")) true)
             field
               "intake-room"
               "Preferred room"
               "The same control with the opposite answer: a room not on this list does not exist, so free text is refused."
-              (FormFieldKind.Combobox(false, None, Binding.Static(Some rooms), Some(Binding.State(kRoom, Some ""))))
+              (FormFieldKind.comboboxDeclarative (Binding.Static(Some rooms)) (Binding.State(kRoom, Some "")) false)
             field
               "intake-tags"
               "Topics"
               "Several values in one control, each removable. Suggestions are offered; anything else you type is admitted, which is this field's default."
-              (FormFieldKind.Tokens(
-                true,
-                None,
-                Some(Binding.Static(Some topics)),
-                Some(Binding.State(kTags, Some [ "wire-formats"; "a11y" ]))
-              ))
+              (FormFieldKind.tokensDeclarative
+                (Binding.State(kTags, Some [ "wire-formats"; "a11y" ]))
+                (Some(Binding.Static(Some topics)))
+                true)
             field
               "intake-level"
               "How prepared is the material?"
               "A bounded ordinal — five positions, halves admitted. The scale is on the wire, so a host cannot quietly render four."
-              (FormFieldKind.Rating(true, 5, None, Some(Binding.State(kLevel, Some 3.5))))
+              (FormFieldKind.ratingDeclarative (Binding.State(kLevel, Some 3.5)) 5 true)
             field
               "intake-accent"
               "Slide accent colour"
               "A colour as a VALUE, not as styling. What it produces is data the submitter chose, and it travels in the submission like every other answer."
-              (FormFieldKind.Color(None, Some(Binding.State(kAccent, Some "#3f6f5f")))) ] }
+              (FormFieldKind.colorDeclarative (Binding.State(kAccent, Some "#3f6f5f"))) ] }
 
 let private wire: string = CJson.encodeNode submission
 

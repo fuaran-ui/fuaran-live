@@ -399,48 +399,42 @@ let private holdForm: Node<obj> =
                   Fields =
                     [ { Id = idTitle
                         Label = TextSource.Literal "Title or author"
-                        Kind = FormFieldKind.Text(Some(Binding.State(kTitle, Some "The Dispossessed")), None)
+                        Kind = FormFieldKind.textDeclarative (Binding.State(kTitle, Some "The Dispossessed"))
                         Required = true
                         Help = Some(TextSource.Literal "At least two characters.")
                         Rule = None }
                       { Id = idFormat
                         Label = TextSource.Literal "Format"
                         Kind =
-                          FormFieldKind.Choice(
-                            Binding.Static(Some [ option "Print"; option "Ebook"; option "Audiobook" ]),
-                            Some(Binding.State(kFormat, Some "Print")),
-                            None
-                          )
+                          FormFieldKind.choiceDeclarative
+                            (Binding.Static(Some [ option "Print"; option "Ebook"; option "Audiobook" ]))
+                            (Binding.State(kFormat, Some "Print"))
                         Required = true
                         Help = None
                         Rule = None }
                       { Id = idBranch
                         Label = TextSource.Literal "Collect from"
                         Kind =
-                          FormFieldKind.Choice(
-                            Binding.Static(Some [ option "Central"; option "Riverside"; option "Hillcrest" ]),
-                            Some(Binding.State(kBranch, Some "Riverside")),
-                            None
-                          )
+                          FormFieldKind.choiceDeclarative
+                            (Binding.Static(Some [ option "Central"; option "Riverside"; option "Hillcrest" ]))
+                            (Binding.State(kBranch, Some "Riverside"))
                         Required = true
                         Help = None
                         Rule = None }
                       { Id = idCopies
                         Label = TextSource.Literal "Copies"
                         Kind =
-                          FormFieldKind.RangedNumber(
-                            Some(Binding.State(kCopies, Some 1.0)),
-                            None,
-                            Some 1.0,
-                            Some 4.0,
-                            Some 1.0
-                          )
+                          FormFieldKind.rangedNumberDeclarative
+                            (Binding.State(kCopies, Some 1.0))
+                            (Some 1.0)
+                            (Some 4.0)
+                            (Some 1.0)
                         Required = true
                         Help = Some(TextSource.Literal "One to four.")
                         Rule = None }
                       { Id = idNotify
                         Label = TextSource.Literal "Email me when it arrives"
-                        Kind = FormFieldKind.Checkbox(Some(Binding.State(kNotify, Some true)), None)
+                        Kind = FormFieldKind.checkboxDeclarative (Binding.State(kNotify, Some true))
                         Required = false
                         Help = None
                         Rule = None } ]

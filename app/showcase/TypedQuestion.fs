@@ -96,7 +96,7 @@ let private askTree (round: int) : Node<obj> =
                   Fields =
                     [ { Id = "tq-canary-field"
                         Label = TextSource.Literal "Canary share (%)"
-                        Kind = FormFieldKind.Number(Some(Binding.State(canaryKey, Some 10.0)), None)
+                        Kind = FormFieldKind.numberDeclarative (Binding.State(canaryKey, Some 10.0))
                         Required = true
                         Help =
                           Some(TextSource.Literal "A whole percentage. Try 12.5 – the contract says integers only.")
@@ -104,22 +104,20 @@ let private askTree (round: int) : Node<obj> =
                       { Id = "tq-env-field"
                         Label = TextSource.Literal "Environment"
                         Kind =
-                          FormFieldKind.Choice(
-                            Binding.Static(
+                          FormFieldKind.choiceDeclarative
+                            (Binding.Static(
                               Some
                                 [ { Value = "staging"; Label = "Staging" }
                                   { Value = "production"
                                     Label = "Production" } ]
-                            ),
-                            Some(Binding.State(envKey, Some "staging")),
-                            None
-                          )
+                            ))
+                            (Binding.State(envKey, Some "staging"))
                         Required = true
                         Help = None
                         Rule = None }
                       { Id = "tq-note-field"
                         Label = TextSource.Literal "Note for the log"
-                        Kind = FormFieldKind.Text(Some(Binding.State(noteKey, Some "")), None)
+                        Kind = FormFieldKind.textDeclarative (Binding.State(noteKey, Some ""))
                         Required = false
                         Help = Some(TextSource.Literal "Optional – up to 120 characters.")
                         Rule = None } ]

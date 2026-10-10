@@ -57,41 +57,35 @@ let private card: Node<obj> =
         Fields =
           [ { Id = "hv-incident"
               Label = TextSource.Literal "Incident reference"
-              Kind = FormFieldKind.Text(Some(Binding.State(kIncident, Some "INC-4471")), None)
+              Kind = FormFieldKind.textDeclarative (Binding.State(kIncident, Some "INC-4471"))
               Required = true
               Help = Some(TextSource.Literal "Edit it, then press the copy button beside it.")
               Rule = None }
             { Id = "hv-severity"
               Label = TextSource.Literal "Severity"
               Kind =
-                FormFieldKind.Choice(
-                  Binding.Static(Some [ option "SEV-1"; option "SEV-2"; option "SEV-3" ]),
-                  Some(Binding.State(kSeverity, Some "SEV-2")),
-                  None
-                )
+                FormFieldKind.choiceDeclarative
+                  (Binding.Static(Some [ option "SEV-1"; option "SEV-2"; option "SEV-3" ]))
+                  (Binding.State(kSeverity, Some "SEV-2"))
               Required = true
               Help = None
               Rule = None }
             { Id = "hv-owner"
               Label = TextSource.Literal "Handing over to"
-              Kind = FormFieldKind.Text(Some(Binding.State(kOwner, Some "Mhairi (late shift)")), None)
+              Kind = FormFieldKind.textDeclarative (Binding.State(kOwner, Some "Mhairi (late shift)"))
               Required = true
               Help = None
               Rule = None }
             { Id = "hv-note"
               Label = TextSource.Literal "What the next shift needs to know"
               Kind =
-                FormFieldKind.TextArea(
-                  Some(
-                    Binding.State(
-                      kNote,
-                      Some
-                        "Replica lag peaked at 41s at 03:12 and is back under 2s. Root cause is the nightly reindex overlapping the batch window. Do not restart the follower — it is catching up cleanly."
-                    )
-                  ),
-                  None,
+                FormFieldKind.textAreaDeclarative
+                  (Binding.State(
+                    kNote,
+                    Some
+                      "Replica lag peaked at 41s at 03:12 and is back under 2s. Root cause is the nightly reindex overlapping the batch window. Do not restart the follower — it is catching up cleanly."
+                  ))
                   4
-                )
               Required = false
               Help = None
               Rule = None } ] }

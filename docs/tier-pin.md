@@ -200,6 +200,19 @@ the contract compiled against did not move at the switch.
   `renderer` 0.26.0) and `fuaran-ui` 0.8.0, the releases carrying Phases 1810,
   1811, 1812 and 1892 — which is what cleared the projection-conformance
   quarantine's TypeScript entries and its four Python 1812 / 1892 entries.
+- **v0.93.0** (2026-10-12, Phase 2215) — the release carrying Phase 2177's
+  `FormFieldKind` reshape: every case's `value` is a `Binding<JVal>` and its
+  handler is one `onChange` taking a `JVal`, so Checkbox and Toggle no longer
+  have an `onToggle`. The showcase needed no source edit at this raise, because
+  Phase 2210 had already moved its form fields onto the
+  `FormFieldKind.*Declarative` helpers, whose signatures did not change; that
+  was verified by compiling the showcase against a `v0.93.0` source archive laid
+  out as the sibling (`--noCache`). The tier declares `Fuaran.Core.*` 0.36.0,
+  which the floor already met. It rides with the `@fuaran-ui/*` v0.30.0 set
+  (`schema` 0.26.0, `ops` 0.30.0, `renderer` 0.27.0, `ui` 0.24.0, `ai-tools`
+  0.14.0, `charts` 0.14.4, `op-stream` 0.11.4) and `fuaran-ui` 0.9.0, and the
+  specification checkout's temporary pin to its last pre-2177 commit goes with
+  it: that pin existed only because no pinned host had released 2177 yet.
 
 ## The package pins — the same release, by package
 
@@ -260,6 +273,14 @@ source migration (above) and the package checklist below.
   `ColExpr`, `Slot` and the enums beside them) live in the `Fuaran.Compute`
   namespace; from 0.91.0 the expression bound counts a rounding scale as a
   node. `Fuaran.Core.*` moved 0.32.0 → 0.34.0.
+- **0.91.0 → 0.93.0** (Phase 2215) — the same release, by package. The F#
+  schema table in `app/Projection.fs` follows the reshape: every `FormFieldKind`
+  value slot is described as a `Binding<JVal>` whose `Static` encodes bare
+  (`BS<j>`), and Checkbox/Toggle's handler row is `onChange`. The `RangePair` and
+  `DateTimeRangePair` rows went with it, since only the old typed `Range` and
+  `DateTimeRange` value slots read them. `Fuaran.UI.Program` 0.93.0 floors
+  `Fuaran.Program.Runtime` at 0.9.0, so `FuaranProgramVersion` moved 0.7.1 →
+  0.9.0 (point 3); `Fuaran.Core.*` stays at 0.36.0.
 - **The ceiling that twice held the family back is gone.** Before the loop's
   0.6.0 split, the tier widened a member of `Action` and the loop — a separate
   producer — still constructed the narrower form in its own Fable-packed

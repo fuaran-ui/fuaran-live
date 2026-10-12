@@ -13,7 +13,10 @@
 import { StrictMode, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
-import { FuaranRenderer, emptySources, defaultTheme, enhanceMath } from '@fuaran-ui/renderer';
+import { FuaranRenderer, emptySources, defaultTheme } from '@fuaran-ui/renderer';
+// The math enhancer's home is its own subpath (the package root stopped
+// re-exporting it at renderer 0.27.0), the one the Fable host imports too.
+import { enhanceMath } from '@fuaran-ui/renderer/enhance-math';
 import { decodeNode, encodeNode } from '@fuaran-ui/ops';
 import type { Node } from '@fuaran-ui/schema';
 

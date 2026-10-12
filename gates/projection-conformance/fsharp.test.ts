@@ -520,8 +520,13 @@ describe('F# projection conformance (Node corpus)', () => {
     ).toEqual([]);
 
     // Said out loud, so a reader of a green run knows WHICH world it was green
-    // in. The pin predates Phase 1661 as of fuaran#1695; when it moves, the
-    // assertion above is what names the work.
+    // in. The pin predated Phase 1661 when fuaran#1695 recorded this rule; at
+    // `Fuaran.UI` 0.93.0 (Phase 2215) it takes the bound spelling. The rule is
+    // not specific to this slot: Phase 2177 retired Checkbox/Toggle's `onToggle`
+    // for `onChange` and made every `FormFieldKind` value a `Binding<JVal>`, and
+    // app/Projection.fs took that shape in the same change that moved the pin
+    // to the release shipping it — never ahead of it. When the pin moves again,
+    // the assertion above is what names the work.
     expect(['bare', 'bound']).toContain(arm.spelling);
   }, 600_000);
 

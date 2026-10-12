@@ -220,9 +220,10 @@ export interface QuarantineEntry {
  * fixture quarantined on one arm and not the other is a single row whose other
  * cell is simply absent.
  *
- * The state, as re-measured 2026-10-04 (Phase 1882) against the pinned hosts —
- * `@fuaran-ui/ops` 0.29.0 / `@fuaran-ui/ui` 0.23.0, `fuaran-ui` 0.8.0 on PyPI and
- * `Fuaran.UI` 0.91.0 — is in the census test's generated name. Every entry is HOST
+ * The state, as re-measured 2026-10-12 (Phase 2215) against the pinned hosts —
+ * `@fuaran-ui/ops` 0.30.0 / `@fuaran-ui/ui` 0.24.0, `fuaran-ui` 0.9.0 on PyPI and
+ * `Fuaran.UI` 0.93.0, the releases carrying Phase 2177's `FormFieldKind`
+ * reshape, which moved no entry — is in the census test's generated name. Every entry is HOST
  * lag with the probe agreeing; none is the projector's. What each family is:
  *
  *   • TypeScript — none. The 0.29.0 set carries Phases 1811 (the temporal rename

@@ -1664,10 +1664,10 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
 
   match kind with
   | "Number" -> tsInline ([ "kind", qs "Number" ] @ handler "onChange" @ [ "value", value ])
-  | "Checkbox" -> tsInline ([ "kind", qs "Checkbox" ] @ handler "onToggle" @ [ "value", value ])
-  // Phase 766 — Toggle shares Checkbox's shape exactly (same onToggle handler,
+  | "Checkbox" -> tsInline ([ "kind", qs "Checkbox" ] @ handler "onChange" @ [ "value", value ])
+  // Phase 766 — Toggle shares Checkbox's shape exactly (same onChange handler,
   // same boolean value slot); only the kind discriminator differs.
-  | "Toggle" -> tsInline ([ "kind", qs "Toggle" ] @ handler "onToggle" @ [ "value", value ])
+  | "Toggle" -> tsInline ([ "kind", qs "Toggle" ] @ handler "onChange" @ [ "value", value ])
   | "Choice" ->
     tsInline (
       [ "kind", qs "Choice" ]
@@ -3470,8 +3470,8 @@ let private pyStrItem (v: JsonValue) : string =
 ///
 /// From fuaran-py 0.2.0 every handler is a `bool` flag the encoder turns into
 /// the `"<closure>"` sentinel, and the defaults are NOT uniform: `on_change` and
-/// `on_select` default True, `on_toggle` and `on_select_tag` default False, and
-/// `ToggleField.on_toggle` defaults False where `CheckboxField.on_toggle`
+/// `on_select` default True, `on_toggle` (Disclosure) and `on_select_tag`
+/// default False, and `ToggleField.on_change` defaults False where `CheckboxField.on_change`
 /// defaults True. A projector that omitted the argument would therefore emit
 /// whichever sentinel that release happens to default to rather than the one the
 /// fixture carries, and would break silently on a release that flipped one. The
@@ -4154,8 +4154,8 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
   // the whole closure-sentinel quarantine family is what that cost.
   match kind with
   | "Number" -> pyCall "t.NumberField" [] (optValue @ pyHandler "onChange" "on_change" v)
-  | "Checkbox" -> pyCall "t.CheckboxField" [] (optValue @ pyHandler "onToggle" "on_toggle" v)
-  | "Toggle" -> pyCall "t.ToggleField" [] (optValue @ pyHandler "onToggle" "on_toggle" v)
+  | "Checkbox" -> pyCall "t.CheckboxField" [] (optValue @ pyHandler "onChange" "on_change" v)
+  | "Toggle" -> pyCall "t.ToggleField" [] (optValue @ pyHandler "onChange" "on_change" v)
   | "Choice" ->
     pyCall "t.ChoiceField" [ pyOptionsBinding (fieldReq "options" v) ] (optValue @ pyHandler "onChange" "on_change" v)
   | "SegmentedChoice" ->
@@ -5763,7 +5763,9 @@ type private Fd =
   /// `Binding<'T>` over the given payload.
   | Bind of Fd
   /// `Binding<'T>` at a slot whose encoder writes a BARE `'T` for a
-  /// `Static` — the `FormFieldKind.Range` / `.DateRange` shorthand.
+  /// `Static` — every `FormFieldKind` value slot, a `Binding<JVal>` on every
+  /// case since the tier's 0.93.0 (Phase 2177), whose bare object payloads
+  /// (`Range`, `DateTimeRange`) carry no `$type` to dispatch on.
   | BindStatic of Fd
   | Lst of Fd
   | MapOf of Fd
@@ -5937,7 +5939,6 @@ let private fsRecordTable: (string * string * string list) list =
        "Source|source|!|B<core:rows>"
        "StaticRows|staticRows|?|R:StaticRows"
        "OnRowClick|onRowClick|?|C" ])
-    ("DateTimeRangePair", "", [ "From|from|!|s"; "To|to|!|s" ])
     ("DefaultSort", "", [ "Column|column|!|i"; "Direction|direction|!|E:SortDirection" ])
     ("DisclosureSpec",
      "Disclosure",
@@ -6132,7 +6133,6 @@ let private fsRecordTable: (string * string * string list) list =
        "Tone|tone|=ToneVariant.Default|E:ToneVariant"
        "Label|label|?|U:TextSource"
        "Caveat|caveat|?|U:TextSource" ])
-    ("RangePair", "", [ "Max|max|!|f"; "Min|min|!|f" ])
     ("ScrollAreaSpec",
      "ScrollArea",
      [ "Children|children|!|L<n>"
@@ -6303,26 +6303,26 @@ let private fsUnionTable: (string * string * string list) list =
        "to|to|!|R:DrawPoint" ])
     ("CurveCommand", "QuadraticTo", [ "control|control|!|R:DrawPoint"; "to|to|!|R:DrawPoint" ])
     ("CurveCommand", "Close", [])
-    ("FormFieldKind", "Text", [ "value|value|?|B<s>"; "onChange|onChange|?|C" ])
-    ("FormFieldKind", "Number", [ "value|value|?|B<f>"; "onChange|onChange|?|C" ])
-    ("FormFieldKind", "Checkbox", [ "value|value|?|B<b>"; "onToggle|onToggle|?|C" ])
-    ("FormFieldKind", "Toggle", [ "value|value|?|B<b>"; "onToggle|onToggle|?|C" ])
+    ("FormFieldKind", "Text", [ "value|value|?|BS<j>"; "onChange|onChange|?|C" ])
+    ("FormFieldKind", "Number", [ "value|value|?|BS<j>"; "onChange|onChange|?|C" ])
+    ("FormFieldKind", "Checkbox", [ "value|value|?|BS<j>"; "onChange|onChange|?|C" ])
+    ("FormFieldKind", "Toggle", [ "value|value|?|BS<j>"; "onChange|onChange|?|C" ])
     ("FormFieldKind",
      "Choice",
      [ "options|options|!|B<L<R:SelectOption>>"
-       "value|value|?|B<s>"
+       "value|value|?|BS<j>"
        "onChange|onChange|?|C" ])
-    ("FormFieldKind", "TextArea", [ "value|value|?|B<s>"; "onChange|onChange|?|C"; "rows|rows|!|i" ])
+    ("FormFieldKind", "TextArea", [ "value|value|?|BS<j>"; "onChange|onChange|?|C"; "rows|rows|!|i" ])
     ("FormFieldKind",
      "RangedNumber",
-     [ "value|value|?|B<f>"
+     [ "value|value|?|BS<j>"
        "onChange|onChange|?|C"
        "min|min|?|f"
        "max|max|?|f"
        "step|step|?|f" ])
     ("FormFieldKind",
      "Range",
-     [ "value|value|?|BS<R:RangePair>"
+     [ "value|value|?|BS<j>"
        "onChange|onChange|?|C"
        "min|min|?|f"
        "max|max|?|f"
@@ -6330,12 +6330,12 @@ let private fsUnionTable: (string * string * string list) list =
     ("FormFieldKind",
      "SegmentedChoice",
      [ "options|options|!|B<L<R:SelectOption>>"
-       "value|value|?|B<s>"
+       "value|value|?|BS<j>"
        "onChange|onChange|?|C"
        "orientation|orientation|!|E:Orientation" ])
     ("FormFieldKind",
      "DateTime",
-     [ "value|value|?|B<s>"
+     [ "value|value|?|BS<j>"
        "onChange|onChange|?|C"
        "variant|variant|!|E:DateTimeVariant"
        "min|min|?|s"
@@ -6343,7 +6343,7 @@ let private fsUnionTable: (string * string * string list) list =
        "step|step|?|f" ])
     ("FormFieldKind",
      "DateTimeRange",
-     [ "value|value|?|BS<R:DateTimeRangePair>"
+     [ "value|value|?|BS<j>"
        "onChange|onChange|?|C"
        "variant|variant|!|E:DateTimeVariant"
        "min|min|?|s"
@@ -6354,20 +6354,20 @@ let private fsUnionTable: (string * string * string list) list =
      [ "allowFreeText|allowFreeText|=false|b"
        "onChange|onChange|?|C"
        "options|options|!|B<L<R:SelectOption>>"
-       "value|value|?|B<s>" ])
+       "value|value|?|BS<j>" ])
     ("FormFieldKind",
      "Rating",
      [ "allowHalf|allowHalf|=false|b"
        "max|max|!|i"
        "onChange|onChange|?|C"
-       "value|value|?|B<f>" ])
-    ("FormFieldKind", "Color", [ "onChange|onChange|?|C"; "value|value|?|B<s>" ])
+       "value|value|?|BS<j>" ])
+    ("FormFieldKind", "Color", [ "onChange|onChange|?|C"; "value|value|?|BS<j>" ])
     ("FormFieldKind",
      "Tokens",
      [ "allowFreeText|allowFreeText|=true|b"
        "onChange|onChange|?|C"
        "suggestions|suggestions|?|B<L<R:SelectOption>>"
-       "value|value|?|B<L<s>>" ])
+       "value|value|?|BS<j>" ])
     ("Format", "Number", [ "decimals|decimals|?|i" ])
     ("Format", "Currency", [ "isoCode|isoCode|!|s" ])
     ("Format", "Percent", [ "decimals|decimals|?|i" ])

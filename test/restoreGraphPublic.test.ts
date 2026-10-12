@@ -26,23 +26,23 @@
 //  would have pinned a name that merely looked right, and nothing in this repo
 //  would have objected. See the `## Dependencies` section of `CLAUDE.md`.
 //
-//  REGISTRY EVIDENCE (re-checked 2026-10-04, AiWire 2026-10-06 against the public flat-container
+//  REGISTRY EVIDENCE (re-checked 2026-10-12, Phase 2215, against the public flat-container
 //  index; recorded here rather than fetched by the test, which stays offline
 //  and deterministic). Every id+version below was served:
-//    Fuaran.UI 0.91.0 · Fuaran.UI.Renderer 0.91.0 · Fuaran.UI.Ops 0.91.0
-//    Fuaran.UI.OpStream.Abstractions 0.91.0 · Fuaran.UI.OpStream.Replay 0.91.0
-//    Fuaran.UI.ServerDriven 0.91.0 · Fuaran.UI.Program 0.91.0
-//    Fuaran.UI.AiWire 0.91.0 (re-checked 2026-10-06, Phase 2079: one version with the family)
-//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.36.0 (re-checked 2026-10-09, Phase 2184;
-//    a floor, not the tier's declared 0.34.0 — see Directory.Build.props)
-//    Fuaran.Program.Runtime 0.7.1
+//    Fuaran.UI 0.93.0 · Fuaran.UI.Renderer 0.93.0 · Fuaran.UI.Ops 0.93.0
+//    Fuaran.UI.OpStream.Abstractions 0.93.0 · Fuaran.UI.OpStream.Replay 0.93.0
+//    Fuaran.UI.ServerDriven 0.93.0 · Fuaran.UI.Program 0.93.0
+//    Fuaran.UI.AiWire 0.93.0 (one version with the family since Phase 2079)
+//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.36.0 (a floor; the 0.93.0
+//    tier declares 0.36.0 too — see Directory.Build.props)
+//    Fuaran.Program.Runtime 0.9.0 (the floor Fuaran.UI.Program 0.93.0 declares)
 //  The program loop's UI adapter is a member of the UI family since Phase 2016:
 //  it ships from the language tier as `Fuaran.UI.Program` (it was
 //  `Fuaran.Program.UI`, published by the program domain up to 0.7.1), so it is
 //  pinned with the family and its old id leaves the allowed set.
-//  The `Fuaran.Core.*` line moves 0.32.0 -> 0.34.0 WITH the tier family and not
-//  on its own account: those are direct pins on packages the tier also depends
-//  on, and the 0.91.0 tier declares Core 0.34.0 where 0.86.0 declared 0.32.0 —
+//  The `Fuaran.Core.*` line moves WITH the tier family and not on its own
+//  account: those are direct pins on packages the tier also depends on, and
+//  each tier release declares its own Core floor (0.93.0 declares 0.36.0) —
 //  a direct pin beats a transitive floor, so leaving them behind downgrades the
 //  tier's own dependency (NU1605) rather than holding Core back. The reasoning
 //  is at the pins themselves in `app/FuaranLive.fsproj`.

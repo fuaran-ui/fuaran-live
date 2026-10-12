@@ -43,7 +43,7 @@ import { describe, expect, it, vi } from 'vitest';
 const out = resolve(__dirname, '../app/output');
 const fableModules = resolve(out, 'fable_modules');
 
-/** The versioned package folder Fable emitted for `id` (e.g. `<id>.0.91.0`). */
+/** The versioned package folder Fable emitted for `id` (e.g. `<id>.0.93.0`). */
 const pkg = (id: string): string => {
   const hit = readdirSync(fableModules).find((d) => d.startsWith(id + '.'));
   if (!hit) {

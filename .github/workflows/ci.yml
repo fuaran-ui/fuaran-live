@@ -56,18 +56,13 @@ jobs:
           # The corpus checkout stays unpinned deliberately — it is the shared
           # conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: v0.91.0
+          ref: v0.93.0
           path: fuaran-dotnet
 
       - uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
-          # Pinned to the last specification commit before Phase 2177 (Checkbox/Toggle onToggle -> onChange).
-          # The hosts this repo restores (npm, PyPI, nuget.org) have not released 2177 yet, and the
-          # projection emits the pinned tier's spelling, so the corpus at main is ahead of every tier
-          # pinned here. Phase 2215 raises the pins and removes this ref.
-          ref: 055358aa18bc05d6b9fae449d46b2348d8415214
           # Full history, because the host-pin drift step below measures the DISTANCE
           # between each pinned host's publish date and the corpus fixture commits that
           # followed it. The default depth of 1 holds HEAD and nothing else, under which
@@ -151,7 +146,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install the Python host (fuaran-ui)
-        run: python -m pip install --disable-pip-version-check fuaran-ui==0.8.0
+        run: python -m pip install --disable-pip-version-check fuaran-ui==0.9.0
 
       # The F# tier's nuget.config declares a local folder feed at a fixed
       # relative depth; NuGet hard-errors (NU1301) on a missing folder source,

@@ -213,6 +213,17 @@ the contract compiled against did not move at the switch.
   0.14.0, `charts` 0.14.4, `op-stream` 0.11.4) and `fuaran-ui` 0.9.0, and the
   specification checkout's temporary pin to its last pre-2177 commit goes with
   it: that pin existed only because no pinned host had released 2177 yet.
+- **v0.94.0** (2026-10-15, Phase 2243) — a breaking release for F# consumers:
+  `PreEmitValidate.DefectSeverity` is gone (the tier reports one
+  `Fuaran.Core.Severity`, which gains `Info`), both render contexts hold their
+  egress, hash-floor, CSP and scope settings in one `Policy` record, and a client
+  context is built by `Render.RenderContext.create` plus `with`. The showcase's
+  four full `RenderContext` literals (`AgentReadable`, `Exhibit`, `Send`,
+  `TypedQuestion`) became `create` with `Runtime` and `Policy` set; each keeps
+  its explicit non-local egress denial, which is also `RenderPolicy.defaults`.
+  Verified by compiling the showcase against a `v0.94.0` source archive laid out
+  as the sibling. The tier declares `Fuaran.Core.*` 0.36.0 and
+  `Fuaran.Program.Runtime` 0.9.0, which the floors already met.
 
 ## The package pins — the same release, by package
 
@@ -281,6 +292,12 @@ source migration (above) and the package checklist below.
   `DateTimeRange` value slots read them. `Fuaran.UI.Program` 0.93.0 floors
   `Fuaran.Program.Runtime` at 0.9.0, so `FuaranProgramVersion` moved 0.7.1 →
   0.9.0 (point 3); `Fuaran.Core.*` stays at 0.36.0.
+- **0.93.0 → 0.94.0** (Phase 2243) — the same release, by package. The
+  playground's three severity sites (`A11yWalk`, `PropertyEditor`, `Session`)
+  read `Fuaran.Core.Severity`. `A11yWalk`'s own two-case copy of the severity
+  is now an abbreviation of it, so its `info` tag exists for a severity no
+  Fuaran check raises today. `Fuaran.Core.*` stays at 0.36.0 and
+  `Fuaran.Program.Runtime` at 0.9.0.
 - **The ceiling that twice held the family back is gone.** Before the loop's
   0.6.0 split, the tier widened a member of `Action` and the loop — a separate
   producer — still constructed the narrower form in its own Fable-packed

@@ -243,57 +243,29 @@ let private browserRuntime: Runtime.IFuaranRuntime =
 
 let private renderLive (node: Node<obj>) : ReactElement =
   Render.render
-    { Sources =
+    { Render.RenderContext.create
         { BindingResolver.empty with
             State = StateStore.snapshot () }
-      Runtime = browserRuntime
-      VisAdapter = VisAdapter.noOp<obj>
-      Dispatch = ignore
-      TelemetrySink = None
-      InErrorBoundary = false
-      Fragments = Render.collectFragments Map.empty node
-      ExpandingFragments = Set.empty
-      Scope = None
-      SessionContext = Map.empty
-      // Deny non-local egress, and here that is the load-bearing choice rather
-      // than the cheap one: this is the page that renders a DECODED tree. The
-      // question arrives as canonical bytes and is decoded before it is drawn,
-      // so the tree is exactly the artefact a presenting host must not trust -
-      // an asking agent could put a destination in it, and a rendered `src`
-      // is contacted by rendering alone. A decoded tree cannot declare its own
-      // egress, so absent a declaration from this host it gets none. There is
-      // nothing to declare: the elicitation carries a form, a prompt and a
-      // commit action, and no destination at all.
-      //
-      // This is the same posture as the dispatch policy above, one seam over.
-      // The page grants exactly the one capability its contract needs and
-      // refuses the rest, so it stays out of a `grep permissiveEgress` sweep
-      // for hosts that opted back out of the default.
-      EgressPolicy = Sanitize.denyNonLocalEgress
-      UploadSink = None
-      // No user-action record sink: this is a client-only page with no
-      // durable destination, and the action log is privacy-classed, so an
-      // unconfigured host must record nothing and pay nothing. `None`
-      // reproduces the renderer's own default at every convenience entry
-      // point. `CurrentNodeId` is renderer-owned - `render` sets it per
-      // node, and only when a sink is wired - so `None` is the only
-      // correct value at construction.
-      ActionSink = None
-      CurrentNodeId = None
-      // Phase 1532 - this render declares no per-render Custom content-hash
-      // floor, so the process floor (`CustomHash.installCustomHashFloor`)
-      // decides. `None` is the renderer's own default at every convenience
-      // entry point, and the field is raise-only, so declaring nothing here
-      // can never weaken a floor the host installed.
-      CustomHashFloor = None
-      // Phase 1545 - the strict-CSP render mode. `Permissive` is the tier's own
-      // default at every convenience entry point and emits byte-identical output,
-      // so declaring it here changes nothing this page renders. It is also the
-      // only correct value for a client-only render: a nonce has to match the
-      // Content-Security-Policy header of the response that delivered the
-      // document, and a render with no such response has nothing to match, so a
-      // strict render here would emit generated classes with no rules behind them.
-      Csp = Csp.Permissive }
+        ignore
+        node with
+        Runtime = browserRuntime
+        // Deny non-local egress, and here that is the load-bearing choice rather
+        // than the cheap one: this is the page that renders a DECODED tree. The
+        // question arrives as canonical bytes and is decoded before it is drawn,
+        // so the tree is exactly the artefact a presenting host must not trust -
+        // an asking agent could put a destination in it, and a rendered `src`
+        // is contacted by rendering alone. A decoded tree cannot declare its own
+        // egress, so absent a declaration from this host it gets none. There is
+        // nothing to declare: the elicitation carries a form, a prompt and a
+        // commit action, and no destination at all.
+        //
+        // This is the same posture as the dispatch policy above, one seam over.
+        // The page grants exactly the one capability its contract needs and
+        // refuses the rest, so it stays out of a `grep permissiveEgress` sweep
+        // for hosts that opted back out of the default.
+        Policy =
+          { RenderPolicy.defaults with
+              Egress = Sanitize.denyNonLocalEgress } }
     node
 
 // ─── The presenting host's answer capture ────────────────────────────────────

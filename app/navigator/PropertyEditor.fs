@@ -497,7 +497,7 @@ let private errorDefects (tree: Node<obj>) : string list =
       let code, severity, message = Validate.describe d
 
       match severity with
-      | Validate.DefectSeverity.Error -> Some(code + "|" + message)
+      | Fuaran.Core.Severity.Error -> Some(code + "|" + message)
       | _ -> None)
 
 /// The defects the edit INTRODUCES — the candidate's error set minus the

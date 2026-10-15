@@ -44,36 +44,15 @@ let renderStatic (n: Node<'msg>) : ReactElement =
 /// re-renders; this function only supplies the snapshot the resolver reads.
 let renderLiveWith (egress: Sanitize.EgressPolicy) (node: Node<obj>) : ReactElement =
   Render.render
-    { Sources =
+    { Render.RenderContext.create
         { BindingResolver.empty with
             State = StateStore.snapshot () }
-      Runtime = runtime
-      VisAdapter = VisAdapter.noOp<obj>
-      Dispatch = ignore
-      TelemetrySink = None
-      InErrorBoundary = false
-      Fragments = Render.collectFragments Map.empty node
-      ExpandingFragments = Set.empty
-      Scope = None
-      SessionContext = Map.empty
-      EgressPolicy = egress
-      UploadSink = None
-      ActionSink = None
-      CurrentNodeId = None
-      // Phase 1532 - this render declares no per-render Custom content-hash
-      // floor, so the process floor (`CustomHash.installCustomHashFloor`)
-      // decides. `None` is the renderer's own default at every convenience
-      // entry point, and the field is raise-only, so declaring nothing here
-      // can never weaken a floor the host installed.
-      CustomHashFloor = None
-      // Phase 1545 - the strict-CSP render mode. `Permissive` is the tier's own
-      // default at every convenience entry point and emits byte-identical output,
-      // so declaring it here changes nothing this page renders. It is also the
-      // only correct value for a client-only render: a nonce has to match the
-      // Content-Security-Policy header of the response that delivered the
-      // document, and a render with no such response has nothing to match, so a
-      // strict render here would emit generated classes with no rules behind them.
-      Csp = Csp.Permissive }
+        ignore
+        node with
+        Runtime = runtime
+        Policy =
+          { RenderPolicy.defaults with
+              Egress = egress } }
     node
 
 /// The common case: a hand-authored tree whose destinations are this origin's

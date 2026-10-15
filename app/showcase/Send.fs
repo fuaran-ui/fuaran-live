@@ -255,52 +255,24 @@ let private browserRuntime: Runtime.IFuaranRuntime = BrowserRuntime.create ()
 
 let private renderTree (n: Node<unit>) : ReactElement =
   Render.render
-    { Sources =
+    { Render.RenderContext.create
         { BindingResolver.empty with
             State = StateStore.snapshot () }
-      Runtime = browserRuntime
-      VisAdapter = VisAdapter.noOp<unit>
-      Dispatch = ignore
-      TelemetrySink = None
-      InErrorBoundary = false
-      Fragments = Render.collectFragments Map.empty n
-      ExpandingFragments = Set.empty
-      Scope = None
-      SessionContext = Map.empty
-      // Deny non-local egress, stated rather than inherited. The exemplar is
-      // hand-authored above and names no destination outside this page: no
-      // link, no image `src`, no markdown anchor, and its one route is the
-      // relative `dashboard/refresh`, which is same-origin and so allowed by
-      // this policy anyway (the dispatch gate above is what refuses it, and
-      // for its own reason). So the denying default costs this page nothing
-      // and says something true - a zero-egress exhibit declares no egress.
-      // Reaching `permissiveEgress` here would be the opposite claim, made
-      // only to fill the field.
-      EgressPolicy = Sanitize.denyNonLocalEgress
-      UploadSink = None
-      // No user-action record sink: this is a client-only page with no
-      // durable destination, and the action log is privacy-classed, so an
-      // unconfigured host must record nothing and pay nothing. `None`
-      // reproduces the renderer's own default at every convenience entry
-      // point. `CurrentNodeId` is renderer-owned - `render` sets it per
-      // node, and only when a sink is wired - so `None` is the only
-      // correct value at construction.
-      ActionSink = None
-      CurrentNodeId = None
-      // Phase 1532 - this render declares no per-render Custom content-hash
-      // floor, so the process floor (`CustomHash.installCustomHashFloor`)
-      // decides. `None` is the renderer's own default at every convenience
-      // entry point, and the field is raise-only, so declaring nothing here
-      // can never weaken a floor the host installed.
-      CustomHashFloor = None
-      // Phase 1545 - the strict-CSP render mode. `Permissive` is the tier's own
-      // default at every convenience entry point and emits byte-identical output,
-      // so declaring it here changes nothing this page renders. It is also the
-      // only correct value for a client-only render: a nonce has to match the
-      // Content-Security-Policy header of the response that delivered the
-      // document, and a render with no such response has nothing to match, so a
-      // strict render here would emit generated classes with no rules behind them.
-      Csp = Csp.Permissive }
+        ignore
+        n with
+        Runtime = browserRuntime
+        // Deny non-local egress, stated rather than inherited. The exemplar is
+        // hand-authored above and names no destination outside this page: no
+        // link, no image `src`, no markdown anchor, and its one route is the
+        // relative `dashboard/refresh`, which is same-origin and so allowed by
+        // this policy anyway (the dispatch gate above is what refuses it, and
+        // for its own reason). So the denying default costs this page nothing
+        // and says something true - a zero-egress exhibit declares no egress.
+        // Reaching `permissiveEgress` here would be the opposite claim, made
+        // only to fill the field.
+        Policy =
+          { RenderPolicy.defaults with
+              Egress = Sanitize.denyNonLocalEgress } }
     n
 
 [<ReactComponent>]

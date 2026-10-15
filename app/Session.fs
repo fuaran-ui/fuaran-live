@@ -356,8 +356,9 @@ let preEmitAdvisories (session: SessionState) : Advisory list =
         { Code = code
           Severity =
             (match severity with
-             | Fuaran.UI.PreEmitValidate.DefectSeverity.Error -> "error"
-             | Fuaran.UI.PreEmitValidate.DefectSeverity.Warning -> "warning")
+             | Fuaran.Core.Severity.Error -> "error"
+             | Fuaran.Core.Severity.Warning -> "warning"
+             | Fuaran.Core.Severity.Info -> "info")
           Message = message })
 
 // ─── closed-loop turn construction ───────────────────────────────────────────

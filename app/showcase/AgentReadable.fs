@@ -449,48 +449,25 @@ let private holdForm: Node<obj> =
 
 let private renderLive (node: Node<obj>) : ReactElement =
   Render.render
-    { Sources =
+    { Render.RenderContext.create
         { BindingResolver.empty with
             State = StateStore.snapshot () }
-      Runtime = browserRuntime
-      VisAdapter = VisAdapter.noOp<obj>
-      Dispatch = ignore
-      TelemetrySink = None
-      InErrorBoundary = false
-      Fragments = Render.collectFragments Map.empty node
-      ExpandingFragments = Set.empty
-      Scope = None
-      SessionContext = Map.empty
-      // Deny non-local egress. Note this page names a permissive DISPATCH
-      // runtime a few lines up and still denies egress here: the two seams are
-      // declared separately and one does not imply the other. Dispatch was
-      // opted out of because the tree's single action is a state write this
-      // page authored and can read; egress is a different question, and the
-      // honest answer is that the hold form names no destination at all - no
-      // link, no image, no markdown anchor - so there is nothing to declare
-      // and a denial forbids nothing the exhibit does. The page advertises
-      // what it affords; declaring an egress it does not use would be the one
-      // affordance claim on it that was not true.
-      EgressPolicy = Sanitize.denyNonLocalEgress
-      UploadSink = None
-      // Client-only page with no durable destination: an unconfigured host
-      // records nothing and pays nothing, and `CurrentNodeId` is renderer-owned.
-      ActionSink = None
-      CurrentNodeId = None
-      // Phase 1532 - this render declares no per-render Custom content-hash
-      // floor, so the process floor (`CustomHash.installCustomHashFloor`)
-      // decides. `None` is the renderer's own default at every convenience
-      // entry point, and the field is raise-only, so declaring nothing here
-      // can never weaken a floor the host installed.
-      CustomHashFloor = None
-      // Phase 1545 - the strict-CSP render mode. `Permissive` is the tier's own
-      // default at every convenience entry point and emits byte-identical output,
-      // so declaring it here changes nothing this page renders. It is also the
-      // only correct value for a client-only render: a nonce has to match the
-      // Content-Security-Policy header of the response that delivered the
-      // document, and a render with no such response has nothing to match, so a
-      // strict render here would emit generated classes with no rules behind them.
-      Csp = Csp.Permissive }
+        ignore
+        node with
+        Runtime = browserRuntime
+        // Deny non-local egress. Note this page names a permissive DISPATCH
+        // runtime a few lines up and still denies egress here: the two seams are
+        // declared separately and one does not imply the other. Dispatch was
+        // opted out of because the tree's single action is a state write this
+        // page authored and can read; egress is a different question, and the
+        // honest answer is that the hold form names no destination at all - no
+        // link, no image, no markdown anchor - so there is nothing to declare
+        // and a denial forbids nothing the exhibit does. The page advertises
+        // what it affords; declaring an egress it does not use would be the one
+        // affordance claim on it that was not true.
+        Policy =
+          { RenderPolicy.defaults with
+              Egress = Sanitize.denyNonLocalEgress } }
     node
 
 let private seedStore () : unit =

@@ -152,13 +152,11 @@ module Defaults = Fuaran.UI.Defaults
 
 // ─── the flag model (pure — no DOM, no React) ────────────────────────────────
 
-/// Mirrors `Fuaran.UI.Validator.Findings.Severity` — the vocabulary an author
-/// already knows from the build-time validator, so a finding here reads the
-/// same way one there does. Qualified because `Error` is also `Result`'s.
-[<RequireQualifiedAccess>]
-type Severity =
-  | Error
-  | Warning
+/// The tier's one severity (`Fuaran.Core.Severity`, since `Fuaran.UI` 0.94.0) —
+/// the vocabulary the runtime and the build-time validator both report in, so a
+/// finding here reads the same way one there does. Qualified because `Error` is
+/// also `Result`'s.
+type Severity = Fuaran.Core.Severity
 
 /// The raw string of a `NodeId` — the wire spelling, and the value every flat
 /// surface below is keyed by.
@@ -168,6 +166,7 @@ let severityTag (s: Severity) : string =
   match s with
   | Severity.Error -> "error"
   | Severity.Warning -> "warning"
+  | Severity.Info -> "info"
 
 /// One accessibility finding against one node.
 type Flag =
@@ -297,14 +296,6 @@ let private validatorA11yDefects (root: Node<obj>) : Validate.PreEmitDefect list
   with _ ->
     []
 
-/// The validator's severity in this lens's vocabulary. The two mirror
-/// `Fuaran.UI.Validator.Findings.Severity` between them, so this is a spelling
-/// change and not a judgement.
-let private severityOf (s: Validate.DefectSeverity) : Severity =
-  match s with
-  | Validate.DefectSeverity.Error -> Severity.Error
-  | Validate.DefectSeverity.Warning -> Severity.Warning
-
 // ─── derivation ──────────────────────────────────────────────────────────────
 
 /// The node's canonical wire JSON — the source of every declared value, and of
@@ -395,7 +386,7 @@ let private nodeFlagsWith (defects: Validate.PreEmitDefect list) (root: Node<obj
           Some
             { NodeId = id
               Code = "A11Y-NAME"
-              Severity = severityOf severity
+              Severity = severity
               Message = message
               // The slot the rule names, resolved to the row that edits it. A
               // slot the property panel does not publish leaves the finding
@@ -451,7 +442,7 @@ let private nodeFlagsWith (defects: Validate.PreEmitDefect list) (root: Node<obj
           Some
             { NodeId = id
               Code = "A11Y-REF"
-              Severity = severityOf severity
+              Severity = severity
               Message = message
               Fix = None
               Unfixable =

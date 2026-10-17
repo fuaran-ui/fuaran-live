@@ -46,39 +46,22 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { projectFSharpExpr } from '../../app/output/Projection.js';
 
 import { entriesFor, registerQuarantineChecks, type ConstructVerdict } from './quarantine';
+import {
+  aheadTitle,
+  corpusDir,
+  pinnedTierVersion,
+  nodeFixtures as tierSplit,
+  type ManifestEntry,
+} from './tier';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '../..');
-const corpusDir = resolve(repoRoot, '../wire-format-fixtures');
 
 /** The gitignored scratch root the generated project is written into. */
 const scratchDir = resolve(here, '.fsharp-exec');
 
-/**
- * The `Fuaran.UI.*` version the generated project restores. It must be the
- * version `app/FuaranLive.fsproj` pins: the whole claim is that the projection
- * executes against the surface the app itself compiles against, and a harness
- * that silently restored a different one would be measuring something else. Read
- * from that fsproj rather than restated, so the pin moves in one place.
- */
-const pinnedTierVersion = ((): string => {
-  const fsproj = readFileSync(resolve(repoRoot, 'app/FuaranLive.fsproj'), 'utf8');
-  const m = /<PackageReference\s+Include="Fuaran\.UI"\s+Version="([^"]+)"/.exec(fsproj);
-  if (m === null) throw new Error('app/FuaranLive.fsproj declares no Fuaran.UI PackageReference');
-  return m[1]!;
-})();
-
-interface ManifestEntry {
-  readonly id: string;
-  readonly kind: string;
-  readonly inputFile: string;
-}
-
-const manifest = JSON.parse(readFileSync(resolve(corpusDir, 'manifest.json'), 'utf8')) as {
-  fixtures: ManifestEntry[];
-};
-
-const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip');
+// The corpus, the pinned tier and the AHEAD split (WIRE_FORMAT.md 11.3): a fixture the pinned
+// release cannot know is registered below as a skipped AHEAD test and is in no batch here.
+const nodeFixtures = tierSplit.certified;
 
 const wireOfFixture = (f: ManifestEntry): string =>
   readFileSync(resolve(corpusDir, f.inputFile), 'utf8').trim();
@@ -409,6 +392,8 @@ const pinnedI18nArgumentArm = (): I18nArmVerdict => {
 };
 
 describe('F# projection conformance (Node corpus)', () => {
+  for (const f of tierSplit.ahead) it.skip(aheadTitle(f), () => {});
+
   it('the corpus is present and non-trivial', () => {
     expect(nodeFixtures.length).toBeGreaterThanOrEqual(70);
   });

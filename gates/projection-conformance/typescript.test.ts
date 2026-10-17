@@ -45,6 +45,7 @@ import {
   resolveTypeScriptConstruct,
   type ConstructVerdict,
 } from './quarantine';
+import { aheadTitle, corpusDir, nodeFixtures as tierSplit, type ManifestEntry } from './tier';
 
 const { encodeNode } = ops;
 const { fuaran, binding, action, format, formFieldKind, nodeId, iconSource } = ui;
@@ -61,19 +62,10 @@ import {
 } from '../../app/output/testing/ProjectionProbes.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const corpusDir = resolve(here, '../../../wire-format-fixtures');
 
-interface ManifestEntry {
-  readonly id: string;
-  readonly kind: string;
-  readonly inputFile: string;
-}
-
-const manifest = JSON.parse(readFileSync(resolve(corpusDir, 'manifest.json'), 'utf8')) as {
-  fixtures: ManifestEntry[];
-};
-
-const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip');
+// The corpus, the pinned tier and the AHEAD split (WIRE_FORMAT.md 11.3): a fixture the pinned
+// release cannot know is registered below as a skipped AHEAD test and is in no batch here.
+const nodeFixtures = tierSplit.certified;
 
 /** Evaluate a projected expression against the real @fuaran-ui/ui surface. */
 const evalExpr = (expr: string): Node<unknown> => {
@@ -471,6 +463,8 @@ describe("the TypeScript arm's construct resolver (Phase 1584)", () => {
 });
 
 describe('TS projection conformance (Node corpus)', () => {
+  for (const f of tierSplit.ahead) it.skip(aheadTitle(f), () => {});
+
   it('the corpus is present and non-trivial', () => {
     expect(nodeFixtures.length).toBeGreaterThanOrEqual(70);
   });

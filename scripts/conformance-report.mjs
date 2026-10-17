@@ -71,6 +71,29 @@ if (!existsSync(rawPath)) {
 
 const result = JSON.parse(readFileSync(rawPath, 'utf8'));
 
+// WIRE_FORMAT.md 11.3 (Phase 2301): a fixture whose `since` post-dates the pinned tier is AHEAD —
+// registered by gates/projection-conformance/tier.ts as a SKIPPED test whose title carries the marker
+// below. Counted and named per leg (test file), never folded into `passed` and never red: the deploy's
+// red condition is any failure, and an AHEAD fixture is not run, so it cannot be one.
+const AHEAD_MARKER = ' AHEAD of tier ';
+const aheadByLeg = {};
+for (const file of result.testResults ?? []) {
+  const leg = (file.name ?? '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .pop()
+    .replace(/\.test\.ts$/, '');
+  const ids = (file.assertionResults ?? [])
+    .filter(
+      (a) =>
+        (a.status === 'pending' || a.status === 'skipped') &&
+        (a.title ?? '').includes(AHEAD_MARKER),
+    )
+    .map((a) => a.title.slice(0, a.title.indexOf(AHEAD_MARKER)));
+  if (ids.length > 0) aheadByLeg[leg] = ids;
+}
+const ahead = Object.values(aheadByLeg).reduce((n, ids) => n + ids.length, 0);
+
 const passed = result.numPassedTests ?? 0;
 const failed = result.numFailedTests ?? 0;
 const total = result.numTotalTests ?? 0;
@@ -85,6 +108,8 @@ const report = {
   passed,
   failed,
   total,
+  ahead,
+  aheadByLeg,
   ok,
 };
 
@@ -98,7 +123,9 @@ console.log(
     total +
     ' passed, ' +
     failed +
-    ' failed, ok=' +
+    ' failed, ' +
+    ahead +
+    ' AHEAD of the pinned tier, ok=' +
     ok,
 );
 

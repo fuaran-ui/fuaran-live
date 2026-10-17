@@ -41,6 +41,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { projectPythonExpr } from '../../app/output/Projection.js';
 
 import { entriesFor, registerQuarantineChecks, type ConstructVerdict } from './quarantine';
+import { aheadTitle, corpusDir, nodeFixtures as tierSplit, type ManifestEntry } from './tier';
 import {
   computeExpectedUnmodelled,
   deriveTokens,
@@ -54,19 +55,10 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '../..');
-const corpusDir = resolve(repoRoot, '../wire-format-fixtures');
 
-interface ManifestEntry {
-  readonly id: string;
-  readonly kind: string;
-  readonly inputFile: string;
-}
-
-const manifest = JSON.parse(readFileSync(resolve(corpusDir, 'manifest.json'), 'utf8')) as {
-  fixtures: ManifestEntry[];
-};
-
-const nodeFixtures = manifest.fixtures.filter((f) => f.kind === 'node-round-trip');
+// The corpus, the pinned tier and the AHEAD split (WIRE_FORMAT.md 11.3): a fixture the pinned
+// release cannot know is registered below as a skipped AHEAD test and is in no batch here.
+const nodeFixtures = tierSplit.certified;
 
 /**
  * The interpreter to run the executor with. A repo-local `.venv` wins (the
@@ -291,6 +283,8 @@ describe.skipIf(notRunReason !== undefined)('Python projection conformance (Node
     // FUARAN_PY_PYTHON at an interpreter that already has it.
     expect(fatal, fatal ?? '').toBeUndefined();
   });
+
+  for (const f of tierSplit.ahead) it.skip(aheadTitle(f), () => {});
 
   it('the corpus is present and non-trivial', () => {
     expect(nodeFixtures.length).toBeGreaterThanOrEqual(70);

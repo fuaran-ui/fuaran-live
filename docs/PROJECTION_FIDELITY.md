@@ -79,7 +79,7 @@ Python has **no such escape hatch**: `encode` calls `.to_wire()` on the root, an
 the structural `fuaran_ui.model.Obj` has no such method, so a construct the typed
 authoring model does not carry has no spelling at all. Measured against
 `fuaran-ui` 0.8.0 — the release the three workflows pin, and the one the standing
-entries were last re-run against — the remaining set falls in three families:
+entries were last re-run against — the remaining set falls in one family:
 (the distribution was `fuaran-py` up to 0.5.0; Phase 1694 renamed it, and the
 import package with it, so older notes here and elsewhere cite the old name for
 releases that genuinely carried it)
@@ -87,20 +87,19 @@ releases that genuinely carried it)
 - **No typed binding case** — `Binding.Expr`. The union runs Static, State,
   Filter, Selection, Now, FormatBinding, Local, Query, Invoke — and no further, so
   a predicate binding has no spelling in any slot that takes one.
-- **A record narrower than the wire** — `TransformBinding.source` is a bare
-  `DataSource` rather than the wire's `TransformSource`, so a `State`- or
-  `Live`-bound source has no spelling.
-- **A discriminator with no payload** — `ColumnKind` is a bare tag, so a
-  row-action `Button` / `ButtonGroup` column cell loses its `label` / `buttons`.
 
-Two families that held most of this set are now EMPTY, and each is kept named
+Three families that held most of this set are now EMPTY, and each is kept named
 because its shape recurs and its remedy is not the others'. The **hardcoded
 closure sentinel**, which held every canonical minimal control, emptied at 0.2.0:
 that release made every handler an omittable flag and every control's `value`
 optional, and the projector reads both off the wire. **No typed node kind**
 emptied at 0.3.0, which grew `Drawing`, `Fact` and `Mount` — along with the
 `Query` and `Invoke` bindings, `TextSource.I18n` and the `Call` / `AiTool` /
-`Invoke` actions, which between them emptied most of the second family too.
+`Invoke` actions, which between them emptied most of the second family too. **A
+record narrower than the wire** emptied with fuaran#2316: `TransformBinding.source`
+became the wire's `TransformSource` (a live `State` / `Selection` / `Query` source
+is spelled as the binding it is), and `ColumnKind` gained the row-action cells'
+`label` / `buttons`, with the projector taught both in the same change.
 
 The set's size is deliberately not quoted here. It is computed and printed by the
 census test both arms register from the shared table, which is the only place it

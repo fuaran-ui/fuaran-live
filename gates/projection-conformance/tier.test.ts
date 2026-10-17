@@ -20,6 +20,9 @@ describe('the AHEAD grade', () => {
     expect(isAhead('next', '0.94.0')).toBe(false);
     expect(isAhead('0.95.0', 'main')).toBe(false);
   });
+  it('the pinned tier is a resolved version, not an MSBuild property', () => {
+    expect(pinnedTierVersion).toMatch(/^\d+\.\d+\.\d+/);
+  });
   it('the split is a partition of the corpus node fixtures at the pinned tier', () => {
     const { certified, ahead } = nodeFixtures;
     expect(certified.length).toBeGreaterThan(0);

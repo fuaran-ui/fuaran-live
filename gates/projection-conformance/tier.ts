@@ -35,7 +35,14 @@ export const pinnedTierVersion = ((): string => {
   const fsproj = readFileSync(resolve(repoRoot, 'app/FuaranLive.fsproj'), 'utf8');
   const m = /<PackageReference\s+Include="Fuaran\.UI"\s+Version="([^"]+)"/.exec(fsproj);
   if (m === null) throw new Error('app/FuaranLive.fsproj declares no Fuaran.UI PackageReference');
-  return m[1]!;
+  // The pin is spelled `$(FuaranUIVersion)` and bound once in Directory.Build.props
+  // (docs/tier-pin.md); resolve it, since an unresolved property would grade nothing AHEAD.
+  const property = /^\$\((\w+)\)$/.exec(m[1]!);
+  if (property === null) return m[1]!;
+  const props = readFileSync(resolve(repoRoot, 'Directory.Build.props'), 'utf8');
+  const bound = new RegExp(`<${property[1]}>([^<]+)</${property[1]}>`).exec(props);
+  if (bound === null) throw new Error(`Directory.Build.props binds no ${property[1]}`);
+  return bound[1]!.trim();
 })();
 
 export interface ManifestEntry {

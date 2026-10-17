@@ -308,6 +308,7 @@ let private describePlacement (placement: StructuralEdit.Placement) : string =
   | StructuralEdit.Placement.First -> "at the start"
   | StructuralEdit.Placement.Before anchor -> "before #" + idText anchor
   | StructuralEdit.Placement.After anchor -> "after #" + idText anchor
+  | StructuralEdit.Placement.Index index -> "at position " + string index
 
 let private emptyState: ReactElement =
   Html.div

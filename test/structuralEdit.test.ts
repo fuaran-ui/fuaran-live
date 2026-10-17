@@ -273,10 +273,25 @@ describe('a move appends, and states any other placement by id', () => {
     expect(childIds(r.Next, 'card')).toEqual(['x', 'a', 'y']);
   });
 
-  it('re-places a node within its current parent', () => {
+  it('re-places a node within its current parent as a bare ReorderChildren', () => {
     const r = act(moveTo(seeded(), 'c', 'root', 'before:a'));
     expect(r.Ok).toBe(true);
+
+    // A move within one parent is a reorder, not `Batch [MoveNode, ReorderChildren]`:
+    // it writes the parent's order alone, so it serialises against fewer concurrent edits.
+    const emittedOp = op(r.Next);
+    expect(emittedOp.$type).toBe('ReorderChildren');
+    expect(emittedOp.parentId).toBe('root');
+    expect(emittedOp.newOrder).toEqual(['c', 'a', 'card']);
     expect(childIds(r.Next, 'root')).toEqual(['c', 'a', 'card']);
+  });
+
+  it('commits nothing for a move to where the node already is', () => {
+    const s = seeded();
+    const r = moveTo(s, 'c', 'root', 'last');
+    expect(r.Ok).toBe(true);
+    expect(logKinds(r.Next)).toEqual(logKinds(s));
+    expect(canonicalTree(r.Next)).toBe(canonicalTree(s));
   });
 
   it('will not drop a node into itself or its own descendant', () => {

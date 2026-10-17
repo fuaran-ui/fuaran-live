@@ -273,7 +273,7 @@ let movePage
 
               let target =
                 { ParentId = NodeId destRoot.Id
-                  Placement = Placement.Last }
+                  Placement = StructuralEdit.Placement.Last }
 
               match StructuralEdit.pasteFromAs actor destSession target sub with
               | PropertyEditor.Rejected message -> Error("page '" + toPage + "' refused it: " + message)

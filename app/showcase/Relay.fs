@@ -270,7 +270,8 @@ let private stationCount = stations.Length
 let private stationWire (s: int) : string =
   CJson.encodeNode (treeAfter stations.[s].OpsThrough)
 
-let private stationHash (s: int) : string = Hashing.sha256Hex (stationWire s)
+let private stationHash (s: int) : string =
+  Fuaran.Core.Hash.sha256Hex (stationWire s)
 
 let private hostSlug (h: Host) : string =
   match h with

@@ -177,7 +177,8 @@ let private appTree: Node<unit> =
                     Fuaran.markdown "sk-p3" "**Seats used:** 128 of 150" ] } ] }
 
 /// The tree's canonical hash – constant across every skin (the whole point).
-let private treeHash: string = Hashing.sha256Hex (CanonicalJson.encodeNode appTree)
+let private treeHash: string =
+  Fuaran.Core.Hash.sha256Hex (CanonicalJson.encodeNode appTree)
 
 let private treeJson: string = CanonicalJson.encodeNode appTree
 

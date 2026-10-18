@@ -153,7 +153,7 @@ let baseTree (session: SessionState) : Node<obj> option = List.tryHead session.S
 /// there is a base at all.
 let baseHash (session: SessionState) : string =
   match baseTree session with
-  | Some tree -> HashChain.sha256Hex (Canon.encodeNode tree)
+  | Some tree -> Fuaran.Core.Hash.sha256Hex (Canon.encodeNode tree)
   | None -> HashChain.genesisPreviousHash
 
 /// Re-point the session at a new base tree: the op sequence, the snapshots and

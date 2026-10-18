@@ -21,19 +21,21 @@ module Fuaran.Live.StructuralEdit
 //
 //  and there is no integer anywhere in it. That derivation — the post-op
 //  sibling permutation, the dropped reorder leg when appending already yields
-//  the wanted order, and the pre-checks that mirror the apply engine's own
-//  refusals — ships in the apply-engine tier as `Fuaran.UI.Ops.Placement`
-//  (`Placement` / `Target` / `PlaceError` / `placeOp` / `moveOp` / `nudgeOp` /
-//  `canPlace`), and this module CONSUMES it rather than carrying its own copy.
-//  The types are re-exported below so callers keep addressing them as
+//  the wanted order, a move within one parent stated as a bare reorder (or
+//  nothing, when the node is already there) — is Fuaran.Core's placement
+//  algebra, which the apply-engine tier ships as `Fuaran.UI.Ops.Placement`
+//  (`Target` / `PlaceError` / `placeOp` / `moveOp` / `nudgeOp` / `canPlace`,
+//  over Core's `Anchor`). This module CONSUMES it rather than carrying its own
+//  copy. The types are re-exported below so callers keep addressing them as
 //  `StructuralEdit.Placement` / `StructuralEdit.Target`.
 //
-//  One consequence worth naming: the packaged pre-checks refuse an op the apply
-//  engine would refuse — an unknown anchor, a childless destination, a move
-//  into a descendant — BEFORE emission, with a sentence, where this module once
-//  emitted the op and let the gate reject it after the fact. Same outcome
-//  either way (the commit funnel below turns both into a rejection that leaves
-//  the session untouched); the refusal just arrives earlier and reads better.
+//  One consequence worth naming: the packaged verbs ask the apply engine's own
+//  dry run before they emit anything, so an op the engine would refuse — an
+//  unknown anchor, a childless destination, a move into a descendant — is
+//  refused BEFORE emission, with a sentence, where this module once emitted the
+//  op and let the gate reject it after the fact. Same outcome either way (the
+//  commit funnel below turns both into a rejection that leaves the session
+//  untouched); the refusal just arrives earlier and reads better.
 //
 //  ── The palette is derived, not written ────────────────────────────────────
 //
@@ -81,10 +83,10 @@ module Decode = Fuaran.UI.Ops.JsonDecode
 
 // ─── placement (the packaged vocabulary, re-exported) ────────────────────────
 
-/// Where a node should sit among its new siblings — the packaged placement
-/// vocabulary (`Fuaran.UI.Ops`), re-exported so callers keep addressing it as
-/// `StructuralEdit.Placement`.
-type Placement = Fuaran.UI.Ops.Placement
+/// Where a node should sit among its new siblings — Fuaran.Core's `Anchor`,
+/// the vocabulary the packaged placement takes, re-exported so callers keep
+/// addressing it as `StructuralEdit.Placement`.
+type Placement = Fuaran.Core.Anchor<NodeId>
 
 /// A structural destination: which parent, and where among its children — the
 /// packaged `Fuaran.UI.Ops.Target`, re-exported.
@@ -123,49 +125,59 @@ let defaultTarget (root: Node<obj>) (focused: NodeId) : Target option =
 //
 // The ops themselves come from the packaged placement algebra. What is local is
 // the translation of its typed refusal into the sentence the navigator's status
-// line shows — each `PlaceError` case is a pre-statement of the apply-time
-// refusal the emitted op would have met, so the sentence describes the same
-// fact the engine would have reported after the fact.
+// line shows — a `PlaceError.Refused` carries the apply engine's own rejection of
+// the op, so the sentence describes the same fact the engine would have
+// reported after the fact.
 
 let placeErrorText (error: PlaceError) : string =
   match error with
-  | PlaceError.ParentNotFound(NodeId parentId) -> "no node '" + parentId + "' to place under"
-  | PlaceError.ChildlessKind(NodeId parentId) -> "'" + parentId + "' is a kind that takes no children"
-  | PlaceError.NodeNotFound(NodeId nodeId) -> "no node '" + nodeId + "' in the tree"
-  | PlaceError.UnknownAnchor(NodeId anchor) -> "no sibling '" + anchor + "' to place beside"
-  | PlaceError.DuplicateId(NodeId nodeId) -> "the id '" + nodeId + "' is already taken"
-  | PlaceError.MoveIntoSelf(NodeId nodeId) -> "cannot move '" + nodeId + "' into itself"
-  | PlaceError.MoveIntoDescendant(NodeId nodeId, NodeId parentId) ->
-    "cannot move '" + nodeId + "' into '" + parentId + "', which is inside it"
-  | PlaceError.CannotNudgeRoot _ -> "the root node has no siblings to reorder"
-  | PlaceError.NudgeOutOfRange(_, delta) ->
-    if delta < 0 then
+  | PlaceError.Refused rejection ->
+    match rejection with
+    | Fuaran.Core.Rejection.UnknownNode(NodeId nodeId, _) -> "no node '" + nodeId + "' in the tree"
+    | Fuaran.Core.Rejection.NotAContainer(NodeId parentId, _) -> "'" + parentId + "' is a kind that takes no children"
+    | Fuaran.Core.Rejection.DuplicateId(NodeId nodeId) -> "the id '" + nodeId + "' is already taken"
+    | Fuaran.Core.Rejection.WouldNestUnderSelf(NodeId nodeId, Fuaran.Core.NestRelation.Self) ->
+      "cannot move '" + nodeId + "' into itself"
+    | Fuaran.Core.Rejection.WouldNestUnderSelf(NodeId nodeId, Fuaran.Core.NestRelation.Descendant) ->
+      "cannot move '" + nodeId + "' into a node inside it"
+    | Fuaran.Core.Rejection.CannotRemoveRoot -> "the root node cannot be moved"
+    | other -> "the edit was refused (" + Fuaran.Core.Rejection.code other + ")"
+  | PlaceError.UnknownAnchor(_, NodeId anchor, _) -> "no sibling '" + anchor + "' to place beside"
+  | PlaceError.IndexOutOfRange(_, index, count) ->
+    if index < 0 then
       "already the first of its siblings"
-    else
+    elif index = count + 1 then
       "already the last of its siblings"
+    else
+      "there is no position " + string index + " among " + string count + " siblings"
+  | PlaceError.PositionNotStructural(NodeId nodeId, slot) ->
+    "'" + nodeId + "' cannot leave or cross the '" + slot + "' position"
+  | PlaceError.CannotNudgeRoot _ -> "the root node has no siblings to reorder"
 
 /// The one seam every placed op passes through: a refusal from the packaged
-/// pre-checks becomes a rejection (session untouched, exactly as an apply-time
-/// rejection would leave it); a derived op goes through the very gate a
-/// property edit uses — apply to a CANDIDATE tree, refuse on a newly-introduced
-/// error-severity defect, and only then fold, recording the op against the
-/// caller's actor. That shared channel is what makes undo cover structure for
-/// free: the replay knows nothing about which op it is replaying, so a
-/// structural op undoes because it applies.
+/// placement becomes a rejection (session untouched, exactly as an apply-time
+/// rejection would leave it); no op — a node already where it was asked to go
+/// — commits nothing and leaves the session as it is; a derived op goes
+/// through the very gate a property edit uses — apply to a CANDIDATE tree,
+/// refuse on a newly-introduced error-severity defect, and only then fold,
+/// recording the op against the caller's actor. That shared channel is what
+/// makes undo cover structure for free: the replay knows nothing about which op
+/// it is replaying, so a structural op undoes because it applies.
 let private commitPlacedAs
   (actor: Fuaran.UI.OpStream.Abstractions.Actor)
   (session: Session.SessionState)
-  (planned: Result<TreeOp<obj>, PlaceError>)
+  (planned: Result<TreeOp<obj> option, PlaceError>)
   : PropertyEditor.CommitOutcome =
   match planned with
   | Error error -> PropertyEditor.Rejected(placeErrorText error)
-  | Ok op -> PropertyEditor.commitOpAs actor session op
+  | Ok None -> PropertyEditor.Committed session
+  | Ok(Some op) -> PropertyEditor.commitOpAs actor session op
 
 /// `commitPlacedAs` under the navigator's own origin marker — the shape every
 /// single-tree structural edit below uses.
 let private commitPlaced
   (session: Session.SessionState)
-  (planned: Result<TreeOp<obj>, PlaceError>)
+  (planned: Result<TreeOp<obj> option, PlaceError>)
   : PropertyEditor.CommitOutcome =
   commitPlacedAs Session.navigatorActor session planned
 
@@ -191,12 +203,12 @@ let fallbackAfterRemove (root: Node<obj>) (nodeId: NodeId) : NodeId option =
       Some(NodeId parent.Id)
 
 /// Whether `moved` may legally be dropped under `parentId` — the pick-up/drop
-/// interaction's own guard, delegated to the packaged pre-check (`canPlace`
-/// with an end placement, since drop legality is about the destination, not
-/// the position): a parent that takes children, that is not the node itself,
-/// and that is not inside it (a move into your own descendant is a cycle,
-/// refused by the apply engine — saying so before the click is friendlier than
-/// a rejection after it).
+/// interaction's own guard, delegated to the packaged verdict (`canPlace` with
+/// an end placement, since drop legality is about the destination, not the
+/// position): a parent that takes children, that is not the node itself, and
+/// that is not inside it (a move into your own descendant is a cycle, refused
+/// by the apply engine — saying so before the click is friendlier than a
+/// rejection after it).
 let canDrop (root: Node<obj>) (moved: NodeId) (parentId: NodeId) : bool =
   Placement.canPlace
     root
@@ -415,7 +427,7 @@ let palette (session: Session.SessionState) (target: Target) : PaletteEntry list
     |> List.choose (fun disc ->
       defaultNodeFor root disc
       |> Option.bind (fun node ->
-        match commitPlaced session (Placement.placeOp root node target) with
+        match commitPlaced session (Placement.placeOp root node target |> Result.map Some) with
         | PropertyEditor.Committed _ -> Some { Kind = disc; Node = node }
         | PropertyEditor.Rejected _ -> None))
 
@@ -432,7 +444,7 @@ let private withRoot (session: Session.SessionState) (f: Node<obj> -> PropertyEd
 
 /// Insert `child` at `target`.
 let insert (session: Session.SessionState) (target: Target) (child: Node<obj>) : PropertyEditor.CommitOutcome =
-  withRoot session (fun root -> commitPlaced session (Placement.placeOp root child target))
+  withRoot session (fun root -> commitPlaced session (Placement.placeOp root child target |> Result.map Some))
 
 /// Remove `nodeId` (the caller confirms; this does not ask).
 let remove (session: Session.SessionState) (nodeId: NodeId) : PropertyEditor.CommitOutcome =
@@ -465,7 +477,8 @@ let pasteFromAs
   (target: Target)
   (incoming: Node<obj>)
   : PropertyEditor.CommitOutcome =
-  withRoot session (fun root -> commitPlacedAs actor session (Placement.pasteOp root incoming target))
+  withRoot session (fun root ->
+    commitPlacedAs actor session (Placement.pasteOp root incoming target |> Result.map Some))
 
 /// Remove `nodeId`, recorded against a caller-chosen actor — the source-page
 /// leg of a cross-page move.
@@ -482,8 +495,8 @@ let removeAs
 // between that spelling and the typed `Placement`.
 
 /// A placement spelled as a plain string: `"last"`, `"first"`, `"before:<id>"`,
-/// `"after:<id>"`. Anything unrecognised is `Last` — the append the ops do on
-/// their own, which is the safe reading of an unknown request.
+/// `"after:<id>"`, `"index:<n>"`. Anything unrecognised is `Last` — the append
+/// the ops do on their own, which is the safe reading of an unknown request.
 let parsePlacement (spec: string) : Placement =
   if spec = "first" then
     Placement.First
@@ -491,6 +504,10 @@ let parsePlacement (spec: string) : Placement =
     Placement.Before(NodeId(spec.Substring 7))
   elif spec.StartsWith "after:" then
     Placement.After(NodeId(spec.Substring 6))
+  elif spec.StartsWith "index:" then
+    match System.Int32.TryParse(spec.Substring 6) with
+    | true, index -> Placement.Index index
+    | _ -> Placement.Last
   else
     Placement.Last
 
@@ -501,3 +518,4 @@ let placementSpec (placement: Placement) : string =
   | Placement.First -> "first"
   | Placement.Before anchor -> "before:" + idText anchor
   | Placement.After anchor -> "after:" + idText anchor
+  | Placement.Index index -> "index:" + string index

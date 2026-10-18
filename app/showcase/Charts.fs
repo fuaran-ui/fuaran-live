@@ -168,6 +168,7 @@ let private opKind (op: TreeOp<Msg>) : string =
   | TreeOp.ReplaceBinding _ -> "ReplaceBinding"
   | TreeOp.EditNode _ -> "EditNode"
   | TreeOp.UpdateStyle _ -> "UpdateStyle"
+  | TreeOp.PatchStyle _ -> "PatchStyle"
   | TreeOp.UpdateState _ -> "UpdateState"
   | TreeOp.InsertChild _ -> "InsertChild"
   | TreeOp.RemoveNode _ -> "RemoveNode"
@@ -214,7 +215,7 @@ let private ChartsView () : ReactElement =
   // plotted series, so the two never disagree.
   let tree = chartNode kind yFields showVariance rows
   let wire = CanonicalJson.encodeNode tree
-  let hash = Hashing.sha256Hex wire
+  let hash = Fuaran.Core.Hash.sha256Hex wire
 
   // The editable grid dispatches SetCell; fold it into the row state, which
   // re-derives everything downstream.

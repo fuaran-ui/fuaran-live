@@ -44,6 +44,8 @@ open Fuaran.UI.OpStream.Replay
 module Decode = Fuaran.UI.Ops.JsonDecode
 module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 module Diff = Fuaran.UI.OpStream.Replay.TreeDiff
+module CoreDiff = Fuaran.Core.Diff
+module Introspect = Fuaran.UI.Ops.Introspect
 
 // ─── the baseline (captured at re-prompt time) ───────────────────────────────
 
@@ -138,60 +140,103 @@ let stageLabel (s: Stage) : string =
 
 // ─── the comparison ──────────────────────────────────────────────────────────
 
+/// The literal text of a `Heading` / `Markdown` node — the two kinds whose
+/// text change the readout shows character for character.
+let private literalText (node: Node<obj>) : string option =
+  match node.Kind with
+  | NodeKind.Heading spec ->
+    match spec.Text with
+    | TextSource.Literal text -> Some text
+    | _ -> None
+  | NodeKind.Markdown spec ->
+    match spec.Text with
+    | TextSource.Literal text -> Some text
+    | _ -> None
+  | _ -> None
+
 /// One change, as a line. Reuses the shipped classification rather than
-/// re-deriving one: `Added` / `Removed` / `Moved` / `KindChanged` /
-/// `PropChanged` / `TextChanged` is the estate's vocabulary for what happened
-/// between two snapshots, and the playground should not invent a second.
-let changeLine (change: NodeChange) : string =
-  let (NodeId id) = change.NodeId
+/// re-deriving one: Core's `Diff.ChangeKind` (`Added` / `Removed` / `Moved` /
+/// `KindChanged` / `Changed` / `Reordered`, Phase 2304) is the vocabulary for
+/// what happened between two snapshots, and the playground should not invent a
+/// second. A `Changed` Heading or Markdown whose literal text moved reads the
+/// two texts off the trees, so the readout still shows the character delta.
+let changeLine (before: Node<obj>) (after: Node<obj>) (change: CoreDiff.Change<NodeId>) : string =
+  let (NodeId id) = change.Id
 
-  match change.Change with
-  | NodeChangeKind.Added _ -> sprintf "added #%s" id
-  | NodeChangeKind.Removed _ -> sprintf "removed #%s" id
-  | NodeChangeKind.Moved _ -> sprintf "moved #%s" id
-  | NodeChangeKind.KindChanged(fromKind, toKind) -> sprintf "#%s: %s → %s" id fromKind toKind
-  | NodeChangeKind.TextChanged(fromText, toText) -> sprintf "#%s: \"%s\" → \"%s\"" id fromText toText
-  | NodeChangeKind.PropChanged _ -> sprintf "#%s: properties changed" id
+  match change.Kind with
+  | CoreDiff.ChangeKind.Added -> sprintf "added #%s" id
+  | CoreDiff.ChangeKind.Removed -> sprintf "removed #%s" id
+  | CoreDiff.ChangeKind.Moved _ -> sprintf "moved #%s" id
+  | CoreDiff.ChangeKind.Reordered -> sprintf "#%s: children reordered" id
+  | CoreDiff.ChangeKind.KindChanged(fromKind, toKind) -> sprintf "#%s: %s → %s" id fromKind toKind
+  | CoreDiff.ChangeKind.Changed ->
+    let textIn tree =
+      Introspect.findNode change.Id tree |> Option.bind literalText
 
-/// The last change set computed, with the live tree and the baseline it was
-/// computed from (Phase 2047). The pane re-renders on every keystroke — its own
-/// draft box's and the page's prompt box's — and neither changes the two trees,
-/// so the decode and the diff run once per (live tree, baseline) pair rather
-/// than once per render. Keyed on IDENTITY: the live tree is an immutable value
-/// every edit replaces, and a baseline is frozen once when a refinement is
-/// asked for, so an unchanged pair of references is an unchanged pair of trees.
-let mutable private lastChanges: (Node<obj> * Baseline * NodeChange list) option =
+    match textIn before, textIn after with
+    | Some fromText, Some toText when fromText <> toText -> sprintf "#%s: \"%s\" → \"%s\"" id fromText toText
+    | _ -> sprintf "#%s: properties changed" id
+
+/// The last comparison computed — the decoded baseline tree, the live tree,
+/// the baseline they came from and the change set (Phase 2047). The pane
+/// re-renders on every keystroke — its own draft box's and the page's prompt
+/// box's — and neither changes the two trees, so the decode and the diff run
+/// once per (live tree, baseline) pair rather than once per render. Keyed on
+/// IDENTITY: the live tree is an immutable value every edit replaces, and a
+/// baseline is frozen once when a refinement is asked for, so an unchanged
+/// pair of references is an unchanged pair of trees.
+let mutable private lastComparison: (Node<obj> * Baseline * (Node<obj> * CoreDiff.Change<NodeId> list) option) option =
   None
 
-/// The changes the re-emission made against the edited baseline (`[]` when
-/// there is nothing to compare — no baseline, no live tree, or bytes that will
-/// not decode).
-let changes (session: Session.SessionState) (baseline: Baseline option) : NodeChange list =
+/// The decoded baseline tree and the changes the re-emission made against it
+/// (`None` when there is nothing to compare — no baseline, no live tree, or
+/// bytes that will not decode).
+let private compared
+  (session: Session.SessionState)
+  (baseline: Baseline option)
+  : (Node<obj> * Node<obj> * CoreDiff.Change<NodeId> list) option =
   match baseline, session.Tree with
   | Some b, Some live ->
-    match lastChanges with
-    | Some(heldLive, heldBaseline, held) when
-      LanguagePrimitives.PhysicalEquality heldLive live
-      && LanguagePrimitives.PhysicalEquality heldBaseline b
-      ->
-      held
-    | _ ->
-      let computed =
-        match baselineTree b with
-        | Some before -> (Diff.diff before live).Changes
-        | None -> []
+    let held =
+      match lastComparison with
+      | Some(heldLive, heldBaseline, held) when
+        LanguagePrimitives.PhysicalEquality heldLive live
+        && LanguagePrimitives.PhysicalEquality heldBaseline b
+        ->
+        held
+      | _ ->
+        let computed =
+          baselineTree b
+          |> Option.map (fun before -> before, (Diff.diff before live).Changes)
 
-      lastChanges <- Some(live, b, computed)
-      computed
-  | _ -> []
+        lastComparison <- Some(live, b, computed)
+        computed
+
+    held |> Option.map (fun (before, changeSet) -> before, live, changeSet)
+  | _ -> None
+
+/// The changes the re-emission made against the edited baseline (`[]` when
+/// there is nothing to compare).
+let changes (session: Session.SessionState) (baseline: Baseline option) : CoreDiff.Change<NodeId> list =
+  match compared session baseline with
+  | Some(_, _, changeSet) -> changeSet
+  | None -> []
+
+/// The readout's lines, one per change, in the diff's order.
+let changeLines (session: Session.SessionState) (baseline: Baseline option) : string list =
+  match compared session baseline with
+  | Some(before, live, changeSet) -> changeSet |> List.map (changeLine before live)
+  | None -> []
 
 /// The edited ids, each paired with whether `changeSet` left it alone. An id
-/// absent from the diff was retained.
-let private retentionOf (baseline: Baseline) (changeSet: NodeChange list) : (string * bool) list =
+/// absent from the diff was retained. Since Phase 2304 a same-parent reposition
+/// is `Reordered` on the PARENT, so an edited node the re-emission only moved
+/// among its siblings reads as retained, and its parent as touched.
+let private retentionOf (baseline: Baseline) (changeSet: CoreDiff.Change<NodeId> list) : (string * bool) list =
   let touched =
     changeSet
     |> List.map (fun c ->
-      let (NodeId id) = c.NodeId
+      let (NodeId id) = c.Id
       id)
     |> Set.ofList
 
@@ -213,7 +258,7 @@ let retention (session: Session.SessionState) (baseline: Baseline option) : (str
 /// it; until Phase 2047 the three readouts each re-ran the decode and the diff.
 let private comparison (session: Session.SessionState) (baseline: Baseline) : ReactElement =
   let changeSet = changes session (Some baseline)
-  let lines = changeSet |> List.map changeLine |> Array.ofList
+  let lines = changeLines session (Some baseline) |> Array.ofList
   let kept = retentionOf baseline changeSet
   let retained = kept |> List.filter snd |> List.map fst |> Array.ofList
   let overwritten = kept |> List.filter (snd >> not) |> List.map fst |> Array.ofList

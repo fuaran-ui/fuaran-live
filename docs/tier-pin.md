@@ -224,6 +224,18 @@ the contract compiled against did not move at the switch.
   Verified by compiling the showcase against a `v0.94.0` source archive laid out
   as the sibling. The tier declares `Fuaran.Core.*` 0.36.0 and
   `Fuaran.Program.Runtime` 0.9.0, which the floors already met.
+- **v0.96.0** (2026-10-18, Phase 2306) — a two-release jump over v0.95.0, and
+  source-affecting in two ways the showcase names. `Fuaran.UI.Hashing.sha256Hex`
+  is gone (Phase 2309): the tier hashes through `Fuaran.Core.Hash.sha256Hex`, the
+  same lowercase hex over the same bytes, so `Charts`, `Relay`, `Rosetta`,
+  `Skins` and `TimeMachine` call it there and no rendered hash moves (TimeMachine's
+  private alias went with it). `TreeOp` gained `PatchStyle` at v0.95.0 (in
+  Phase 2291) and the tier's diff now emits it, so the op-name summaries in
+  `Charts` and `Pandas` gain the arm rather than raising a match failure on a
+  style edit.
+  Verified by compiling the showcase against a `v0.96.0` source archive laid out
+  as the sibling. The tier declares `Fuaran.Core.*` 0.36.0 and
+  `Fuaran.Program.Runtime` 0.9.0, which the floors already met.
 
 ## The package pins — the same release, by package
 
@@ -298,6 +310,16 @@ source migration (above) and the package checklist below.
   is now an abbreviation of it, so its `info` tag exists for a severity no
   Fuaran check raises today. `Fuaran.Core.*` stays at 0.36.0 and
   `Fuaran.Program.Runtime` at 0.9.0.
+- **0.94.0 → 0.96.0** (Phase 2306) — the same release, by package. The
+  playground's two chain-seed hashes (`Session.baseHash`, a panel's `BaseHash`)
+  call `Fuaran.Core.Hash.sha256Hex` (Phase 2309; the value is byte-identical).
+  The refine pane reads Core's diff vocabulary (Phase 2304): `TreeDiff.Changes`
+  is `Fuaran.Core.Diff.Change<NodeId> list`, a same-parent reposition is one
+  `Reordered` entry on the PARENT, and a Heading or Markdown text change is a
+  `Changed` entry whose two texts the pane reads off the trees, so the readout
+  still shows the character delta. The structural editor takes Core's `Anchor`
+  and a same-parent move is a bare reorder (Phase 2306). `Fuaran.Core.*` stays
+  at 0.36.0 and `Fuaran.Program.Runtime` at 0.9.0.
 - **The ceiling that twice held the family back is gone.** Before the loop's
   0.6.0 split, the tier widened a member of `Action` and the loop — a separate
   producer — still constructed the narrower form in its own Fable-packed

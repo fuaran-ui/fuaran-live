@@ -40,7 +40,6 @@ open Fuaran.UI.OpStream.Dag.Merge
 module Apply = Fuaran.UI.Ops.Apply
 module CJson = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 
-let private sha256Hex (s: string) : string = Fuaran.UI.Hashing.sha256Hex s
 let private nid (s: string) : NodeId = NodeId s
 
 // ─── The one app, as intent – small tree pieces the arc grows ────────────────
@@ -208,12 +207,12 @@ let private trunkChain: (string * string) list =
         + "|"
         + Actor.encode t.Actor
 
-      let h = sha256Hex payload
+      let h = Fuaran.Core.Hash.sha256Hex payload
       (h, acc @ [ (h, prev) ]))
     (HashChain.genesisPreviousHash, [])
   |> snd
 
-let private initialHash = sha256Hex (CJson.encodeNode initialTree)
+let private initialHash = Fuaran.Core.Hash.sha256Hex (CJson.encodeNode initialTree)
 
 let private shortHash (h: string) : string =
   if h.Length <= 12 then h else h.Substring(0, 12)

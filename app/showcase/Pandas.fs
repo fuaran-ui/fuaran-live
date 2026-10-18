@@ -58,6 +58,7 @@ let private opSummary (op: TreeOp<obj>) : string =
   | TreeOp.ReplaceBinding(n, slot, _) -> sprintf "ReplaceBinding  %s.%s" (idOf n) slot
   | TreeOp.EditNode(n, _) -> sprintf "EditNode  %s" (idOf n)
   | TreeOp.UpdateStyle(n, _) -> sprintf "UpdateStyle  %s" (idOf n)
+  | TreeOp.PatchStyle(n, _) -> sprintf "PatchStyle  %s" (idOf n)
   | TreeOp.UpdateState(n, _) -> sprintf "UpdateState  %s" (idOf n)
   | TreeOp.InsertChild(p, c) -> sprintf "InsertChild  %s ← %s" (idOf p) c.Id
   | TreeOp.RemoveNode n -> sprintf "RemoveNode  %s" (idOf n)

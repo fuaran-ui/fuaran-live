@@ -321,7 +321,7 @@ let private RosettaView () : ReactElement =
 
   let ho = holesObj holes
   let fsWire = CanonicalJson.encodeNode (exemplarTree holes)
-  let fsHash = Hashing.sha256Hex fsWire
+  let fsHash = Fuaran.Core.Hash.sha256Hex fsWire
   let tsWire = encodeWireTs ho
   let naiveWire = encodeWireNaive ho
 

@@ -18,13 +18,12 @@ open Fuaran.UI.OpStream.Replay
 
 module Decode = Fuaran.UI.Ops.JsonDecode
 module Canon = Fuaran.UI.OpStream.Abstractions.CanonicalJson
-module Diff = Fuaran.UI.OpStream.Replay.TreeDiff
 
 open Fuaran.Live
 open Fuaran.Live.Refine
 
 let changeLines (session: Session.SessionState) (baseline: Baseline option) : string array =
-  changes session baseline |> List.map changeLine |> Array.ofList
+  Refine.changeLines session baseline |> Array.ofList
 
 /// The edited ids the re-emission left untouched.
 let retainedIds (session: Session.SessionState) (baseline: Baseline option) : string array =

@@ -191,7 +191,7 @@ let ingest (store: PanelStore) (author: Actor) (payload: PanelPayload) : PanelOu
           Title = title
           Tree = tree
           BaseJson = baseJson
-          BaseHash = Fuaran.UI.Hashing.sha256Hex baseJson
+          BaseHash = Fuaran.Core.Hash.sha256Hex baseJson
           OpsJson = []
           Chain = [] }
 

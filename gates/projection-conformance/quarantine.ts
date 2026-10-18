@@ -128,10 +128,12 @@
 //      which Phase 1580 declined with its reasons; (iii) a hardcoded closure
 //      sentinel — emptied at 0.2.0, which made every handler an omittable flag
 //      and every control's `value` optional; (iv) a record narrower than the wire
-//      — `TransformBinding.source`, still a bare `DataSource`; (v) an encoder that
-//      disagrees with the wire — §2 rule 2 orders object keys by UTF-16 code
-//      unit, and the writer sorted by code point until 0.1.0. Families (i), (iii)
-//      and (v) are empty. Read the list as the history it is and the map below as
+//      — `TransformBinding.source`, a bare `DataSource`, and `ColumnKind`, a bare
+//      discriminator — emptied by fuaran#2316, which made the source the wire's
+//      `TransformSource` and gave the row-action cells their members; (v) an
+//      encoder that disagrees with the wire — §2 rule 2 orders object keys by
+//      UTF-16 code unit, and the writer sorted by code point until 0.1.0.
+//      Families (i), (iii), (iv) and (v) are empty. Read the list as the history it is and the map below as
 //      the state.
 //
 // The TypeScript arm's own history is the mirror image and is shorter: its set
@@ -233,12 +235,12 @@ export interface QuarantineEntry {
  *     entries from Phase 2023 until this raise; app/Projection.fs was taught all
  *     three in the same change. The arm's preference is unchanged: a shortfall
  *     the pinned host CAN encode is taught, never listed.
- *   • Python — `Binding.Expr` (declined, fuaran#1580), the bare-`DataSource`
- *     transform source and a row-action column cell's label. 0.8.0 models the
- *     1812 / 1892 slots, so those four entries cleared on the raise, with the
- *     projector taught them and the 1810 / 1811 temporal vocabulary together.
- *     Where the manifest is SILENT on what an entry needs (hosted cases, case
- *     fields under the out-of-scope column-kind union), the entry carries the
+ *   • Python — `Binding.Expr` (declined, fuaran#1580), nothing else. The live
+ *     transform source and the row-action column cells' members cleared with
+ *     fuaran#2316, the projector taught both in the same change. 0.8.0 models
+ *     the 1812 / 1892 slots, so those four entries cleared on that raise, with
+ *     the projector taught them and the 1810 / 1811 temporal vocabulary together.
+ *     Where the manifest is SILENT on what an entry needs, the entry carries the
  *     `residual` naming that silence.
  *   • F# — none. Its host is the pinned `Fuaran.UI` package, whose model IS the
  *     wire model, so every shortfall there has been the projector's own
@@ -307,88 +309,6 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
       },
     ],
   ],
-
-  // 2 — a record narrower than the wire. `TransformBinding.source` is a bare
-  // `DataSource` rather than the wire's `TransformSource` DU, so a source that
-  // is `{"$type":"State"}` has no spelling at all — the fixture reads as a
-  // literal table where the wire names a state key. Tracked against the phase
-  // that first measured it on this arm; fuaran-py carries no phase of its own
-  // for the record yet.
-  [
-    'badge-transform-live',
-    [
-      {
-        arm: 'python',
-        construct: 'cp.TransformSource',
-        class: 'host',
-        owner: 'fuaran-py',
-        phase: 'fuaran#1100',
-        reason:
-          'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
-        // The gap is INSIDE a slot the corpus IDL types as `hosted`, so it lives in
-        // the hostedCases family — which this host cannot derive at all (its compute
-        // layer lowers through an isinstance ladder rather than per-record to_wire).
-        // A manifest therefore says nothing here, and this entry is what stands in
-        // its place until one does.
-        residual: { family: 'hostedCases', scopeKey: 'Binding.Transform.source' },
-      },
-    ],
-  ],
-  [
-    'shared-source-seeded-pair',
-    [
-      {
-        arm: 'python',
-        construct: 'cp.TransformSource',
-        class: 'host',
-        owner: 'fuaran-py',
-        phase: 'fuaran#1100',
-        reason:
-          'TransformBinding.source is a bare DataSource — a State-bound source has no spelling',
-        // The gap is INSIDE a slot the corpus IDL types as `hosted`, so it lives in
-        // the hostedCases family — which this host cannot derive at all (its compute
-        // layer lowers through an isinstance ladder rather than per-record to_wire).
-        // A manifest therefore says nothing here, and this entry is what stands in
-        // its place until one does.
-        residual: { family: 'hostedCases', scopeKey: 'Binding.Transform.source' },
-      },
-    ],
-  ],
-
-  // 3 — a row-action column cell's label. `ColumnKind` is a bare discriminator
-  // in every fuaran-ui release to date, so `Button` / `ButtonGroup` cells encode
-  // with no `label` / `buttons`; the TypeScript host models both and the
-  // projector emits them there. The column-kind union is out of the host
-  // manifest's scope (its discriminator is computed at run time), so the
-  // residual names the case-field family under it.
-  [
-    'grid-action-column-clean',
-    [
-      {
-        arm: 'python',
-        construct: 'ColumnKind.label',
-        class: 'host',
-        owner: 'fuaran-py',
-        phase: 'fuaran#1909',
-        reason: 'ColumnKind carries no label, so a Button / ButtonGroup cell loses it',
-        residual: { family: 'caseFields', scopeKey: 'CellKindErased' },
-      },
-    ],
-  ],
-  [
-    'grid-action-column-field',
-    [
-      {
-        arm: 'python',
-        construct: 'ColumnKind.label',
-        class: 'host',
-        owner: 'fuaran-py',
-        phase: 'fuaran#1909',
-        reason: 'ColumnKind carries no label, so a Button cell loses it',
-        residual: { family: 'caseFields', scopeKey: 'CellKindErased' },
-      },
-    ],
-  ],
 ]);
 
 /** Every entry this arm owns, keyed by fixture id. */
@@ -421,7 +341,7 @@ const emptyTally = (): ArmTally => ({ host: 0, projector: 0, both: 0 });
  */
 export const QUARANTINE_CENSUS: Readonly<Record<Arm, ArmTally>> = {
   typescript: { host: 0, projector: 0, both: 0 },
-  python: { host: 8, projector: 0, both: 0 },
+  python: { host: 4, projector: 0, both: 0 },
   // The F# arm holds NONE, and its emptiness is an assertion of its own
   // (fuaran#1657) — every node fixture is required to compile, execute and
   // re-encode byte-identically there. See `fsharp.test.ts`.

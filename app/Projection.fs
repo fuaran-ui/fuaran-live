@@ -3845,12 +3845,17 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
     + pyLocaleSource (fieldReq "locale" v)
     + ")"
   | Some "Transform" ->
-    // `TransformBinding.source` is a bare `DataSource` rather than the wire's
-    // `TransformSource` DU, so a `State`- or `Live`-sourced transform still has
-    // no spelling and stays quarantined. `params` does have one from 0.1.0 —
-    // omitted from the wire when empty, so a param-free binding is unchanged.
+    // Phase 2316 — `TransformBinding.source` is the wire's `TransformSource`:
+    // the data a pipeline runs over, or a LIVE `State` / `Selection` / `Query`
+    // binding, which is spelled as the binding it is. `params` has a spelling
+    // from 0.1.0 — omitted from the wire when empty, so a param-free binding is
+    // unchanged.
+    let source = fieldReq "source" v
+
     "cp.TransformBinding("
-    + pyDataSource (fieldReq "source" v)
+    + (match dollarType source with
+       | Some("State" | "Selection" | "Query") -> pyBinding Opq.Collection source
+       | _ -> pyDataSource source)
     + ", "
     + pyList (arrOf "pipeline" v |> List.map pyTransformStep)
     + (match arrOf "params" v with
@@ -4370,6 +4375,30 @@ let private pyColumnKind (v: JsonValue) : string =
       (match optStr "default" v with
        | Some d -> [ "default", pq d ]
        | None -> [])
+  // Phase 2316 — the two row-ACTION cells carry wire members of their own
+  // (fuaran#1909): a `Button` cell's label and click flag, a `ButtonGroup`
+  // cell's buttons. The click flag is read from the wire key's presence, as
+  // every handler is (`pyHandler`).
+  | "Button" ->
+    pyCall
+      "t.ColumnKind"
+      [ pq "Button" ]
+      ((match JsonValue.tryField "label" v with
+        | Some l -> [ "label", pyTextSource l ]
+        | None -> [])
+       @ pyHandler "onClick" "on_click" v)
+  | "ButtonGroup" ->
+    let buttons =
+      arrOf "buttons" v
+      |> List.map (fun b ->
+        pyCall "t.ButtonGroupItem" [ pyTextSource (fieldReq "label" b) ] (pyHandler "onClick" "on_click" b))
+
+    pyCall
+      "t.ColumnKind"
+      [ pq "ButtonGroup" ]
+      (match buttons with
+       | [] -> []
+       | _ -> [ "buttons", "(" + String.concat ", " buttons + ",)" ])
   | other -> "t.ColumnKind(" + pq other + ")"
 
 /// A declarative sort seed — shared by the grid and by the static table, which
@@ -4436,9 +4465,12 @@ let private pyGridColumn (v: JsonValue) : string =
      // `field` (declarative) and `value` (closure) are sibling optional slots:
      // naming a `field_name` emits `field` and omits the erased `value`, which
      // is the record's own rule rather than something to arrange here.
-     @ (match optStr "field" v with
-        | Some f -> [ "fieldName", pq f ]
-        | None -> [])
+     @ (match optStr "field" v, JsonValue.tryField "value" v with
+        | Some f, _ -> [ "fieldName", pq f ]
+        // Phase 2316 — neither slot: a row-ACTION column projects no cell value,
+        // so the erased `value` closure the record otherwise writes is turned off.
+        | None, None -> [ "value", "False" ]
+        | None, Some _ -> [])
      // Phase 1581 — per-column overrides, modelled from 0.2.0 and tri-state on
      // both sides: `sortable=False` and an omitted `sortable` are two different
      // documents, so neither is emitted where the wire carries no key.

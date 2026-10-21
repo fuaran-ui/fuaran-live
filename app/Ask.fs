@@ -87,13 +87,17 @@ let buildAnswerJson (getState: string -> obj option) (contract: AnswerContract) 
 
 // ─── display helpers ─────────────────────────────────────────────────────────
 
-let private spaceText (s: ValueSpace) : string =
+let spaceText (s: ValueSpace) : string =
   match s with
   | IntRange(lo, hi) -> sprintf "integer %d–%d" lo hi
   | FloatRange(lo, hi) -> sprintf "number %s–%s" (string lo) (string hi)
   | StringLen(lo, hi) -> sprintf "string, %d–%d chars" lo hi
   | Enum values -> "one of " + String.concat " | " values
   | AnyString -> "any string"
+  // The tree space (a capability space) is not one an elicitation normally carries;
+  // the arm keeps the match total, so the ask table never fails on a contract that does.
+  | SlotTree(Some kind) -> sprintf "a %s subtree" kind
+  | SlotTree None -> "a subtree"
 
 let outcomeKindName (o: ElicitationOutcome) : string =
   match o with

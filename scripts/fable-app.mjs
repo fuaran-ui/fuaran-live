@@ -20,10 +20,10 @@
 //  2. The required JS artefacts exist (a compile that prevents emission
 //     entirely still fails even if its error text slipped past check 1).
 
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runFable } from './fable-run.mjs';
 
 // `nuget.config` declares a folder package source beside the released feed so a
 // local pack can shadow a published package during development. NuGet hard-errors
@@ -41,23 +41,6 @@ function ensureLocalFeedFolder() {
   if (!existsSync(feed)) mkdirSync(feed, { recursive: true });
 }
 ensureLocalFeedFolder();
-
-function runFable(args) {
-  const r = spawnSync('dotnet', ['fable', ...args], { encoding: 'utf8' });
-  const out = (r.stdout ?? '') + (r.stderr ?? '');
-  process.stdout.write(out);
-  // A Fable CRASH (e.g. the project cracker dying on a NuGet restore failure)
-  // prints an exception, not `error FSHARP` lines — and the artefact-existence
-  // check below cannot catch it either, because the PREVIOUS build's JS is
-  // still on disk. Discovered 2026-07-31: an NU1605 package downgrade crashed
-  // the cracker and this script reported success over stale output.
-  if (/Unhandled exception/i.test(out)) {
-    return ['Fable crashed (unhandled exception) — see the output above for the cause'];
-  }
-  return out
-    .split(/\r?\n/)
-    .filter((l) => /\berror\b/i.test(l) && /error (FSHARP|FABLE|FS\d+)/i.test(l));
-}
 
 // NOTE ON THE DEVELOPMENT-ONLY IN-PAGE SURFACE.
 //

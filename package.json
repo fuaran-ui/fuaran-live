@@ -26,7 +26,7 @@
     "conformance": "vitest run -c vitest.conformance.config.ts",
     "conformance:report": "node scripts/conformance-report.mjs",
     "host-pin-drift": "node scripts/host-pin-drift.mjs",
-    "fable": "dotnet fable fable-host --outDir fable-host/output",
+    "fable": "node scripts/fable-run.mjs fable-host --outDir fable-host/output",
     "fable:watch": "dotnet fable watch fable-host --outDir fable-host/output",
     "build:dual": "pnpm run fable && tsc --noEmit && cross-env VITE_DUAL_HOST=1 vite build",
     "fable:app": "node scripts/fable-app.mjs",

@@ -1,15 +1,23 @@
 # The language-tier pin — what `ref:` means in the workflows, and how to bump it
 
-Six workflows check the F# language tier out as a sibling
+Four workflows check the F# language tier out as a sibling
 (`repository: fuaran-ui/fuaran-dotnet`, `path: fuaran-dotnet`) at an exact
-`ref:`. This document is that pin's rationale and its bump procedure. It lives
-here rather than in the workflows because it was duplicated verbatim across all
-six, and a fifty-line comment copied six times drifts: on 2026-09-09 every copy
-still opened by announcing a release tag of `v0.12.0` while the `ref:` beside it
-read `v0.79.0`, five bumps later. One copy can be wrong; six copies are wrong in
-different places.
+`ref:` — `ci.yml`, `pages.yml`, `azure-static-web-apps.yml` and `parity.yml`,
+the four that build the playground bundle. No project compiles that checkout
+(Phase 2140 moved the last one, the showcase, to packages); the one input read
+from it is the playground's prompt pack, which `app/SystemPrompt.fs` inlines with
+a `?raw` import. The showcase deploy (`azure-static-web-apps-showcase.yml`) and
+the projection-conformance gate (`conformance.yml`) build nothing that reads the
+tier's source, so they no longer check it out at all.
 
-Each workflow now carries a one-line pointer here and the `ref:` itself.
+This document is that pin's rationale and its bump procedure. It lives here
+rather than in the workflows because it was duplicated verbatim across all six
+workflows that carried it then, and a fifty-line comment copied six times drifts:
+on 2026-09-09 every copy still opened by announcing a release tag of `v0.12.0`
+while the `ref:` beside it read `v0.79.0`, five bumps later. One copy can be
+wrong; six copies are wrong in different places.
+
+Each workflow now carries a short pointer here and the `ref:` itself.
 
 ## One binding: `Directory.Build.props` (Phase 2079)
 
@@ -23,11 +31,14 @@ and Feliz toolchain packages. No project file spells a number.
 `test/restoreGraphPublic.test.ts` locks three things about it: every pin reads a
 property that file declares, each producer family reads its own one property,
 and the `ref:` every workflow checks the tier out at equals
-`v$(FuaranUIVersion)`. That last lock is what makes this ONE binding: the
-showcase's source-bound tier and the packaged tier the other two projects
-compile are the same release, so `app/Projection.fs`, `app/shared/Brand.fs` and
+`v$(FuaranUIVersion)`. Since Phase 2140 all three projects compile the tier as
+packages at that one property, so `app/Projection.fs`, `app/shared/Brand.fs` and
 `app/navigator/Cursor.fs` — compiled into both the playground and the showcase —
-compile against one tier version.
+compile against one tier version by construction; the `ref:` lock now keeps the
+playground's prompt pack teaching the same release the playground compiles. Two
+further locks in the same suite keep the posture from eroding: no project
+reference or linked file reaches outside the repository, and the showcase-only
+workflows check no tier source out.
 
 ### Why each project binds as it does
 
@@ -54,26 +65,38 @@ compile against one tier version.
   view compared the same contract either way; as packages, both sides of it —
   this host and the TypeScript host's `@fuaran-ui/*` packages — are what a
   stranger restores.
-- **The showcase (`app/showcase/Showcase.fsproj`) still binds the tier by
-  SOURCE**, through ProjectReferences into the sibling checkout this document's
-  `ref:` names. Its Git for Interfaces page runs `Fuaran.UI.OpStream.Dag.Merge`
-  (the structural 3-way merge engine) in the browser, and that package is
-  published for .NET hosts only: it ships no `fable/` sources, by the language
-  tier's own recorded decision (its Phase 2128), so Fable cannot compile it from
-  the registry. The binding cannot be mixed either — one ProjectReference among
-  packages is the substitution failure described for the playground above. The
-  showcase therefore WAITS on Dag.Merge's Fable packaging, which the language
-  tier has decided to ship (operator ruling, 2026-10-06): it moves to packages
-  at the first release that carries the merge engine's `fable/` sources, and
-  until then the `ref:` lock keeps it on the same release as everything else.
+- **The showcase (`app/showcase/Showcase.fsproj`) takes published packages
+  since Phase 2140.** Until then it bound the tier by SOURCE, through six
+  ProjectReferences into the sibling checkout this document's `ref:` names: its
+  Git for Interfaces page runs `Fuaran.UI.OpStream.Dag.Merge` (the structural
+  3-way merge engine) in the browser, and that package was published for .NET
+  hosts only — no `fable/` sources, by the language tier's recorded decision
+  (its Phase 2128) — so Fable could not compile it from the registry, and the
+  binding could not be mixed (one ProjectReference among packages is the
+  substitution failure described for the playground above). The language tier
+  reversed that decision (operator ruling, 2026-10-06; its Phase 2139), and the
+  0.96.0 nupkgs of `Fuaran.UI.OpStream.Dag.Merge`,
+  `Fuaran.UI.StyleObserver.Abstractions` and
+  `Fuaran.UI.LayoutObserver.Abstractions` — the three members the showcase uses
+  beyond the playground's set — each carry their `fable/` sources (checked by
+  opening the published packages, 2026-10-21). The six references became
+  `PackageReference`s on `FuaranUIVersion`, with no source edit: a package at a
+  release tag compiles the same sources the tag's checkout held. The proof was a
+  cold build in a layout where no tier checkout existed beside the repository,
+  with an empty package cache: the Fable compile, the projection-conformance
+  gate and the showcase build were green, and every showcase route rendered in a
+  browser, Git for Interfaces' merge included.
 
 ## What the pin is
 
-**Only the SHOWCASE project checks this tier out.** The playground and the
-parity host do not project-reference the language tier at all — they consume it
-as published nuget.org packages at `FuaranUIVersion`. So this `ref:` decides
-which tier contracts `app/showcase/` compiles against, and it is a pin in every
-sense the package pins are, spelled as a git ref.
+**No project compiles this checkout.** Every F# project consumes the language
+tier as published nuget.org packages at `FuaranUIVersion`. What the `ref:` still
+decides is which release's prompt pack (`docs/prompt-pack/system-prompt.md` in
+the tier) the playground ships as its system prompt, and which one
+`test/promptPack.test.ts` checks it against. That is still a pin in every sense
+the package pins are, spelled as a git ref: the prompt teaches a tier, and it
+must be the tier the playground compiles. Until Phase 2140 the showcase also
+compiled its tier from this checkout, which is what the history below records.
 
 **It is a release TAG, and a tag is immutable**, so it is no less deliberate
 than the bare commit SHA it replaced. It was a SHA from Phase 761 until v0.75.0,
@@ -87,25 +110,28 @@ specification the format has moved past.
 ## Bumping it is a SOURCE-AFFECTING act
 
 Not housekeeping. A tier release that widens a record breaks every full-literal
-construction of it in `app/showcase/`, so the `ref:` and the source migration
-land in ONE commit and cannot be split: the field assignment alone fails against
-the old checkout, and the `ref:` alone fails once the field is required.
+construction of it in `app/showcase/` and `app/`, so the version raise and the
+source migration land in ONE commit and cannot be split. Since Phase 2140 that
+cost arrives through `FuaranUIVersion` alone — the packages carry the contract —
+and the `ref:` moves with it so the prompt pack the playground ships names the
+same release.
 
 **To bump: raise `FuaranUIVersion` in `Directory.Build.props` and the `ref:` in
-all six workflows together** (grep the ref), with the showcase migration and the
-package-raise checklist below in the same commit. The restore-graph suite
-refuses the commit that moves one without the other.
+the four workflows that carry one together** (grep the ref), with the source
+migration and the package-raise checklist below in the same commit. The
+restore-graph suite refuses the commit that moves one without the other.
 
 ## Why the two siblings are pinned differently
 
 The tier is PINNED and the corpus is NOT, and the asymmetry is deliberate.
 
-The tier is consumed by project reference, so its source is part of the
-showcase's compile. Floating it on a default branch meant any upstream push
+The tier's checkout feeds the shipped prompt (and, until Phase 2140, the
+showcase's compile). Floating it on a default branch meant any upstream push
 could redden this repo with no commit here — which is exactly what happened on
 2026-07-27, when a required `RenderContext` field landed upstream and all six
-workflows failed on a CI-only commit. An exact ref turns that into a deliberate
-bump.
+workflows then carrying the checkout failed on a CI-only commit — or change the
+prompt the playground ships without anyone here choosing it. An exact ref turns
+that into a deliberate bump.
 
 The corpus is the shared conformance gate every host certifies against, and the
 whole point of giving it one home is that all hosts see the same current
@@ -236,21 +262,29 @@ the contract compiled against did not move at the switch.
   Verified by compiling the showcase against a `v0.96.0` source archive laid out
   as the sibling. The tier declares `Fuaran.Core.*` 0.36.0 and
   `Fuaran.Program.Runtime` 0.9.0, which the floors already met.
+- **v0.96.0, the showcase leaves the checkout** (2026-10-21, Phase 2140) — no
+  version moved. The showcase's six ProjectReferences became PackageReferences
+  at `FuaranUIVersion` (see "Why each project binds as it does"), and the
+  showcase deploy and the conformance gate stopped checking the tier out. The
+  `ref:` stays in the four workflows that build the playground, for its prompt
+  pack, and its meaning narrowed from "the showcase's compiled tier" to "the
+  prompt the playground ships".
 
 ## The package pins — the same release, by package
 
-Everything above is about the `ref:` in the six workflows. The playground and
-the parity host consume the same tier as published nuget.org packages, at
-`FuaranUIVersion`. Until Phase 2079 that was a SEPARATE slot on its own rhythm
-(the two were unequal from the ref's v0.80.0 against a 0.79.0 package family,
-and raised separately again on 2026-09-22), and `Projection.fs` was compiled
-against two tier versions as a result. They are now one number, held equal by
-the restore-graph suite, so a raise is one act with both costs: the showcase's
-source migration (above) and the package checklist below.
+Everything above is about the `ref:` in the workflows. Every F# project consumes
+the tier as published nuget.org packages, at `FuaranUIVersion` — the playground
+and the parity host since Phase 2079 or before, the showcase since Phase 2140.
+Until Phase 2079 the package family was a SEPARATE slot on its own rhythm (the
+two were unequal from the ref's v0.80.0 against a 0.79.0 package family, and
+raised separately again on 2026-09-22), and `Projection.fs` was compiled against
+two tier versions as a result. They are now one number, held equal by the
+restore-graph suite, so a raise is one act with both costs: the source migration
+(above) and the package checklist below.
 
 **What a package raise touches**, all in one commit:
 
-1. `FuaranUIVersion` in `Directory.Build.props`, and the six workflow `ref:`s;
+1. `FuaranUIVersion` in `Directory.Build.props`, and the four workflow `ref:`s;
 2. **`FuaranCoreVersion` beside it** — read the new tier's nuspec from the
    registry and make this AT LEAST its declared Core version (a floor; see
    "Why Core is a floor" below). These are DIRECT pins on
@@ -366,3 +400,8 @@ value would give them a different answer from the showcase, and in CI it would
 read the `ref:` tier's number, which is the lower bound rather than the one a
 local build needs. Making the workflows pass it in is a workflow change, which
 is an operator act, and would buy nothing the floor does not already guarantee.
+
+Since Phase 2140 the second tier above is gone: the showcase compiles the
+packaged release like everything else, so a local build and CI compile one tier,
+and the floor is measured against that release's declared Core version alone
+(read from its nuspec, point 2). The floor rule itself is unchanged.

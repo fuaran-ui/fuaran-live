@@ -1,15 +1,14 @@
 // Build the entirely-F#/Fable apps: the playground (`app/`) and the showcase
 // (`app/showcase/`), as two separate Fable projects.
 //
-// How each binds the F# language tier is recorded in docs/tier-pin.md (Phase 2079):
-// the playground takes the tier as published packages, so Fable extracts its
-// sources under `app/output/fable_modules/<PackageId>.<Version>/` (the `required`
-// paths below name that version); the showcase still takes the tier as source,
-// through project references into the sibling `fuaran-dotnet` checkout, until the
-// release that ships the merge engine's Fable sources lets it move to packages.
-// The parity render host (`fable-host/`, built by `pnpm run fable`) takes packages
-// too. Neither project here links tier sources any more, so no diagnostic is
-// tolerated: every compiler ERROR fails the build.
+// How each binds the F# language tier is recorded in docs/tier-pin.md: both
+// projects here take the tier as published packages (the showcase since Phase
+// 2140), so Fable extracts its sources under
+// `<outDir>/fable_modules/<PackageId>.<Version>/` (the `required` paths below name
+// that version for the playground). The parity render host (`fable-host/`, built
+// by `pnpm run fable`) takes packages too. No project links tier sources or
+// references a sibling checkout, so no diagnostic is tolerated: every compiler
+// ERROR fails the build.
 //
 // The gate is TWO checks, both required:
 //  1. Every compiler ERROR fails the build. File existence is NOT enough: Fable

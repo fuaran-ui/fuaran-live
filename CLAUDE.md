@@ -75,12 +75,11 @@ server (24070) serves all entries; the playground door on the showcase landing t
 `VITE_DUAL_HOST=1` additionally emits the `ts-host.html` / `fable-host.html` parity pages.
 
 **`dotnet build` is not a supported gate for the two app projects** (`app/FuaranLive.fsproj`,
-`app/showcase/Showcase.fsproj`), and cannot be made one: their `DefineConstants` reach only their own
-sources, so the ProjectReferenced Fuaran projects build as plain .NET assemblies _without_
-`FABLE_COMPILER` — Fable-only members there (e.g. the renderer's `StateStore.useStateKeys` React
-hook, `#if FABLE_COMPILER`-guarded by design) are absent from the assemblies, and any call site fails
-FS0039. `dotnet fable` recompiles the whole graph from source with `FABLE_COMPILER` defined
-everywhere, which is why the real pipeline is green. Both fsprojs carry a `FableOnlyGuard` target
+`app/showcase/Showcase.fsproj`), and cannot be made one: the Fuaran packages' .NET assemblies are
+built _without_ `FABLE_COMPILER` — Fable-only members there (e.g. the renderer's
+`StateStore.useStateKeys` React hook, `#if FABLE_COMPILER`-guarded by design) are absent from the
+assemblies, and any call site fails FS0039. `dotnet fable` recompiles every package from its
+`fable/` sources with `FABLE_COMPILER` defined everywhere, which is why the real pipeline is green. Both fsprojs carry a `FableOnlyGuard` target
 that fails a plain `dotnet build` immediately with this explanation (design-time builds are exempt;
 `-p:SkipFableOnlyGuard=true` bypasses it). The Fable compile via `scripts/fable-app.mjs` is the
 typecheck gate.
@@ -131,8 +130,11 @@ emitter locks below. It is an **exact id set** rather than a prefix pattern, pre
 prefix proves nothing: a new id reddens the unit suite until someone adds it deliberately, and that
 act is where the registry gets checked. The lock is offline, so it does not claim a version is
 served _today_ — `ci.yml` restores with no local feed and is what proves that on every push.
-Raising a pin stays a separate deliberate act: the six CI workflows pin the language-tier sibling
-checkout at a tier ref and must move together with it, per [`docs/tier-pin.md`](docs/tier-pin.md).
+Raising a pin stays a separate deliberate act: the four CI workflows that build the playground
+check the language tier out at a tier ref (for its prompt pack only; no project compiles that
+checkout) and must move together with it, per [`docs/tier-pin.md`](docs/tier-pin.md). The same
+suite holds every project inside the repository: no `ProjectReference` or linked source reaches a
+sibling checkout, and the showcase deploy builds from published packages alone.
 
 **The shared wire core.** `Fuaran.UI.AiWire` is the portable AI-connector wire substrate that
 `app/Byok.fs` and `app/Projection.fs` are built on — the insertion-ordered `JsonValue` model with

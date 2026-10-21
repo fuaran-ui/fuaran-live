@@ -33,6 +33,9 @@
 //    Fuaran.UI.OpStream.Abstractions 0.96.0 · Fuaran.UI.OpStream.Replay 0.96.0
 //    Fuaran.UI.ServerDriven 0.96.0 · Fuaran.UI.Program 0.96.0
 //    Fuaran.UI.AiWire 0.96.0 (one version with the family since Phase 2079)
+//    Fuaran.UI.StyleObserver.Abstractions · Fuaran.UI.LayoutObserver.Abstractions
+//    · Fuaran.UI.OpStream.Dag.Merge 0.96.0 (re-checked 2026-10-21, Phase 2140,
+//    the nupkgs opened: each carries its fable/ sources)
 //    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.36.0 (a floor; the 0.96.0
 //    tier declares 0.36.0 too — see Directory.Build.props)
 //    Fuaran.Program.Runtime 0.9.0 (the floor Fuaran.UI.Program 0.96.0 declares)
@@ -47,11 +50,16 @@
 //  tier's own dependency (NU1605) rather than holding Core back. The reasoning
 //  is at the pins themselves in `app/FuaranLive.fsproj`.
 //
-//  A PIN MAY STILL SIT BEHIND THE TIER'S HEAD DELIBERATELY — the six CI
-//  workflows pin the sibling SOURCE checkout at a tier ref, a separate slot on
-//  its own rhythm that moves with a showcase migration in one commit
-//  (`docs/tier-pin.md`) — so "behind" and "unobtainable" are different
-//  questions and only the second one is a defect.
+//  A PIN MAY STILL SIT BEHIND THE TIER'S HEAD DELIBERATELY — a raise is a
+//  deliberate act that moves this property, the playground's prompt-pack
+//  checkout ref and the emitted-module paths together (`docs/tier-pin.md`) —
+//  so "behind" and "unobtainable" are different questions and only the second
+//  one is a defect.
+//
+//  NO PROJECT REACHES A SOURCE TREE (Phase 2140). The showcase took the tier by
+//  project reference into a sibling checkout until the merge engine shipped
+//  its Fable sources; every project now takes it as packages, and the two
+//  locks after the tier-ref one keep a source binding from creeping back.
 //
 //  WHAT THIS LOCK DOES NOT CLAIM. It is offline, so it cannot tell you that a
 //  version is on the registry TODAY; it tells you that the id set has not moved
@@ -66,7 +74,7 @@
 // =============================================================================
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(__dirname, '..');
@@ -92,6 +100,13 @@ const ALLOWED_PACKAGE_IDS: readonly string[] = [
   // The portable AI-connector wire substrate this repo's BYOK layer is built
   // on — adopted as a package by Phase 1698, which deleted the vendored copy.
   'Fuaran.UI.AiWire',
+  // The showcase's three tier members beyond the playground's set (Phase 2140,
+  // which moved the showcase off its source binding): the contrast and
+  // overflow derivations, and the structural 3-way merge engine, which ships
+  // its fable/ sources since Phase 2139.
+  'Fuaran.UI.StyleObserver.Abstractions',
+  'Fuaran.UI.LayoutObserver.Abstractions',
+  'Fuaran.UI.OpStream.Dag.Merge',
   // The shared substrate spine (public, nuget.org).
   'Fuaran.Core.Tree',
   'Fuaran.Core.Ops',
@@ -180,15 +195,50 @@ const versionProps = parseVersionProps(
 const projects = findProjects(repoRoot);
 const pins = projects.flatMap((p) => parsePins(readFileSync(p, 'utf8'), p));
 
-/** The six-plus workflows' language-tier checkout refs, file by file. */
+/**
+ * Every project-file reference that names a path (`ProjectReference`, and the
+ * `Compile` / `None` / `Content` items that link a file), resolved against the
+ * project's own directory. Windows separators are normalised first, so the
+ * check reads the same on a Linux runner as on a maintainer's machine.
+ */
+function pathReferences(text: string, project: string): { item: string; path: string }[] {
+  const dir = dirname(project);
+  const re = /<(ProjectReference|Compile|None|Content)\s+Include="([^"]+)"/g;
+  return [...text.matchAll(re)].map((m) => ({
+    item: m[1]!,
+    path: resolve(dir, m[2]!.replace(/\\/g, '/')),
+  }));
+}
+
+/** True when `path` lies inside `root` (or is `root`). */
+function inside(root: string, path: string): boolean {
+  const rel = relative(root, path);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+/** The workflows' language-tier checkout refs, file by file. */
 const workflowDir = join(repoRoot, '.github', 'workflows');
-const tierRefs = readdirSync(workflowDir)
-  .filter((f) => f.endsWith('.yml'))
-  .flatMap((f) => {
-    const text = readFileSync(join(workflowDir, f), 'utf8');
-    const re = /repository:\s*fuaran-ui\/fuaran-dotnet\s*\n\s*ref:\s*(\S+)/g;
-    return [...text.matchAll(re)].map((m) => ({ file: f, ref: m[1]! }));
-  });
+const workflowText = new Map(
+  readdirSync(workflowDir)
+    .filter((f) => f.endsWith('.yml'))
+    .map((f) => [f, readFileSync(join(workflowDir, f), 'utf8')] as const),
+);
+const tierRefs = [...workflowText].flatMap(([f, text]) => {
+  const re = /repository:\s*fuaran-ui\/fuaran-dotnet\s*\n\s*ref:\s*(\S+)/g;
+  return [...text.matchAll(re)].map((m) => ({ file: f, ref: m[1]! }));
+});
+
+/**
+ * The workflows that build only the showcase or the projector, never the
+ * playground bundle: no step of theirs reads the language tier's source, so
+ * none may check it out (Phase 2140). The other four keep the checkout for one
+ * input alone, the playground's `?raw` import of the tier's prompt pack
+ * (`app/SystemPrompt.fs`, `test/promptPack.test.ts`).
+ */
+const SHOWCASE_ONLY_WORKFLOWS: readonly string[] = [
+  'azure-static-web-apps-showcase.yml',
+  'conformance.yml',
+];
 
 describe('NuGet restore-graph lock', () => {
   it('finds the repo projects at all (the guard is observing something)', () => {
@@ -256,16 +306,48 @@ describe('NuGet restore-graph lock', () => {
   });
 
   it('holds the CI tier checkout ref equal to the packaged tier version', () => {
-    // The showcase compiles the tier by SOURCE at this ref; the playground and
-    // the parity host compile it as packages at FuaranUIVersion. Projection.fs
-    // compiles into both, so the two must name one tier version — see
-    // docs/tier-pin.md for why the showcase cannot take packages yet.
+    // No project compiles the tier from this checkout any more (Phase 2140).
+    // What still reads it is the playground's prompt pack, the teaching for the
+    // tier the playground compiles as packages at FuaranUIVersion, so the two
+    // must name one tier version — see docs/tier-pin.md.
     expect(
       tierRefs.length,
       'no workflow checks the tier out; the probe saw nothing',
     ).toBeGreaterThan(0);
     const want = `v${versionProps.get('FuaranUIVersion')}`;
     expect(tierRefs.filter((r) => r.ref !== want)).toEqual([]);
+  });
+
+  it('lets no project reference reach a source tree outside this repository (Phase 2140)', () => {
+    // The language tier arrives as packages and nothing else: a ProjectReference
+    // or a linked source file outside the repo root is a second binding that a
+    // stranger's clone cannot satisfy, and the showcase carried six of them
+    // until the merge engine shipped its Fable sources.
+    const escaping = projects.flatMap((p) =>
+      pathReferences(readFileSync(p, 'utf8'), p)
+        .filter((r) => !inside(repoRoot, r.path))
+        .map((r) => `${r.item} ${r.path}  (in ${p.slice(repoRoot.length + 1)})`),
+    );
+    expect(
+      escaping,
+      'A project reaches outside the repository. Take the code as a published ' +
+        'package (and add its id above once the registry serves it).',
+    ).toEqual([]);
+    // The probe is observing: the showcase links repo-local shared sources.
+    expect(projects.some((p) => pathReferences(readFileSync(p, 'utf8'), p).length > 0)).toBe(true);
+  });
+
+  it('checks the tier source out in no workflow that builds only the showcase (Phase 2140)', () => {
+    const missing = SHOWCASE_ONLY_WORKFLOWS.filter((f) => !workflowText.has(f));
+    expect(missing, 'a named showcase-only workflow no longer exists').toEqual([]);
+    const checkingOut = SHOWCASE_ONLY_WORKFLOWS.filter((f) =>
+      /repository:\s*fuaran-ui\/fuaran-dotnet\b/.test(workflowText.get(f) ?? ''),
+    );
+    expect(
+      checkingOut,
+      'The showcase builds from published packages alone; a fuaran-dotnet ' +
+        'checkout here would let a source binding creep back unnoticed.',
+    ).toEqual([]);
   });
 
   it('keeps the retired vendored wire copy deleted', () => {
@@ -335,6 +417,17 @@ describe('NuGet restore-graph lock — go-red self-test', () => {
         <PackageReference Include="Feliz" Version="2.9.0"></PackageReference>
       </ItemGroup>`;
     expect(parsePins(text, 'synthetic.fsproj').map((p) => p.id)).toEqual(['Fuaran.UI', 'Feliz']);
+  });
+
+  it('an out-of-repo reference is caught, and a repo-local link is not', () => {
+    const project = join(repoRoot, 'app', 'showcase', 'Synthetic.fsproj');
+    const text = `
+      <Compile Include="..\\shared\\Brand.fs" />
+      <ProjectReference Include="..\\..\\..\\some-sibling\\src\\Tier.fsproj" />`;
+    const refs = pathReferences(text, project);
+    expect(refs.map((r) => r.item)).toEqual(['Compile', 'ProjectReference']);
+    expect(inside(repoRoot, refs[0]!.path)).toBe(true);
+    expect(inside(repoRoot, refs[1]!.path)).toBe(false);
   });
 
   it('the retired-directory check resolves against the repo root, both ways', () => {

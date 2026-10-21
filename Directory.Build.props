@@ -15,9 +15,9 @@
     docs/tier-pin.md. The short form: every id below must be served by the
     public registry at exactly this version (test/restoreGraphPublic.test.ts
     is the lock), and the language-tier ref the CI workflows check the sibling
-    source out at is held EQUAL to FuaranUIVersion by that same suite, so the
-    showcase's source-bound tier and the playground's packaged tier are one
-    tier version.
+    source out at (for the playground's prompt pack; no project compiles it) is
+    held EQUAL to FuaranUIVersion by that same suite, so the prompt the
+    playground ships teaches the tier version every project compiles.
 
     Being the nearest Directory.Build.props, this file also ends MSBuild's
     upward search: nothing above this repository is imported into its
@@ -34,14 +34,11 @@
          packages the tier also depends on, so this is a FLOOR: it must be at or
          above the Core version of EVERY tier this repo compiles, because a lower
          number downgrades that tier's own dependency (NU1605) and one NU160x
-         line kills the Fable project cracker. It is deliberately NOT derived
-         from any one tier checkout, because the repository compiles more than
-         one: the CI workflows check the sibling source out at the v$(FuaranUIVersion)
-         ref (Core 0.36.0 at v0.96.0) and the packaged tier is the same release,
-         while a local `pnpm run fable:app` compiles whatever the sibling
-         checkout holds (the language tier's main, also Core 0.36.0 at the time
-         of Phase 2215). Raising it is safe for the
-         older tier and required for the newer, so it tracks the highest. -->
+         line kills the Fable project cracker. Every project compiles the one
+         packaged tier at FuaranUIVersion (the showcase since Phase 2140), so
+         the floor is that release's declared Core version (0.36.0 at 0.96.0),
+         read from its nuspec at each raise; docs/tier-pin.md has why it is a
+         floor and not derived. -->
     <!-- Phase 2184: raised 0.35.2 -> 0.36.0 so a local showcase build against the sibling's main restores. Verified green in both shapes: the sibling at main (local) and the sibling at v0.91.0 (CI). 0.36.0 is published on nuget.org. -->
     <FuaranCoreVersion>0.36.0</FuaranCoreVersion>
     <!-- The program/logic domain's domain-generic runtime

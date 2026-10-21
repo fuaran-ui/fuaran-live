@@ -60,22 +60,12 @@ jobs:
         with:
           path: fuaran-live
 
-      # Sibling checkouts (public repos, no token): the Fable app
-      # project-references ../fuaran-dotnet; the corpus sits at ../wire-format-fixtures.
-      - uses: actions/checkout@v4
-        with:
-          # The language-tier pin. Only the SHOWCASE project checks this tier out
-          # (the playground consumes published packages), so this ref decides which
-          # tier contracts app/showcase/ compiles against. Bumping it is a
-          # SOURCE-AFFECTING act, not housekeeping, and it moves in all six
-          # workflows together with the showcase migration in the same commit.
-          # Rationale, procedure and the per-release history: docs/tier-pin.md.
-          # The corpus checkout stays unpinned deliberately — it is the shared
-          # conformance gate.
-          repository: fuaran-ui/fuaran-dotnet
-          ref: v0.96.0
-          path: fuaran-dotnet
-
+      # One sibling checkout (public repo, no token): the corpus at
+      # ../wire-format-fixtures, unpinned deliberately — it is the shared
+      # conformance gate. The language tier is NOT checked out: the showcase
+      # takes it as published packages (Phase 2140), and nothing this job builds
+      # reads the tier's source, so the build restores exactly as a stranger's
+      # would. test/restoreGraphPublic.test.ts keeps it that way.
       - uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-ui-specification

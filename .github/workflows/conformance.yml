@@ -8,11 +8,11 @@ name: Projection conformance
 # verified TypeScript AND Python projections honest (see docs/PROJECTION_FIDELITY.md;
 # the F# / C# / VB legs are demo-grade pending their re-authored arms).
 #
-# This gate assembles a multi-repo layout because the Fable app build compiles the
-# showcase project, which project-references the sibling F# tier (the playground
-# and the Fable host take the tier as packages, and the @fuaran-ui/* npm packages
-# resolve from the registry; docs/tier-pin.md). Every checked-out repo is public —
-# no token needed.
+# This gate assembles a two-repo layout: this repo beside the corpus it
+# certifies against. The language tier is NOT checked out — every F# project
+# here takes it as published packages (the showcase since Phase 2140), and the
+# @fuaran-ui/* npm packages resolve from the registry; docs/tier-pin.md. Both
+# checked-out repos are public — no token needed.
 
 on:
   push:
@@ -31,28 +31,12 @@ jobs:
     steps:
       # Assemble the workspace layout:
       #   <root>/wire-format-fixtures   (fuaran-ui-specification)
-      #   <root>/fuaran                 (F# tier — the showcase's project reference)
       #   <root>/fuaran-live            (this repo)
       - name: Checkout the wire-format corpus (fuaran-ui-specification)
         uses: actions/checkout@v4
         with:
           repository: fuaran-ui/fuaran-ui-specification
           path: workspace/wire-format-fixtures
-
-      - name: Checkout fuaran (F# tier)
-        uses: actions/checkout@v4
-        with:
-          # The language-tier pin. Only the SHOWCASE project checks this tier out
-          # (the playground consumes published packages), so this ref decides which
-          # tier contracts app/showcase/ compiles against. Bumping it is a
-          # SOURCE-AFFECTING act, not housekeeping, and it moves in all six
-          # workflows together with the showcase migration in the same commit.
-          # Rationale, procedure and the per-release history: docs/tier-pin.md.
-          # The corpus checkout stays unpinned deliberately — it is the shared
-          # conformance gate.
-          repository: fuaran-ui/fuaran-dotnet
-          ref: v0.96.0
-          path: workspace/fuaran-dotnet
 
       - name: Checkout fuaran-live (this repo)
         uses: actions/checkout@v4

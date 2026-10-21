@@ -2,9 +2,10 @@ name: Deploy to GitHub Pages
 
 # Builds the static dist/ and publishes it to GitHub Pages. The app is fully
 # static — no server, no secrets; the visitor supplies their own provider key
-# at runtime, client-side only. The F#/Fable app project-references the
-# sibling F# tier, so the public fuaran-dotnet + fuaran-ui-specification repos
-# are checked out as siblings (see ci.yml).
+# at runtime, client-side only. The F#/Fable app takes the language tier as
+# published packages and inlines its prompt pack from the tier's source, so the
+# public fuaran-dotnet + fuaran-ui-specification repos are checked out as
+# siblings (see ci.yml).
 
 on:
   push:
@@ -32,14 +33,15 @@ jobs:
           path: fuaran-live
       - uses: actions/checkout@v4
         with:
-          # The language-tier pin. Only the SHOWCASE project checks this tier out
-          # (the playground consumes published packages), so this ref decides which
-          # tier contracts app/showcase/ compiles against. Bumping it is a
-          # SOURCE-AFFECTING act, not housekeeping, and it moves in all six
-          # workflows together with the showcase migration in the same commit.
-          # Rationale, procedure and the per-release history: docs/tier-pin.md.
-          # The corpus checkout stays unpinned deliberately — it is the shared
-          # conformance gate.
+          # The language-tier pin. No project compiles this checkout: every F#
+          # project takes the tier as published packages (the showcase since
+          # Phase 2140). The one input read from it is the playground's prompt pack
+          # (the ?raw import in app/SystemPrompt.fs) — the teaching for the tier the
+          # playground compiles — so test/restoreGraphPublic.test.ts holds this ref
+          # equal to v$(FuaranUIVersion), and it moves with every raise, in the four
+          # workflows that build the playground. Rationale and history:
+          # docs/tier-pin.md. The corpus checkout stays unpinned deliberately — it is
+          # the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
           ref: v0.96.0
           path: fuaran-dotnet

@@ -9,10 +9,10 @@ name: Cross-host parity
 # regression guard over the Phase 77 reference-CSS byte-copy + parity-locked
 # class names.
 #
-# Like conformance.yml, this gate assembles a multi-repo layout. The Fable host
-# takes the F# tier as published packages (the @fuaran-ui/* npm packages also
-# resolve from the registry); the sibling F# checkout is there for the showcase
-# project that the app build compiles, which still project-references it
+# Like conformance.yml, this gate assembles a multi-repo layout. Every F#
+# project takes the tier as published packages (the @fuaran-ui/* npm packages
+# also resolve from the registry); the sibling F# checkout is there for the
+# playground's prompt pack, which the dual-host build bundles through index.html
 # (docs/tier-pin.md). Every checked-out repo is public — no token needed.
 
 on:
@@ -32,7 +32,7 @@ jobs:
     steps:
       # Assemble the workspace layout:
       #   <root>/wire-format-fixtures   (fuaran-ui-specification — the parity fixtures)
-      #   <root>/fuaran                 (F# tier — the showcase's project reference)
+      #   <root>/fuaran-dotnet          (F# tier — the playground's prompt pack)
       #   <root>/fuaran-live            (this repo)
       - name: Checkout the wire-format corpus (fuaran-ui-specification)
         uses: actions/checkout@v4
@@ -43,14 +43,15 @@ jobs:
       - name: Checkout fuaran (F# tier)
         uses: actions/checkout@v4
         with:
-          # The language-tier pin. Only the SHOWCASE project checks this tier out
-          # (the playground consumes published packages), so this ref decides which
-          # tier contracts app/showcase/ compiles against. Bumping it is a
-          # SOURCE-AFFECTING act, not housekeeping, and it moves in all six
-          # workflows together with the showcase migration in the same commit.
-          # Rationale, procedure and the per-release history: docs/tier-pin.md.
-          # The corpus checkout stays unpinned deliberately — it is the shared
-          # conformance gate.
+          # The language-tier pin. No project compiles this checkout: every F#
+          # project takes the tier as published packages (the showcase since
+          # Phase 2140). The one input read from it is the playground's prompt pack
+          # (the ?raw import in app/SystemPrompt.fs) — the teaching for the tier the
+          # playground compiles — so test/restoreGraphPublic.test.ts holds this ref
+          # equal to v$(FuaranUIVersion), and it moves with every raise, in the four
+          # workflows that build the playground. Rationale and history:
+          # docs/tier-pin.md. The corpus checkout stays unpinned deliberately — it is
+          # the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
           ref: v0.96.0
           path: workspace/fuaran-dotnet

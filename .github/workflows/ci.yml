@@ -1,11 +1,11 @@
 name: CI
 
 # The @fuaran-ui/* packages resolve from the public npm registry; the committed
-# pnpm-lock.yaml is authoritative (installs are --frozen-lockfile). The playground
-# and the Fable host take the F# language tier as published packages; only the
-# showcase project-references the sibling F# tier (until it moves to packages,
-# docs/tier-pin.md). The conformance gate reads the shared wire-format corpus, so
-# both public repos are checked out as siblings.
+# pnpm-lock.yaml is authoritative (installs are --frozen-lockfile). Every F#
+# project (the playground, the showcase and the Fable host) takes the language
+# tier as published packages (docs/tier-pin.md); the playground's prompt pack is
+# read from the tier's source and the conformance gate reads the shared
+# wire-format corpus, so both public repos are checked out as siblings.
 # Local verification: clone fuaran-dotnet as ../fuaran-dotnet and fuaran-ui-specification
 # as ../wire-format-fixtures, then `pnpm install && pnpm run build && pnpm test`.
 
@@ -31,15 +31,16 @@ jobs:
         with:
           path: fuaran-live
 
-      # Sibling checkouts (both repos are public — no token needed): the showcase
-      # project-references ../fuaran-dotnet (the playground and the Fable host
-      # take the same release as packages); the conformance gate reads
+      # Sibling checkouts (both repos are public — no token needed): the
+      # playground inlines its prompt pack from ../fuaran-dotnet (every project
+      # compiles the same release as packages); the conformance gate reads
       # ../wire-format-fixtures.
       #
       # The two are deliberately pinned DIFFERENTLY, and that asymmetry is the
-      # point: the showcase consumes the tier by project reference, so its source
-      # is part of that compile and floating it lets an upstream push redden this
-      # repo with no commit here (it did, on 2026-07-27); the corpus is the
+      # point: the prompt pack teaches the tier the playground compiles, so
+      # floating it lets an upstream push change the shipped prompt and redden
+      # this repo with no commit here (the source binding the showcase had until
+      # Phase 2140 did exactly that, on 2026-07-27); the corpus is the
       # shared conformance gate every host certifies against, and pinning it
       # would reintroduce exactly the drift that giving it one home bought out.
       #
@@ -47,14 +48,15 @@ jobs:
       # the more rigorous choice here: docs/tier-pin.md.
       - uses: actions/checkout@v4
         with:
-          # The language-tier pin. Only the SHOWCASE project checks this tier out
-          # (the playground consumes published packages), so this ref decides which
-          # tier contracts app/showcase/ compiles against. Bumping it is a
-          # SOURCE-AFFECTING act, not housekeeping, and it moves in all six
-          # workflows together with the showcase migration in the same commit.
-          # Rationale, procedure and the per-release history: docs/tier-pin.md.
-          # The corpus checkout stays unpinned deliberately — it is the shared
-          # conformance gate.
+          # The language-tier pin. No project compiles this checkout: every F#
+          # project takes the tier as published packages (the showcase since
+          # Phase 2140). The one input read from it is the playground's prompt pack
+          # (the ?raw import in app/SystemPrompt.fs) — the teaching for the tier the
+          # playground compiles — so test/restoreGraphPublic.test.ts holds this ref
+          # equal to v$(FuaranUIVersion), and it moves with every raise, in the four
+          # workflows that build the playground. Rationale and history:
+          # docs/tier-pin.md. The corpus checkout stays unpinned deliberately — it is
+          # the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
           ref: v0.96.0
           path: fuaran-dotnet

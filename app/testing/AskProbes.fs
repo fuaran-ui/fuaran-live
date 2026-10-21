@@ -45,3 +45,9 @@ let buildAnswerJsonFlat (stateJson: string) (envelopeWire: string) : string =
 
       buildAnswerJson getState env.Contract
     | _ -> ""
+
+/// The ask table's description of a tree value space, addressed by plain
+/// string (`""` for an unconstrained kind), so the suite can pin the one space
+/// an elicitation does not normally carry.
+let slotTreeSpaceText (kind: string) : string =
+  spaceText (SlotTree(if kind = "" then None else Some kind))

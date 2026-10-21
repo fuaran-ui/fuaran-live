@@ -143,3 +143,8 @@ let canDropAt (session: Session.SessionState) (moved: string) (parentId: string)
   match session.Tree with
   | None -> false
   | Some root -> canDrop root (NodeId moved) (NodeId parentId)
+
+/// The navigator status-line sentence for a position the node may not leave or
+/// cross, addressed by plain strings.
+let positionNotStructuralText (nodeId: string) (slot: string) : string =
+  placeErrorText (PlaceError.PositionNotStructural(NodeId nodeId, slot))

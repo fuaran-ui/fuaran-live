@@ -108,6 +108,7 @@
     <Compile Include="testing\AgentReadableProbes.fs" />
     <Compile Include="testing\TeleportProbes.fs" />
     <Compile Include="testing\TimeMachineProbes.fs" />
+    <Compile Include="testing\DataInTheInterfaceProbes.fs" />
     <!-- The page registry: after the pages, because it names each page's value;
          it loads each one as its own chunk. -->
     <Compile Include="Registry.fs" />

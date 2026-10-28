@@ -269,7 +269,26 @@ let pages: Page list =
       Pillar = Pillar.Machine
       Wow =
         "One guest document framed three times with three different relaxations, reporting on itself — watch the sandbox bite. An embed that asks for nothing gets nothing: the wire-cheapest document is the safest one."
-      Load = fun () -> importValueDynamic Embedded.page } ]
+      Load = fun () -> importValueDynamic Embedded.page }
+    // ── Data in the interface (Phase 1887) ──────────────────────────────────
+    { Id = "linked-brushing"
+      Title = "Linked Brushing"
+      Pillar = Pillar.Intent
+      Wow =
+        "Click a bar and every view filters. No view is told about another: each declares a filter on what the other chart publishes, and the renderer does the rest."
+      Load = fun () -> importValueDynamic LinkedBrushing.page }
+    { Id = "pivot-sandbox"
+      Title = "The Pivot Sandbox"
+      Pillar = Pillar.Machine
+      Wow =
+        "Build a pivot, a derived column or a running total out of steps that are data, watch it compute in your browser, then add a runaway and watch the renderer refuse it before it runs."
+      Load = fun () -> importValueDynamic PivotSandbox.page }
+    { Id = "typed-refusal"
+      Title = "The Typed Refusal"
+      Pillar = Pillar.Machine
+      Wow =
+        "Break a chart's binding and get a refusal naming the slot, the code and the columns that do exist, instead of a blank chart."
+      Load = fun () -> importValueDynamic TypedRefusal.page } ]
 
 let pagesInPillar (p: Pillar) : Page list =
   pages |> List.filter (fun d -> d.Pillar = p)

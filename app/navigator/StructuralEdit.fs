@@ -318,6 +318,37 @@ let private sentinel = "fuaran-new-node-"
     if (val === MISSING) { return ''; }
     kindObj[f] = val;
   }
+  // A requirement that depends on another member (`getKindSchema`'s
+  // `conditional`, JSON Schema's `if` / `then` / `else`): read the `if` against
+  // the shape built so far, and synthesise the required members of the branch
+  // that applies. A single-select's `value` is the one today (tier Phase 1962):
+  // the minimal Select sets no `multiple`, so its `else` requires `value`.
+  var cond = kindSchema && kindSchema.conditional;
+  if (cond && cond['if']) {
+    var test = cond['if'];
+    var holds = true;
+    var ifReq = Array.isArray(test.required) ? test.required : [];
+    for (var q = 0; q < ifReq.length; q++) {
+      if (!Object.prototype.hasOwnProperty.call(kindObj, ifReq[q])) { holds = false; }
+    }
+    var ifProps = test.properties || {};
+    for (var ik in ifProps) {
+      if (Object.prototype.hasOwnProperty.call(ifProps, ik)
+          && Object.prototype.hasOwnProperty.call(kindObj, ik)
+          && typeof ifProps[ik]['const'] !== 'undefined'
+          && kindObj[ik] !== ifProps[ik]['const']) { holds = false; }
+    }
+    var applies = holds ? cond.then : cond['else'];
+    var extra = (applies && Array.isArray(applies.required)) ? applies.required : [];
+    for (var e = 0; e < extra.length; e++) {
+      var g = extra[e];
+      if (Object.prototype.hasOwnProperty.call(kindObj, g)) { continue; }
+      if (!Object.prototype.hasOwnProperty.call(properties, g)) { return ''; }
+      var gv = synth(properties[g], 1, g);
+      if (gv === MISSING) { return ''; }
+      kindObj[g] = gv;
+    }
+  }
   try { return JSON.stringify({ id: sentinel + '0', kind: kindObj }); } catch (e) { return ''; }
 })($0, $1, $2)""")>]
 let private synthesiseJs (kindSchema: obj) (disc: string) (sentinelPrefix: string) : string = jsNative

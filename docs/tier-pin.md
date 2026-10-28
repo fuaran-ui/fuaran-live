@@ -269,6 +269,27 @@ the contract compiled against did not move at the switch.
   `ref:` stays in the four workflows that build the playground, for its prompt
   pack, and its meaning narrowed from "the showcase's compiled tier" to "the
   prompt the playground ships".
+- **v0.97.0** (2026-10-28, Phase 2227) — the release that moves the tier onto
+  Fuaran.Core 0.38.1's typed column, and source-affecting in the ways Core's
+  `0.37.0` migration notes list. Every `{ Name; Type; Cells }` column literal in
+  `Charts`, `LivingSheet`, `LinkedBrushing`, `PivotSandbox` and `TypedRefusal`
+  is a typed builder (`Column.ofStrs` / `ofInts` / `ofFloats` over a `Vector`,
+  `AllValid`), every schema entry a `Field.create`, and the table reads go
+  through `Table.tryColumn` / `Table.rowCount` / `Column.cell`; `Fuaran.Core.Row`
+  is gone, so the row accessors spell `Map<string, obj>`; `WireVersioning` reads
+  its widgets through Core's typed `Decoder` (the `Decode.*Field` helpers left)
+  and qualifies `Versioning.Evolution`. Two wire changes ride the release, both
+  re-pinned rather than worked around: a multi-select carries `values` and no
+  `value` (its Phase 1962, so `SelectSpec.Value` is an option), and a member at
+  its declared default leaves the canonical form (its Phase 2300 rule 1 —
+  `Flex.wrap: false`, `Heading.variant: Standard` and thirteen more). The
+  Rosetta exemplar's TypeScript and Python hosts drop `wrap: false`, and its
+  Rust and Go WebAssembly artefacts were rebuilt from hosts carrying the same
+  rule (`public/rosetta/PROVENANCE.md`). The tier declares `Fuaran.Core.*`
+  0.38.1 and `Fuaran.Program.Runtime` 0.10.0, so both floors moved. It rides
+  with the `@fuaran-ui/*` v0.31.0 set (`ops` 0.31.0, `schema` 0.27.0,
+  `renderer` 0.28.0, `ui` 0.25.0, `ai-tools` 0.14.1, `charts` 0.14.5,
+  `op-stream` 0.11.5), the TypeScript release carrying the same two wire rules.
 
 ## The package pins — the same release, by package
 
@@ -354,6 +375,22 @@ restore-graph suite, so a raise is one act with both costs: the source migration
   still shows the character delta. The structural editor takes Core's `Anchor`
   and a same-parent move is a bare reorder (Phase 2306). `Fuaran.Core.*` stays
   at 0.36.0 and `Fuaran.Program.Runtime` at 0.9.0.
+- **0.96.0 → 0.97.0** (Phase 2227) — the same release, by package, and the
+  first on Core's typed column: `Fuaran.Core.*` moved 0.36.0 → 0.38.1 and
+  `Fuaran.Program.Runtime` 0.9.0 → 0.10.0 (points 2 and 3). The Pattern Bank's
+  signature entries carry Core's `HoleKind` as their `Kind` (Core Phase 409);
+  its compute sample and the gallery's sales explorer build their columns with
+  the typed builders. The playground's F# view (`app/Projection.fs`) spells an
+  embedded column the same way — a typed builder over the wire's `values` and
+  `validity`, or `Column.ofCells` for a date or timestamp column, whose wire
+  text the bridge reads — and a timestamp type with its unit. The parity host's
+  query bridge builds its refined table through `Column.ofCells` from a schema
+  read at run time, and reads it back with `Column.cell`. Three readers follow
+  the wire's two new rules: `getKindSchema` carries a spec's `if` / `then` /
+  `else` as `conditional` (a single-select's `value`), the structural editor's
+  default synthesis reads it, and the property editor shows a member absent at
+  its declared default as that default, found by asking the decoder and encoder
+  which candidate the canonical form omits.
 - **The ceiling that twice held the family back is gone.** Before the loop's
   0.6.0 split, the tier widened a member of `Action` and the loop — a separate
   producer — still constructed the narrower form in its own Fable-packed

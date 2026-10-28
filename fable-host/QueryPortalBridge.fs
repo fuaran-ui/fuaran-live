@@ -47,7 +47,7 @@ let private parseSchema (json: string) : Result<Schema, string> =
         match field "name", field "type" with
         | Some(JStr name), Some(JStr ty) ->
           match ColumnType.ofTag ty with
-          | Some ct -> go ((name, ct) :: acc) rest
+          | Some ct -> go (Field.create name ct :: acc) rest
           | None -> Error("unknown column type '" + ty + "'")
         | _ -> Error "each schema entry needs a string 'name' and 'type'"
       | _ -> Error "each schema entry must be a JSON object"
@@ -94,26 +94,25 @@ let checkDashboard (schemaJson: string, dashboardWireJson: string) : obj =
         [ "ok" ==> List.isEmpty defects
           "defects" ==> (defects |> List.map defectToJs |> List.toArray) ]
 
+/// Project a `Fuaran.Core.Schema` to the JS `{ name, type }[]` shape.
+let private schemaToJs (schema: Schema) : obj =
+  schema
+  |> List.map (fun f -> createObj [ "name" ==> f.Name; "type" ==> ColumnType.tag f.Type ])
+  |> List.toArray
+  |> box
+
 /// The canonical retrieval-hit schema (Phase 325) as a JSON-friendly
 /// `{ name, type }[]` – so the TS retrieval surface types a case-history
 /// dashboard against the SAME `RetrievalSource.hitSchema` the F# core defines
 /// (one contract for the relational and retrieval planes alike).
-let retrievalHitSchema () : obj =
-  RetrievalSource.hitSchema
-  |> List.map (fun (name, ct) -> createObj [ "name" ==> name; "type" ==> ColumnType.tag ct ])
-  |> List.toArray
-  |> box
-
-/// Project a `Fuaran.Core.Schema` to the JS `{ name, type }[]` shape.
-let private schemaToJs (schema: Schema) : obj =
-  schema
-  |> List.map (fun (name, ct) -> createObj [ "name" ==> name; "type" ==> ColumnType.tag ct ])
-  |> List.toArray
-  |> box
+let retrievalHitSchema () : obj = schemaToJs RetrievalSource.hitSchema
 
 /// Marshal one JSON value into a `Cell` of the declared column type. A missing /
 /// shape-mismatched value becomes `Null` (best-effort over already-fetched data –
 /// the refinement is local compute, not a strict re-decode of untrusted wire).
+/// Date and timestamp text that does not name an instant the column can hold is
+/// a mismatch too, so every cell this answers is one its column's typed storage
+/// holds (`Column.ofCells` would refuse the column otherwise).
 let private cellOf (ty: ColumnType) (v: JVal option) : Cell =
   match ty, v with
   | IntType, Some(JInt i) -> Int i
@@ -125,8 +124,9 @@ let private cellOf (ty: ColumnType) (v: JVal option) : Cell =
   // tier's lossless promotion. Text that is not decimal text is `Null`, like any mismatch.
   | DecimalType, Some(JStr s) -> Cell.decimal s |> Option.defaultValue Null
   | DecimalType, Some(JInt i) -> Cell.decimal (string i) |> Option.defaultValue Null
-  | DateType, Some(JStr s) -> Date s
-  | TimestampType, Some(JStr s) -> Timestamp s
+  | DateType, Some(JStr s) when (TemporalText.tryDays s).IsSome -> Date s
+  | TimestampType unit, Some(JStr s) when TemporalText.isCanonicalTimestamp s && (TemporalText.tryInstant unit s).IsSome ->
+    Timestamp s
   | _ -> Null
 
 /// Project a realised `Cell` back to a JS scalar (`Null` → JS `null`).
@@ -143,33 +143,32 @@ let private cellToJs (c: Cell) : obj =
 
 /// Build a column-oriented `Table` from a `Schema` + row-objects (the shape the TS
 /// shell already holds – `{ col: value }[]`), so the bridge owns the row↔columnar
-/// marshalling and the TS side passes the rows it has in hand.
-let private tableOfRows (schema: Schema) (rows: (string * JVal) list list) : Table =
-  let columns =
-    schema
-    |> List.map (fun (name, ty) ->
+/// marshalling and the TS side passes the rows it has in hand. The column type is
+/// read from the schema at run time, so the cells go through `Column.ofCells`, the
+/// one builder that takes a type as a value; `cellOf` answers only cells that type
+/// holds, so its refusal is reported rather than expected.
+let private tableOfRows (schema: Schema) (rows: (string * JVal) list list) : Result<Table, string> =
+  let rec columns acc (fields: Field list) =
+    match fields with
+    | [] -> Ok(List.rev acc)
+    | f :: rest ->
       let cells =
         rows
-        |> List.map (fun fields ->
-          cellOf ty (fields |> List.tryPick (fun (k, fv) -> if k = name then Some fv else None)))
+        |> List.map (fun row -> cellOf f.Type (row |> List.tryPick (fun (k, v) -> if k = f.Name then Some v else None)))
 
-      Column.create name ty cells)
+      match Column.ofCells f.Name f.Type cells with
+      | Ok c -> columns (c :: acc) rest
+      | Error e -> Error("rows do not fit the schema: " + ColumnCodec.errorString e)
 
-  { Schema = schema; Columns = columns }
+  columns [] schema |> Result.map (fun cs -> { Schema = schema; Columns = cs })
 
 /// Project a `Table` back to row-objects (`{ col: value }[]`) for the TS renderer.
-/// Each column's cell list is read ONCE into an array and indexed per row –
-/// `Column.cell i` walks the linked list (O(i)), which made this O(rows² × columns).
-/// A column shorter than the row count pads with `Null`, exactly as `Column.cell`
-/// answered past the end.
+/// `Column.cell` is an O(1) read over the typed storage, `Null` for an absent row
+/// and past the end of a short column.
 let private tableToRowsJs (t: Table) : obj =
   let n = Table.rowCount t
-  let columns = t.Columns |> List.map (fun c -> c.Name, List.toArray c.Cells)
 
-  let cellAt (i: int) (cells: Cell[]) : Cell =
-    if i < cells.Length then cells.[i] else Null
-
-  [| for i in 0 .. n - 1 -> createObj [ for name, cells in columns -> name ==> cellToJs (cellAt i cells) ] |]
+  [| for i in 0 .. n - 1 -> createObj [ for c in t.Columns -> c.Name ==> cellToJs (Column.cell i c) ] |]
   |> box
 
 /// Apply a local refinement to ALREADY-FETCHED rows and re-type the dashboard –
@@ -224,18 +223,19 @@ let refineLocally (schemaJson: string, rowsJson: string, pipelineJson: string, d
         match JsonDecode.decodeNode dashboardJson with
         | Error de -> fail (de.Code + ": " + de.Message)
         | Ok dashboard ->
-          let table = tableOfRows schema rowFields
-
-          match QueryRefine.refineLocally table pipeline (WireTree.reify dashboard) with
-          | Ok(refined, _) ->
-            createObj
-              [ "ok" ==> true
-                "schema" ==> schemaToJs refined.Schema
-                "rows" ==> tableToRowsJs refined ]
-          | Error(QueryRefine.RefineError.TypeMismatch defects) ->
-            createObj
-              [ "ok" ==> false
-                "error"
-                ==> QueryRefine.RefineError.message (QueryRefine.RefineError.TypeMismatch defects)
-                "defects" ==> (defects |> List.map defectToJs |> List.toArray) ]
-          | Error e -> fail (QueryRefine.RefineError.message e)
+          match tableOfRows schema rowFields with
+          | Error e -> fail e
+          | Ok table ->
+            match QueryRefine.refineLocally table pipeline (WireTree.reify dashboard) with
+            | Ok(refined, _) ->
+              createObj
+                [ "ok" ==> true
+                  "schema" ==> schemaToJs refined.Schema
+                  "rows" ==> tableToRowsJs refined ]
+            | Error(QueryRefine.RefineError.TypeMismatch defects) ->
+              createObj
+                [ "ok" ==> false
+                  "error"
+                  ==> QueryRefine.RefineError.message (QueryRefine.RefineError.TypeMismatch defects)
+                  "defects" ==> (defects |> List.map defectToJs |> List.toArray) ]
+            | Error e -> fail (QueryRefine.RefineError.message e)

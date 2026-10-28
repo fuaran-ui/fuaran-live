@@ -140,7 +140,8 @@ def _model(h):
                 }
             ],
             "heading": "Revenue snapshot",
-            "layout": {"$type": "Flex", "direction": "Vertical", "wrap": False},
+            # `wrap` at its default (False) is not on the canonical wire.
+            "layout": {"$type": "Flex", "direction": "Vertical"},
             "role": "Dashboard",
         },
     }

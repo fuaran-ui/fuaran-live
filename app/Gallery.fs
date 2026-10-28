@@ -189,47 +189,36 @@ let private statStack: Node<obj> =
 // handler, no server, no model call. And because a pipeline is a value, the whole
 // explorer survives the wire: share the permalink and the recompute goes with it.
 
-let private explorerColumn
-  (name: string)
-  (ty: Fuaran.Core.ColumnType)
-  (cells: Fuaran.Core.Cell list)
-  : Fuaran.Core.Column =
-  { Name = name
-    Type = ty
-    Cells = cells }
-
 let private explorerSource: Fuaran.Core.DataSource =
   let region =
-    [ Fuaran.Core.Str "North"
-      Fuaran.Core.Str "North"
-      Fuaran.Core.Str "North"
-      Fuaran.Core.Str "North"
-      Fuaran.Core.Str "South"
-      Fuaran.Core.Str "South"
-      Fuaran.Core.Str "South"
-      Fuaran.Core.Str "South"
-      Fuaran.Core.Str "West"
-      Fuaran.Core.Str "West"
-      Fuaran.Core.Str "West"
-      Fuaran.Core.Str "West" ]
+    [ "North"
+      "North"
+      "North"
+      "North"
+      "South"
+      "South"
+      "South"
+      "South"
+      "West"
+      "West"
+      "West"
+      "West" ]
 
   let product =
-    [ Fuaran.Core.Str "Widgets"
-      Fuaran.Core.Str "Gadgets"
-      Fuaran.Core.Str "Sprockets"
-      Fuaran.Core.Str "Cogs"
-      Fuaran.Core.Str "Widgets"
-      Fuaran.Core.Str "Gadgets"
-      Fuaran.Core.Str "Sprockets"
-      Fuaran.Core.Str "Cogs"
-      Fuaran.Core.Str "Widgets"
-      Fuaran.Core.Str "Gadgets"
-      Fuaran.Core.Str "Sprockets"
-      Fuaran.Core.Str "Cogs" ]
+    [ "Widgets"
+      "Gadgets"
+      "Sprockets"
+      "Cogs"
+      "Widgets"
+      "Gadgets"
+      "Sprockets"
+      "Cogs"
+      "Widgets"
+      "Gadgets"
+      "Sprockets"
+      "Cogs" ]
 
-  let units =
-    [ 120; 80; 45; 210; 95; 130; 60; 175; 140; 70; 90; 250 ]
-    |> List.map Fuaran.Core.Int
+  let units = [ 120; 80; 45; 210; 95; 130; 60; 175; 140; 70; 90; 250 ]
 
   let revenue =
     [ 24000.0
@@ -244,19 +233,19 @@ let private explorerSource: Fuaran.Core.DataSource =
       11200.0
       13500.0
       12500.0 ]
-    |> List.map Fuaran.Core.Float
 
+  // Every row is present, so each column carries no mask (`AllValid`).
   Fuaran.Core.Embedded
     { Schema =
-        [ "region", Fuaran.Core.StringType
-          "product", Fuaran.Core.StringType
-          "units", Fuaran.Core.IntType
-          "revenue", Fuaran.Core.FloatType ]
+        [ Fuaran.Core.Field.create "region" Fuaran.Core.StringType
+          Fuaran.Core.Field.create "product" Fuaran.Core.StringType
+          Fuaran.Core.Field.create "units" Fuaran.Core.IntType
+          Fuaran.Core.Field.create "revenue" Fuaran.Core.FloatType ]
       Columns =
-        [ explorerColumn "region" Fuaran.Core.StringType region
-          explorerColumn "product" Fuaran.Core.StringType product
-          explorerColumn "units" Fuaran.Core.IntType units
-          explorerColumn "revenue" Fuaran.Core.FloatType revenue ] }
+        [ Fuaran.Core.Column.ofStrs "region" (Fuaran.Core.Vector.ofList region) Fuaran.Core.AllValid
+          Fuaran.Core.Column.ofStrs "product" (Fuaran.Core.Vector.ofList product) Fuaran.Core.AllValid
+          Fuaran.Core.Column.ofInts "units" (Fuaran.Core.Vector.ofList units) Fuaran.Core.AllValid
+          Fuaran.Core.Column.ofFloats "revenue" (Fuaran.Core.Vector.ofList revenue) Fuaran.Core.AllValid ] }
 
 /// The region scope, as an expression: "All" means no constraint, anything else
 /// matches the column. `Param "region"` is bound per evaluation from the state
@@ -342,7 +331,7 @@ let private datasetExplorer: Node<obj> =
                           { Label = "South"; Value = "South" }
                           { Label = "West"; Value = "West" } ]
                     )
-                  Value = Binding.State("explorer.region", Some "All") }
+                  Value = Some(Binding.State("explorer.region", Some "All")) }
             Fuaran.metric
               "ex-explorer-total"
               { Defaults.metric with
@@ -570,7 +559,7 @@ let private signupForm: Node<obj> =
 
 // ─── Charts, tables and maps – a regional review ──────────────────────────────
 
-let private monthRow (month: string) (sales: float) : Fuaran.Core.Row =
+let private monthRow (month: string) (sales: float) : Map<string, obj> =
   Map.ofList [ "month", box month; "sales", box sales ]
 
 let private regionalReview: Node<obj> =

@@ -95,7 +95,7 @@ let private askTree: Node<obj> =
               { Defaults.select with
                   Label = TextSource.Literal "Deep-dive section"
                   Source = Binding.Static(Some askSections)
-                  Value = Binding.State("da-section-value", Some "data-bindings") } ] }
+                  Value = Some(Binding.State("da-section-value", Some "data-bindings")) } ] }
 
 let private askEnvelopeWire: string =
   let envelope: ElicitationEnvelope =

@@ -69,17 +69,17 @@ let private initialRows: Row list =
 /// The editable rows as a real `Fuaran.Core.Table` (columnar, null-aware) – the
 /// embedded source the chart's `Binding.Transform` computes over.
 let private sourceTable (rows: Row list) : Table =
-  { Schema = [ "quarter", StringType; "revenue", FloatType; "target", FloatType ]
+  let column build name (read: Row -> 'T) =
+    build name (rows |> List.map read |> Vector.ofList) AllValid
+
+  { Schema =
+      [ Field.create "quarter" StringType
+        Field.create "revenue" FloatType
+        Field.create "target" FloatType ]
     Columns =
-      [ { Name = "quarter"
-          Type = StringType
-          Cells = rows |> List.map (fun r -> Cell.Str r.Quarter) }
-        { Name = "revenue"
-          Type = FloatType
-          Cells = rows |> List.map (fun r -> Cell.Float r.Revenue) }
-        { Name = "target"
-          Type = FloatType
-          Cells = rows |> List.map (fun r -> Cell.Float r.Target) } ] }
+      [ column Fuaran.Core.Column.ofStrs "quarter" (fun r -> r.Quarter)
+        column Fuaran.Core.Column.ofFloats "revenue" (fun r -> r.Revenue)
+        column Fuaran.Core.Column.ofFloats "target" (fun r -> r.Target) ] }
 
 // ─── The declarative transform (the real dataframe algebra, on the wire) ─────
 
@@ -135,10 +135,10 @@ let private cellNum (v: CellValue) : float =
 // fuaran#665 — column accessors and handlers read the projected wire `Row`
 // (Map<string, obj>) by field name; the typed record survives only at the
 // Source seam, projected through the REQUIRED `toRow` below.
-let private rowText (field: string) (r: Fuaran.Core.Row) : string =
+let private rowText (field: string) (r: Map<string, obj>) : string =
   defaultArg (Map.tryFind field r |> Option.map string) ""
 
-let private rowFloat (field: string) (r: Fuaran.Core.Row) : float =
+let private rowFloat (field: string) (r: Map<string, obj>) : float =
   match Map.tryFind field r with
   | Some v -> unbox<float> v
   | None -> 0.0

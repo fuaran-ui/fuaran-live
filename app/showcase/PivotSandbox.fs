@@ -47,21 +47,19 @@ let table: Table =
           let units = scale * season / 100
           region, quarter, units, float units * 3.5 ]
 
-  let col name ty (cells: Cell list) =
-    { Name = name
-      Type = ty
-      Cells = cells }
+  let col build name values =
+    build name (Vector.ofList values) AllValid
 
   { Schema =
-      [ "region", StringType
-        "quarter", StringType
-        "units", IntType
-        "revenue", FloatType ]
+      [ Field.create "region" StringType
+        Field.create "quarter" StringType
+        Field.create "units" IntType
+        Field.create "revenue" FloatType ]
     Columns =
-      [ col "region" StringType [ for r, _, _, _ in rows -> Cell.Str r ]
-        col "quarter" StringType [ for _, q, _, _ in rows -> Cell.Str q ]
-        col "units" IntType [ for _, _, u, _ in rows -> Cell.Int u ]
-        col "revenue" FloatType [ for _, _, _, v in rows -> Cell.Float v ] ] }
+      [ col Fuaran.Core.Column.ofStrs "region" [ for r, _, _, _ in rows -> r ]
+        col Fuaran.Core.Column.ofStrs "quarter" [ for _, q, _, _ in rows -> q ]
+        col Fuaran.Core.Column.ofInts "units" [ for _, _, u, _ in rows -> u ]
+        col Fuaran.Core.Column.ofFloats "revenue" [ for _, _, _, v in rows -> v ] ] }
 
 // ─── the steps a visitor can add ─────────────────────────────────────────────
 
@@ -140,7 +138,8 @@ let private resultColumns (pipeline: Transform list) : ColumnErased<obj> list =
     | Error _ -> []
     | Ok result ->
       result.Schema
-      |> List.map (fun (name, ty) ->
+      |> List.map (fun (field: Field) ->
+        let name, ty = field.Name, field.Type
         let numeric = ty = IntType || ty = FloatType
 
         { Defaults.columnErased<obj> with

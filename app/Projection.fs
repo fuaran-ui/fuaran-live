@@ -5877,7 +5877,10 @@ let private fsRecordTable: (string * string * string list) list =
        "LiveRegion|liveRegion|?|E:LiveRegionKind"
        "Role|role|?|aria"
        "Speak|speak|?|U:TextSource" ])
-    ("BadgeSpec", "Badge", [ "Label|label|!|U:TextSource"; "Variant|variant|!|E:BadgeVariant" ])
+    ("BadgeSpec",
+     "Badge",
+     [ "Label|label|!|U:TextSource"
+       "Variant|variant|=BadgeVariant.Neutral|E:BadgeVariant" ])
     ("BoxSpec",
      "Box",
      [ "Children|children|!|L<n>"
@@ -5891,7 +5894,7 @@ let private fsRecordTable: (string * string * string list) list =
      "Button",
      [ "Label|label|!|U:TextSource"
        "OnClick|onClick|!|a"
-       "Variant|variant|!|E:ButtonVariant"
+       "Variant|variant|=ButtonVariant.Secondary|E:ButtonVariant"
        "Icon|icon|?|s"
        "Tooltip|-|-|X:Option.None"
        "Disabled|disabled|?|B<b>" ])
@@ -5922,10 +5925,10 @@ let private fsRecordTable: (string * string * string list) list =
     ("CodeBlockSpec",
      "CodeBlock",
      [ "Code|code|!|s"
-       "Copyable|copyable|!|b"
-       "HighlightLines|highlightLines|!|L<i>"
+       "Copyable|copyable|=true|b"
+       "HighlightLines|highlightLines|=[]|L<i>"
        "Language|language|!|s"
-       "LineNumbers|lineNumbers|!|b" ])
+       "LineNumbers|lineNumbers|=false|b" ])
     ("ColumnErased",
      "",
      [ "Field|field|?|s"
@@ -6031,7 +6034,7 @@ let private fsRecordTable: (string * string * string list) list =
      "FileUpload",
      [ "Accept|accept|!|L<s>"
        "Label|label|!|U:TextSource"
-       "Multiple|multiple|!|b"
+       "Multiple|multiple|=false|b"
        "OnSelect|onSelect|?|C"
        "Disabled|disabled|?|B<b>"
        "AcceptPaste|acceptPaste|=false|b"
@@ -6047,7 +6050,7 @@ let private fsRecordTable: (string * string * string list) list =
      [ "Id|id|!|s"
        "Kind|kind|!|U:FormFieldKind"
        "Label|label|!|U:TextSource"
-       "Required|required|!|b"
+       "Required|required|=false|b"
        "Help|help|?|U:TextSource"
        "Rule|rule|?|R:FieldRule" ])
     ("FormSpec",
@@ -6075,7 +6078,7 @@ let private fsRecordTable: (string * string * string list) list =
      "Heading",
      [ "Level|level|!|i"
        "Text|text|!|U:TextSource"
-       "Variant|variant|!|E:HeadingVariant" ])
+       "Variant|variant|=HeadingVariant.Standard|E:HeadingVariant" ])
     ("IconSpec",
      "Icon",
      [ "Icon|icon|!|s"
@@ -6086,7 +6089,7 @@ let private fsRecordTable: (string * string * string list) list =
      "Image",
      [ "Alt|alt|!|U:TextSource"
        "Src|src|!|B<s>"
-       "Variant|variant|!|E:ImageVariant"
+       "Variant|variant|=ImageVariant.Default|E:ImageVariant"
        "Fit|fit|=ImageFit.Natural|E:ImageFit"
        "AspectRatio|aspectRatio|=ImageAspect.Natural|E:ImageAspect"
        "Loading|loading|=ImageLoading.Eager|E:ImageLoading"
@@ -6105,11 +6108,11 @@ let private fsRecordTable: (string * string * string list) list =
      "Link",
      [ "Href|href|!|B<s>"
        "Label|label|!|U:TextSource"
-       "Download|download|!|b"
+       "Download|download|=false|b"
        "Rel|rel|?|s"
        "Target|target|?|s"
        "Protection|protection|?|E:LinkProtection" ])
-    ("ListSpec", "List", [ "Items|items|!|L<U:TextSource>"; "Ordered|ordered|!|b" ])
+    ("ListSpec", "List", [ "Items|items|!|L<U:TextSource>"; "Ordered|ordered|=false|b" ])
     ("MapMarker", "", [ "Label|label|!|s"; "Latitude|latitude|!|f"; "Longitude|longitude|!|f" ])
     ("MapSpec",
      "Map",
@@ -6145,7 +6148,7 @@ let private fsRecordTable: (string * string * string list) list =
     ("ModalSpec",
      "Modal",
      [ "Children|children|!|L<n>"
-       "Dismissable|dismissable|!|b"
+       "Dismissable|dismissable|=true|b"
        "OnDismiss|onDismiss|?|a"
        "Open|open|!|B<b>"
        "Heading|heading|?|U:TextSource"
@@ -6178,7 +6181,7 @@ let private fsRecordTable: (string * string * string list) list =
        "OnChange|onChange|?|C"
        "OnChangeMulti|onChangeMulti|?|C"
        "Source|source|!|B<L<R:SelectOption>>"
-       "Value|value|!|B<s>"
+       "Value|value|?|B<s>"
        "Placeholder|placeholder|?|U:TextSource"
        "Disabled|disabled|?|B<b>"
        "Multiple|multiple|?|b"
@@ -6204,7 +6207,7 @@ let private fsRecordTable: (string * string * string list) list =
        "Sortable|sortable|?|b" ])
     ("StepperSpec",
      "Stepper",
-     [ "ActiveStep|activeStep|!|B<i>"
+     [ "ActiveStep|activeStep|=Binding.Static(Some(0))|B<i>"
        "Children|children|!|L<n>"
        "OnSelect|onSelect|?|C" ])
     ("SummaryListSpec", "SummaryList", [ "Children|children|!|L<n>"; "Heading|heading|?|U:TextSource" ])
@@ -6286,7 +6289,7 @@ let private fsUnionTable: (string * string * string list) list =
        "onCancel|onCancel|?|a" ])
     ("Action", "Focus", [ "nodeId|nodeId|!|s" ])
     ("BoxLayout", "Auto", [])
-    ("BoxLayout", "Flex", [ "direction|direction|!|E:Orientation"; "wrap|wrap|!|b"; "gap|gap|?|i" ])
+    ("BoxLayout", "Flex", [ "direction|direction|!|E:Orientation"; "wrap|wrap|=false|b"; "gap|gap|?|i" ])
     ("BoxLayout", "Grid", [ "cols|cols|!|i"; "templateColumns|templateColumns|?|s"; "gap|gap|?|i" ])
     ("BoxLayout", "Masonry", [ "cols|cols|!|i"; "gap|gap|?|i" ])
     ("CallResultTarget", "State", [ "key|key|!|s" ])
@@ -6364,7 +6367,7 @@ let private fsUnionTable: (string * string * string list) list =
      [ "options|options|!|B<L<R:SelectOption>>"
        "value|value|?|BS<j>"
        "onChange|onChange|?|C"
-       "orientation|orientation|!|E:Orientation" ])
+       "orientation|orientation|=Orientation.Horizontal|E:Orientation" ])
     ("FormFieldKind",
      "DateTime",
      [ "value|value|?|BS<j>"
@@ -6767,30 +6770,36 @@ let rec private fsJVal (v: JsonValue) : string =
 // bespoke — a column is split across a `values` / `validity` pair, a `lit` cell
 // is `$type`-tagged, an `in` step is two different constructors under one tag.
 
+/// A column type, from its wire tag. A timestamp carries its unit (`timestamp`
+/// is whole seconds; `_ms` / `_us` / `_ns` the finer units), so it is spelled
+/// parenthesised wherever it is an argument.
 let private fsColumnType (tag: string) : string =
   match tag with
   | "int" -> "Fuaran.Core.ColumnType.IntType"
   | "float" -> "Fuaran.Core.ColumnType.FloatType"
   | "bool" -> "Fuaran.Core.ColumnType.BoolType"
+  | "decimal" -> "Fuaran.Core.ColumnType.DecimalType"
   | "date" -> "Fuaran.Core.ColumnType.DateType"
-  | "timestamp" -> "Fuaran.Core.ColumnType.TimestampType"
+  | "timestamp" -> "(Fuaran.Core.ColumnType.TimestampType Fuaran.Core.TimeUnit.Seconds)"
+  | "timestamp_ms" -> "(Fuaran.Core.ColumnType.TimestampType Fuaran.Core.TimeUnit.Milliseconds)"
+  | "timestamp_us" -> "(Fuaran.Core.ColumnType.TimestampType Fuaran.Core.TimeUnit.Microseconds)"
+  | "timestamp_ns" -> "(Fuaran.Core.ColumnType.TimestampType Fuaran.Core.TimeUnit.Nanoseconds)"
   | _ -> "Fuaran.Core.ColumnType.StringType"
 
-/// One realised cell, given its column's declared type. A `validity` slot that
-/// is `false` is the absent marker and takes the `Null` case whatever the
-/// co-indexed `values` entry holds (the encoder writes the type's default
-/// placeholder there).
-let private fsCellOfColumn (tag: string) (valid: bool) (v: JsonValue) : string =
+let private isTemporalTag (tag: string) : bool =
+  tag = "date" || tag.StartsWith "timestamp"
+
+/// One realised cell of a date or timestamp column, whose wire value is its
+/// canonical text. A `validity` slot that is `false` is the absent marker and
+/// takes the `Null` case whatever the co-indexed `values` entry holds (the
+/// encoder writes the type's default placeholder there).
+let private fsTemporalCell (tag: string) (valid: bool) (v: JsonValue) : string =
   if not valid then
     "Fuaran.Core.Cell.Null"
+  elif tag = "date" then
+    "Fuaran.Core.Cell.Date(" + fsStrOf v + ")"
   else
-    match tag with
-    | "int" -> "Fuaran.Core.Cell.Int(" + fsIntOf v + ")"
-    | "float" -> "Fuaran.Core.Cell.Float(" + fsFloatOf v + ")"
-    | "bool" -> "Fuaran.Core.Cell.Bool(" + fsBoolOf v + ")"
-    | "date" -> "Fuaran.Core.Cell.Date(" + fsStrOf v + ")"
-    | "timestamp" -> "Fuaran.Core.Cell.Timestamp(" + fsStrOf v + ")"
-    | _ -> "Fuaran.Core.Cell.Str(" + fsStrOf v + ")"
+    "Fuaran.Core.Cell.Timestamp(" + fsStrOf v + ")"
 
 /// A `lit` cell: `$type`-tagged, so it carries its own scalar type.
 let private fsCellLiteral (v: JsonValue) : string =
@@ -6817,9 +6826,14 @@ let private fsDataSource (v: JsonValue) : string =
 
     let schemaLit =
       schema
-      |> List.map (fun (n, t) -> "(" + fsStr n + ", " + fsColumnType t + ")")
+      |> List.map (fun (n, t) -> "Fuaran.Core.Field.create " + fsStr n + " " + fsColumnType t)
       |> String.concat "; "
 
+    // A column is spelled with Core's typed builder for its type, over the
+    // wire's `values` and `validity` as they stand. A date or timestamp column
+    // holds day and instant numbers the wire spells as canonical text, so it is
+    // built from its cells through `Column.ofCells`, the bridge that reads that
+    // text and refuses text that names no day or instant.
     let columnLit =
       schema
       |> List.map (fun (n, t) ->
@@ -6839,23 +6853,47 @@ let private fsDataSource (v: JsonValue) : string =
           | JNull -> []
           | c -> arrOf "validity" c
 
-        let cells =
+        let present =
           values
-          |> List.mapi (fun i value ->
-            let valid =
-              match List.tryItem i validity with
-              | Some(JBool b) -> b
-              | _ -> true
+          |> List.mapi (fun i _ ->
+            match List.tryItem i validity with
+            | Some(JBool b) -> b
+            | _ -> true)
 
-            fsCellOfColumn t valid value)
+        let validityLit =
+          if List.forall id present then
+            "Fuaran.Core.AllValid"
+          else
+            "(Fuaran.Core.Validity.ofList [ "
+            + (present |> List.map fsBoolLit |> String.concat "; ")
+            + " ])"
 
-        "{ Name = "
-        + fsStr n
-        + "; Type = "
-        + fsColumnType t
-        + "; Cells = [ "
-        + String.concat "; " cells
-        + " ] }")
+        let typed (builder: string) (literal: JsonValue -> string) =
+          "Fuaran.Core.Column."
+          + builder
+          + " "
+          + fsStr n
+          + " (Fuaran.Core.Vector.ofList [ "
+          + (values |> List.map literal |> String.concat "; ")
+          + " ]) "
+          + validityLit
+
+        match t with
+        | "int" -> typed "ofInts" fsIntOf
+        | "float" -> typed "ofFloats" fsFloatOf
+        | "bool" -> typed "ofBools" fsBoolOf
+        | "decimal" -> typed "ofDecimals" fsStrOf
+        | tag when isTemporalTag tag ->
+          let cells = List.map2 (fsTemporalCell tag) present values
+
+          "(Fuaran.Core.Column.ofCells "
+          + fsStr n
+          + " "
+          + fsColumnType tag
+          + " [ "
+          + String.concat "; " cells
+          + " ] |> Result.defaultWith (fun e -> failwith (Fuaran.Core.ColumnCodec.errorString e)))"
+        | _ -> typed "ofStrs" fsStrOf)
       |> String.concat "; "
 
     "Fuaran.Core.DataSource.Embedded { Schema = [ "

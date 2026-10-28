@@ -19,6 +19,11 @@ corpus-certified canonical encoder over it. Dependency-free (no `wasm-bindgen`);
 the page marshals UTF-8 across linear memory through the module's
 `fuaran_alloc` / `fuaran_dealloc` + packed `(ptr<<32 | len)` return ABI.
 
+Last regenerated 2026-10-28, when the canonical form began omitting `Flex.wrap`
+at its default: `fuaran-rs` at `b64cf4e`, beside `fuaran-core-rs` at `09e35e4`
+and `fuaran-program-rs` at `f776714` (the generic Program core that commit of
+`fuaran-rs` builds against).
+
 Regenerate (from the `fuaran-rs` repo root):
 
 ```
@@ -34,6 +39,8 @@ cp target/wasm32-unknown-unknown/release/fuaran_rs.wasm \
 builds the exemplar tree from the six holes and runs `wire.EncodeNode`. Several
 MB (the Go runtime is bundled), so – like the Pyodide host – it loads only when
 the visitor clicks "Run the Go host".
+
+Last regenerated 2026-10-28 from `fuaran-go` at `ad2abb2`, with Go 1.26.5.
 
 Regenerate (from the `fuaran-go` repo root):
 

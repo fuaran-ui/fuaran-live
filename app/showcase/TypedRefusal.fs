@@ -47,21 +47,19 @@ let table: Table =
       "West", "2026-02", 26, 520.0
       "West", "2026-03", 30, 615.0 ]
 
-  let col name ty (cells: Cell list) =
-    { Name = name
-      Type = ty
-      Cells = cells }
+  let col build name values =
+    build name (Vector.ofList values) AllValid
 
   { Schema =
-      [ "region", StringType
-        "month", StringType
-        "units", IntType
-        "revenue", FloatType ]
+      [ Field.create "region" StringType
+        Field.create "month" StringType
+        Field.create "units" IntType
+        Field.create "revenue" FloatType ]
     Columns =
-      [ col "region" StringType [ for r, _, _, _ in rows -> Cell.Str r ]
-        col "month" StringType [ for _, m, _, _ in rows -> Cell.Str m ]
-        col "units" IntType [ for _, _, u, _ in rows -> Cell.Int u ]
-        col "revenue" FloatType [ for _, _, _, v in rows -> Cell.Float v ] ] }
+      [ col Fuaran.Core.Column.ofStrs "region" [ for r, _, _, _ in rows -> r ]
+        col Fuaran.Core.Column.ofStrs "month" [ for _, m, _, _ in rows -> m ]
+        col Fuaran.Core.Column.ofInts "units" [ for _, _, u, _ in rows -> u ]
+        col Fuaran.Core.Column.ofFloats "revenue" [ for _, _, _, v in rows -> v ] ] }
 
 /// Where the chart's rows come from: the inline table, or a table the host is
 /// asked to resolve by name. Same pipeline either way.

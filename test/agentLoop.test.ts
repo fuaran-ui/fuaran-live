@@ -88,15 +88,20 @@ describe('the agent tool dispatch (pure over the wire tree)', () => {
 
 describe('getKindSchema (the authoritative per-kind shape lookup)', () => {
   it('returns every required field for a complex kind in one call', () => {
-    // The Select trap: a valid Select needs THREE required fields, not the one the
+    // The Select trap: a valid single-select needs THREE fields, not the one the
     // model would discover per decode error. getKindSchema surfaces them at once.
     // (`onChange` is optional since Phase 426 – the control write-back default.)
+    // Since the tier's Phase 1962 `value` is required only of a single-select —
+    // a multi-select carries `values` — so it rides the schema's conditional,
+    // which travels beside the unconditional `required` list.
     const r = dispatchToolFlat(null, 'getKindSchema', { kind: 'Select' });
     expect(r.Ok).toBe(true);
     const result = JSON.parse(r.Content);
     expect(result.kind).toBe('Select');
-    expect(result.required).toEqual(expect.arrayContaining(['label', 'source', 'value']));
+    expect(result.required).toEqual(expect.arrayContaining(['label', 'source']));
     expect(result.required).not.toContain('onChange');
+    expect(result.conditional.if.properties.multiple.const).toBe(true);
+    expect(result.conditional.else.required).toEqual(['value']);
     // The referenced binding/text defs travel with it – a self-contained sub-schema.
     // The tier types every binding slot's payload per element rather than emitting
     // one erased `Binding`, so the defs Select drags in are its OWN slots' types:

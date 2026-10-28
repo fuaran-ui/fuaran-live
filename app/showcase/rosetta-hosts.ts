@@ -187,7 +187,8 @@ function wireModel(h: Holes): Json {
         },
       ],
       heading: 'Revenue snapshot',
-      layout: { $type: 'Flex', direction: 'Vertical', wrap: false },
+      // `wrap` at its default (`false`) is not on the canonical wire.
+      layout: { $type: 'Flex', direction: 'Vertical' },
       role: 'Dashboard',
     },
   };

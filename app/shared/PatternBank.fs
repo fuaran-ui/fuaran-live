@@ -55,19 +55,16 @@ module PatternBankEngine =
   let numberHole (addr: string) (name: string) (lo: int) (hi: int) : HoleDecl = valueHole addr name (IntRange(lo, hi))
 
   let private sigEntryOf (h: HoleDecl) : SigEntry =
-    let kindStr, space, slot, action, required =
+    let required =
       match h.Kind with
-      | ValueHole s -> "value", Some s, None, None, true
-      | SlotHole c -> "slot", None, c, None, true
-      | RepeatHole s -> "repeat", Some s, None, None, false
-      | ActionHole e -> "action", None, None, Some e, false
+      | ValueHole _
+      | SlotHole _ -> true
+      | RepeatHole _
+      | ActionHole _ -> false
 
     { Addr = h.Addr
       Name = h.Name
-      Kind = kindStr
-      Space = space
-      Slot = slot
-      Action = action
+      Kind = h.Kind
       Required = required }
 
   let private signatureOf (name: string) (holes: HoleDecl list) : Signature =
@@ -125,14 +122,10 @@ module PatternBankEngine =
   /// as a ready `Binding<float>` so the tree-building code never opens Fuaran.Core.
   let computedRevenue: Fuaran.UI.Types.Binding<float> =
     let table: Table =
-      { Schema = [ "region", StringType; "revenue", FloatType ]
+      { Schema = [ Field.create "region" StringType; Field.create "revenue" FloatType ]
         Columns =
-          [ { Name = "region"
-              Type = StringType
-              Cells = [ Cell.Str "North"; Cell.Str "South"; Cell.Str "East" ] }
-            { Name = "revenue"
-              Type = FloatType
-              Cells = [ Cell.Float 4800.0; Cell.Float 9100.0; Cell.Float 3600.0 ] } ] }
+          [ Column.ofStrs "region" (Vector.ofList [ "North"; "South"; "East" ]) AllValid
+            Column.ofFloats "revenue" (Vector.ofList [ 4800.0; 9100.0; 3600.0 ]) AllValid ] }
 
     let pipeline: Transform list =
       [ GroupBy(

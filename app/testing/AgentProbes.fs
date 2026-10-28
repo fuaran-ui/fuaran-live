@@ -689,7 +689,7 @@ let private probeEnvelopeWire () : string =
                 { Fuaran.UI.Defaults.select with
                     Label = Fuaran.UI.Types.TextSource.Literal "Flavour"
                     Source = Fuaran.UI.Types.Binding.Static(Some flavourOptions)
-                    Value = Fuaran.UI.Types.Binding.State("ask-flavour-value", Some "compact") } ] }
+                    Value = Some(Fuaran.UI.Types.Binding.State("ask-flavour-value", Some "compact")) } ] }
 
   let envelope: ElicitationEnvelope =
     { ElicitationId = "probe-ask-1"

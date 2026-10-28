@@ -12,6 +12,10 @@
 // files (each compiled with a one-off dump of its private seed list, encoded
 // through the canonical encoder) and is not regenerated from the merged code:
 // a change to a seed is a deliberate act that edits the golden beside it.
+// Phase 2227 re-canonicalised its twenty trees once, through the released TS
+// codec (decode, then encode): the tier's 0.97.0 omits a member at its declared
+// default (its Phase 2300), so `wrap: false` and `variant: "Standard"` left the
+// canonical bytes. The trees themselves did not change.
 //
 // Requires `pnpm run fable:app` to have produced app/output/.
 

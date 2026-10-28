@@ -1,7 +1,9 @@
 // Rosetta parity lock – every encoder the /demo/rosetta page runs must emit the
 // reference canonical bytes for the exemplar tree. The pinned literal below IS
 // the real Fuaran.UI canonical encoder's output for the default holes (verified
-// against the Fable-compiled reference on 2026-07-23); when a canonical-format
+// against the Fable-compiled reference on 2026-07-23, and moved on 2026-10-28
+// with the tier's 0.97.0, whose canonical form omits `wrap` at its default
+// `false` – language-tier Phase 2300); when a canonical-format
 // rev lands, this pin moves in the same change-set as rosetta-hosts.ts and the
 // wasm artefacts – a failing pin here means the live byte-parity strip on
 // /demo/rosetta is showing "diverges", which is exactly the regression this test
@@ -42,7 +44,7 @@ const referenceWire =
   '{"id":"rosetta-m-c","kind":{"$type":"Metric","label":"Churn %","value":' +
   '{"$type":"Static","value":12.4}}}],"layout":{"$type":"Flex","direction":"Horizontal",' +
   '"wrap":true},"role":"Group"}}],"heading":"Revenue snapshot","layout":' +
-  '{"$type":"Flex","direction":"Vertical","wrap":false},"role":"Dashboard"}}';
+  '{"$type":"Flex","direction":"Vertical"},"role":"Dashboard"}}';
 
 const rosettaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'rosetta');
 

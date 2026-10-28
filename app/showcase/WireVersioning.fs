@@ -82,22 +82,25 @@ module private Engine =
   let envelopeBytes = Versioning.render envelope
   let authoredText = Versioning.Profile.render authored
 
-  let private tagOf (el: JVal) =
-    Decode.getProp "$type" el |> Result.bind Decode.asString
+  /// One member of `el`, read by Core's typed decoder; the refusal as its sentence.
+  let private member' (name: string) (d: Decoder<'T>) (el: JVal) : Result<'T, string> =
+    Decoder.describing (Decoder.field name d) el
+
+  let private tagOf (el: JVal) = member' "$type" Decoder.str el
 
   let private decodeWidget (el: JVal) : Result<Widget, string> =
     tagOf el
     |> Result.bind (fun tag ->
       match tag with
       | "Metric" ->
-        Decode.strField "label" el
-        |> Result.bind (fun l -> Decode.intField "value" el |> Result.map (fun v -> WMetric(l, v)))
+        member' "label" Decoder.str el
+        |> Result.bind (fun l -> member' "value" Decoder.int el |> Result.map (fun v -> WMetric(l, v)))
       | "Callout" ->
-        Decode.strField "heading" el
-        |> Result.bind (fun h -> Decode.strField "body" el |> Result.map (fun b -> WCallout(h, b)))
+        member' "heading" Decoder.str el
+        |> Result.bind (fun h -> member' "body" Decoder.str el |> Result.map (fun b -> WCallout(h, b)))
       | "LiveTicker" ->
-        Decode.strField "label" el
-        |> Result.bind (fun l -> Decode.strField "symbol" el |> Result.map (fun s -> WTicker(l, s)))
+        member' "label" Decoder.str el
+        |> Result.bind (fun l -> member' "symbol" Decoder.str el |> Result.map (fun s -> WTicker(l, s)))
       | other -> Error("unrecognised kind: " + other))
 
   let private encodeWidget (w: Widget) : JVal =
@@ -193,8 +196,8 @@ module private Engine =
 
     let cls =
       match ev with
-      | Versioning.Additive _ -> "additive → minor bump"
-      | Versioning.Breaking _ -> "breaking → major bump"
+      | Versioning.Evolution.Additive _ -> "additive → minor bump"
+      | Versioning.Evolution.Breaking _ -> "breaking → major bump"
 
     cls, Versioning.Profile.render (Versioning.bump baseP ev)
 

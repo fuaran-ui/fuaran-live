@@ -55,23 +55,21 @@ let private facts: (string * string * string * int * float) list =
 
 /// The inline table every view reads, as a real columnar `Fuaran.Core.Table`.
 let table: Table =
-  let col name ty (cells: Cell list) =
-    { Name = name
-      Type = ty
-      Cells = cells }
+  let col build name values =
+    build name (Vector.ofList values) AllValid
 
   { Schema =
-      [ "region", StringType
-        "product", StringType
-        "quarter", StringType
-        "units", IntType
-        "revenue", FloatType ]
+      [ Field.create "region" StringType
+        Field.create "product" StringType
+        Field.create "quarter" StringType
+        Field.create "units" IntType
+        Field.create "revenue" FloatType ]
     Columns =
-      [ col "region" StringType [ for r, _, _, _, _ in facts -> Cell.Str r ]
-        col "product" StringType [ for _, p, _, _, _ in facts -> Cell.Str p ]
-        col "quarter" StringType [ for _, _, q, _, _ in facts -> Cell.Str q ]
-        col "units" IntType [ for _, _, _, u, _ in facts -> Cell.Int u ]
-        col "revenue" FloatType [ for _, _, _, _, v in facts -> Cell.Float v ] ] }
+      [ col Fuaran.Core.Column.ofStrs "region" [ for r, _, _, _, _ in facts -> r ]
+        col Fuaran.Core.Column.ofStrs "product" [ for _, p, _, _, _ in facts -> p ]
+        col Fuaran.Core.Column.ofStrs "quarter" [ for _, _, q, _, _ in facts -> q ]
+        col Fuaran.Core.Column.ofInts "units" [ for _, _, _, u, _ in facts -> u ]
+        col Fuaran.Core.Column.ofFloats "revenue" [ for _, _, _, _, v in facts -> v ] ] }
 
 // ─── the declarations ────────────────────────────────────────────────────────
 

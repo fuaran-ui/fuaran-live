@@ -87,28 +87,21 @@ let private initialRows: Row list =
 
 /// Build the real `Fuaran.Core.Table` (columnar, null-aware) from the editable rows.
 let private sourceTable (rows: Row list) : Table =
+  let column build name (read: Row -> 'T) =
+    build name (rows |> List.map read |> Vector.ofList) AllValid
+
   { Schema =
-      [ "region", StringType
-        "product", StringType
-        "units", IntType
-        "revenue", FloatType
-        "cost", FloatType ]
+      [ Field.create "region" StringType
+        Field.create "product" StringType
+        Field.create "units" IntType
+        Field.create "revenue" FloatType
+        Field.create "cost" FloatType ]
     Columns =
-      [ { Name = "region"
-          Type = StringType
-          Cells = rows |> List.map (fun r -> Cell.Str r.Region) }
-        { Name = "product"
-          Type = StringType
-          Cells = rows |> List.map (fun r -> Cell.Str r.Product) }
-        { Name = "units"
-          Type = IntType
-          Cells = rows |> List.map (fun r -> Cell.Int r.Units) }
-        { Name = "revenue"
-          Type = FloatType
-          Cells = rows |> List.map (fun r -> Cell.Float r.Revenue) }
-        { Name = "cost"
-          Type = FloatType
-          Cells = rows |> List.map (fun r -> Cell.Float r.Cost) } ] }
+      [ column Fuaran.Core.Column.ofStrs "region" (fun r -> r.Region)
+        column Fuaran.Core.Column.ofStrs "product" (fun r -> r.Product)
+        column Fuaran.Core.Column.ofInts "units" (fun r -> r.Units)
+        column Fuaran.Core.Column.ofFloats "revenue" (fun r -> r.Revenue)
+        column Fuaran.Core.Column.ofFloats "cost" (fun r -> r.Cost) ] }
 
 // ─── The declarative pipeline (the real Transform algebra) ───────────────────
 
@@ -144,18 +137,12 @@ let private buildPipeline (derive: bool) (filter: bool) (group: bool) : Transfor
 
 // ─── Reading a computed table back ───────────────────────────────────────────
 
-let private colByName (t: Table) (name: string) : Column option =
-  t.Columns |> List.tryFind (fun c -> c.Name = name)
-
-let private rowCount (t: Table) : int =
-  match t.Columns with
-  | [] -> 0
-  | c :: _ -> List.length c.Cells
-
+/// The cell at row `i` of the named column; `Null` for an absent column, an
+/// absent row or an index past the end (`Column.cell` is total and O(1)).
 let private cellAt (t: Table) (name: string) (i: int) : Cell =
-  match colByName t name with
-  | Some c when i < List.length c.Cells -> List.item i c.Cells
-  | _ -> Cell.Null
+  match Table.tryColumn name t with
+  | Some c -> Fuaran.Core.Column.cell i c
+  | None -> Cell.Null
 
 let private cellFloat (c: Cell) : float =
   match c with
@@ -184,8 +171,8 @@ let private kpiCard (id: string) (label: string) (value: string) : Node<unit> =
         Children = [ Fuaran.markdown (id + "-v") value ] }
 
 let private dashboardNode (out: Table) : Node<unit> =
-  let n = rowCount out
-  let hasMargin = (colByName out "margin").IsSome
+  let n = Table.rowCount out
+  let hasMargin = (Table.tryColumn "margin" out).IsSome
 
   Fuaran.box
     "ls-dash"
@@ -223,8 +210,8 @@ let private dashboardNode (out: Table) : Node<unit> =
 /// A generic HTML sheet of any computed table (used when the pipeline is not
 /// grouped – the raw derived/filtered rows).
 let private sheetTable (t: Table) : ReactElement =
-  let names = t.Schema |> List.map fst
-  let n = rowCount t
+  let names = Table.columnNames t
+  let n = Table.rowCount t
 
   Html.div
     [ prop.className "ls-sheet-wrap"
@@ -354,7 +341,7 @@ let private LivingSheetView () : ReactElement =
           prop.children
             [ Html.span [ prop.className "ls-eval-mark"; prop.text "EvalError" ]
               Html.code [ prop.text (sprintf "%A" e) ] ] ]
-    | Ok out when group && (colByName out "region").IsSome ->
+    | Ok out when group && (Table.tryColumn "region" out).IsSome ->
       Html.div
         [ prop.className "ls-dash-render"
           prop.children [ Exhibit.renderStatic (dashboardNode out) ] ]

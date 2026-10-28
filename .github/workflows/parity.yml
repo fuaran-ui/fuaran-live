@@ -53,7 +53,7 @@ jobs:
           # docs/tier-pin.md. The corpus checkout stays unpinned deliberately — it is
           # the shared conformance gate.
           repository: fuaran-ui/fuaran-dotnet
-          ref: v0.96.0
+          ref: v0.97.0
           path: workspace/fuaran-dotnet
 
       - name: Checkout fuaran-live (this repo)

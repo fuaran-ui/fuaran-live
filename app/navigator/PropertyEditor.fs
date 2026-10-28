@@ -256,9 +256,9 @@ let private classifyJs (kindSchema: obj) (wirePath: string) (value: obj) : obj =
 })($0)""")>]
 let private styleTokensJs (schemaText: string) : obj array = jsNative
 
-/// Set one dotted path in a JSON document to a bare string, creating missing
-/// intermediate objects, and re-render the document. Used only for the style
-/// round-trip below.
+/// Set one dotted path in a JSON document to a bare JSON value, creating
+/// missing intermediate objects, and re-render the document. Used for the style
+/// round-trip and the declared-default probe below.
 [<Emit("""(function(json, path, value){
   var o; try { o = JSON.parse(json); } catch (e) { return json; }
   var segs = String(path).split('.');
@@ -270,7 +270,7 @@ let private styleTokensJs (schemaText: string) : obj array = jsNative
   cur[segs[segs.length - 1]] = value;
   try { return JSON.stringify(o); } catch (e) { return json; }
 })($0, $1, $2)""")>]
-let private patchString (json: string) (path: string) (value: string) : string = jsNative
+let private patchAt (json: string) (path: string) (value: obj) : string = jsNative
 
 /// `Number(s)` with empty/non-finite mapped to NaN — JS parsing semantics, so
 /// the number rows accept exactly what JSON would.
@@ -338,6 +338,42 @@ let private nodeJson (node: Node<obj>) : string =
   with _ ->
     ""
 
+/// The value a member ABSENT from the canonical wire stands for. Since the
+/// tier's Phase 2300 a member at its declared default is omitted from the
+/// canonical form, and the decoder restores the default on absence — so the
+/// default of a choice or toggle is the one candidate the canonical encoder
+/// omits once it is written in. The decoder and encoder answer it, so no
+/// default is restated here; an optional member with no declared default keeps
+/// every candidate and answers `""`, as an absent member always read. Memoised
+/// per kind and path: a declared default is a property of the vocabulary.
+let private defaultCache = System.Collections.Generic.Dictionary<string, string>()
+
+let private declaredDefault (json: string) (disc: string) (wire: string) (editor: Editor) : string =
+  let key = disc + "|" + wire
+
+  match defaultCache.TryGetValue key with
+  | true, cached -> cached
+  | _ ->
+    let candidates: (string * obj) list =
+      match editor with
+      | Editor.Choice options -> options |> List.map (fun o -> o, box o)
+      | Editor.Toggle -> [ "false", box false; "true", box true ]
+      | _ -> []
+
+    let omitted (value: obj) =
+      match Decode.decodeNode (patchAt json wire value) with
+      | Ok decoded -> displayOf (valueAt (Canon.encodeNode (WireTree.reify decoded)) wire) = ""
+      | Error _ -> false
+
+    let found =
+      candidates
+      |> List.tryFind (snd >> omitted)
+      |> Option.map fst
+      |> Option.defaultValue ""
+
+    defaultCache[key] <- found
+    found
+
 let private editorOf (schema: obj) (kindWirePath: string) (current: obj) : Editor =
   let bag = classifyJs schema kindWirePath current
 
@@ -399,7 +435,10 @@ let fields (node: Node<obj>) : Field list =
         Wire = wire
         Label = path
         Editor = editor
-        Current = displayOf current
+        Current =
+          match displayOf current with
+          | "" -> declaredDefault json disc wire editor
+          | shown -> shown
         Route = Route.Prop }
 
     let top = Introspect.availableFields node.Kind |> List.map (derive "Properties")
@@ -440,7 +479,7 @@ let opFor (node: Node<obj>) (field: Field) (raw: string) : Result<TreeOp<obj>, s
   | _ ->
     match field.Route with
     | Route.Style ->
-      let patched = patchString (nodeJson node) field.Wire raw
+      let patched = patchAt (nodeJson node) field.Wire (box raw)
 
       match Decode.decodeNode patched with
       | Error e -> Error e.Message

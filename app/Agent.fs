@@ -384,7 +384,13 @@ let getBindingValue (treeJson: string option) (id: string) : obj =
     var more = refsFrom(defs[name], {});
     for (var m in more) if (!included[m]) queue.push(m);
   }
-  return { kind: wanted, spec: branch.specName, required: branch.required, properties: branch.properties, defs: included };
+  // A spec whose requirement depends on another member carries it as JSON
+  // Schema's `if` / `then` / `else` (a single-select's `value`, required unless
+  // `multiple` is true, tier Phase 1962). It travels verbatim beside `required`,
+  // which lists only what every instance must carry.
+  var specDef = branch.specName ? defs[branch.specName] : null;
+  var conditional = (specDef && specDef['if']) ? { 'if': specDef['if'], then: specDef.then, 'else': specDef['else'] } : undefined;
+  return { kind: wanted, spec: branch.specName, required: branch.required, conditional: conditional, properties: branch.properties, defs: included };
 })($0, $1)""")>]
 let private kindSchemaJs (schemaText: string) (wanted: string) : obj = jsNative
 

@@ -354,6 +354,22 @@ describe('absent-is-error sites (Phase 1603)', () => {
   });
 });
 
+type MemberTable = Readonly<Record<string, readonly { readonly name: string }[]>>;
+
+/** Each kind's and each union case's member names, as a namespace per owner. */
+const fieldTables = (): Record<string, Record<string, true>> => {
+  const names = (members: readonly { readonly name: string }[]): Record<string, true> =>
+    Object.fromEntries(members.map((m) => [m.name, true] as const));
+  const out: Record<string, Record<string, true>> = {};
+  for (const [kind, members] of Object.entries(ui.KIND_FIELDS as MemberTable))
+    out[kind] = names(members);
+  for (const [union, cases] of Object.entries(
+    ui.UNION_CASES as Readonly<Record<string, MemberTable>>,
+  ))
+    for (const [kase, members] of Object.entries(cases)) out[`${union}:${kase}`] = names(members);
+  return out;
+};
+
 // -- The shared quarantine's TypeScript arm (Phase 1584) ---------------------
 //
 // The surfaces the resolver answers against. `fuaran` … `iconSource` are exactly
@@ -374,6 +390,12 @@ const TS_NAMESPACES: Readonly<Record<string, unknown>> = {
   localeFormat: ui.localeFormat,
   ui,
   ops,
+  // The host's own member tables (Phase 2399), so a token can name a FIELD the
+  // way the Python grammar's `Chart.annotations` does: `<Kind>.<field>` over
+  // `KIND_FIELDS`, and `<Union>:<Case>.<field>` over `UNION_CASES`. Both are the
+  // pinned packages' generated schema, so the claim stays about the surface the
+  // round trip encodes against.
+  ...fieldTables(),
 };
 
 const tsHostModels = (token: string): ConstructVerdict =>

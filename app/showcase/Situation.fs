@@ -79,7 +79,7 @@ let private board: Node<obj> =
                       "sr-auth"
                       "Authorisation rate"
                       0.9412
-                      (CellFormat.Percent(Some 2))
+                      (CellFormat.Percent(Some 2, None))
                       ToneVariant.Success
                       "vs 94.9% baseline"
                     |> hint
@@ -88,19 +88,25 @@ let private board: Node<obj> =
                       "sr-challenge"
                       "Challenge rate"
                       0.083
-                      (CellFormat.Percent(Some 1))
+                      (CellFormat.Percent(Some 1, None))
                       ToneVariant.Default
                       "step-up sent"
                     |> hint
                       "Share of attempts where the issuer asked for a step-up. A rise here with a flat authorisation rate is the issuer being cautious; a rise with a falling authorisation rate is the challenge failing."
-                    tile "sr-capture" "Capture latency (ms)" 412.0 (CellFormat.Number(Some 0)) ToneVariant.Default "p95"
+                    tile
+                      "sr-capture"
+                      "Capture latency (ms)"
+                      412.0
+                      (CellFormat.Number(Some 0, None))
+                      ToneVariant.Default
+                      "p95"
                     |> hint
                       "Ninety-fifth percentile from authorisation to captured funds, measured at our edge. It does not include the acquirer's own settlement window, which is a next-day figure and belongs on the finance board."
                     tile
                       "sr-decline"
                       "Hard declines"
                       1284.0
-                      (CellFormat.Number(Some 0))
+                      (CellFormat.Number(Some 0, None))
                       ToneVariant.Warning
                       "issuer-final"
                     |> hint
@@ -109,7 +115,7 @@ let private board: Node<obj> =
                       "sr-fraud"
                       "Fraud rate"
                       0.0011
-                      (CellFormat.Percent(Some 3))
+                      (CellFormat.Percent(Some 3, None))
                       ToneVariant.Critical
                       "by value, 30-day trailing"
                     |> hint
@@ -118,19 +124,25 @@ let private board: Node<obj> =
                       "sr-chargeback"
                       "Chargebacks"
                       37.0
-                      (CellFormat.Number(Some 0))
+                      (CellFormat.Number(Some 0, None))
                       ToneVariant.Warning
                       "received today"
                     |> hint
                       "Cases opened by an issuer today, whatever transaction date they name. Roughly two thirds concern transactions more than a fortnight old, so this is not a signal about today's traffic."
-                    tile "sr-refund" "Refunds" 18420.0 (CellFormat.Currency "GBP") ToneVariant.Default "value, today"
+                    tile
+                      "sr-refund"
+                      "Refunds"
+                      18420.0
+                      (CellFormat.Currency("GBP", None, None))
+                      ToneVariant.Default
+                      "value, today"
                     |> hint
                       "Merchant-initiated returns only. A chargeback that we accept without contest is settled through the dispute path and is counted there, never twice."
                     tile
                       "sr-retry"
                       "Retry recovery"
                       0.212
-                      (CellFormat.Percent(Some 1))
+                      (CellFormat.Percent(Some 1, None))
                       ToneVariant.Success
                       "of soft declines"
                     |> hint
@@ -139,7 +151,7 @@ let private board: Node<obj> =
                       "sr-queue"
                       "Settlement queue"
                       906.0
-                      (CellFormat.Number(Some 0))
+                      (CellFormat.Number(Some 0, None))
                       ToneVariant.Default
                       "awaiting batch"
                     |> hint
@@ -148,7 +160,7 @@ let private board: Node<obj> =
                       "sr-tokens"
                       "Tokenised share"
                       0.774
-                      (CellFormat.Percent(Some 1))
+                      (CellFormat.Percent(Some 1, None))
                       ToneVariant.Brand
                       "of attempts"
                     |> hint
@@ -157,7 +169,7 @@ let private board: Node<obj> =
                       "sr-cost"
                       "Cost per authorisation"
                       0.0612
-                      (CellFormat.Currency "GBP")
+                      (CellFormat.Currency("GBP", None, None))
                       ToneVariant.Default
                       "blended"
                     |> hint

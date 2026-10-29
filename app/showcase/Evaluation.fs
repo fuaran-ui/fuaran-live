@@ -382,7 +382,7 @@ let private providerCard (basis: CostBasis) (i: int) (p: Provider) : Node<unit> 
       (sprintf "ev-pm-%d" i)
       "Pass rate"
       p.PassRate
-      (CellFormat.Percent(Some 0))
+      (CellFormat.Percent(Some 0, None))
       (toneFor p.PassRate)
       (sprintf
         "%d / %d prompts%s"
@@ -408,7 +408,7 @@ let private providerCard (basis: CostBasis) (i: int) (p: Provider) : Node<unit> 
       (sprintf "ev-pcpc-%d" i)
       "Cost per correct (USD)"
       (costOn basis p.CostPerCorrectUsd p.CostPerCorrectCachedUsd)
-      (CellFormat.Number(Some 4))
+      (CellFormat.Number(Some 4, None))
       ToneVariant.Default
       (sprintf "%s basis · %s" (basisLabel basis) (otherBasisText basis p.CostPerCorrectUsd p.CostPerCorrectCachedUsd))
 
@@ -417,7 +417,7 @@ let private providerCard (basis: CostBasis) (i: int) (p: Provider) : Node<unit> 
       (sprintf "ev-prs-%d" i)
       "Reasoning share"
       p.ReasoningShare
-      (CellFormat.Percent(Some 0))
+      (CellFormat.Percent(Some 0, None))
       ToneVariant.Default
       (if p.ReasoningShare.IsSome then
          sprintf "of billed output · %s" (splitSourceText p.ReasoningSplitSource)
@@ -448,14 +448,14 @@ let private dashboardTree (basis: CostBasis) (r: Results) : Node<unit> =
                 "ev-s-prompts"
                 "Prompts evaluated"
                 (float r.Summary.TotalPrompts)
-                (CellFormat.Number(Some 0))
+                (CellFormat.Number(Some 0, None))
                 ToneVariant.Brand
                 "the fixed canonical set"
               metricNode
                 "ev-s-pass"
                 "Overall pass rate"
                 r.Summary.PassRate
-                (CellFormat.Percent(Some 0))
+                (CellFormat.Percent(Some 0, None))
                 ToneVariant.Brand
                 (sprintf "%d / %d passed" r.Summary.Passed r.Summary.TotalPrompts)
               // The headline economic figure. Rendered at four decimals rather
@@ -466,7 +466,7 @@ let private dashboardTree (basis: CostBasis) (r: Results) : Node<unit> =
                 "ev-s-cpc"
                 "Cost per correct (USD)"
                 (costOn basis r.Summary.CostPerCorrectUsd r.Summary.CostPerCorrectCachedUsd)
-                (CellFormat.Number(Some 4))
+                (CellFormat.Number(Some 4, None))
                 ToneVariant.Brand
                 (sprintf
                   "%s basis · %s"
@@ -476,21 +476,21 @@ let private dashboardTree (basis: CostBasis) (r: Results) : Node<unit> =
                 "ev-s-reason"
                 "Reasoning share"
                 r.Summary.ReasoningShare
-                (CellFormat.Percent(Some 0))
+                (CellFormat.Percent(Some 0, None))
                 ToneVariant.Default
                 "reasoning tokens over billed output, pooled"
               metricNode
                 "ev-s-prov"
                 "Providers"
                 (float r.Summary.ProvidersEvaluated)
-                (CellFormat.Number(Some 0))
+                (CellFormat.Number(Some 0, None))
                 ToneVariant.Default
                 "evaluated head-to-head"
               metricOptNode
                 "ev-s-adv"
                 "Adversarial pass rate"
                 r.Summary.AdversarialPassRate
-                (CellFormat.Percent(Some 0))
+                (CellFormat.Percent(Some 0, None))
                 (toneForOpt r.Summary.AdversarialPassRate)
                 "held-out adversarial track" ] }
 
@@ -534,7 +534,7 @@ let private dashboardTree (basis: CostBasis) (r: Results) : Node<unit> =
                   (sprintf "ev-c-%d" i)
                   c.Name
                   c.PassRate
-                  (CellFormat.Percent(Some 0))
+                  (CellFormat.Percent(Some 0, None))
                   (toneFor c.PassRate)
                   (sprintf "%d / %d" c.Passed c.Total) ] }
 
@@ -557,7 +557,7 @@ let private dashboardTree (basis: CostBasis) (r: Results) : Node<unit> =
         (sprintf "ev-se-%d" i)
         (sprintf "%s · %s" a.Condition a.ModelPin)
         (if turn5 then a.UsdAtTurn5 else a.UsdAtTurn3)
-        (CellFormat.Currency "USD")
+        (CellFormat.Currency("USD", None, None))
         ToneVariant.Default
         (sprintf
           "turn 3: $%.3f (n=%d)%s · identity μ %.2f (n=%d)"
@@ -600,7 +600,7 @@ let private dashboardTree (basis: CostBasis) (r: Results) : Node<unit> =
         (sprintf "ev-rr-%s-%d" prefix i)
         a.Label
         rate
-        (CellFormat.Percent(Some 0))
+        (CellFormat.Percent(Some 0, None))
         (toneFor rate)
         (sprintf "%d / %d recovered given an induced failure" a.Recovered a.Fired)
 

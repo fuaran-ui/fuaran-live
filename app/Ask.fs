@@ -83,7 +83,7 @@ let buildAnswerJson (getState: string -> obj option) (contract: AnswerContract) 
     contract.Fields
     |> List.choose (fun f -> getState f.StateKey |> Option.bind classify |> Option.map (fun jv -> f.Name, jv))
 
-  Canon.render (JObj(List.sortBy fst entries))
+  Canonical.write Rendering.CrossHost (JObj(List.sortBy fst entries))
 
 // ─── display helpers ─────────────────────────────────────────────────────────
 

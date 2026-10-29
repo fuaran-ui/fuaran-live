@@ -304,7 +304,7 @@ let private readAnswerJson () : string =
           yield "note", JStr s
       | None -> () ]
 
-  Canon.render (JObj(List.sortBy fst entries))
+  Canonical.write Rendering.CrossHost (JObj(List.sortBy fst entries))
 
 let private seedStore () : unit =
   // The presenting host pre-fills the envelope's declared `default` (§18.1)

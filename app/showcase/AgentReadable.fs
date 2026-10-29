@@ -186,12 +186,14 @@ let private declaredModule: ModuleAffordance =
 // no hand-typed JSON here that could drift from the type it claims to encode.
 
 let private commandsJson (commands: DeclaredCommand list) : string =
-  Canon.render (
-    JArr [ for c in commands -> JObj [ "phrase", JStr c.Phrase; "effect", JStr(CommandEffect.toWire c.Effect) ] ]
-  )
+  Canonical.write
+    Rendering.CrossHost
+    (JArr [ for c in commands -> JObj [ "phrase", JStr c.Phrase; "effect", JStr(CommandEffect.toWire c.Effect) ] ])
 
 let private aliasesJson (aliases: (string * string) list) : string =
-  Canon.render (JArr [ for alias, canonical in aliases -> JObj [ "alias", JStr alias; "value", JStr canonical ] ])
+  Canonical.write
+    Rendering.CrossHost
+    (JArr [ for alias, canonical in aliases -> JObj [ "alias", JStr alias; "value", JStr canonical ] ])
 
 /// The three bound shapes, each with its open ends OMITTED rather than nulled.
 let private valuesJson (hint: ValueHint) : string =
@@ -214,7 +216,7 @@ let private valuesJson (hint: ValueHint) : string =
         |> List.choose id
       )
 
-  Canon.render payload
+  Canonical.write Rendering.CrossHost payload
 
 /// A representative value to stand in for a `{value}` slot in the prose
 /// examples. Derived from the declared bound where there is one – so the
@@ -222,7 +224,7 @@ let private valuesJson (hint: ValueHint) : string =
 let private exampleValue (field: FieldAffordance) : string =
   match field.Values with
   | Some(ValueHint.OneOf(first :: _)) -> first
-  | Some(ValueHint.NumberRange(Some low, _, _)) -> Canon.render (JFloat low)
+  | Some(ValueHint.NumberRange(Some low, _, _)) -> Canonical.write Rendering.CrossHost (JFloat low)
   | Some(ValueHint.TextLength _) -> "The Dispossessed"
   | _ -> "…"
 

@@ -85,9 +85,14 @@ let private salesDashboard: Node<obj> =
               { Defaults.gridLayout<obj> with
                   Cols = 3
                   Children =
-                    [ metric "ex-sales-rev" "Revenue" 142500.0 (CellFormat.Currency "GBP") ToneVariant.Brand
-                      metric "ex-sales-orders" "Orders" 1284.0 (CellFormat.Number(Some 0)) ToneVariant.Default
-                      metric "ex-sales-conv" "Conversion" 0.043 (CellFormat.Percent(Some 1)) ToneVariant.Success ] }
+                    [ metric
+                        "ex-sales-rev"
+                        "Revenue"
+                        142500.0
+                        (CellFormat.Currency("GBP", None, None))
+                        ToneVariant.Brand
+                      metric "ex-sales-orders" "Orders" 1284.0 (CellFormat.Number(Some 0, None)) ToneVariant.Default
+                      metric "ex-sales-conv" "Conversion" 0.043 (CellFormat.Percent(Some 1, None)) ToneVariant.Success ] }
             Fuaran.markdown
               "ex-sales-note"
               "Updated hourly. **No server** – this is canonical Fuaran wire JSON rendered live. Type a prompt to edit it." ] }
@@ -175,9 +180,9 @@ let private statStack: Node<obj> =
               { Level = 2
                 Text = TextSource.Literal "Service health"
                 Variant = HeadingVariant.Standard }
-            metric "ex-stats-uptime" "Uptime" 0.9993 (CellFormat.Percent(Some 2)) ToneVariant.Success
-            metric "ex-stats-p95" "p95 latency (ms)" 184.0 (CellFormat.Number(Some 0)) ToneVariant.Default
-            metric "ex-stats-errors" "Error rate" 0.002 (CellFormat.Percent(Some 1)) ToneVariant.Warning ] }
+            metric "ex-stats-uptime" "Uptime" 0.9993 (CellFormat.Percent(Some 2, None)) ToneVariant.Success
+            metric "ex-stats-p95" "p95 latency (ms)" 184.0 (CellFormat.Number(Some 0, None)) ToneVariant.Default
+            metric "ex-stats-errors" "Error rate" 0.002 (CellFormat.Percent(Some 1, None)) ToneVariant.Warning ] }
 
 // ─── the DATA headline – an interactive dataset explorer (the Compute layer) ──
 //
@@ -337,7 +342,7 @@ let private datasetExplorer: Node<obj> =
               { Defaults.metric with
                   Label = TextSource.Literal "Revenue in view"
                   Value = Binding.Transform(TransformSource.Data explorerSource, totalRevenue, Some [ regionParam ])
-                  Format = CellFormat.Currency "GBP"
+                  Format = CellFormat.Currency("GBP", None, None)
                   Tone = ToneVariant.Brand }
             Fuaran.chart
               "ex-explorer-chart"
@@ -617,19 +622,19 @@ let private regionalReview: Node<obj> =
                         { Defaults.labelValueRow with
                             Label = TextSource.Literal "Leeds (North)"
                             Value = Binding.Static(Some 54000.0)
-                            Format = CellFormat.Currency "GBP" }
+                            Format = CellFormat.Currency("GBP", None, None) }
                       Fuaran.labelValueRow
                         "ex-regional-bristol"
                         { Defaults.labelValueRow with
                             Label = TextSource.Literal "Bristol (South)"
                             Value = Binding.Static(Some 57550.0)
-                            Format = CellFormat.Currency "GBP" }
+                            Format = CellFormat.Currency("GBP", None, None) }
                       Fuaran.labelValueRow
                         "ex-regional-cardiff"
                         { Defaults.labelValueRow with
                             Label = TextSource.Literal "Cardiff (West)"
                             Value = Binding.Static(Some 65200.0)
-                            Format = CellFormat.Currency "GBP"
+                            Format = CellFormat.Currency("GBP", None, None)
                             Emphasis = true } ] }
             Fuaran.map
               "ex-regional-map"
@@ -669,14 +674,14 @@ let private priceBoard: Node<obj> =
               { Defaults.metric with
                   Label = TextSource.Literal "List price"
                   Value = price
-                  Format = CellFormat.Currency "GBP"
+                  Format = CellFormat.Currency("GBP", None, None)
                   Tone = ToneVariant.Brand }
             Fuaran.labelValueRow
               "ex-price-row"
               { Defaults.labelValueRow with
                   Label = TextSource.Literal "Units in stock"
                   Value = Binding.State("price.stock", Some 318.0)
-                  Format = CellFormat.Number(Some 0) }
+                  Format = CellFormat.Number(Some 0, None) }
             Fuaran.factSpec
               "ex-price-fact"
               { Defaults.fact with
@@ -699,7 +704,7 @@ let private capabilityCard: Node<obj> =
               { Defaults.metric with
                   Label = TextSource.Literal "Value at risk (95%)"
                   Value = binding.invoke "risk.var" [ "confidence", "0.95"; "horizonDays", "1" ]
-                  Format = CellFormat.Currency "GBP"
+                  Format = CellFormat.Currency("GBP", None, None)
                   Tone = ToneVariant.Warning }
             |> Node.onLoading (Fuaran.skeleton "ex-invoke-pending" 1) ] }
 
@@ -733,7 +738,7 @@ let private fragmentBoard: Node<obj> =
                                 { Defaults.metric with
                                     Label = TextSource.Literal "Signups"
                                     Value = Binding.Static(Some 1240.0)
-                                    Format = CellFormat.Number(Some 0) }
+                                    Format = CellFormat.Number(Some 0, None) }
                               Fuaran.markdown "caption" "_Expanded from the `stat-card` fragment._" ] } }
             Fuaran.gridLayout
               "ex-fragment-row"
@@ -767,7 +772,7 @@ let private resilientPage: Node<obj> =
                               { Defaults.metric with
                                   Label = TextSource.Literal "Requests / sec"
                                   Value = Binding.State("feed.rate", Some 1840.0)
-                                  Format = CellFormat.Number(Some 0) } ] }
+                                  Format = CellFormat.Number(Some 0, None) } ] }
                 Fallback =
                   Fuaran.callout
                     "ex-boundary-fallback"

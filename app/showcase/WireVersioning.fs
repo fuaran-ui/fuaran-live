@@ -55,13 +55,13 @@ module private Engine =
   // The authored app, stamped core@1.2. `LiveTicker` is the kind minted in 1.2 –
   // the one an older core@1.0 host will not understand.
   let private metricJ l (v: int) =
-    Canon.typed "Metric" [ "label", JStr l; "value", JInt v ]
+    Canonical.typed "Metric" [ "label", JStr l; "value", JInt v ]
 
   let private calloutJ h b =
-    Canon.typed "Callout" [ "heading", JStr h; "body", JStr b ]
+    Canonical.typed "Callout" [ "heading", JStr h; "body", JStr b ]
 
   let private tickerJ l s =
-    Canon.typed "LiveTicker" [ "label", JStr l; "symbol", JStr s ]
+    Canonical.typed "LiveTicker" [ "label", JStr l; "symbol", JStr s ]
 
   let private appPayload =
     JArr
@@ -70,9 +70,9 @@ module private Engine =
         tickerJ "FUARAN" "up 2.3% today" ]
 
   let private authored =
-    match Versioning.Profile.tryParse "core@1.2" with
+    match Versioning.Capability.tryParse "core@1.2" with
     | Ok p -> p
-    | Error _ -> Versioning.Profile.coreV1
+    | Error _ -> Versioning.Capability.coreV1
 
   let private envelope: Versioning.Envelope =
     { Profile = authored
@@ -80,7 +80,7 @@ module private Engine =
 
   /// The one artefact on the wire – canonical bytes carrying `$profile` + `$payload`.
   let envelopeBytes = Versioning.render envelope
-  let authoredText = Versioning.Profile.render authored
+  let authoredText = Versioning.Capability.render authored
 
   /// One member of `el`, read by Core's typed decoder; the refusal as its sentence.
   let private member' (name: string) (d: Decoder<'T>) (el: JVal) : Result<'T, string> =
@@ -111,7 +111,7 @@ module private Engine =
 
   // A consumer profile's known-kind set: core@1.0 knows two kinds; the additive
   // 1.2 bump added LiveTicker, so a 1.2+ host knows all three.
-  let private knownAt (p: Versioning.Profile) : Set<string> =
+  let private knownAt (p: Versioning.Capability) : Set<string> =
     if p.Major = 1 && p.Minor >= 2 then
       set [ "Metric"; "Callout"; "LiveTicker" ]
     else
@@ -121,9 +121,9 @@ module private Engine =
   /// real negotiate + tolerant-decode path.
   let hostView (consumerText: string) : HostView =
     let consumer =
-      match Versioning.Profile.tryParse consumerText with
+      match Versioning.Capability.tryParse consumerText with
       | Ok p -> p
-      | Error _ -> Versioning.Profile.coreV1
+      | Error _ -> Versioning.Capability.coreV1
 
     match Versioning.parse envelopeBytes with
     | Error e ->
@@ -131,7 +131,7 @@ module private Engine =
         Negotiation = Foreign
         Slots = []
         RoundTripsExact = false
-        Reason = "unreadable wire: " + e }
+        Reason = "unreadable wire: " + Versioning.EnvelopeRefusal.describe e }
     | Ok env ->
       match Versioning.negotiate consumer env.Profile with
       | Versioning.Foreign a ->
@@ -142,7 +142,7 @@ module private Engine =
           Reason =
             sprintf
               "authored %s · this host speaks %s – a different major is a hard wall. Cross it with a migration shim, never a silent mis-read."
-              (Versioning.Profile.render a)
+              (Versioning.Capability.render a)
               consumerText }
       | comp ->
         let known = knownAt consumer
@@ -162,8 +162,8 @@ module private Engine =
           |> List.map (fun (el, r) ->
             match r with
             | Ok(Versioning.Known w) -> Known w
-            | Ok(Versioning.Unknown u) -> Preserved(u.Kind, Canon.render u.Payload)
-            | Error _ -> Preserved("malformed", Canon.render el))
+            | Ok(Versioning.Unknown u) -> Preserved(u.Kind, Canonical.write Rendering.CrossHost u.Payload)
+            | Error _ -> Preserved("malformed", Canonical.write Rendering.CrossHost el))
 
         // Does the old host round-trip the WHOLE artefact byte-for-byte –
         // re-emitting what it renders AND the unknown kind it preserved?
@@ -176,7 +176,8 @@ module private Engine =
               | Error _ -> el)
           )
 
-        let roundTrips = Canon.render reencoded = Canon.render env.Payload
+        let roundTrips =
+          Canonical.write Rendering.CrossHost reencoded = Canonical.write Rendering.CrossHost env.Payload
 
         let neg =
           match comp with
@@ -191,7 +192,7 @@ module private Engine =
 
   // The computed version story: adding a kind is additive → minor bump; removing
   // one is breaking → major bump. Both derived by the real `classify` / `bump`.
-  let private describe (before: string list) (after: string list) (baseP: Versioning.Profile) : string * string =
+  let private describe (before: string list) (after: string list) (baseP: Versioning.Capability) : string * string =
     let ev = Versioning.classify (Set.ofList before) (Set.ofList after)
 
     let cls =
@@ -199,20 +200,20 @@ module private Engine =
       | Versioning.Evolution.Additive _ -> "additive → minor bump"
       | Versioning.Evolution.Breaking _ -> "breaking → major bump"
 
-    cls, Versioning.Profile.render (Versioning.bump baseP ev)
+    cls, Versioning.Capability.render (Versioning.bump baseP ev)
 
   let additiveStory =
     describe
       [ "Metric"; "Callout" ]
       [ "Metric"; "Callout"; "LiveTicker" ]
-      { Versioning.Profile.coreV1 with
+      { Versioning.Capability.coreV1 with
           Minor = 1 }
 
   let breakingStory =
     describe
       [ "Metric"; "Callout" ]
       [ "Callout" ]
-      { Versioning.Profile.coreV1 with
+      { Versioning.Capability.coreV1 with
           Minor = 9 }
 
 // ─── the UI (renders each host's real negotiation outcome) ───────────────────
@@ -225,7 +226,7 @@ let private widgetNode (i: int) (w: Engine.Widget) : Node<unit> =
       { Defaults.metric with
           Label = TextSource.Literal l
           Value = Binding.Static(Some(float v))
-          Format = CellFormat.Number(Some 0)
+          Format = CellFormat.Number(Some 0, None)
           Tone = ToneVariant.Brand }
   | Engine.WCallout(h, b) ->
     Fuaran.callout

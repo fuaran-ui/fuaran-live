@@ -25,11 +25,10 @@ open Fuaran.Showcase.AgentReadable
 /// controls – the shapes are a contract a reader relies on, so they are pinned
 /// rather than trusted.
 let annotationsJson: string =
-  Canon.render (
-    JArr
+  Canonical.write
+    Rendering.CrossHost
+    (JArr
       [ for a in annotations ->
           JObj
             [ "field", JStr a.FieldId
-              "attributes", JObj [ for name, value in a.Attributes -> name, JStr value ] ] ]
-  )
-
+              "attributes", JObj [ for name, value in a.Attributes -> name, JStr value ] ] ])

@@ -29,22 +29,22 @@
   <PropertyGroup>
     <!-- The Fuaran UI language tier (Fuaran.UI.*, including Fuaran.UI.AiWire
          and the program loop's UI adapter Fuaran.UI.Program). -->
-    <FuaranUIVersion>0.97.0</FuaranUIVersion>
+    <FuaranUIVersion>0.99.1</FuaranUIVersion>
     <!-- The shared substrate spine (Fuaran.Core.*). These are DIRECT pins on
          packages the tier also depends on, so this is a FLOOR: it must be at or
          above the Core version of EVERY tier this repo compiles, because a lower
          number downgrades that tier's own dependency (NU1605) and one NU160x
          line kills the Fable project cracker. Every project compiles the one
          packaged tier at FuaranUIVersion (the showcase since Phase 2140), so
-         the floor is that release's declared Core version (0.38.1 at 0.97.0),
+         the floor is that release's declared Core version (0.40.2 at 0.99.1),
          read from its nuspec at each raise; docs/tier-pin.md has why it is a
          floor and not derived. -->
-    <FuaranCoreVersion>0.38.1</FuaranCoreVersion>
+    <FuaranCoreVersion>0.40.2</FuaranCoreVersion>
     <!-- The program/logic domain's domain-generic runtime
          (Fuaran.Program.Runtime). Its floor is set by the UI adapter above:
-         Fuaran.UI.Program 0.97.0 declares Fuaran.Program.Runtime 0.10.0, so a
-         lower pin is an NU1605 downgrade (Phase 2227 raised it from 0.9.0). -->
-    <FuaranProgramVersion>0.10.0</FuaranProgramVersion>
+         Fuaran.UI.Program 0.99.1 declares Fuaran.Program.Runtime 0.13.0, so a
+         lower pin is an NU1605 downgrade (Phase 2399 raised it from 0.10.0). -->
+    <FuaranProgramVersion>0.13.0</FuaranProgramVersion>
     <!-- The Fable / Elmish / Feliz toolchain, one producer each. -->
     <FableCoreVersion>5.0</FableCoreVersion>
     <FableElmishVersion>5.0.2</FableElmishVersion>

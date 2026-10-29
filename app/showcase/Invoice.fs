@@ -128,9 +128,9 @@ let private lines: Node<obj> =
             Column.text "Description" (rowText "item")
             Column.numeric "Qty" (rowFloat "qty")
             Column.numeric "Rate" (rowFloat "rate")
-            |> Column.withFormat (CellFormat.Currency "GBP")
+            |> Column.withFormat (CellFormat.Currency("GBP", None, None))
             Column.numeric "Net" (rowFloat "net")
-            |> Column.withFormat (CellFormat.Currency "GBP") ] }
+            |> Column.withFormat (CellFormat.Currency("GBP", None, None)) ] }
 
 let private net = lineRows |> List.sumBy (rowFloat "net")
 let private vat = System.Math.Round(net * 0.2, 2)
@@ -142,7 +142,7 @@ let private amountRow (id: string) (label: string) (value: float) (emphasis: boo
     { Defaults.labelValueRow with
         Label = TextSource.Literal label
         Value = Binding.Static(Some value)
-        Format = CellFormat.Currency "GBP"
+        Format = CellFormat.Currency("GBP", None, None)
         Emphasis = emphasis }
 
 /// The totals block. `keepTogether` is the clearest instance of the charter's

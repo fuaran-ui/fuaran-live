@@ -109,6 +109,7 @@
     <Compile Include="testing\TeleportProbes.fs" />
     <Compile Include="testing\TimeMachineProbes.fs" />
     <Compile Include="testing\DataInTheInterfaceProbes.fs" />
+    <Compile Include="testing\UndoGridProbes.fs" />
     <!-- The page registry: after the pages, because it names each page's value;
          it loads each one as its own chunk. -->
     <Compile Include="Registry.fs" />
@@ -133,6 +134,10 @@
     <!-- Git for Interfaces: TreeMerge.merge3Way / merge3WayWithAuthor, run in
          the browser from the package's fable/ sources (Phase 2139). -->
     <PackageReference Include="Fuaran.UI.OpStream.Dag.Merge" Version="$(FuaranUIVersion)" />
+    <!-- The Undo Grid: the grid edit log (GridEditLog / GridEdit, Phase 1891),
+         whose undo, redo and hash-chained record the page draws on. Already
+         compiled by the playground; Fable-source-packed. -->
+    <PackageReference Include="Fuaran.UI.ServerDriven" Version="$(FuaranUIVersion)" />
     <!-- The Pattern Bank's signature search and the Versioning Envelope page's
          negotiation substrate. Fable-source-packed; at FuaranCoreVersion, the
          Core version the tier declares. -->

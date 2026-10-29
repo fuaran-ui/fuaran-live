@@ -7961,3 +7961,92 @@ polygon.gi-dag-pending {
   font-size: 0.75rem;
   color: var(--fuaran-color-text-muted, #5a5a66);
 }
+
+/* ── The Undo Grid (2395): the fourth "data in the interface" page ── */
+.ug-stage {
+  box-sizing: border-box;
+  min-width: 0;
+  border: var(--ds-border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: var(--fuaran-color-elevated, #fff);
+  color: var(--fuaran-color-text, #1a2026);
+  overflow-x: auto;
+}
+.ug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.ug-action {
+  min-height: 2.25rem;
+  border: var(--ds-border);
+  border-radius: 0.5rem;
+  background: var(--fuaran-color-elevated, #fff);
+  color: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 0.9rem;
+}
+.ug-action:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.ug-refusal {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+  color: var(--fuaran-color-critical, #b42318);
+  word-break: break-word;
+}
+.ug-records {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.ug-record {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.88rem;
+}
+.ug-record-after {
+  opacity: 0.45;
+}
+.ug-seq,
+.ug-hash {
+  font-family: var(--ds-font-mono);
+  font-size: 0.78rem;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.ug-op {
+  word-break: break-word;
+}
+.ug-empty,
+.ug-integrity,
+.ug-verdict {
+  margin: 0.8rem 0 0;
+  font-size: 0.85rem;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.ug-empty {
+  font-style: italic;
+}
+.ug-scrub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.ug-scrub input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.ug-verdict {
+  margin-bottom: 0.9rem;
+}

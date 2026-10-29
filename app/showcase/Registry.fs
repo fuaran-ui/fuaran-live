@@ -288,7 +288,14 @@ let pages: Page list =
       Pillar = Pillar.Machine
       Wow =
         "Break a chart's binding and get a refusal naming the slot, the code and the columns that do exist, instead of a blank chart."
-      Load = fun () -> importValueDynamic TypedRefusal.page } ]
+      Load = fun () -> importValueDynamic TypedRefusal.page }
+    // Phase 2395 — the fourth "data in the interface" page, split out of 1887.
+    { Id = "undo-grid"
+      Title = "The Undo Grid"
+      Pillar = Pillar.Machine
+      Wow =
+        "Edit a grid, undo it and replay the history. The page has no undo code: every edit is an op, and undo, redo and the replayable record come from the published edit log."
+      Load = fun () -> importValueDynamic UndoGrid.page } ]
 
 let pagesInPillar (p: Pillar) : Page list =
   pages |> List.filter (fun d -> d.Pillar = p)

@@ -74,6 +74,7 @@ module Fuaran.Live.StructuralEdit
 // ============================================================================
 
 open Fable.Core
+open Fuaran.Core
 open Fuaran.UI.Types
 open Fuaran.UI.Ops
 open Fuaran.UI.Ops.Types
@@ -86,7 +87,10 @@ module Decode = Fuaran.UI.Ops.JsonDecode
 /// Where a node should sit among its new siblings — Fuaran.Core's `Anchor`,
 /// the vocabulary the packaged placement takes, re-exported so callers keep
 /// addressing it as `StructuralEdit.Placement`.
-type Placement = Fuaran.Core.Anchor<NodeId>
+// Named unqualified, through `open Fuaran.Core`: since Core 0.40 the namespace
+// also holds the op stream's non-generic `Anchor` record (a chain boundary), and
+// the qualified spelling `Fuaran.Core.Anchor<NodeId>` resolves to that record.
+type Placement = Anchor<NodeId>
 
 /// A structural destination: which parent, and where among its children — the
 /// packaged `Fuaran.UI.Ops.Target`, re-exported.

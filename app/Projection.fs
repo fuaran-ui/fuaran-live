@@ -785,6 +785,21 @@ let private optStr (name: string) (v: JsonValue) : string option =
   | Some(JString s) -> Some s
   | _ -> None
 
+/// A TS member the corpus omits at its default (Phase 1603): emitted only when the
+/// wire carries it, so the pinned host supplies its own default and its encoder
+/// omits it again.
+let private tsOptStrMember (name: string) (v: JsonValue) : (string * string) list =
+  match optStr name v with
+  | Some s -> [ name, qs s ]
+  | None -> []
+
+/// A bool member whose wire default is `dflt` (omitted there): the wire's value
+/// when it carries one, else the default.
+let private boolOr (dflt: bool) (name: string) (v: JsonValue) : bool =
+  match JsonValue.tryField name v with
+  | Some(JBool b) -> b
+  | _ -> dflt
+
 let private optNum (name: string) (v: JsonValue) : float option =
   match JsonValue.tryField name v with
   | Some(JNumber n) -> Some n
@@ -1678,8 +1693,10 @@ let private tsFieldKindLit (ab: AutoBind) (v: JsonValue) : string =
     tsInline (
       [ "kind", qs "SegmentedChoice" ]
       @ handler "onChange"
+      // `orientation` is omitted at its default on the wire; the in-memory
+      // field is required, so an absent member is the default.
       @ [ "options", tsOptionsBinding (fieldReq "options" v)
-          "orientation", qs (strOf "orientation" v)
+          "orientation", qs (optStr "orientation" v |> Option.defaultValue "Horizontal")
           "value", value ]
     )
   | "TextArea" ->
@@ -2080,7 +2097,12 @@ let private tsGridColumnErased (v: JsonValue) : string =
       let mapLit =
         membersOf "map" kindObj
         |> List.map (fun (value, tone) ->
-          qs value
+          // A bare `__proto__` key in an object literal sets the prototype rather
+          // than an own member; the computed spelling keeps it a member.
+          (if value = "__proto__" then
+             "[" + qs value + "]"
+           else
+             qs value)
           + ": "
           + qs (
             match tone with
@@ -2300,11 +2322,15 @@ and private tsMountNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonVal
       + " }"
 
   let spec =
-    tsInline
+    tsInline (
       [ "scopeId", qs (strOf "scopeId" k)
         "inputs", inputsLit
         "channel", channel
         "capabilities", "[" + (arrOf "capabilities" k |> List.map strItem |> String.concat ", ") + "]" ]
+      @ (match JsonValue.tryField "onBubble" k with
+         | Some _ -> [ "onBubble", "() => action.chain([])" ]
+         | None -> [])
+    )
 
   let fields =
     [ "id", qs id
@@ -2693,9 +2719,12 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
   | "Stepper" ->
     call
       "stepper"
-      [ idF
-        "activeStep", tsBinding Opq.Scalar (fieldReq "activeStep" k)
-        "children", tsChildren depth k ]
+      ([ idF
+         "activeStep", tsBinding Opq.Scalar (fieldReq "activeStep" k)
+         "children", tsChildren depth k ]
+       @ (match JsonValue.tryField "onSelect" k with
+          | Some _ -> [ "onSelect", "() => action.chain([])" ]
+          | None -> []))
   | "SummaryList" ->
     call
       "summaryList"
@@ -2723,7 +2752,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | Some h -> [ "heading", tsTextInput h ]
           | None -> [])
        @ [ "open", tsBinding Opq.Scalar (fieldReq "open" k)
-           "dismissable", boolLit (boolOf "dismissable" k) ]
+           // `dismissable` defaults to true and is omitted there.
+           "dismissable", boolLit (boolOr true "dismissable" k) ]
        @ (match JsonValue.tryField "onDismiss" k with
           | Some d -> [ "onDismiss", tsAction d ]
           | None -> [])
@@ -2752,10 +2782,10 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
   | "Heading" ->
     call
       "heading"
-      [ idF
-        "text", tsTextInput (fieldReq "text" k)
-        "level", numLit (numOf "level" k)
-        "variant", qs (strOf "variant" k) ]
+      ([ idF
+         "text", tsTextInput (fieldReq "text" k)
+         "level", numLit (numOf "level" k) ]
+       @ tsOptStrMember "variant" k)
   | "Markdown" ->
     let t = fieldReq "text" k
 
@@ -2796,12 +2826,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match JsonValue.tryField "subtext" k with
           | Some s -> [ "subtext", tsTextInput s ]
           | None -> []))
-  | "Badge" ->
-    call
-      "badge"
-      [ idF
-        "label", tsTextInput (fieldReq "label" k)
-        "variant", qs (strOf "variant" k) ]
+  | "Badge" -> call "badge" ([ idF; "label", tsTextInput (fieldReq "label" k) ] @ tsOptStrMember "variant" k)
   | "Sparkline" -> call "sparkline" [ idF; "source", tsBinding Opq.Collection (fieldReq "source" k) ]
   | "Spacer" -> call "spacer" [ idF; "size", qs (strOf "size" k) ]
   | "Skeleton" -> Some("fuaran.skeleton(" + qs id + ", " + numLit (numOf "rows" k) + ")")
@@ -2863,8 +2888,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "image"
       ([ idF
          "src", tsBinding Opq.Scalar (fieldReq "src" k)
-         "alt", tsTextInput (fieldReq "alt" k)
-         "variant", qs (strOf "variant" k) ]
+         "alt", tsTextInput (fieldReq "alt" k) ]
+       @ tsOptStrMember "variant" k
        // The presentation slots (fit / aspectRatio / loading) and the figure
        // slots (caption / expandable) are each optional and omitted-when-absent.
        @ (match optStr "fit" k with
@@ -3006,10 +3031,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
         "message", tsTextInput (fieldReq "message" k)
         "tone", qs (strOf "tone" k)
         "open", tsBinding Opq.Scalar (fieldReq "open" k)
-        "dismissable",
-        (match JsonValue.tryField "dismissable" k with
-         | Some(JBool b) -> boolLit b
-         | _ -> "true") ]
+        "dismissable", boolLit (boolOr true "dismissable" k) ]
   | "CodeBlock" ->
     call
       "codeBlock"
@@ -3018,7 +3040,9 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
         "language", qs (strOf "language" k)
         "lineNumbers", boolLit (boolOf "lineNumbers" k)
         "highlightLines", "[" + (arrOf "highlightLines" k |> List.map numItem |> String.concat ", ") + "]"
-        "copyable", boolLit (boolOf "copyable" k) ]
+        // `copyable` defaults to true on the wire (omitted there); the host's own
+        // default is false, so an absent member reconstructs as the wire default.
+        "copyable", boolLit (boolOr true "copyable" k) ]
   | "Math" -> call "math" [ idF; "source", qs (strOf "source" k); "display", qs (strOf "display" k) ]
   // ── Input ─────────────────────────────────────────────────────────────────
   | "Button" ->
@@ -3026,8 +3050,8 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "button"
       ([ idF
          "label", tsTextInput (fieldReq "label" k)
-         "onClick", tsAction (fieldReq "onClick" k)
-         "variant", qs (strOf "variant" k) ]
+         "onClick", tsAction (fieldReq "onClick" k) ]
+       @ tsOptStrMember "variant" k
        @ (match optStr "icon" k with
           | Some i -> [ "icon", qs i ]
           | None -> [])
@@ -3039,8 +3063,11 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "select"
       ([ idF
          "label", tsTextInput (fieldReq "label" k)
-         "source", tsOptionsBinding (fieldReq "source" k)
-         "value", tsBinding Opq.Scalar (fieldReq "value" k) ]
+         "source", tsOptionsBinding (fieldReq "source" k) ]
+       // A multi-select carries `values` and no `value` (Phase 1962).
+       @ (match JsonValue.tryField "value" k with
+          | Some vb -> [ "value", tsBinding Opq.Scalar vb ]
+          | None -> [])
        @ (match JsonValue.tryField "onChange" k with
           | Some _ -> [ "onChange", "() => action.chain([])" ]
           | None -> [])
@@ -3050,7 +3077,9 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match JsonValue.tryField "disabled" k with
           | Some d -> [ "disabled", tsBinding Opq.Scalar d ]
           | None -> [])
-       @ (if boolOf "multiple" k then [ "multiple", "true" ] else [])
+       @ (match JsonValue.tryField "multiple" k with
+          | Some(JBool b) -> [ "multiple", boolLit b ]
+          | _ -> [])
        @ (match JsonValue.tryField "values" k with
           | Some vs -> [ "values", tsBinding Opq.Collection vs ]
           | None -> [])
@@ -3103,8 +3132,10 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       ([ idF
          "label", tsTextInput (fieldReq "label" k)
          "accept", "[" + (arrOf "accept" k |> List.map strItem |> String.concat ", ") + "]"
-         "multiple", boolLit (boolOf "multiple" k)
-         "onSelect", "() => action.chain([])" ]
+         "multiple", boolLit (boolOf "multiple" k) ]
+       @ (match JsonValue.tryField "onSelect" k with
+          | Some _ -> [ "onSelect", "() => action.chain([])" ]
+          | None -> [])
        @ (match JsonValue.tryField "disabled" k with
           | Some d -> [ "disabled", tsBinding Opq.Scalar d ]
           | None -> [])
@@ -3408,6 +3439,13 @@ let private pq (s: string) : string = "'" + escape '\'' s + "'"
 
 let private pyBool (b: bool) : string = if b then "True" else "False"
 
+/// The Python twin of `tsOptStrMember`: a member the corpus omits at its default
+/// is written only when the wire carries it.
+let private pyOptStrMember (name: string) (v: JsonValue) : (string * string) list =
+  match optStr name v with
+  | Some s -> [ name, pq s ]
+  | None -> []
+
 /// A number as a Python literal. Python distinguishes `int` from `float` where
 /// JavaScript does not, and the canonical encoder honours that distinction — so
 /// a whole number large enough that the wire carries it in exponent form has to
@@ -3692,6 +3730,11 @@ let private pyTransformStep (v: JsonValue) : string =
 
 // ── Bindings / actions / text / formats ──────────────────────────────────────
 
+let private pyLocaleSource (v: JsonValue) : string =
+  match dollarType v with
+  | Some "Explicit" -> "t.Explicit(" + pq (strOf "tag" v) + ")"
+  | _ -> "t.Ambient()"
+
 /// A COLUMN's `CellFormat` — the `format.*` helper namespace.
 ///
 /// Deliberately adjacent to `pyFormatIntent` below, which projects the `Format`
@@ -3702,16 +3745,20 @@ let private pyTransformStep (v: JsonValue) : string =
 /// second. Moved above `pyBinding` in Phase 1581, which gave the `Local` case a
 /// `codec` slot and so made a binding depend on this.
 let private pyCellFormat (v: JsonValue) : string =
+  // The fraction digits and the locale a figure may carry (Phases 2490 / 2499),
+  // each written only where the wire carries it.
+  let figure =
+    (match optNum "decimals" v with
+     | Some d -> [ "decimals", numLit d ]
+     | None -> [])
+    @ (match JsonValue.tryField "locale" v with
+       | Some l -> [ "locale", pyLocaleSource l ]
+       | None -> [])
+
   match dollarType v with
-  | Some "Number" ->
-    (match optNum "decimals" v with
-     | Some d -> "format.number(" + numLit d + ")"
-     | None -> "format.number()")
-  | Some "Currency" -> "format.currency(" + pq (strOf "code" v) + ")"
-  | Some "Percent" ->
-    (match optNum "decimals" v with
-     | Some d -> "format.percent(" + numLit d + ")"
-     | None -> "format.percent()")
+  | Some "Number" -> pyCall "format.number" [] figure
+  | Some "Currency" -> pyCall "format.currency" [ pq (strOf "code" v) ] figure
+  | Some "Percent" -> pyCall "format.percent" [] figure
   | Some "SignificantDigits" -> "format.significant_digits(" + numLit (numOf "digits" v) + ")"
   // Phase 1811 — `CellFormat.Date` became `DateTime` (the pattern renders a date,
   // a time or both); fuaran-ui 0.8.0 spells it `format.date_time` and has no
@@ -3723,7 +3770,13 @@ let private pyCellFormat (v: JsonValue) : string =
 
 let private pyFormatIntent (v: JsonValue) : string =
   match dollarType v with
-  | Some "Currency" -> "t.FmtCurrency(" + pq (strOf "isoCode" v) + ")"
+  | Some "Currency" ->
+    pyCall
+      "t.FmtCurrency"
+      [ pq (strOf "isoCode" v) ]
+      (match optNum "decimals" v with
+       | Some d -> [ "decimals", numLit d ]
+       | None -> [])
   | Some "Percent" ->
     (match optNum "decimals" v with
      | Some d -> "t.FmtPercent(" + numLit d + ")"
@@ -3754,11 +3807,6 @@ let private pyFormatIntent (v: JsonValue) : string =
     (match optNum "decimals" v with
      | Some d -> "t.FmtNumber(" + numLit d + ")"
      | None -> "t.FmtNumber()")
-
-let private pyLocaleSource (v: JsonValue) : string =
-  match dollarType v with
-  | Some "Explicit" -> "t.Explicit(" + pq (strOf "tag" v) + ")"
-  | _ -> "t.Ambient()"
 
 let private pyFlushTrigger (v: JsonValue) : string =
   match dollarType v with
@@ -4167,9 +4215,7 @@ let private pyFieldKind (ab: AutoBind) (v: JsonValue) : string =
     pyCall
       "t.SegmentedChoice"
       [ pyOptionsBinding (fieldReq "options" v) ]
-      (optValue
-       @ [ "orientation", pq (strOf "orientation" v) ]
-       @ pyHandler "onChange" "on_change" v)
+      (optValue @ pyOptStrMember "orientation" v @ pyHandler "onChange" "on_change" v)
   | "TextArea" ->
     pyCall
       "t.TextAreaField"
@@ -4264,7 +4310,7 @@ let private pyFilterKind (ab: AutoBind) (v: JsonValue) : string =
       "t.SegmentedFilter"
       [ pyOptionsBinding (fieldReq "options" v) ]
       (optValue "SegmentedChoice"
-       @ [ "orientation", pq (strOf "orientation" v) ]
+       @ pyOptStrMember "orientation" v
        @ pyHandler "onChange" "on_change" v)
   | "Text" -> pyCall "t.TextFilter" [] (optValue "Text" @ pyHandler "onChange" "on_change" v)
   // Phase 1581 — the filter-side slider. `t.RangeFilter` is the alias of
@@ -5024,7 +5070,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
         | Some h -> [ "heading", pyTextInput h ]
         | None -> [])
        @ [ "open", pyBinding Opq.Scalar (fieldReq "open" k)
-           "dismissable", pyBool (boolOf "dismissable" k) ]
+           "dismissable", pyBool (boolOr true "dismissable" k) ]
        // `on_dismiss` defaults to the no-op `Chain`, which the encoder writes
        // as a real `onDismiss` key — so a wire that omits the slot has to say
        // `None` explicitly. This is the one handler in the vocabulary that is an
@@ -5060,7 +5106,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
     call
       "heading"
       [ pyTextInput (fieldReq "text" k) ]
-      [ "level", numLit (numOf "level" k); "variant", pq (strOf "variant" k) ]
+      ([ "level", numLit (numOf "level" k) ] @ pyOptStrMember "variant" k)
   | "Markdown" -> call "markdown" [ pyTextInput (fieldReq "text" k) ] []
   | "Metric" ->
     call
@@ -5087,13 +5133,28 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match optStr "trendPolarity" k with
           | Some p -> [ "trendPolarity", pq p ]
           | None -> [])
+       @ (match arrOf "comparisons" k with
+          | [] -> []
+          | cs ->
+            let one (c: JsonValue) =
+              pyCall
+                "t.MetricComparison"
+                []
+                ([ "label", pyTextSource (fieldReq "label" c)
+                   "value", pyBinding Opq.Scalar (fieldReq "value" c) ]
+                 @ (match JsonValue.tryField "format" c with
+                    | Some f -> [ "format", pyCellFormat f ]
+                    | None -> [])
+                 @ pyOptStrMember "polarity" c)
+
+            [ "comparisons", "[" + (cs |> List.map one |> String.concat ", ") + "]" ])
        @ (match optStr "icon" k with
           | Some i -> [ "icon", pq i ]
           | None -> [])
        @ (match JsonValue.tryField "subtext" k with
           | Some s -> [ "subtext", pyTextInput s ]
           | None -> []))
-  | "Badge" -> call "badge" [] [ "label", pyTextInput (fieldReq "label" k); "variant", pq (strOf "variant" k) ]
+  | "Badge" -> call "badge" [] ([ "label", pyTextInput (fieldReq "label" k) ] @ pyOptStrMember "variant" k)
   | "Sparkline" -> call "sparkline" [] [ "source", pyBinding Opq.Collection (fieldReq "source" k) ]
   | "Skeleton" -> call "skeleton" [ numLit (numOf "rows" k) ] []
   | "Callout" ->
@@ -5155,8 +5216,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "image"
       []
       ([ "src", pyBinding Opq.Scalar (fieldReq "src" k)
-         "alt", pyTextInput (fieldReq "alt" k)
-         "variant", pq (strOf "variant" k) ]
+         "alt", pyTextInput (fieldReq "alt" k) ]
+       @ pyOptStrMember "variant" k
        @ (match optStr "fit" k with
           | Some f -> [ "fit", pq f ]
           | None -> [])
@@ -5254,7 +5315,7 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
         "language", pq (strOf "language" k)
         "lineNumbers", pyBool (boolOf "lineNumbers" k)
         "highlightLines", pyList (arrOf "highlightLines" k |> List.map numItem)
-        "copyable", pyBool (boolOf "copyable" k) ]
+        "copyable", pyBool (boolOr true "copyable" k) ]
   | "Math" -> call "math" [ pq (strOf "source" k) ] [ "display", pq (strOf "display" k) ]
   // Phase 1596 — `Fact`, modelled by fuaran-py from 0.3.0. `tone` and
   // `emphasis` carry record defaults the wire omits at, so each is emitted only
@@ -5283,8 +5344,8 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "button"
       []
       ([ "label", pyTextInput (fieldReq "label" k)
-         "onClick", pyAction (fieldReq "onClick" k)
-         "variant", pq (strOf "variant" k) ]
+         "onClick", pyAction (fieldReq "onClick" k) ]
+       @ pyOptStrMember "variant" k
        @ (match optStr "icon" k with
           | Some i -> [ "icon", pq i ]
           | None -> [])
@@ -5296,15 +5357,20 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "select"
       []
       ([ "label", pyTextInput (fieldReq "label" k)
-         "source", pyOptionsBinding (fieldReq "source" k)
-         "value", pyBinding Opq.Scalar (fieldReq "value" k) ]
+         "source", pyOptionsBinding (fieldReq "source" k) ]
+       // A multi-select carries `values` and no `value` (Phase 1962).
+       @ (match JsonValue.tryField "value" k with
+          | Some vb -> [ "value", pyBinding Opq.Scalar vb ]
+          | None -> [])
        @ (match JsonValue.tryField "placeholder" k with
           | Some p -> [ "placeholder", pyTextInput p ]
           | None -> [])
        @ (match JsonValue.tryField "disabled" k with
           | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
           | None -> [])
-       @ (if boolOf "multiple" k then [ "multiple", "True" ] else [])
+       @ (match JsonValue.tryField "multiple" k with
+          | Some(JBool b) -> [ "multiple", (if b then "True" else "False") ]
+          | _ -> [])
        @ (match JsonValue.tryField "values" k with
           | Some vs -> [ "values", pyBinding Opq.Collection vs ]
           | None -> [])
@@ -5473,6 +5539,14 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           @ pyTriBool "sortable" "sortable" sr
           @ (match JsonValue.tryField "defaultSort" sr with
              | Some ds -> [ "defaultSort", pyDefaultSort ds ]
+             | None -> [])
+          // A static grid may declare its columns and its row key beside the
+          // rows (the table constructor reaches both after fuaran-py 0.10.0).
+          @ (match arrOf "columns" k with
+             | [] -> []
+             | cols -> [ "columns", pyList (cols |> List.map pyGridColumn) ])
+          @ (match optStr "rowKeyField" k with
+             | Some f -> [ "rowKeyField", pq f ]
              | None -> []))
      | None ->
        call
@@ -6132,6 +6206,12 @@ let private fsRecordTable: (string * string * string list) list =
        "Src|src|!|B<s>"
        "Tracks|tracks|=[]|L<R:TrackEntry>"
        "Transcript|transcript|?|U:TextSource" ])
+    ("MetricComparison",
+     "",
+     [ "Label|label|!|U:TextSource"
+       "Value|value|!|B<f>"
+       "Format|format|=CellFormat.None|U:CellFormat"
+       "Polarity|polarity|=TrendPolarity.HigherIsBetter|E:TrendPolarity" ])
     ("MetricSpec",
      "Metric",
      [ "Label|label|!|U:TextSource"
@@ -6143,6 +6223,7 @@ let private fsRecordTable: (string * string * string list) list =
        "Trend|trend|?|B<f>"
        "TrendFormat|trendFormat|?|U:CellFormat"
        "TrendPolarity|trendPolarity|=TrendPolarity.HigherIsBetter|E:TrendPolarity"
+       "Comparisons|comparisons|=[]|L<R:MetricComparison>"
        "Icon|icon|?|s"
        "Subtext|subtext|?|U:TextSource" ])
     ("ModalSpec",
@@ -6295,9 +6376,9 @@ let private fsUnionTable: (string * string * string list) list =
     ("CallResultTarget", "State", [ "key|key|!|s" ])
     ("CallResultTarget", "Query", [ "name|name|!|s" ])
     ("CellFormat", "None", [])
-    ("CellFormat", "Number", [ "decimals|decimals|?|i" ])
-    ("CellFormat", "Currency", [ "code|code|!|s" ])
-    ("CellFormat", "Percent", [ "decimals|decimals|?|i" ])
+    ("CellFormat", "Number", [ "decimals|decimals|?|i"; "locale|locale|?|U:LocaleSource" ])
+    ("CellFormat", "Currency", [ "code|code|!|s"; "decimals|decimals|?|i"; "locale|locale|?|U:LocaleSource" ])
+    ("CellFormat", "Percent", [ "decimals|decimals|?|i"; "locale|locale|?|U:LocaleSource" ])
     ("CellFormat", "SignificantDigits", [ "digits|digits|!|i" ])
     ("CellFormat", "DateTime", [ "format|format|!|s" ])
     ("CellFormat", "Duration", [ "unit|unit|!|E:DurationUnit"; "style|style|!|E:DurationStyle" ])
@@ -6404,7 +6485,7 @@ let private fsUnionTable: (string * string * string list) list =
        "suggestions|suggestions|?|B<L<R:SelectOption>>"
        "value|value|?|BS<j>" ])
     ("Format", "Number", [ "decimals|decimals|?|i" ])
-    ("Format", "Currency", [ "isoCode|isoCode|!|s" ])
+    ("Format", "Currency", [ "isoCode|isoCode|!|s"; "decimals|decimals|?|i" ])
     ("Format", "Percent", [ "decimals|decimals|?|i" ])
     ("Format", "DateTime", [ "dateStyle|dateStyle|?|E:DateStyle"; "timeStyle|timeStyle|?|E:TimeStyle" ])
     ("Format", "RelativeTime", [ "unit|unit|!|E:RelativeTimeUnit" ])

@@ -188,8 +188,8 @@ let detailGrid: Node<obj> =
                 Columns =
                   [ fieldColumn "Region" "region" CellKindErased.Text CellFormat.None
                     fieldColumn "Product" "product" CellKindErased.Text CellFormat.None
-                    fieldColumn "Units" "units" CellKindErased.Numeric (CellFormat.Number(Some 0))
-                    fieldColumn "Revenue" "revenue" CellKindErased.Numeric (CellFormat.Number(Some 0)) ] } }
+                    fieldColumn "Units" "units" CellKindErased.Numeric (CellFormat.Number(Some 0, None))
+                    fieldColumn "Revenue" "revenue" CellKindErased.Numeric (CellFormat.Number(Some 0, None)) ] } }
   | _ -> node
 
 /// The whole dashboard, one tree: what the wire drawer shows and the renderer draws.

@@ -243,7 +243,7 @@ module PatternBankSeeds =
         Holes =
           [ textHole "metric.label" "a label"
             numberHole "metric.value" "a number" 0 1000000 ]
-        Build = fun _ -> metric "sm" "Revenue" 128000.0 (CellFormat.Currency "GBP") ToneVariant.Brand }
+        Build = fun _ -> metric "sm" "Revenue" 128000.0 (CellFormat.Currency("GBP", None, None)) ToneVariant.Brand }
       { Id = "metric-strip"
         Title = "Metric strip"
         Summary = "A row of three KPIs."
@@ -260,9 +260,9 @@ module PatternBankSeeds =
             metricGrid
               "strip"
               3
-              [ metric "s0" "Revenue" 128000.0 (CellFormat.Currency "GBP") ToneVariant.Brand
-                metric "s1" "Orders" 1318.0 (CellFormat.Number(Some 0)) ToneVariant.Default
-                metric "s2" "Conversion" 0.058 (CellFormat.Percent(Some 1)) ToneVariant.Success ] }
+              [ metric "s0" "Revenue" 128000.0 (CellFormat.Currency("GBP", None, None)) ToneVariant.Brand
+                metric "s1" "Orders" 1318.0 (CellFormat.Number(Some 0, None)) ToneVariant.Default
+                metric "s2" "Conversion" 0.058 (CellFormat.Percent(Some 1, None)) ToneVariant.Success ] }
       { Id = "kpi-card"
         Title = "KPI card"
         Summary = "A single big value inside a titled card."
@@ -293,9 +293,9 @@ module PatternBankSeeds =
               [ metricGrid
                   "dash-strip"
                   3
-                  [ metric "d0" "Revenue" 128000.0 (CellFormat.Currency "GBP") ToneVariant.Brand
-                    metric "d1" "Orders" 1318.0 (CellFormat.Number(Some 0)) ToneVariant.Default
-                    metric "d2" "Margin" 0.58 (CellFormat.Percent(Some 0)) ToneVariant.Success ] ] }
+                  [ metric "d0" "Revenue" 128000.0 (CellFormat.Currency("GBP", None, None)) ToneVariant.Brand
+                    metric "d1" "Orders" 1318.0 (CellFormat.Number(Some 0, None)) ToneVariant.Default
+                    metric "d2" "Margin" 0.58 (CellFormat.Percent(Some 0, None)) ToneVariant.Success ] ] }
       { Id = "hero"
         Title = "Hero"
         Summary = "A headline and a supporting line."

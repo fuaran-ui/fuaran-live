@@ -290,6 +290,27 @@ the contract compiled against did not move at the switch.
   with the `@fuaran-ui/*` v0.31.0 set (`ops` 0.31.0, `schema` 0.27.0,
   `renderer` 0.28.0, `ui` 0.25.0, `ai-tools` 0.14.1, `charts` 0.14.5,
   `op-stream` 0.11.5), the TypeScript release carrying the same two wire rules.
+- **v0.99.1** (2026-10-29, Phase 2399) — a two-release jump (0.98.0 was never
+  released; 0.98.1 and 0.99.1 were), and source-affecting in three ways. Core
+  0.40's wire module folds `Canon` into `Canonical`, so every `Canon.render` is
+  `Canonical.write Rendering.CrossHost` and `Canon.typed` is `Canonical.typed`
+  (`Ask`, `AgentReadable`, `TypedQuestion`, `WireVersioning` and a probe);
+  `Versioning.Profile` is `Versioning.Capability`, and an envelope that will not
+  parse is a typed `EnvelopeRefusal`, read through `EnvelopeRefusal.describe`.
+  `CellFormat.Number` / `Currency` / `Percent` gain the fraction digits and the
+  locale a figure may carry (its Phases 2490 / 2499), so every literal states
+  `None` for them. And Core 0.40's op stream adds a non-generic `Anchor` record
+  (a chain boundary) to the `Fuaran.Core` namespace, beside placement's
+  `Anchor<'Id>`: the qualified `Fuaran.Core.Anchor<NodeId>` now resolves to the
+  record and fails, so the navigator names it unqualified under
+  `open Fuaran.Core`. The tier declares `Fuaran.Core.*` 0.40.2,
+  `Fuaran.Compute.DataFrame` / `ColumnOps` 0.41.0 (transitive) and
+  `Fuaran.Program.Runtime` / `Bounded` 0.13.0, so both floors moved; Core 0.40.3
+  and Program 0.13.1 are released but were not adopted, the floors being what
+  the release was built and certified on. The `@fuaran-ui/*` v0.31.0 set did
+  not move: it is still the newest on npm, so the four fixtures the tier now
+  certifies and those packages cannot encode (a figure's locale and fraction
+  digits, a metric's comparisons) are quarantined on the TypeScript arm.
 
 ## The package pins — the same release, by package
 
@@ -391,6 +412,13 @@ restore-graph suite, so a raise is one act with both costs: the source migration
   default synthesis reads it, and the property editor shows a member absent at
   its declared default as that default, found by asking the decoder and encoder
   which candidate the canonical form omits.
+- **0.97.0 → 0.99.1** (Phase 2399) — the same release, by package. `Fuaran.Core.*`
+  moved 0.38.1 → 0.40.2 and `Fuaran.Program.Runtime` 0.10.0 → 0.13.0 (points 2
+  and 3); the restore also brings `Fuaran.UI.Renderer.Core`, `Fuaran.UI.Charts`
+  and `Fuaran.UI.Telemetry.Abstractions` in transitively. The F# view
+  (`app/Projection.fs`) was taught `MetricSpec.Comparisons`, the figure members
+  of `CellFormat` and `Format.Currency`'s fraction digits, which turned the F#
+  conformance arm green against the corpus at main.
 - **The ceiling that twice held the family back is gone.** Before the loop's
   0.6.0 split, the tier widened a member of `Action` and the loop — a separate
   producer — still constructed the narrower form in its own Fable-packed

@@ -107,7 +107,7 @@ let private baseTree: Node<unit> =
               BreakBefore = false
               Heading = None
               Children =
-                [ kpi "nv-kpi-coverage" "Coverage" 0.842 (CellFormat.Percent(Some 1)) ToneVariant.Success
+                [ kpi "nv-kpi-coverage" "Coverage" 0.842 (CellFormat.Percent(Some 1, None)) ToneVariant.Success
                   kpi "nv-kpi-open" "Open blockers" 2.0 CellFormat.None ToneVariant.Warning
                   kpi "nv-kpi-latency" "p95 latency (ms)" 184.0 CellFormat.None ToneVariant.Default ] }
           Fuaran.callout

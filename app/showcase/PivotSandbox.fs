@@ -152,7 +152,7 @@ let private resultColumns (pipeline: Transform list) : ColumnErased<obj> list =
                 CellKindErased.Text
             Format =
               if ty = FloatType then
-                CellFormat.Number(Some 2)
+                CellFormat.Number(Some 2, None)
               else
                 CellFormat.None })
 

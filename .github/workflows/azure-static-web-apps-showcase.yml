@@ -43,7 +43,9 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: azure-swa-showcase-${{ github.ref }}
+  # A merged PR's `closed` run carries the base ref, so keying on the PR number
+  # keeps it out of the push deploy's group, which it would otherwise cancel.
+  group: azure-swa-showcase-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -181,22 +181,10 @@ let verify (session: Session.SessionState) : VerifyReport =
 
 // ─── export ──────────────────────────────────────────────────────────────────
 
-/// Canonical JSON string escaping — mirrors `CanonicalJson`'s rule (only `"`,
-/// `\` and control characters, control as `\u00xx`) so the envelope's own string
-/// fields are written by the same rule as the documents embedded in it.
-let private jstr (s: string) : string =
-  let sb = System.Text.StringBuilder()
-  sb.Append '"' |> ignore
-
-  for ch in s do
-    match ch with
-    | '"' -> sb.Append "\\\"" |> ignore
-    | '\\' -> sb.Append "\\\\" |> ignore
-    | c when c < ' ' -> sb.Append(sprintf "\\u%04x" (int c)) |> ignore
-    | c -> sb.Append c |> ignore
-
-  sb.Append '"' |> ignore
-  sb.ToString()
+/// A string as a JSON string literal, through Core's canonical escape (Phase 2026)
+/// — the rule `CanonicalJson` writes by, so the envelope's own string fields are
+/// written by the same rule as the documents embedded in it.
+let private jstr (s: string) : string = Fuaran.Core.JsonString.quote s
 
 /// The export envelope's format version. Bump it when the shape changes, so a
 /// reader can reject an unrecognised document with a clear error rather than

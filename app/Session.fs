@@ -452,8 +452,8 @@ let humanOpsSinceEmission (session: SessionState) : LogEntry list =
     |> List.mapi (fun i e -> i, e)
     |> List.filter (fun (_, e) ->
       match e.Actor with
-      | Agent _ -> true
-      | Human _ -> false)
+      | Fuaran.Core.Actor.Agent _ -> true
+      | Fuaran.Core.Actor.Human _ -> false)
     |> List.tryLast
     |> Option.map fst
 
@@ -465,8 +465,8 @@ let humanOpsSinceEmission (session: SessionState) : LogEntry list =
   after
   |> List.filter (fun e ->
     match e.Actor with
-    | Human _ -> true
-    | Agent _ -> false)
+    | Fuaran.Core.Actor.Human _ -> true
+    | Fuaran.Core.Actor.Agent _ -> false)
 
 /// The character budget for the correction block. ~4 characters per token is the
 /// usual rule of thumb across the providers this playground offers, so this is

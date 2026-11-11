@@ -2,29 +2,30 @@ module Fuaran.Showcase.GitForInterfaces
 
 // ============================================================================
 //  Git for Interfaces – two assistants edit one app on separate branches; their
-//  work is combined by a real structural three-way merge. Pillar: "the app is a
-//  value".
+//  work is combined by a real merge that is a fold over Core's conflict report.
+//  Pillar: "the app is a value".
 //
 //  Because a Fuaran app is a value, it can be branched and merged. Both branches
 //  fork from the same base; each is a list of real `TreeOp`s. The merge is the
-//  **shipped language-tier engine** running in the browser: `TreeMerge.merge3Way`
-//  (the facet-refined structural 3-way merge, fuaran#179) – made Fable-portable
-//  by fuaran#501, so the same function the .NET host runs now executes here.
+//  **shipped language-tier policy** running in the browser: `DagReconcile`
+//  reads Core's conflict report over the two deltas and derives the merged tree
+//  as a fold, recording only the script the fold cannot decide itself.
 //
 //   - Round 1 (clean): the two branches touch DISJOINT cells – Agent A deep-edits
-//     two figures, Agent B adds sibling cards – so `merge3Way base A B` returns
-//     `Ok mergedTree`: a genuine auto-merge, nothing to resolve.
-//   - Round 2 (conflict): both assistants rewrite the SAME title, so `merge3Way`
-//     returns `Error [MergeConflict …]` naming the contended `g-title:kind` cell
-//     (detected by the engine's canonical-encoding comparison, three-up over
-//     base/A/B). The visitor resolves it; human-primacy is the default because the
-//     visitor's own title lives in the common ancestor both branches forked from –
-//     `merge3WayLenient` (both sides Secondary) keeps that base value, so "yours"
-//     wins unless the visitor hands the cell to an assistant.
+//     a figure, Agent B adds sibling cards – so `reconcile base A B` returns
+//     `Ok`: a derived tree and an empty script, nothing to resolve.
+//   - Round 2 (conflict): both assistants rewrite the SAME title, so the report
+//     names a pair the policy does not admit and the merge REFUSES with a
+//     `ReconcileFault.Refused`: each pair's address, shape and class, and the
+//     refusal envelope the cross-host hash is taken over. The visitor settles it.
+//     Human-primacy: keeping yours drops both assistants' title edits and
+//     re-derives the merge; handing the cell to an assistant names that side,
+//     whose refused edit the merge re-asserts as script.
 //
 //  Honest scope: the branch trees are authored with the shipped `Apply.apply`;
-//  the MERGE (clean auto-merge, conflict detection, primacy default) is the real
-//  `Fuaran.UI.OpStream.Dag.Merge.TreeMerge` engine, not a client-side re-creation.
+//  the MERGE (the derivation, the refusal and its class, the re-asserted side)
+//  is the real `Fuaran.UI.OpStream.Dag.Merge.DagReconcile`, not a client-side
+//  re-creation.
 // ============================================================================
 
 open Feliz
@@ -34,6 +35,8 @@ open Fuaran.UI.Types
 open Fuaran.UI.Renderer
 open Fuaran.UI.Ops.Types
 open Fuaran.UI.OpStream.Dag.Merge
+
+module CJson = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 
 module Apply = Fuaran.UI.Ops.Apply
 
@@ -100,9 +103,9 @@ let private cleanB: TreeOp<unit> list =
 let private cleanATree = applyAll cleanA baseTree
 let private cleanBTree = applyAll cleanB baseTree
 
-// THE REAL ENGINE: the facet-refined structural 3-way merge. Disjoint cells ⇒ Ok.
-let private cleanMerge: Result<Node<unit>, MergeConflict list> =
-  TreeMerge.merge3Way baseTree cleanATree cleanBTree
+// THE REAL POLICY: a fold over Core's conflict report. Disjoint cells ⇒ Ok.
+let private cleanMerge: Result<Reconciled<unit>, ReconcileFault<unit>> =
+  DagReconcile.reconcile baseTree cleanA cleanB
 
 // ─── Scenario 2 – the conflict (both edit g-title) + a disjoint change each ──
 
@@ -118,21 +121,24 @@ let private conflictB: TreeOp<unit> list =
 let private conflictATree = applyAll conflictA baseTree
 let private conflictBTree = applyAll conflictB baseTree
 
-// THE REAL ENGINE: same call, but the two branches collide on g-title, so the
-// engine returns Error carrying the contended-cell envelope(s).
-let private conflictMerge: Result<Node<unit>, MergeConflict list> =
-  TreeMerge.merge3Way baseTree conflictATree conflictBTree
+// THE REAL POLICY: same call, but the two branches collide on g-title, so the
+// merge refuses with the refused pairs' envelope.
+let private conflictMerge: Result<Reconciled<unit>, ReconcileFault<unit>> =
+  DagReconcile.reconcile baseTree conflictA conflictB
 
-let private conflicts: MergeConflict list =
+let private conflicts: Refusal<unit> list =
   match conflictMerge with
-  | Ok _ -> []
-  | Error cs -> cs
+  | Error(ReconcileFault.Refused cs) -> cs
+  | _ -> []
 
-// The human-primacy DEFAULT merged tree: the lenient 3-way merge (both sides
-// Secondary) resolves the contended cell to the common ancestor – the visitor's
-// own value – while still auto-merging the disjoint changes around it.
-let private conflictBaseMerged: Node<unit> =
-  TreeMerge.merge3WayLenient baseTree conflictATree conflictBTree
+/// The ops that are not one side of a refused pair (compared by canonical bytes).
+let private withoutRefused (ops: TreeOp<unit> list) : TreeOp<unit> list =
+  let refused =
+    conflicts
+    |> List.collect (fun c -> [ CJson.encodeOp c.Conflict.Left; CJson.encodeOp c.Conflict.Right ])
+    |> Set.ofList
+
+  ops |> List.filter (fun op -> not (Set.contains (CJson.encodeOp op) refused))
 
 [<RequireQualifiedAccess>]
 type private Resolution =
@@ -146,13 +152,38 @@ let private resolvedTitle (r: Resolution) : string =
   | Resolution.AgentA -> "Executive summary"
   | Resolution.AgentB -> "Analytics review"
 
-// Resolution is a human choice OVER the engine's default: the lenient merge keeps
-// the base title; handing the cell to an assistant applies their value to that one
-// contended node, leaving every auto-merged cell untouched.
-let private conflictMerged (r: Resolution) : Node<unit> =
+// Resolution is a human choice OVER the refusal: keeping yours re-derives the
+// merge with both assistants' contended edits dropped, so the title stays the
+// visitor's; handing the cell to an assistant names that side, whose refused edit
+// the merge re-asserts as script. Every other cell is derived as before.
+let private conflictMerged (r: Resolution) : Result<Reconciled<unit>, ReconcileFault<unit>> =
   match r with
-  | Resolution.Yours -> conflictBaseMerged
-  | _ -> applyAll [ TreeOp.UpdateProp(nid "g-title", "Text", wireStr (resolvedTitle r)) ] conflictBaseMerged
+  | Resolution.Yours -> DagReconcile.reconcile baseTree (withoutRefused conflictA) (withoutRefused conflictB)
+  | Resolution.AgentA -> DagReconcile.reconcileWith (Some ReconcileSide.A) baseTree conflictA conflictB
+  | Resolution.AgentB -> DagReconcile.reconcileWith (Some ReconcileSide.B) baseTree conflictA conflictB
+
+/// What the derivation recorded: the agreements and interleaves the fold
+/// admitted, and the script (the only thing the merge stores).
+let private derivationNote (r: Reconciled<unit>) : ReactElement =
+  Html.div
+    [ prop.className "gi-derivation"
+      prop.children
+        [ Html.p
+            [ prop.text (
+                sprintf
+                  "Derived by the fold: %d agreed edit(s) applied once, %d parent(s) interleaved, %d op(s) re-asserted. The merge records a script of %d op(s); the tree is derived."
+                  r.Agreements
+                  r.Interleaves
+                  r.Reasserted
+                  (List.length r.Script)
+              ) ]
+          Html.pre
+            [ prop.className "gi-script"
+              prop.text (
+                match r.Script with
+                | [] -> "script: [] (the fold needed no decision)"
+                | ops -> "script: " + String.concat "; " (ops |> List.map CJson.encodeOp)
+              ) ] ] ]
 
 // ─── View helpers ────────────────────────────────────────────────────────────
 
@@ -179,6 +210,14 @@ let private appPaneAccented (accent: string) (title: string) (badge: string opti
                    | Some b -> Html.span [ prop.className "gi-pane-badge"; prop.text b ]
                    | None -> Html.none) ] ]
           Html.div [ prop.className "gi-pane-app"; prop.children [ Exhibit.renderStatic tree ] ] ] ]
+
+let private mergedPane (title: string) (badge: string) (result: Result<Reconciled<unit>, ReconcileFault<unit>>) =
+  match result with
+  | Ok r -> Html.div [ derivationNote r; appPaneAccented "" title (Some badge) r.Tree ]
+  | Error f ->
+    Html.div
+      [ prop.className "gi-result-banner gi-result-conflict"
+        prop.text (sprintf "%A" f) ]
 
 /// The bottom node's three states: waiting for the combine, contested (the
 /// engine returned a conflict the visitor has not resolved yet), or landed.
@@ -329,8 +368,9 @@ let private GitForInterfacesView () : ReactElement =
     setMerged false
     setResolution None
 
-  // Real detection: the engine flagged g-title as a contended cell.
-  let titleConflict = conflicts |> List.exists (fun c -> c.NodeId = "g-title")
+  // Real detection: Core's report named g-title and the policy refused the pair.
+  let titleConflict =
+    conflicts |> List.exists (fun c -> c.Conflict.Address = "g-title")
 
   let aTree, bTree =
     match scenario with
@@ -388,22 +428,22 @@ let private GitForInterfacesView () : ReactElement =
 
   let cleanResult =
     match cleanMerge with
-    | Ok mergedTree ->
+    | Ok _ ->
       Html.div
         [ prop.className "gi-result"
           prop.children
             [ Html.div
                 [ prop.className "gi-result-banner gi-result-ok"
                   prop.text
-                    "The structural three-way merge returned a clean result – the branches touched different cells, so the engine auto-merged them with nothing to resolve." ]
-              appPaneAccented "" "Merged · B's analytics inside A's tightening" (Some "auto-merged") mergedTree ] ]
+                    "The merge derived a clean result – the branches touched different cells, so Core's report named nothing to decide and the fold composed them with nothing to resolve." ]
+              mergedPane "Merged · B's analytics inside A's tightening" "derived" cleanMerge ] ]
     | Error _ ->
       Html.div
         [ prop.className "gi-result"
           prop.children
             [ Html.div
                 [ prop.className "gi-result-banner gi-result-conflict"
-                  prop.text "Unexpected conflict on the clean round." ] ] ]
+                  prop.text "Unexpected refusal on the clean round." ] ] ]
 
   let conflictResult =
     let chosen = defaultArg resolution Resolution.Yours
@@ -415,20 +455,25 @@ let private GitForInterfacesView () : ReactElement =
               [ prop.className "gi-result-banner gi-result-conflict"
                 prop.text (
                   if titleConflict then
-                    "⚠ Merge conflict — the disjoint changes merged automatically, but both assistants rewrote the same title. The engine detected that collision, not a guess: the title's canonical encoding differs across base, A and B."
+                    "⚠ Merge refused — both assistants rewrote the same title. Core's conflict report names that collision, a slot clash on the title's text, and the policy classes it a conflict rather than guessing; the disjoint changes still derive around it once you settle it."
                   else
                     "No conflict detected."
                 ) ]
-            // The contended cell(s), straight from the engine's MergeConflict
-            // report – real data, not page prose.
+            // The contended cell(s), straight from the refusal – real data, not
+            // page prose – and the envelope the cross-host refusal hash covers.
             (if titleConflict then
                Html.div
                  [ prop.className "gi-conflict-cells"
                    prop.children
-                     [ for c in conflicts ->
-                         Html.span
-                           [ prop.className "gi-conflict-chip"
-                             prop.text (sprintf "contended cell · %s : %s · %A" c.NodeId c.Facet c.Class) ] ] ]
+                     [ for c in conflicts do
+                         yield
+                           Html.span
+                             [ prop.className "gi-conflict-chip"
+                               prop.text (sprintf "refused · %s · %A · %A" c.Conflict.Address c.Conflict.Shape c.Class) ]
+                       yield
+                         Html.pre
+                           [ prop.className "gi-script"
+                             prop.text ("envelope: " + DagReconcile.encodeEnvelope conflicts) ] ] ]
              else
                Html.none)
             Html.div
@@ -455,10 +500,10 @@ let private GitForInterfacesView () : ReactElement =
                        Html.p
                          [ prop.className "gi-primacy-note"
                            prop.text
-                             "Human-primacy is the default: the engine keeps your version (it lives in the common ancestor both assistants forked from) unless you hand the cell over." ]
+                             "Human-primacy is the default: keeping yours drops both assistants' title edits and re-derives the merge, so your version (it lives in the common ancestor both assistants forked from) survives unless you hand the cell over." ]
                      else
                        Html.none) ] ]
-            appPaneAccented "" "Merged · conflict resolved" (Some "resolved") (conflictMerged chosen) ] ]
+            mergedPane "Merged · conflict resolved" "resolved" (conflictMerged chosen) ] ]
 
   let resultBlock =
     if not merged then
@@ -473,13 +518,13 @@ let private GitForInterfacesView () : ReactElement =
       "A real merge, not a mock-up"
       [ Html.li
           [ prop.text
-              "Both rounds run the shipped structural three-way merge from the language tier – the very same function the server-side host runs, compiled into this page. Nothing about the merge is staged." ]
+              "Both rounds run the shipped reconciliation policy from the language tier over Core's conflict report – the very same function the server-side host runs, compiled into this page. Nothing about the merge is staged." ]
         Html.li
           [ prop.text
-              "Round 1 returns a clean auto-merge because the branches changed different cells; the engine composes them into one tree. Round 2 returns a conflict because both assistants rewrote the same title – detected by comparing that node's canonical encoding across base, A and B, three-way." ]
+              "Round 1 derives a clean merge because the branches changed different cells; the fold composes them into one tree and the merge records an empty script. Round 2 is refused because both assistants rewrote the same title – Core's report names the pair, and the refusal carries its address, shape and class. Two edits that are byte-identical would instead be an agreement and apply once." ]
         Html.li
           [ prop.text
-              "Human-primacy is the closing beat: your edit lives in the common ancestor both assistants forked from, so the engine keeps it by default on the one real conflict while the disjoint work merges around it. Your version survived two assistants." ]
+              "Human-primacy is the closing beat: your edit lives in the common ancestor both assistants forked from, so dropping the contended edits keeps it while the disjoint work merges around it. Handing the cell to an assistant names that side, and the merge re-asserts its edit as script. Your version survived two assistants." ]
         Html.li
           [ prop.children
               [ Html.text
@@ -491,7 +536,7 @@ let private GitForInterfacesView () : ReactElement =
     "gi"
     "Git for Interfaces"
     (Exhibit.lede
-      "Two assistants worked on the same app in parallel, on separate branches. Combine their work – a real structural merge lands both changes, and when they collide, you decide, with your own edit winning by default.")
+      "Two assistants worked on the same app in parallel, on separate branches. Combine their work – a real merge, derived as a fold, lands both changes, and when they collide, you decide, with your own edit winning by default.")
     [ scenarioTabs; branchRow; mergeControls; resultBlock ]
     honesty
 

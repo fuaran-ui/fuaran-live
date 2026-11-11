@@ -60,7 +60,8 @@ let private card: Node<obj> =
               Kind = FormFieldKind.textDeclarative (Binding.State(kIncident, Some "INC-4471"))
               Required = true
               Help = Some(TextSource.Literal "Edit it, then press the copy button beside it.")
-              Rule = None }
+              Rule = None
+              Affordance = None }
             { Id = "hv-severity"
               Label = TextSource.Literal "Severity"
               Kind =
@@ -69,13 +70,15 @@ let private card: Node<obj> =
                   (Binding.State(kSeverity, Some "SEV-2"))
               Required = true
               Help = None
-              Rule = None }
+              Rule = None
+              Affordance = None }
             { Id = "hv-owner"
               Label = TextSource.Literal "Handing over to"
               Kind = FormFieldKind.textDeclarative (Binding.State(kOwner, Some "Mhairi (late shift)"))
               Required = true
               Help = None
-              Rule = None }
+              Rule = None
+              Affordance = None }
             { Id = "hv-note"
               Label = TextSource.Literal "What the next shift needs to know"
               Kind =
@@ -88,7 +91,8 @@ let private card: Node<obj> =
                   4
               Required = false
               Help = None
-              Rule = None } ] }
+              Rule = None
+              Affordance = None } ] }
 
 /// A copy button whose payload is BOUND. It carries no text of its own: what it
 /// puts on the clipboard is whatever the key holds at the moment it is pressed.

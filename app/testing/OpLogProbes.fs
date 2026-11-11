@@ -36,8 +36,8 @@ let originKinds (session: Session.SessionState) : string array =
   session.Log
   |> List.map (fun e ->
     match e.Actor with
-    | Human _ -> "human"
-    | Agent _ -> "agent")
+    | Fuaran.Core.Actor.Human _ -> "human"
+    | Fuaran.Core.Actor.Agent _ -> "agent")
   |> Array.ofList
 
 /// The attribution id per recorded op (`"navigator"` for a panel edit).

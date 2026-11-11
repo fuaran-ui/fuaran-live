@@ -17,6 +17,7 @@ open Fuaran.UI.Renderer
 open Fuaran.UI.Ops.Types
 open Fuaran.UI.OpStream.Abstractions
 open Fuaran.UI.OpStream.Dag.Merge
+
 module Apply = Fuaran.UI.Ops.Apply
 module CJson = Fuaran.UI.OpStream.Abstractions.CanonicalJson
 open Fuaran.Showcase.TimeMachine
@@ -53,26 +54,38 @@ let forkJson (bid: string) (k: int) : string =
     | Ok t -> "ok:" + CJson.encodeNode t
     | Error e -> "error:" + e
 
-/// `merged:<json>` for a clean 3-way merge of the branch (forked at `k`) into
-/// the trunk head, `conflict:<id,id,…>` naming the contended nodes, or
-/// `error:<msg>` when the fork itself cannot apply.
+/// `merged:<json>` for a clean merge of the branch (forked at `k`) into the
+/// trunk head, `conflict:<address,address,…>` naming the refused pairs' addresses,
+/// or `error:<msg>` when the fork itself cannot apply or the fold faults otherwise.
 let mergeJson (bid: string) (k: int) : string =
   match tryBranch bid with
   | None -> "error:unknown branch " + bid
   | Some b ->
     match mergeBranch b k with
     | Error e -> "error:" + e
-    | Ok(Ok merged) -> "merged:" + CJson.encodeNode merged
-    | Ok(Error cs) -> "conflict:" + String.concat "," (conflictIds cs)
+    | Ok(Ok r) -> "merged:" + CJson.encodeNode r.Tree
+    | Ok(Error(ReconcileFault.Refused cs)) -> "conflict:" + String.concat "," (conflictIds cs)
+    | Ok(Error f) -> "error:" + describeError f
 
-/// `merged:<json>` for the lenient resolution (conflicts fall back to the
-/// ancestor's value), or `error:<msg>`.
-let mergeLenientJson (bid: string) (k: int) : string =
+/// `merged:<json>` for the merge settled to a side (`trunk` or `branch`), or `error:<msg>`.
+let mergeResolvedJson (bid: string) (k: int) (side: string) : string =
   match tryBranch bid with
   | None -> "error:unknown branch " + bid
   | Some b ->
-    match mergeBranchLenient b k with
-    | Ok merged -> "merged:" + CJson.encodeNode merged
+    let s = if side = "trunk" then ReconcileSide.A else ReconcileSide.B
+
+    match mergeBranchResolved s b k with
     | Error e -> "error:" + e
+    | Ok(Ok r) -> "merged:" + CJson.encodeNode r.Tree
+    | Ok(Error f) -> "error:" + describeError f
 
-
+/// `agreements=<n>;interleaves=<n>;node=<64 hex>` for the merge settled to the trunk, or
+/// `error:<msg>`. The node is the merge node's Core address.
+let mergeReport (bid: string) (k: int) : string =
+  match tryBranch bid with
+  | None -> "error:unknown branch " + bid
+  | Some b ->
+    match mergeBranchResolved ReconcileSide.A b k with
+    | Ok(Ok r) -> sprintf "agreements=%d;interleaves=%d;node=%s" r.Agreements r.Interleaves (mergeNodeId b k r)
+    | Ok(Error f) -> "error:" + describeError f
+    | Error e -> "error:" + e

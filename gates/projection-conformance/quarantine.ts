@@ -231,17 +231,12 @@ export interface QuarantineEntry {
  * reshape, which moved no entry — is in the census test's generated name. Every entry is HOST
  * lag with the probe agreeing; none is the projector's. What each family is:
  *
- *   • TypeScript — four ids, re-measured 2026-10-29 (Phase 2399) against the
- *     same `@fuaran-ui/*` releases under `Fuaran.UI` 0.99.1: the figure locale /
- *     fraction digits (fuaran#2490, fuaran#2499) and the metric comparisons
- *     (fuaran#2472) the tier models and the newest npm release does not. Before
- *     that raise the arm was empty, and the history reads as follows. The 0.29.0 set carries Phases 1811 (the temporal rename
- *     to `DateTime` / `DateTimeRange` / `Format.DateTime`), 1812
- *     (`accessibility.speak` and the author-declared `fallback`) and 1892
- *     (`DataGrid.windowStateKey` / `rowTotal`), which held the arm's eleven
- *     entries from Phase 2023 until this raise; app/Projection.fs was taught all
- *     three in the same change. The arm's preference is unchanged: a shortfall
- *     the pinned host CAN encode is taught, never listed.
+ *   • TypeScript — none. The four ids Phase 2399 listed (the figure locale / fraction
+ *     digits, fuaran#2490 and fuaran#2499, and the metric comparisons, fuaran#2472)
+ *     cleared with the `@fuaran-ui/*` v0.33.0 set, which models them; each entry's
+ *     token falsified itself the day that release landed, and Phase 2647 retired
+ *     the four. The arm's preference is unchanged: a shortfall the pinned host CAN
+ *     encode is taught, never listed.
  *   • Python — `Binding.Expr` (declined, fuaran#1580), nothing else. The live
  *     transform source and the row-action column cells' members cleared with
  *     fuaran#2316, the projector taught both in the same change. 0.8.0 models
@@ -316,67 +311,6 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
       },
     ],
   ],
-  // 2 — the tier moved past the released TypeScript packages (Phase 2399). The
-  // pinned `@fuaran-ui/ui` 0.25.0 / `@fuaran-ui/ops` 0.31.0 are the newest on npm;
-  // their schema tables carry neither a figure's fraction digits and locale nor a
-  // metric's comparisons, so the encoder drops both. Each clears on the next
-  // `@fuaran-ui/*` release, which the token falsifies the day it lands.
-  [
-    'figure-decimals-en-gb',
-    [
-      {
-        arm: 'typescript',
-        construct: 'CellFormat:Currency.decimals',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#2499',
-        reason:
-          'CellFormat.Currency carries only `code` in the pinned schema; the fraction digits (and the locale) a figure sets are dropped by the encoder',
-      },
-    ],
-  ],
-  [
-    'figure-locale-en-gb',
-    [
-      {
-        arm: 'typescript',
-        construct: 'CellFormat:Currency.locale',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#2490',
-        reason:
-          'CellFormat.Currency carries only `code` in the pinned schema; the locale a figure carries is dropped by the encoder',
-      },
-    ],
-  ],
-  [
-    'metric-two-comparisons',
-    [
-      {
-        arm: 'typescript',
-        construct: 'Metric.comparisons',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#2472',
-        reason:
-          'Metric has no `comparisons` member in the pinned schema, so the encoder drops every comparison',
-      },
-    ],
-  ],
-  [
-    'metric-comparison-inverted',
-    [
-      {
-        arm: 'typescript',
-        construct: 'Metric.comparisons',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#2472',
-        reason:
-          'Metric has no `comparisons` member in the pinned schema, so the encoder drops the inverted comparison',
-      },
-    ],
-  ],
 ]);
 
 /** Every entry this arm owns, keyed by fixture id. */
@@ -408,7 +342,7 @@ const emptyTally = (): ArmTally => ({ host: 0, projector: 0, both: 0 });
  * each carried their own counts; prose cannot be wrong out loud.
  */
 export const QUARANTINE_CENSUS: Readonly<Record<Arm, ArmTally>> = {
-  typescript: { host: 4, projector: 0, both: 0 },
+  typescript: { host: 0, projector: 0, both: 0 },
   python: { host: 4, projector: 0, both: 0 },
   // The F# arm holds NONE, and its emptiness is an assertion of its own
   // (fuaran#1657) — every node fixture is required to compile, execute and

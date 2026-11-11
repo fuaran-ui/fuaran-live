@@ -520,7 +520,12 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
 // The kinds this walker cannot shape AT ALL are pinned separately below: they
 // never reach this set, because a kind that yields no wire at all is filtered
 // out before the drop is measured. That set is empty too, since Phase 1652.
-const UNDECODABLE_SYNTHESIS = new Set<string>([]);
+// Phase 2647: 'Chart' ENTERED the set with the 0.104.0 tier / @fuaran-ui v0.33.0 raise. The
+// walker's default for it, {"kind":"Line","source":{"$type":"Static"},"xField":"XField","yFields":[]},
+// is refused by the TypeScript decoder with a TypeError raised inside the decoder itself
+// (`s.text.substring is not a function`). The cause is upstream, as the assertion below says,
+// and is recorded as a finding of this phase rather than worked around here.
+const UNDECODABLE_SYNTHESIS = new Set<string>(['Chart']);
 
 // The kinds the walker cannot shape at all — `defaultWireFor` returns `''`, so
 // they are filtered out of the drop measurement above before it runs. Pinned

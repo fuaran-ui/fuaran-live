@@ -59,13 +59,14 @@ let private parseSchema (json: string) : Result<Schema, string> =
 let private defectToJs (d: QueryBinding.Defect) : obj =
   createObj
     [ "code" ==> d.Code
-      "nodeId" ==> d.NodeId
-      "column" ==> d.Column
-      "sink" ==> QueryBinding.BindingSinkClass.label d.Sink
+      "nodeId" ==> d.Location.NodeId
+      "column" ==> d.Location.Column
+      "sink" ==> QueryBinding.BindingSinkClass.label d.Location.Sink
       "message" ==> d.Message
-      "availableFields" ==> (d.AvailableFields |> List.toArray)
+      "availableFields"
+      ==> (d.AvailableFields |> Option.defaultValue [] |> List.toArray)
       "suggestion"
-      ==> (match d.Suggestion with
+      ==> (match d.Remedy with
            | Some s -> box s
            | None -> null) ]
 

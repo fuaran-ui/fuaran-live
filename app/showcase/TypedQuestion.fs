@@ -100,7 +100,8 @@ let private askTree (round: int) : Node<obj> =
                         Required = true
                         Help =
                           Some(TextSource.Literal "A whole percentage. Try 12.5 – the contract says integers only.")
-                        Rule = None }
+                        Rule = None
+                        Affordance = None }
                       { Id = "tq-env-field"
                         Label = TextSource.Literal "Environment"
                         Kind =
@@ -114,13 +115,15 @@ let private askTree (round: int) : Node<obj> =
                             (Binding.State(envKey, Some "staging"))
                         Required = true
                         Help = None
-                        Rule = None }
+                        Rule = None
+                        Affordance = None }
                       { Id = "tq-note-field"
                         Label = TextSource.Literal "Note for the log"
                         Kind = FormFieldKind.textDeclarative (Binding.State(noteKey, Some ""))
                         Required = false
                         Help = Some(TextSource.Literal "Optional – up to 120 characters.")
-                        Rule = None } ]
+                        Rule = None
+                        Affordance = None } ]
                   OnSubmit = Action.SetState(commitKey, Some(JStr(envelopeId round)), None)
                   SubmitLabel = TextSource.Literal "Send the typed answer"
                   Disabled = Some(Binding.State(frozenKey round, Some false)) } ] }

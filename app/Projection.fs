@@ -1000,14 +1000,19 @@ let private tsDataSource (v: JsonValue) : string =
               | "float", JNumber n -> tsInline [ "kind", qs "Float"; "value", numLit n ]
               | "bool", JBool b -> tsInline [ "kind", qs "Bool"; "value", boolLit b ]
               | "date", JString s -> tsInline [ "kind", qs "Date"; "value", qs s ]
-              | "timestamp", JString s -> tsInline [ "kind", qs "Timestamp"; "value", qs s ]
+              | t, JString s when t.StartsWith "timestamp" -> tsInline [ "kind", qs "Timestamp"; "value", qs s ]
               | _, JString s -> tsInline [ "kind", qs "Str"; "value", qs s ]
               | _ -> "{ kind: 'Null' }")
 
-        tsInline
-          [ "name", qs name
-            "type", qs ty
-            "cells", "[" + String.concat ", " cells + "]" ])
+        // `@fuaran-ui/ops` 0.32.0 retired the `{ name, type, cells }` literal: a column holds
+        // typed vectors, built by `columnOfCells` (a result: its `value` is the column).
+        "columnOfCells("
+        + qs name
+        + ", "
+        + qs ty
+        + ", ["
+        + String.concat ", " cells
+        + "]).value")
 
     tsInline
       [ "kind", qs "Embedded"
@@ -1102,7 +1107,13 @@ let private tsTransformStep (v: JsonValue) : string =
 
 let private tsFormatIntent (v: JsonValue) : string =
   match dollarType v with
-  | Some "Currency" -> tsInline [ "kind", qs "Currency"; "isoCode", qs (strOf "isoCode" v) ]
+  | Some "Currency" ->
+    tsInline (
+      [ "kind", qs "Currency"; "isoCode", qs (strOf "isoCode" v) ]
+      @ (match optNum "decimals" v with
+         | Some d -> [ "decimals", numLit d ]
+         | None -> [])
+    )
   | Some "Percent" ->
     (match optNum "decimals" v with
      | Some d -> tsInline [ "kind", qs "Percent"; "decimals", numLit d ]
@@ -1540,17 +1551,35 @@ let rec private tsAction (v: JsonValue) : string =
   | Some "Invoke" -> "action.invoke(" + qs (strOf "capabilityId" v) + ", " + tsInvokeArgs v + ")"
   | _ -> "action.chain([])"
 
+/// A figure's locale rides `format.inLocale` (Phase 2490) and its fraction digits
+/// `format.withDecimals` (Phase 2499), each applied only when the wire carries it.
+let private tsFigureLocale (v: JsonValue) (built: string) : string =
+  match JsonValue.tryField "locale" v with
+  | Some l -> "format.inLocale(" + tsLocaleSource l + ", " + built + ")"
+  | None -> built
+
 let private tsCellFormat (v: JsonValue) : string =
   match dollarType v with
   | Some "Number" ->
     (match optNum "decimals" v with
      | Some d -> "format.number(" + numLit d + ")"
      | None -> "format.number()")
-  | Some "Currency" -> "format.currency(" + qs (strOf "code" v) + ")"
+    |> tsFigureLocale v
+  | Some "Currency" ->
+    (match optNum "decimals" v with
+     | Some d ->
+       "format.withDecimals("
+       + numLit d
+       + ", format.currency("
+       + qs (strOf "code" v)
+       + "))"
+     | None -> "format.currency(" + qs (strOf "code" v) + ")")
+    |> tsFigureLocale v
   | Some "Percent" ->
     (match optNum "decimals" v with
      | Some d -> "format.percent(" + numLit d + ")"
      | None -> "format.percent()")
+    |> tsFigureLocale v
   | Some "SignificantDigits" -> "format.significantDigits(" + numLit (numOf "digits" v) + ")"
   // Phase 1811 — `CellFormat.Date` became `DateTime`; `@fuaran-ui/ui` 0.23.0
   // spells it `format.dateTime` and has no `format.date`.
@@ -2511,6 +2540,22 @@ and private tsDataGridNode (depth: int) (id: string) (k: JsonValue) (nodeV: Json
         + (match JsonValue.tryField "defaultSort" sr with
            | Some d -> ", defaultSort: " + tsDefaultSort d
            | None -> "")
+        + (match arrOf "citations" sr with
+           | [] -> ""
+           | cs ->
+             ", citations: ["
+             + (cs
+                |> List.map (fun c ->
+                  tsInline (
+                    [ "column", numLit (numOf "column" c)
+                      "row", numLit (numOf "row" c)
+                      "reference", qs (strOf "reference" c) ]
+                    @ (match JsonValue.tryField "label" c with
+                       | Some l -> [ "label", tsTextSourceLit l ]
+                       | None -> [])
+                  ))
+                |> String.concat ", ")
+             + "]")
 
       [ "staticRows", "{ headers: " + headers + ", rows: " + rows + extras + " }" ]
     | None -> []
@@ -2789,11 +2834,28 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
   | "Markdown" ->
     let t = fieldReq "text" k
 
+    // `citations` is the third argument of `fuaran.markdown` (@fuaran-ui/ui 0.26).
+    let citations =
+      match arrOf "citations" k with
+      | [] -> ""
+      | cs ->
+        ", ["
+        + (cs
+           |> List.map (fun c ->
+             tsInline (
+               [ "name", qs (strOf "name" c); "reference", qs (strOf "reference" c) ]
+               @ (match JsonValue.tryField "label" c with
+                  | Some l -> [ "label", tsTextSourceLit l ]
+                  | None -> [])
+             ))
+           |> String.concat ", ")
+        + "]"
+
     (match t with
-     | JString s -> Some("fuaran.markdown(" + qs id + ", " + qs s + ")")
+     | JString s -> Some("fuaran.markdown(" + qs id + ", " + qs s + citations + ")")
      | _ ->
        match dollarType t with
-       | Some "Literal" -> Some("fuaran.markdown(" + qs id + ", " + qs (strOf "text" t) + ")")
+       | Some "Literal" -> Some("fuaran.markdown(" + qs id + ", " + qs (strOf "text" t) + citations + ")")
        | _ -> Some("fuaran.markdownSpec(" + qs id + ", " + tsTextSourceLit t + ")"))
   | "Metric" ->
     call
@@ -2825,7 +2887,26 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | None -> [])
        @ (match JsonValue.tryField "subtext" k with
           | Some s -> [ "subtext", tsTextInput s ]
-          | None -> []))
+          | None -> [])
+       @ (match arrOf "comparisons" k with
+          | [] -> []
+          | cs ->
+            [ "comparisons",
+              "["
+              + (cs
+                 |> List.map (fun c ->
+                   tsInline (
+                     [ "label", tsTextInput (fieldReq "label" c)
+                       "value", tsBinding Opq.Scalar (fieldReq "value" c) ]
+                     @ (match JsonValue.tryField "format" c with
+                        | Some f -> [ "format", tsCellFormat f ]
+                        | None -> [])
+                     @ (match optStr "polarity" c with
+                        | Some pol -> [ "polarity", qs pol ]
+                        | None -> [])
+                   ))
+                 |> String.concat ", ")
+              + "]" ]))
   | "Badge" -> call "badge" ([ idF; "label", tsTextInput (fieldReq "label" k) ] @ tsOptStrMember "variant" k)
   | "Sparkline" -> call "sparkline" [ idF; "source", tsBinding Opq.Collection (fieldReq "source" k) ]
   | "Spacer" -> call "spacer" [ idF; "size", qs (strOf "size" k) ]
@@ -2851,7 +2932,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
          "indeterminate", boolLit (boolOf "indeterminate" k)
          "tone", qs (strOf "tone" k) ]
        @ (match JsonValue.tryField "label" k with
-          | Some l -> [ "label", tsTextInput l ]
+          | Some l -> [ "label", tsTextSourceLit l ]
           | None -> [])
        @ (match JsonValue.tryField "caveat" k with
           | Some c -> [ "caveat", tsTextInput c ]
@@ -3020,7 +3101,7 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "divider"
       ([ idF; "orientation", qs (strOf "orientation" k) ]
        @ (match JsonValue.tryField "label" k with
-          | Some l -> [ "label", tsTextInput l ]
+          | Some l -> [ "label", tsTextSourceLit l ]
           | None -> []))
   | "Toast" ->
     // 0.2.0 — a Toast is dismissable UNLESS said otherwise (omitted-when-true);
@@ -5971,6 +6052,7 @@ let private fsRecordTable: (string * string * string list) list =
        "Variant|variant|=ButtonVariant.Secondary|E:ButtonVariant"
        "Icon|icon|?|s"
        "Tooltip|-|-|X:Option.None"
+       "Affordance|-|-|X:Option.None"
        "Disabled|disabled|?|B<b>" ])
     ("CalloutSpec",
      "Callout",
@@ -6095,7 +6177,8 @@ let private fsRecordTable: (string * string * string list) list =
        "Icon|icon|?|s"
        "Label|label|!|U:TextSource"
        "Tone|tone|=ToneVariant.Default|E:ToneVariant"
-       "Value|value|!|U:TextSource" ])
+       "Value|value|!|U:TextSource"
+       "Reference|reference|?|s" ])
     ("FieldRule",
      "",
      [ "Compare|compare|?|R:CompareRule"
@@ -6126,7 +6209,8 @@ let private fsRecordTable: (string * string * string list) list =
        "Label|label|!|U:TextSource"
        "Required|required|=false|b"
        "Help|help|?|U:TextSource"
-       "Rule|rule|?|R:FieldRule" ])
+       "Rule|rule|?|R:FieldRule"
+       "Affordance|-|-|X:Option.None" ])
     ("FormSpec",
      "Form",
      [ "Fields|fields|!|L<R:FormField>"
@@ -6195,7 +6279,8 @@ let private fsRecordTable: (string * string * string list) list =
        "Source|source|!|B<L<R:MapMarker>>"
        "Zoom|zoom|!|i"
        "OnMarkerClick|onMarkerClick|?|C" ])
-    ("MarkdownSpec", "Markdown", [ "Text|text|!|U:TextSource" ])
+    ("MarkdownCitation", "", [ "Label|label|?|U:TextSource"; "Name|name|!|s"; "Reference|reference|!|s" ])
+    ("MarkdownSpec", "Markdown", [ "Text|text|!|U:TextSource"; "Citations|citations|=[]|L<R:MarkdownCitation>" ])
     ("MathSpec", "Math", [ "Source|source|!|s"; "Display|display|!|E:MathDisplay" ])
     ("MediaSpec",
      "Media",
@@ -6256,6 +6341,13 @@ let private fsRecordTable: (string * string * string list) list =
        "MaxHeight|maxHeight|?|i"
        "MaxWidth|maxWidth|?|i" ])
     ("SelectOption", "", [ "Label|label|!|s"; "Value|value|!|s" ])
+    ("SelectOptionGroup", "", [ "Label|label|!|s"; "Values|values|!|L<s>" ])
+    ("TableCitation",
+     "",
+     [ "Column|column|!|i"
+       "Label|label|?|U:TextSource"
+       "Reference|reference|!|s"
+       "Row|row|!|i" ])
     ("SelectSpec",
      "Select",
      [ "Label|label|!|U:TextSource"
@@ -6266,7 +6358,9 @@ let private fsRecordTable: (string * string * string list) list =
        "Placeholder|placeholder|?|U:TextSource"
        "Disabled|disabled|?|B<b>"
        "Multiple|multiple|?|b"
-       "Values|values|?|B<L<s>>" ])
+       "Values|values|?|B<L<s>>"
+       "Affordance|-|-|X:Option.None"
+       "Groups|groups|=[]|L<R:SelectOptionGroup>" ])
     ("SemanticStyle",
      "",
      [ "Direction|direction|=TextDirection.Auto|E:TextDirection"
@@ -6282,7 +6376,8 @@ let private fsRecordTable: (string * string * string list) list =
     ("StateBehaviour", "", [ "OnEmpty|onEmpty|?|n"; "OnError|onError|?|C"; "OnLoading|onLoading|?|n" ])
     ("StaticRows",
      "",
-     [ "DefaultSort|defaultSort|?|R:DefaultSort"
+     [ "Citations|citations|=[]|L<R:TableCitation>"
+       "DefaultSort|defaultSort|?|R:DefaultSort"
        "Headers|headers|!|L<U:TextSource>"
        "Rows|rows|!|L<L<U:TextSource>>"
        "Sortable|sortable|?|b" ])

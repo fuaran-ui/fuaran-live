@@ -307,7 +307,7 @@ let private appliedTop (session: Session.SessionState) : Session.LogEntry option
 /// A log entry's correlation id, when it is a cross-page move leg.
 let private corrOf (entry: Session.LogEntry) : string option =
   match entry.Actor with
-  | Human id when id.StartsWith moveActorPrefix -> Some(id.Substring moveActorPrefix.Length)
+  | Fuaran.Core.Actor.Human id when id.StartsWith moveActorPrefix -> Some(id.Substring moveActorPrefix.Length)
   | _ -> None
 
 /// Every page (active included) whose NEWEST applied op is a leg of `corr`.

@@ -5204,7 +5204,25 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
       "heading"
       [ pyTextInput (fieldReq "text" k) ]
       ([ "level", numLit (numOf "level" k) ] @ pyOptStrMember "variant" k)
-  | "Markdown" -> call "markdown" [ pyTextInput (fieldReq "text" k) ] []
+  | "Markdown" ->
+    call
+      "markdown"
+      [ pyTextInput (fieldReq "text" k) ]
+      (match arrOf "citations" k with
+       | [] -> []
+       | cs ->
+         [ "citations",
+           pyList (
+             cs
+             |> List.map (fun c ->
+               pyCall
+                 "t.MarkdownCitation"
+                 []
+                 ([ "name", pq (strOf "name" c); "reference", pq (strOf "reference" c) ]
+                  @ (match JsonValue.tryField "label" c with
+                     | Some l -> [ "label", pyTextSource l ]
+                     | None -> [])))
+           ) ])
   | "Metric" ->
     call
       "metric"
@@ -5434,6 +5452,9 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | None -> [])
        @ (match optStr "icon" k with
           | Some i -> [ "icon", pq i ]
+          | None -> [])
+       @ (match optStr "reference" k with
+          | Some r -> [ "reference", pq r ]
           | None -> []))
   // ── Input ─────────────────────────────────────────────────────────────────
   | "Button" ->
@@ -5449,6 +5470,47 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
        @ (match JsonValue.tryField "disabled" k with
           | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
           | None -> []))
+  | "Select" when not (List.isEmpty (arrOf "groups" k)) ->
+    // The Python `fuaran.select` constructor takes no `groups`; the typed record does,
+    // so a grouped select is the node over the record (`t.Select`).
+    Some(
+      pyCall
+        "t.UiNode"
+        []
+        [ "id", pq id
+          "kind",
+          pyCall
+            "t.Select"
+            []
+            ([ "label", pyTextSource (fieldReq "label" k)
+               "source", pyOptionsBinding (fieldReq "source" k) ]
+             @ (match JsonValue.tryField "value" k with
+                | Some vb -> [ "value", pyBinding Opq.Scalar vb ]
+                | None -> [])
+             @ (match JsonValue.tryField "placeholder" k with
+                | Some ph -> [ "placeholder", pyTextSource ph ]
+                | None -> [])
+             @ (match JsonValue.tryField "disabled" k with
+                | Some d -> [ "disabled", pyBinding Opq.Scalar d ]
+                | None -> [])
+             @ pyTriBool "multiple" "multiple" k
+             @ (match JsonValue.tryField "values" k with
+                | Some vs -> [ "values", pyBinding Opq.Collection vs ]
+                | None -> [])
+             @ pyHandler "onChange" "on_change" k
+             @ pyHandler "onChangeMulti" "on_change_multi" k
+             @ [ "groups",
+                 "("
+                 + (arrOf "groups" k
+                    |> List.map (fun g ->
+                      pyCall
+                        "t.SelectOptionGroup"
+                        []
+                        [ "label", pq (strOf "label" g)
+                          "values", "(" + (arrOf "values" g |> List.map pyStrItem |> String.concat ", ") + ",)" ])
+                    |> String.concat ", ")
+                 + ",)" ]) ]
+    )
   | "Select" ->
     call
       "select"
@@ -5644,7 +5706,24 @@ and private pyKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
              | cols -> [ "columns", pyList (cols |> List.map pyGridColumn) ])
           @ (match optStr "rowKeyField" k with
              | Some f -> [ "rowKeyField", pq f ]
-             | None -> []))
+             | None -> [])
+          @ (match arrOf "citations" sr with
+             | [] -> []
+             | cs ->
+               [ "citations",
+                 pyList (
+                   cs
+                   |> List.map (fun c ->
+                     pyCall
+                       "t.TableCitation"
+                       []
+                       ([ "row", numLit (numOf "row" c)
+                          "column", numLit (numOf "column" c)
+                          "reference", pq (strOf "reference" c) ]
+                        @ (match JsonValue.tryField "label" c with
+                           | Some l -> [ "label", pyTextSource l ]
+                           | None -> [])))
+                 ) ]))
      | None ->
        call
          "grid"

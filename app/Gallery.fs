@@ -822,7 +822,8 @@ let private accessibleForm: Node<obj> =
             // it survives the wire and holds in every conformant renderer.
             Fuaran.markdownSpec
               "ex-a11y-status"
-              { Text = TextSource.Bound(Binding.State("callback.status", Some "No callback requested yet.")) }
+              { Citations = []
+                Text = TextSource.Bound(Binding.State("callback.status", Some "No callback requested yet.")) }
             |> Node.withAccessibility (
               Some
                 { Defaults.Accessibility.empty with

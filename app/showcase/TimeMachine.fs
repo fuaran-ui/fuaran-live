@@ -13,19 +13,24 @@ module Fuaran.Showcase.TimeMachine
 //  frames. "Fork from here" branches the DAG: the trunk prefix up to the chosen
 //  frame, then a canned alternative op-set applied on top – a genuinely
 //  divergent tree that shares the trunk's hash at the fork point. A fork is
-//  shown BESIDE the trunk's head, and "Merge into the trunk" folds it back with
-//  the SHIPPED 3-way merge engine (`TreeMerge.merge3Way` – the same function
-//  the server host runs, Fable-portable in the browser): ancestor = the frame
-//  the branch forked from, ours = everything the trunk did after it, theirs =
-//  the branch. A clean auto-compose lands as one tree; a real `MergeConflict`
-//  names the contended cell, and the lenient resolution falls back to the
-//  ancestor's value.
+//  shown BESIDE the trunk's head, and "Merge into the trunk" folds it back as a
+//  DERIVATION, not an assertion: the base is the frame the branch forked from,
+//  the two deltas are everything the trunk did after it and the branch's own
+//  ops, and the SHIPPED reconciliation policy (`DagReconcile`, the same function
+//  the server host runs, Fable-portable in the browser) reads Core's conflict
+//  report over them. Each reported pair is an agreement (both sides made the
+//  same edit, so the fold applies it once), an interleave (both appended to one
+//  parent, ordered by the declared child-order rule), or a refusal that names
+//  its address, its shape and its class. The merge records only the script the
+//  fold cannot decide itself. A refusal is settled by naming a side, which the
+//  merge re-asserts as script.
 //
 //  The inspector shows, per turn, the REAL canonical op encoding
-//  (`CanonicalJson.encodeOp`) and a REAL content-addressed hash chain
-//  (`prev ++ encodeOp ++ seq ++ actor`, the OpRecord rule minus the timestamp so
-//  the exhibit is deterministic). No API key, no server – the op-stream is
-//  bundled, the reliability floor the whole site rides.
+//  (`CanonicalJson.encodeOp`) and the op's REAL Core node identity (the DAG
+//  address, `DagOpRecord.ofEntry`: sha256 over the parents, the actor and the
+//  op's envelope, with a fixed timestamp so the exhibit is deterministic). No API
+//  key, no server – the op-stream is bundled, the reliability floor the whole
+//  site rides.
 // ============================================================================
 
 open Feliz
@@ -35,6 +40,7 @@ open Fuaran.UI.Types
 open Fuaran.UI.Renderer
 open Fuaran.UI.Ops.Types
 open Fuaran.UI.OpStream.Abstractions
+open Fuaran.UI.OpStream.Dag.Abstractions
 open Fuaran.UI.OpStream.Dag.Merge
 
 module Apply = Fuaran.UI.Ops.Apply
@@ -190,27 +196,31 @@ let internal trunkFrames: Node<unit> array =
        | Ok t -> t
        | Error _ -> initialTree |]
 
-/// A genuine content-addressed chain over the canonical op encodings, mirroring
-/// the shipped OpRecord rule: Hash[n] = sha256(prev ++ encodeOp ++ seq ++
-/// actor). `trunkChain[i]` is (thisHash, prevHash) for op i+1.
-let private trunkChain: (string * string) list =
-  turns
-  |> List.mapi (fun i t -> i, t)
-  |> List.fold
-    (fun (prev, acc) (i, t) ->
-      let payload =
-        prev
-        + "|"
-        + CJson.encodeOp t.Op
-        + "|"
-        + string (i + 1)
-        + "|"
-        + Actor.encode t.Actor
+/// The fixed instant every node of the exhibit carries, so its addresses are
+/// the same on every load.
+let private exhibitEpoch =
+  System.DateTimeOffset(2026, 1, 1, 0, 0, 0, System.TimeSpan.Zero)
 
-      let h = Fuaran.Core.Hash.sha256Hex payload
-      (h, acc @ [ (h, prev) ]))
-    (HashChain.genesisPreviousHash, [])
+let private entryOf (op: TreeOp<unit>) : StreamEntry<unit> =
+  { Op = op
+    Timestamp = exhibitEpoch
+    PromptId = None
+    ResultEnvelope = OpResultEnvelope.Success }
+
+/// A run of ops as Core DAG nodes: each node's parent is the one before it, and
+/// the first hangs off `firstParents` (none for a genesis). The address is
+/// `DagOpRecord`'s own, Core's `Dag.nodeId` – the identity the fold addresses.
+let private nodeChain (firstParents: string list) (steps: (Actor * TreeOp<unit>) list) : DagOpRecord<unit> list =
+  ((firstParents, []), steps)
+  ||> List.fold (fun (parents, acc) (actor, op) ->
+    let r = DagOpRecord.ofEntry "tm" parents actor (entryOf op)
+    [ r.Hash ], r :: acc)
   |> snd
+  |> List.rev
+
+/// The trunk's turns as nodes; `trunkNodes[i]` is turn i+1.
+let private trunkNodes: DagOpRecord<unit> list =
+  nodeChain [] (turns |> List.map (fun t -> t.Actor, t.Op))
 
 let private initialHash = Fuaran.Core.Hash.sha256Hex (CJson.encodeNode initialTree)
 
@@ -240,6 +250,10 @@ let internal branches: Branch list =
       Ops =
         [ TreeOp.InsertChild(nid "tm-accounts", metricCard "tm-br-emea" "EMEA" "£5,900")
           TreeOp.InsertChild(nid "tm-accounts", metricCard "tm-br-apac" "APAC" "£4,200")
+          // The branch recounts the orders and reaches the figure the trunk's
+          // turn 11 records: the SAME edit on both sides, which a merge applies
+          // once (the agreement rule) rather than refusing as a clash.
+          TreeOp.UpdateProp(nid "tm-m-ord-v", "Text", wireStr "1,318")
           TreeOp.UpdateProp(nid "tm-title", "Text", wireStr "Q3 sales by region") ] }
     { Id = "exec"
       Name = "Executive summary"
@@ -260,7 +274,7 @@ let internal branches: Branch list =
                   Body = TextSource.Literal "Revenue £128,400 – up 18% QoQ." }
           ) ] } ]
 
-// ─── Branch reconstruction + the 3-way merge (the real engine) ───────────────
+// ─── Branch reconstruction + the merge (the shipped policy over Core's fold) ──
 
 let internal tryBranch (bid: string) : Branch option =
   branches |> List.tryFind (fun b -> b.Id = bid)
@@ -270,23 +284,54 @@ let internal tryBranch (bid: string) : Branch option =
 /// `ApplyError` (the branch edits a node that frame does not hold yet).
 let internal branchTree (b: Branch) (k: int) : Result<Node<unit>, string> = foldApply trunkFrames[k] b.Ops
 
-/// Fold a fork back into the trunk HEAD with the shipped 3-way merge. The common
-/// ancestor is the frame the branch forked from; "ours" is what the trunk did
-/// after that frame; "theirs" is the branch. Outer `Error` = the fork itself
-/// failed to apply; inner `Ok` = a clean auto-compose; inner `Error` = real
-/// `MergeConflict`s naming the contended cells.
-let internal mergeBranch (b: Branch) (k: int) : Result<Result<Node<unit>, MergeConflict list>, string> =
-  branchTree b k
-  |> Result.map (fun theirs -> TreeMerge.merge3Way trunkFrames[k] trunkFrames[turnCount] theirs)
+/// What the trunk did after frame `k`: the merge's first delta.
+let private trunkDelta (k: int) : TreeOp<unit> list =
+  turns |> List.skip k |> List.map (fun t -> t.Op)
 
-/// The lenient resolution of the same merge: every conflict falls back to the
-/// ancestor's value, so a tree always comes back.
-let internal mergeBranchLenient (b: Branch) (k: int) : Result<Node<unit>, string> =
+/// Merge a fork back into the trunk HEAD as a derivation. The base is the frame
+/// the branch forked from; the deltas are the trunk's later turns and the
+/// branch's ops. Outer `Error` = the fork itself failed to apply; inner `Ok` =
+/// the derived tree, its script and the agreements and interleaves the fold
+/// admitted; inner `Error` = a typed `ReconcileFault`, a refusal naming each
+/// pair's address, shape and class.
+let internal mergeBranch (b: Branch) (k: int) : Result<Result<Reconciled<unit>, ReconcileFault<unit>>, string> =
   branchTree b k
-  |> Result.map (fun theirs -> TreeMerge.merge3WayLenient trunkFrames[k] trunkFrames[turnCount] theirs)
+  |> Result.map (fun _ -> DagReconcile.reconcile trunkFrames[k] (trunkDelta k) b.Ops)
 
-let internal conflictIds (cs: MergeConflict list) : string list =
-  cs |> List.map (fun c -> c.NodeId) |> List.distinct
+/// The same merge with `side` named: the pairs the policy refuses are admitted
+/// and that side's op is re-asserted as the tail of the merge's script. `A` is
+/// the trunk, `B` the branch.
+let internal mergeBranchResolved
+  (side: ReconcileSide)
+  (b: Branch)
+  (k: int)
+  : Result<Result<Reconciled<unit>, ReconcileFault<unit>>, string> =
+  branchTree b k
+  |> Result.map (fun _ -> DagReconcile.reconcileWith (Some side) trunkFrames[k] (trunkDelta k) b.Ops)
+
+/// The address of the merge node of a fork and its derivation: a node of the
+/// trunk head and the branch head whose op is the script, addressed by Core's
+/// `Dag.nodeId` (the node `DagMerge.mergeDag` mints).
+let internal mergeNodeId (b: Branch) (k: int) (r: Reconciled<unit>) : string =
+  let parents =
+    if k = 0 then
+      []
+    else
+      [ (List.item (k - 1) trunkNodes).Hash ]
+
+  let branchHead =
+    nodeChain parents (b.Ops |> List.map (fun op -> Actor.Agent("branch", "1", b.Id), op))
+    |> List.last
+
+  (DagOpRecord.ofEntry
+    "tm"
+    [ (List.last trunkNodes).Hash; branchHead.Hash ]
+    MergeAttribution.anonymous.Actor
+    (entryOf (TreeOp.Batch r.Script)))
+    .Hash
+
+let internal conflictIds (refusals: Refusal<unit> list) : string list =
+  refusals |> List.map (fun r -> r.Conflict.Address) |> List.distinct
 
 // ─── View helpers ────────────────────────────────────────────────────────────
 
@@ -313,9 +358,9 @@ let private tagBadge (tag: Tag) : ReactElement =
 /// the panel never labels a resolved merge as an auto-composed one.
 [<RequireQualifiedAccess>]
 type private MergeView =
-  | Composed of Node<unit>
-  | Conflicts of MergeConflict list
-  | Resolved of Node<unit>
+  | Composed of Reconciled<unit> * nodeId: string
+  | Conflicts of Refusal<unit> list * unsettled: string option
+  | Resolved of Reconciled<unit> * ReconcileSide * nodeId: string
 
 [<ReactComponent>]
 let private TimeMachineView () : ReactElement =
@@ -365,40 +410,76 @@ let private TimeMachineView () : ReactElement =
       [ prop.className "tm-split-panel"
         prop.children [ Html.h4 [ prop.className "tm-split-title"; prop.text title ]; body ] ]
 
+  // How a derived merge reads: what the fold admitted and the node it records.
+  let derivation (r: Reconciled<unit>) (nodeId: string) : ReactElement =
+    Html.p
+      [ prop.className "tm-derivation"
+        prop.text (
+          sprintf
+            "Derived by the fold: %d agreed edit(s) applied once, %d parent(s) interleaved by the child-order rule, %d op(s) re-asserted. The merge node %s records a script of %d op(s); the tree is derived, never stored."
+            r.Agreements
+            r.Interleaves
+            r.Reasserted
+            (shortHash nodeId)
+            (List.length r.Script)
+        ) ]
+
+  let sideName (side: ReconcileSide) : string =
+    match side with
+    | ReconcileSide.A -> "the trunk's"
+    | ReconcileSide.B -> "the branch's"
+
   // The merge outcome panel (only once "Merge into the trunk" has been pressed).
   let mergePanel: ReactElement list =
     match merge with
     | None -> []
-    | Some(MergeView.Composed merged) -> [ panel "merged · 3-way, auto-composed" (Exhibit.renderStatic merged) ]
-    | Some(MergeView.Resolved merged) ->
-      [ panel "merged · conflicts settled to the ancestor's value" (Exhibit.renderStatic merged) ]
-    | Some(MergeView.Conflicts cs) ->
-      let resolve () =
+    | Some(MergeView.Composed(r, nodeId)) ->
+      [ panel "merged · derived by the fold" (Html.div [ derivation r nodeId; Exhibit.renderStatic r.Tree ]) ]
+    | Some(MergeView.Resolved(r, side, nodeId)) ->
+      [ panel
+          (sprintf "merged · refusals settled to %s side" (sideName side))
+          (Html.div [ derivation r nodeId; Exhibit.renderStatic r.Tree ]) ]
+    | Some(MergeView.Conflicts(cs, unsettled)) ->
+      let resolve (side: ReconcileSide) =
         match activeBranch with
         | Some(b, k) ->
-          match mergeBranchLenient b k with
-          | Ok t -> setMerge (Some(MergeView.Resolved t))
-          | Error _ -> ()
+          match mergeBranchResolved side b k with
+          | Ok(Ok r) -> setMerge (Some(MergeView.Resolved(r, side, mergeNodeId b k r)))
+          | Ok(Error f) -> setMerge (Some(MergeView.Conflicts(cs, Some(describeError f))))
+          | Error e -> setMerge (Some(MergeView.Conflicts(cs, Some e)))
         | None -> ()
 
       [ panel
-          "merge · conflicts"
+          "merge · refused"
           (Html.div
             [ prop.className "tm-conflicts"
               prop.children
                 [ Html.p
                     [ prop.text
-                        "Both sides changed the same cell after the fork. The engine returns each one as a real MergeConflict rather than picking silently." ]
+                        "Core's conflict report named pairs the policy does not admit: both sides changed the same cell after the fork. The merge refuses with each pair's address, shape and class rather than picking silently." ]
+                  (match unsettled with
+                   | Some why ->
+                     Html.p
+                       [ prop.className "tm-apply-error"
+                         prop.text (
+                           "Naming a side cannot settle this one: a removal beside an edit of the removed node folds in neither order, so the fold refuses it again. "
+                           + why
+                         ) ]
+                   | None -> Html.none)
                   Html.ul
                     [ prop.children
                         [ for c in cs ->
                             Html.li
-                              [ Html.code [ prop.text c.NodeId ]
-                                Html.text (sprintf " · %s · %A" c.Facet c.Class) ] ] ]
+                              [ Html.code [ prop.text c.Conflict.Address ]
+                                Html.text (sprintf " · %A · %A" c.Conflict.Shape c.Class) ] ] ]
                   Html.button
                     [ prop.className "tm-trunk-btn"
-                      prop.text "Resolve – fall back to the ancestor's value"
-                      prop.onClick (fun _ -> resolve ()) ] ] ]) ]
+                      prop.text "Settle to the trunk's side"
+                      prop.onClick (fun _ -> resolve ReconcileSide.A) ]
+                  Html.button
+                    [ prop.className "tm-trunk-btn"
+                      prop.text "Settle to the branch's side"
+                      prop.onClick (fun _ -> resolve ReconcileSide.B) ] ] ]) ]
 
   let stage =
     match activeBranch, stageResult with
@@ -479,7 +560,9 @@ let private TimeMachineView () : ReactElement =
                       Html.code [ prop.className "tm-hash"; prop.text (shortHash initialHash) ] ] ] ] ]
     else
       let t = List.item (turn - 1) turns
-      let thisHash, prevHash = List.item (turn - 1) trunkChain
+      let node = List.item (turn - 1) trunkNodes
+      let thisHash = node.Hash
+      let prevHash = List.tryHead node.Parents |> Option.defaultValue "genesis"
 
       Html.div
         [ prop.className "tm-inspect"
@@ -494,7 +577,7 @@ let private TimeMachineView () : ReactElement =
               Html.div
                 [ prop.className "tm-hash-row"
                   prop.children
-                    [ Html.span [ prop.className "tm-hash-key"; prop.text "op hash" ]
+                    [ Html.span [ prop.className "tm-hash-key"; prop.text "node id" ]
                       Html.code [ prop.className "tm-hash"; prop.text (shortHash thisHash) ]
                       Html.span [ prop.className "tm-hash-link"; prop.text ("← " + shortHash prevHash) ] ] ]
               Html.pre
@@ -515,14 +598,14 @@ let private TimeMachineView () : ReactElement =
                   prop.text (sprintf "branch · %s · forked from turn %d" b.Name k) ]
               Html.button
                 [ prop.className "tm-fork-btn"
-                  prop.title "3-way merge: ancestor = the fork frame, ours = the trunk head, theirs = this branch"
-                  prop.text "Merge into the trunk (3-way)"
+                  prop.title "Merge by fold: base = the fork frame, deltas = the trunk since then and this branch"
+                  prop.text "Merge into the trunk"
                   prop.disabled (not canMerge)
                   prop.onClick (fun _ ->
                     match mergeBranch b k with
-                    | Ok(Ok merged) -> setMerge (Some(MergeView.Composed merged))
-                    | Ok(Error cs) -> setMerge (Some(MergeView.Conflicts cs))
-                    | Error _ -> ()) ]
+                    | Ok(Ok r) -> setMerge (Some(MergeView.Composed(r, mergeNodeId b k r)))
+                    | Ok(Error(ReconcileFault.Refused cs)) -> setMerge (Some(MergeView.Conflicts(cs, None)))
+                    | _ -> ()) ]
               Html.button
                 [ prop.className "tm-trunk-btn"
                   prop.text "← Return to the trunk"
@@ -550,13 +633,13 @@ let private TimeMachineView () : ReactElement =
               "Dragging the scrubber folds the shipped apply engine over the op prefix – the tree at turn n is genuinely reconstructed from the initial tree plus the first n operations, never a stored snapshot or a video frame." ]
         Html.li
           [ prop.text
-              "The inspector shows the real canonical encoding of each operation and a real content-addressed hash chain: every hash is sha256 over the previous hash, the encoded op, its sequence number, and its author. Change one op and every hash downstream changes." ]
+              "The inspector shows the real canonical encoding of each operation and its real Core node identity: every address is sha256 over the node's parents, its author and the op's envelope. Change one op and every address downstream changes." ]
         Html.li
           [ prop.text
               "Forking replays the trunk up to the chosen frame, then applies an alternative op-set on top – a genuinely divergent app that shares the trunk's history and hash at the branch point. Fork too early and the apply engine returns a real typed error, shown as-is." ]
         Html.li
           [ prop.text
-              "Merging runs the shipped structural 3-way merge in the browser – the same engine a server host uses – with the fork frame as the common ancestor. Disjoint changes compose into one tree automatically; a cell both sides rewrote comes back as a real, named conflict, never a silent pick. Fork from the head and the merge is clean by construction; fork earlier and the trunk's later edits meet the branch's." ]
+              "Merging is a fold over Core's conflict report, run in the browser by the same reconciliation policy a server host uses, with the fork frame as the base. An edit both sides made identically is applied once (the agreement rule); appends to one parent are interleaved by a declared child-order rule; a cell both sides rewrote is refused with its address, shape and class, never silently picked. Every node shown carries its Core address. Fork from the head and the merge is clean by construction; fork earlier and the trunk's later edits meet the branch's." ]
         Html.li
           [ prop.children
               [ Html.text

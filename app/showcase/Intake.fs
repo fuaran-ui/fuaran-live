@@ -95,7 +95,8 @@ let private field (id: string) (label: string) (help: string) (kind: FormFieldKi
     Kind = kind
     Required = false
     Help = (if help = "" then None else Some(TextSource.Literal help))
-    Rule = None }
+    Rule = None
+    Affordance = None }
 
 let private submission: Node<obj> =
   Fuaran.form

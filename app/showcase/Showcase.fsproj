@@ -131,7 +131,7 @@
     <PackageReference Include="Fuaran.UI.StyleObserver.Abstractions" Version="$(FuaranUIVersion)" />
     <!-- Kintsugi's "senses" panel (the manifest-free overflow derivation). -->
     <PackageReference Include="Fuaran.UI.LayoutObserver.Abstractions" Version="$(FuaranUIVersion)" />
-    <!-- Git for Interfaces: TreeMerge.merge3Way / merge3WayWithAuthor, run in
+    <!-- Git for Interfaces, the Counterfactual Corner and the Time Machine: DagReconcile (the merge as a fold over Core's conflict report), run in
          the browser from the package's fable/ sources (Phase 2139). -->
     <PackageReference Include="Fuaran.UI.OpStream.Dag.Merge" Version="$(FuaranUIVersion)" />
     <!-- The Undo Grid: the grid edit log (GridEditLog / GridEdit, Phase 1891),

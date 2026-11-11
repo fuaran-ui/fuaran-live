@@ -404,7 +404,8 @@ let private holdForm: Node<obj> =
                         Kind = FormFieldKind.textDeclarative (Binding.State(kTitle, Some "The Dispossessed"))
                         Required = true
                         Help = Some(TextSource.Literal "At least two characters.")
-                        Rule = None }
+                        Rule = None
+                        Affordance = None }
                       { Id = idFormat
                         Label = TextSource.Literal "Format"
                         Kind =
@@ -413,7 +414,8 @@ let private holdForm: Node<obj> =
                             (Binding.State(kFormat, Some "Print"))
                         Required = true
                         Help = None
-                        Rule = None }
+                        Rule = None
+                        Affordance = None }
                       { Id = idBranch
                         Label = TextSource.Literal "Collect from"
                         Kind =
@@ -422,7 +424,8 @@ let private holdForm: Node<obj> =
                             (Binding.State(kBranch, Some "Riverside"))
                         Required = true
                         Help = None
-                        Rule = None }
+                        Rule = None
+                        Affordance = None }
                       { Id = idCopies
                         Label = TextSource.Literal "Copies"
                         Kind =
@@ -433,13 +436,15 @@ let private holdForm: Node<obj> =
                             (Some 1.0)
                         Required = true
                         Help = Some(TextSource.Literal "One to four.")
-                        Rule = None }
+                        Rule = None
+                        Affordance = None }
                       { Id = idNotify
                         Label = TextSource.Literal "Email me when it arrives"
                         Kind = FormFieldKind.checkboxDeclarative (Binding.State(kNotify, Some true))
                         Required = false
                         Help = None
-                        Rule = None } ]
+                        Rule = None
+                        Affordance = None } ]
                   OnSubmit = Action.SetState(kCommit, Some(JStr "placed"), None)
                   SubmitLabel = TextSource.Literal "Place the hold" }
             Fuaran.metric

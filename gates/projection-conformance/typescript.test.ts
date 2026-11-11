@@ -77,6 +77,7 @@ const evalExpr = (expr: string): Node<unknown> => {
     'formFieldKind',
     'nodeId',
     'iconSource',
+    'columnOfCells',
     `return (${expr});`,
   );
   return factory(
@@ -87,6 +88,7 @@ const evalExpr = (expr: string): Node<unknown> => {
     formFieldKind,
     nodeId,
     iconSource,
+    ops.columnOfCells,
   ) as Node<unknown>;
 };
 

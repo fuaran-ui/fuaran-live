@@ -17,7 +17,7 @@
 //      merge composes to exactly the branch's tree (ancestor == ours, so theirs
 //      wins outright); forked earlier the trunk's later edits meet the branch's
 //      and the SAME engine names the contended node as a conflict, which the
-//      lenient resolution settles to the ancestor's value.
+//      resolution settles to the named side.
 //
 // Requires `pnpm run fable:app` to have produced app/showcase/output/.
 
@@ -100,18 +100,30 @@ describe('Phase 296 – the merge round-trips through the DAG', () => {
     }
   });
 
-  it('the lenient resolution settles every conflict to the ancestor’s value', () => {
-    const ancestorTitle = 'Sales overview (draft)';
-    expect(TM.frameJson(5)).toContain(ancestorTitle);
-    for (const b of branches) {
-      const out: string = TM.mergeLenientJson(b, 5);
-      expect(out.startsWith('merged:')).toBe(true);
-      expect(out).toContain(ancestorTitle);
-    }
+  it('settling a refusal to a side re-asserts that side’s title', () => {
+    const trunkTitle = 'Q3 sales overview';
+    const trunk: string = TM.mergeResolvedJson('region', 5, 'trunk');
+    expect(trunk.startsWith('merged:')).toBe(true);
+    expect(trunk).toContain(trunkTitle);
+    const branch: string = TM.mergeResolvedJson('region', 5, 'branch');
+    expect(branch.startsWith('merged:')).toBe(true);
+    expect(branch).not.toContain(trunkTitle);
+  });
+
+  it('a removal beside an edit of the removed node is not settled by naming a side', () => {
+    // The exec branch removes nodes the trunk still edits after the fork: the fold
+    // faults in one order, so precedence cannot admit it.
+    expect(TM.mergeResolvedJson('exec', 5, 'trunk')).toContain('FoldFaulted');
+  });
+
+  it('an edit both sides made identically is applied once, and the merge node has a Core address', () => {
+    // The region branch recounts the orders to the figure the trunk records on turn 11.
+    const report: string = TM.mergeReport('region', 5);
+    expect(report).toMatch(/^agreements=1;interleaves=1;node=[0-9a-f]{64}$/);
   });
 
   it('a merge of a fork the engine refused is the same error, not a merged tree', () => {
     expect(TM.mergeJson('exec', 0).startsWith('error:')).toBe(true);
-    expect(TM.mergeLenientJson('exec', 0).startsWith('error:')).toBe(true);
+    expect(TM.mergeResolvedJson('exec', 0, 'trunk').startsWith('error:')).toBe(true);
   });
 });

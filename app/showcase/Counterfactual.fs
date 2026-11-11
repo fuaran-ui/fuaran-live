@@ -10,19 +10,22 @@ module Fuaran.Showcase.Counterfactual
 //  guests – each a real branch (a `TreeOp` list applied off the common base),
 //  rendered in its own scope so nothing leaks between them or into your app.
 //
-//  "Adopt" folds a variant back into your trunk with the SHIPPED merge engine
-//  (`TreeMerge.merge3Way`, fuaran#179, made Fable-portable by fuaran#501 – the
-//  same function the server host runs, here in the browser):
-//   - Adopt two variants that touch DISJOINT cells → the engine auto-composes them
-//     into one app (both changes land, nothing to resolve).
-//   - Adopt a variant that rewrites a cell you already changed → the engine returns
-//     a real `MergeConflict` naming the contended node; you resolve it, your current
-//     value winning by default (human-primacy: it lives in the common ancestor).
+//  "Adopt" folds a variant back into your trunk as a DERIVATION: the trunk's
+//  ops and the variant's ops are the two deltas from the common base, and the
+//  SHIPPED reconciliation policy (`DagReconcile`, the same function the server
+//  host runs, here in the browser) reads Core's conflict report over them:
+//   - Adopt two variants that touch DISJOINT cells → the fold composes them into
+//     one app (both changes land, nothing to resolve).
+//   - Adopt a variant that makes an edit you already adopted, byte for byte →
+//     the AGREEMENT rule: the fold applies it once, and the merge says so.
+//   - Adopt a variant that rewrites a cell you already changed → the merge
+//     REFUSES, naming the contended address, its shape and its class; you settle
+//     it, your current value winning by default (human-primacy).
 //
-//  Honest scope: the branch trees are authored with the shipped `Apply.apply`; the
-//  isolation is real (each variant is a separate scope / op-stream off the base);
-//  the merge – auto-compose, conflict detection, primacy default – is the real
-//  `Fuaran.UI.OpStream.Dag.Merge.TreeMerge` engine. Rendering the literal
+//  Honest scope: the branch trees are authored with the shipped `Apply.apply`;
+//  the isolation is real (each variant is a separate scope / op-stream off the base);
+//  the merge – derivation, agreement, refusal – is the real
+//  `Fuaran.UI.OpStream.Dag.Merge.DagReconcile`. Rendering the literal
 //  `NodeKind.Mount` boundary needs the host guest-registry, so each guest scope is
 //  resolved directly and re-id'd for the side-by-side preview (stated below).
 //  Nothing here needs a server.
@@ -36,10 +39,11 @@ open Fuaran.UI.Renderer
 open Fuaran.UI.Ops.Types
 open Fuaran.UI.OpStream.Dag.Merge
 
+module CJson = Fuaran.UI.OpStream.Abstractions.CanonicalJson
+
 module Apply = Fuaran.UI.Ops.Apply
 
 let private nid (s: string) : NodeId = NodeId s
-let private nodeIdStr (NodeId s) : string = s
 let private wireStr (s: string) : PropValue = PropValue.Wire(JStr s)
 
 // ─── The base app (the common ancestor – your app) ───────────────────────────
@@ -83,13 +87,6 @@ let private applyAll (ops: TreeOp<unit> list) (tree: Node<unit>) : Node<unit> =
     | Ok next -> next
     | Error _ -> t)
 
-let private opTarget (op: TreeOp<unit>) : string option =
-  match op with
-  | TreeOp.UpdateProp(n, _, _) -> Some(nodeIdStr n)
-  | TreeOp.InsertChild(_, child) -> Some(child.Id)
-  | TreeOp.RemoveNode n -> Some(nodeIdStr n)
-  | _ -> None
-
 type private Variant =
   { Key: string
     Name: string
@@ -105,9 +102,12 @@ let private variants: Variant list =
           TreeOp.UpdateProp(nid "cc-features", "Text", wireStr "Unlimited projects · same-day support · no credit card") ] }
     { Key = "urgency"
       Name = "Add urgency"
-      Tagline = "A launch-offer callout (a brand-new card)"
+      Tagline = "A launch-offer callout and the launch price"
       Ops =
-        [ TreeOp.InsertChild(
+        [ // The launch price is the same edit the value framing makes: adopt
+          // both and the fold applies it once (the agreement rule).
+          TreeOp.UpdateProp(nid "cc-price-v", "Text", wireStr "£19 / mo")
+          TreeOp.InsertChild(
             nid "cc-root",
             Fuaran.callout
               "cc-offer"
@@ -143,62 +143,96 @@ let rec private reId (prefix: string) (n: Node<unit>) : Node<unit> =
 
 // ─── The merge (the real engine) ─────────────────────────────────────────────
 
-/// Adopt = fold the variant branch into the current trunk via the shipped 3-way
-/// merge (ancestor = base). `Ok` = a clean auto-compose; `Error` = real conflicts.
-let private adoptMerge (trunk: Node<unit>) (v: Variant) : Result<Node<unit>, MergeConflict list> =
-  TreeMerge.merge3Way baseTree trunk (variantTree v)
+/// Adopt = derive the merge of the trunk's ops and the variant's ops from the
+/// base. `Ok` = the derived tree, script and agreements; `Error` = the refused
+/// pairs (address, shape, class) or another typed fault.
+let private adoptMerge (trunkOps: TreeOp<unit> list) (v: Variant) : Result<Reconciled<unit>, ReconcileFault<unit>> =
+  DagReconcile.reconcile baseTree trunkOps v.Ops
 
-/// The variant's ops that do NOT target a contended node – the disjoint changes
-/// that merge onto the (already-diverged) trunk cleanly regardless of the conflict.
-/// Resolution operates on the trunk itself (not the base) because the trunk is the
-/// evolving app: "keep mine" applies only these disjoint ops (the trunk's contended
-/// value survives – human-primacy); "take the variant" applies all the variant's
-/// ops, so its value wins the contended cell.
-let private disjointOps (v: Variant) (conflictIds: Set<string>) : TreeOp<unit> list =
-  v.Ops
-  |> List.filter (fun op ->
-    match opTarget op with
-    | Some t -> not (conflictIds.Contains t)
-    | None -> true)
+/// The variant's ops that are not one side of a refused pair – the disjoint
+/// changes that merge onto the (already-diverged) trunk regardless of the
+/// conflict. "Keep mine" derives the merge over only these (the trunk's contended
+/// value survives – human-primacy); "take the variant" names the variant's side,
+/// whose refused edits the merge re-asserts as script.
+let private disjointOps (v: Variant) (refusals: Refusal<unit> list) : TreeOp<unit> list =
+  let refused =
+    refusals
+    |> List.collect (fun r -> [ CJson.encodeOp r.Conflict.Left; CJson.encodeOp r.Conflict.Right ])
+    |> Set.ofList
+
+  v.Ops |> List.filter (fun op -> not (Set.contains (CJson.encodeOp op) refused))
+
+/// The trunk's ops after an adoption: its own, then the variant's that it does not
+/// already hold (an agreed edit is one op), then the merge's script.
+let private extendTrunk (trunkOps: TreeOp<unit> list) (opsIn: TreeOp<unit> list) (r: Reconciled<unit>) =
+  let held = trunkOps |> List.map CJson.encodeOp |> Set.ofList
+
+  trunkOps
+  @ (opsIn |> List.filter (fun op -> not (Set.contains (CJson.encodeOp op) held)))
+  @ r.Script
 
 // ─── The page ────────────────────────────────────────────────────────────────
 
 [<ReactComponent>]
 let private CounterfactualView () : ReactElement =
   let trunk, setTrunk = React.useState baseTree
+  // The trunk as ops from the base: the merge's first delta.
+  let trunkOps, setTrunkOps = React.useState ([]: TreeOp<unit> list)
+  // What the last adoption derived (agreements applied once, interleaves).
+  let note, setNote = React.useState (None: string option)
   let adopted, setAdopted = React.useState (Set.empty: Set<string>)
   // A pending conflict: the variant being adopted + the contended node ids.
-  let pending, setPending = React.useState (None: (Variant * string list) option)
+  let pending, setPending =
+    React.useState (None: (Variant * Refusal<unit> list) option)
 
   let variantByKey (k: string) : Variant =
     variants |> List.find (fun v -> v.Key = k)
 
+  let landAdoption (v: Variant) (opsIn: TreeOp<unit> list) (r: Reconciled<unit>) : unit =
+    setTrunk r.Tree
+    setTrunkOps (extendTrunk trunkOps opsIn r)
+    setAdopted (Set.add v.Key adopted)
+    setPending None
+
+    setNote (
+      Some(
+        sprintf
+          "Derived by the fold: %d agreed edit(s) applied once, %d parent(s) interleaved, %d op(s) re-asserted; the merge records a script of %d op(s)."
+          r.Agreements
+          r.Interleaves
+          r.Reasserted
+          (List.length r.Script)
+      )
+    )
+
   let adopt (v: Variant) : unit =
-    match adoptMerge trunk v with
-    | Ok merged ->
-      setTrunk merged
-      setAdopted (Set.add v.Key adopted)
-      setPending None
-    | Error cs -> setPending (Some(v, cs |> List.map (fun c -> c.NodeId) |> List.distinct))
+    match adoptMerge trunkOps v with
+    | Ok r -> landAdoption v v.Ops r
+    | Error(ReconcileFault.Refused cs) -> setPending (Some(v, cs))
+    | Error _ -> ()
 
   let resolveKeep () : unit =
     match pending with
-    | Some(v, ids) ->
-      setTrunk (applyAll (disjointOps v (Set.ofList ids)) trunk)
-      setAdopted (Set.add v.Key adopted)
-      setPending None
+    | Some(v, refusals) ->
+      let mine = disjointOps v refusals
+
+      match DagReconcile.reconcile baseTree trunkOps mine with
+      | Ok r -> landAdoption v mine r
+      | Error _ -> ()
     | None -> ()
 
   let resolveTake () : unit =
     match pending with
     | Some(v, _) ->
-      setTrunk (applyAll v.Ops trunk)
-      setAdopted (Set.add v.Key adopted)
-      setPending None
+      match DagReconcile.reconcileWith (Some ReconcileSide.B) baseTree trunkOps v.Ops with
+      | Ok r -> landAdoption v v.Ops r
+      | Error _ -> ()
     | None -> ()
 
   let resetAll () : unit =
     setTrunk baseTree
+    setTrunkOps []
+    setNote None
     setAdopted Set.empty
     setPending None
 
@@ -224,6 +258,9 @@ let private CounterfactualView () : ReactElement =
                                 |> String.concat " + ")
                            ) ]) ] ]
             Html.div [ prop.className "cf-trunk-app"; prop.children [ Exhibit.renderStatic trunk ] ]
+            (match note with
+             | Some n -> Html.p [ prop.className "cf-derivation"; prop.text n ]
+             | None -> Html.none)
             (if Set.isEmpty adopted then
                Html.none
              else
@@ -236,18 +273,20 @@ let private CounterfactualView () : ReactElement =
   let resolveBanner =
     match pending with
     | None -> Html.none
-    | Some(v, ids) ->
+    | Some(v, refusals) ->
+      let ids = refusals |> List.map (fun r -> r.Conflict.Address) |> List.distinct
+
       Html.div
         [ prop.className "cf-conflict"
           prop.children
             [ Html.div
                 [ prop.className "cf-conflict-msg"
                   prop.children
-                    [ Html.span [ prop.className "cf-conflict-mark"; prop.text "merge conflict" ]
+                    [ Html.span [ prop.className "cf-conflict-mark"; prop.text "merge refused" ]
                       Html.span
                         [ prop.text (
                             sprintf
-                              "“%s” changes a cell you already adopted (%s). The disjoint changes merged; you decide this one."
+                              "“%s” changes a cell you already adopted (%s). Core's conflict report names it and the policy refuses the pair; the disjoint changes derive around it once you decide."
                               v.Name
                               (String.concat ", " ids)
                           ) ] ] ]
@@ -265,7 +304,7 @@ let private CounterfactualView () : ReactElement =
               Html.p
                 [ prop.className "cf-primacy"
                   prop.text
-                    "Human-primacy is the default: your app keeps its current value on the contended cell unless you hand it to the variant – the disjoint changes merge in either way." ] ] ]
+                    "Human-primacy is the default: your app keeps its current value on the contended cell unless you hand it to the variant, whose edit the merge then re-asserts as script – the disjoint changes merge in either way." ] ] ]
 
   // ── one counterfactual guest (an isolated live branch) ──────────────────
   let guestPane (v: Variant) : ReactElement =
@@ -327,10 +366,10 @@ let private CounterfactualView () : ReactElement =
               "Each counterfactual is a real branch – a list of typed edit operations applied off the common base with the shipped apply engine – rendered in its own scope so nothing leaks between the variants or into your app until you adopt it." ]
         Html.li
           [ prop.text
-              "Adopt runs the shipped structural three-way merge (the same engine the server host uses, compiled into this page). Adopting two variants that touch different cells auto-composes them; adopting one that rewrites a cell you already changed returns a real conflict, detected by comparing that node's canonical encoding across base, trunk, and branch." ]
+              "Adopt runs the shipped reconciliation policy over Core's conflict report (the same function the server host uses, compiled into this page). Adopting two variants that touch different cells composes them; an edit both make identically is an agreement and is applied once; adopting one that rewrites a cell you already changed is refused, naming the cell's address, shape and class." ]
         Html.li
           [ prop.text
-              "On a conflict your app keeps its current value by default while the disjoint changes still merge around it; you can hand the contended cell to the variant instead. Adopting is incremental – your trunk evolves, and every later adoption merges against it, not the original base." ]
+              "On a refusal your app keeps its current value by default while the disjoint changes still merge around it; you can hand the contended cell to the variant instead. Adopting is incremental – your trunk's ops grow, and every later adoption is derived against them from the same base." ]
         Html.li
           [ prop.children
               [ Html.text
@@ -342,7 +381,7 @@ let private CounterfactualView () : ReactElement =
     "cf"
     "The Counterfactual Corner"
     (Exhibit.lede
-      "Ask “what if?” and parallel universes of your app open side by side – each a live, isolated branch. Adopt the ones you like and a real structural merge folds them together; when two collide, you decide, with your own version winning by default.")
+      "Ask “what if?” and parallel universes of your app open side by side – each a live, isolated branch. Adopt the ones you like and a real merge, derived as a fold, composes them; when two collide, you decide, with your own version winning by default.")
     [ trunkPane; resolveBanner; guests ]
     honesty
 

@@ -520,6 +520,10 @@ function survives(emitted: unknown, canonical: unknown, path: string): void {
 // The kinds this walker cannot shape AT ALL are pinned separately below: they
 // never reach this set, because a kind that yields no wire at all is filtered
 // out before the drop is measured. That set is empty too, since Phase 1652.
+// Phase 2647: 'Chart' briefly entered this set at the 0.104.0 tier raise. The cause was not a
+// decoder: the synthesised wire decodes, and the commit gate refused it with FUARAN168 (an empty
+// `yFields` over a Static source is allowed only over a Query). The synthesiser now names a
+// value column over one inline row, so the set is empty again.
 const UNDECODABLE_SYNTHESIS = new Set<string>([]);
 
 // The kinds the walker cannot shape at all — `defaultWireFor` returns `''`, so

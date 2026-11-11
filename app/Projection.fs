@@ -2468,8 +2468,8 @@ and private tsBoxNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue
     depth
 
 and private tsFactNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValue) : string =
-  // `@fuaran-ui/ui` ships no `Fact` ctor carrying `icon`, so Fact projects as the
-  // typed in-memory Display node literal.
+  // Fact projects as the typed in-memory Display node literal, which carries every
+  // member of the spec (`icon`, `reference`) whichever builder options exist.
   let spec =
     tsInline (
       [ "label", tsTextSourceLit (fieldReq "label" k)
@@ -2483,6 +2483,9 @@ and private tsFactNode (depth: int) (id: string) (k: JsonValue) (nodeV: JsonValu
          | None -> [])
       @ (match optStr "icon" k with
          | Some i -> [ "icon", qs i ]
+         | None -> [])
+      @ (match optStr "reference" k with
+         | Some r -> [ "reference", qs r ]
          | None -> [])
     )
 
@@ -3166,7 +3169,20 @@ and private tsKindCtor (depth: int) (kindType: string) (id: string) (k: JsonValu
           | None -> [])
        @ (match JsonValue.tryField "onChangeMulti" k with
           | Some _ -> [ "onChangeMulti", "() => action.chain([])" ]
-          | None -> []))
+          | None -> [])
+       // `groups` (@fuaran-ui/ui 0.27): named subsets of the option values.
+       @ (match arrOf "groups" k with
+          | [] -> []
+          | gs ->
+            [ "groups",
+              "["
+              + (gs
+                 |> List.map (fun g ->
+                   tsInline
+                     [ "label", qs (strOf "label" g)
+                       "values", "[" + (arrOf "values" g |> List.map strItem |> String.concat ", ") + "]" ])
+                 |> String.concat ", ")
+              + "]" ]))
   | "Form" ->
     let fs = arrOf "fields" k
 

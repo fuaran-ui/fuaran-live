@@ -353,6 +353,18 @@ let private sentinel = "fuaran-new-node-"
       kindObj[g] = gv;
     }
   }
+  // A series-bearing kind's series must be NAMED over inline rows (FUARAN168, WIRE_FORMAT 3.6.29): an
+  // empty `yFields` over a Static source is allowed only over a Query. The minimal legal
+  // node therefore carries one inline row and names its one value column.
+  if (kindObj.source && kindObj.source['$type'] === 'Static'
+      && Array.isArray(kindObj.yFields) && kindObj.yFields.length === 0
+      && typeof kindObj.xField === 'string') {
+    var row = {};
+    row[kindObj.xField] = 'A';
+    row.Value = 1;
+    kindObj.source = { '$type': 'Static', value: [row] };
+    kindObj.yFields = ['Value'];
+  }
   try { return JSON.stringify({ id: sentinel + '0', kind: kindObj }); } catch (e) { return ''; }
 })($0, $1, $2)""")>]
 let private synthesiseJs (kindSchema: obj) (disc: string) (sentinelPrefix: string) : string = jsNative

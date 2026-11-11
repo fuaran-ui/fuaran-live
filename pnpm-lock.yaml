@@ -10,25 +10,25 @@ importers:
     dependencies:
       '@fuaran-ui/ai-tools':
         specifier: ^0.14.3
-        version: 0.14.3(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8)
+        version: 0.14.3(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8)
       '@fuaran-ui/charts':
         specifier: ^0.15.1
-        version: 0.15.1(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)
+        version: 0.15.1(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)
       '@fuaran-ui/op-stream':
         specifier: ^0.12.1
-        version: 0.12.1(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)
+        version: 0.12.1(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)
       '@fuaran-ui/ops':
-        specifier: ^0.33.0
-        version: 0.33.0(@fuaran-ui/schema@0.28.1)
+        specifier: ^0.33.1
+        version: 0.33.1(@fuaran-ui/schema@0.28.1)
       '@fuaran-ui/renderer':
         specifier: ^0.29.1
-        version: 0.29.1(@fuaran-ui/ai-tools@0.14.3(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8))(@fuaran-ui/charts@0.15.1(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1))(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 0.29.1(@fuaran-ui/ai-tools@0.14.3(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8))(@fuaran-ui/charts@0.15.1(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1))(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@fuaran-ui/schema':
         specifier: ^0.28.1
         version: 0.28.1
       '@fuaran-ui/ui':
-        specifier: ^0.26.1
-        version: 0.26.1(@fuaran-ui/schema@0.28.1)
+        specifier: ^0.27.0
+        version: 0.27.0(@fuaran-ui/schema@0.28.1)
       katex:
         specifier: ^0.16.11
         version: 0.16.47
@@ -477,8 +477,8 @@ packages:
       '@fuaran-ui/ops': ^0.33.0
       '@fuaran-ui/schema': ^0.28.1
 
-  '@fuaran-ui/ops@0.33.0':
-    resolution: {integrity: sha512-VzWtPlsI9c00CeInpTtHxVZgb4lbVDqHImBiGvIJCOWToG7J2lBZCf0yErZYHCmD4KoFJfTtOqzqo5PbovYjCw==}
+  '@fuaran-ui/ops@0.33.1':
+    resolution: {integrity: sha512-xzqMGxpbbNHaCbY2M9RiNuTdZin2Ny0rik6Ymr0r2XXlMG5iGq2Uzf7gsKYjA2VCKRnRFjINU/QYYTtrtpNmSw==}
     peerDependencies:
       '@fuaran-ui/schema': ^0.28.1
 
@@ -501,8 +501,8 @@ packages:
   '@fuaran-ui/schema@0.28.1':
     resolution: {integrity: sha512-RrY6wOInADMD6aTF6mC5aeMgNaUyJDKzcIMYpGoXVjLxbfCkvfPldXrRdAFhEfYs3il4ycg7wn0jVGk1Z8cZYw==}
 
-  '@fuaran-ui/ui@0.26.1':
-    resolution: {integrity: sha512-gq4kQOjM50wRN+YFiKdiQ7f2PSJAJnQCyHZsDxjq2nPHCf89+DvX5K2hihSzyLEUClA74jmYdtkbEyvCzek5fQ==}
+  '@fuaran-ui/ui@0.27.0':
+    resolution: {integrity: sha512-FQAPCvHfNuMnq7ymtEyHEb0v7LdnJuBVmY+NxYaZRAilZl+XkkEZ0R4zKDQRAfOHw7VueF580TsX4xxllHMYIA==}
     peerDependencies:
       '@fuaran-ui/schema': ^0.28.1
 
@@ -1370,41 +1370,41 @@ snapshots:
   '@esbuild/win32-x64@0.25.12':
     optional: true
 
-  '@fuaran-ui/ai-tools@0.14.3(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8)':
+  '@fuaran-ui/ai-tools@0.14.3(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8)':
     dependencies:
-      '@fuaran-ui/ops': 0.33.0(@fuaran-ui/schema@0.28.1)
+      '@fuaran-ui/ops': 0.33.1(@fuaran-ui/schema@0.28.1)
       '@fuaran-ui/schema': 0.28.1
     optionalDependencies:
       react: 19.2.8
 
-  '@fuaran-ui/charts@0.15.1(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)':
+  '@fuaran-ui/charts@0.15.1(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)':
     dependencies:
-      '@fuaran-ui/ops': 0.33.0(@fuaran-ui/schema@0.28.1)
+      '@fuaran-ui/ops': 0.33.1(@fuaran-ui/schema@0.28.1)
       '@fuaran-ui/schema': 0.28.1
 
-  '@fuaran-ui/op-stream@0.12.1(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)':
+  '@fuaran-ui/op-stream@0.12.1(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)':
     dependencies:
-      '@fuaran-ui/ops': 0.33.0(@fuaran-ui/schema@0.28.1)
+      '@fuaran-ui/ops': 0.33.1(@fuaran-ui/schema@0.28.1)
       '@fuaran-ui/schema': 0.28.1
 
-  '@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1)':
+  '@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1)':
     dependencies:
       '@fuaran-ui/schema': 0.28.1
 
-  '@fuaran-ui/renderer@0.29.1(@fuaran-ui/ai-tools@0.14.3(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8))(@fuaran-ui/charts@0.15.1(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1))(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@fuaran-ui/renderer@0.29.1(@fuaran-ui/ai-tools@0.14.3(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8))(@fuaran-ui/charts@0.15.1(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1))(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@fuaran-ui/ai-tools': 0.14.3(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8)
-      '@fuaran-ui/ops': 0.33.0(@fuaran-ui/schema@0.28.1)
+      '@fuaran-ui/ai-tools': 0.14.3(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)(react@19.2.8)
+      '@fuaran-ui/ops': 0.33.1(@fuaran-ui/schema@0.28.1)
       '@fuaran-ui/schema': 0.28.1
       katex: 0.16.47
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
-      '@fuaran-ui/charts': 0.15.1(@fuaran-ui/ops@0.33.0(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)
+      '@fuaran-ui/charts': 0.15.1(@fuaran-ui/ops@0.33.1(@fuaran-ui/schema@0.28.1))(@fuaran-ui/schema@0.28.1)
 
   '@fuaran-ui/schema@0.28.1': {}
 
-  '@fuaran-ui/ui@0.26.1(@fuaran-ui/schema@0.28.1)':
+  '@fuaran-ui/ui@0.27.0(@fuaran-ui/schema@0.28.1)':
     dependencies:
       '@fuaran-ui/schema': 0.28.1
 

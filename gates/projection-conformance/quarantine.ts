@@ -233,7 +233,7 @@ export interface QuarantineEntry {
  *
  *   • TypeScript — none. The four ids Phase 2399 listed (the figure locale / fraction
  *     digits, fuaran#2490 and fuaran#2499, and the metric comparisons, fuaran#2472)
- *     cleared with the `@fuaran-ui/*` v0.33.0 set, which models them; each entry's
+ *     cleared with the `@fuaran-ui/*` v0.33.x set, which models them; each entry's
  *     token falsified itself the day that release landed, and Phase 2647 retired
  *     the four. The arm's preference is unchanged: a shortfall the pinned host CAN
  *     encode is taught, never listed.

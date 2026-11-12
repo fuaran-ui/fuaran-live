@@ -195,6 +195,8 @@ jobs:
       - name: Conformance (projection ↔ wire-format corpus)
         env:
           FUARAN_PY_PYTHON: python
+          # A skipped arm fails the gate here: CI provisions every arm.
+          FUARAN_REQUIRE_ARMS: '1'
         run: pnpm run conformance:report
 
       - name: Build

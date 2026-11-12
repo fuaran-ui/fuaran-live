@@ -22,6 +22,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { exitCodeFor, formatArms, tallyArms } from './arm-report.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
@@ -129,4 +130,7 @@ console.log(
     ok,
 );
 
-process.exit(run.status ?? 1);
+// A skipped arm is named, and fails the publisher under FUARAN_REQUIRE_ARMS=1 (CI sets it).
+const arms = tallyArms(result);
+console.log('[conformance-report] arms:\n' + formatArms(arms).join('\n'));
+process.exit(exitCodeFor(run.status ?? 1, arms, process.env.FUARAN_REQUIRE_ARMS === '1'));

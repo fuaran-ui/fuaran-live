@@ -98,7 +98,10 @@ const required = [
 
 const missing = required.filter((p) => !existsSync(p));
 if (missing.length > 0) {
-  console.error('[fable-app] emission incomplete — missing:\n  ' + missing.join('\n  '));
+  console.error(
+    '[fable-app] emission incomplete — the compiles reported no error, yet these are missing:\n  ' +
+      missing.join('\n  '),
+  );
   process.exit(1);
 }
 console.log('[fable-app] Fable emission complete.');

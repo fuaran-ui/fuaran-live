@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit",
     "test": "pnpm run test:unit && pnpm run conformance",
     "test:unit": "vitest run",
-    "conformance": "vitest run -c vitest.conformance.config.ts",
+    "conformance": "node scripts/arm-report.mjs",
     "conformance:report": "node scripts/conformance-report.mjs",
     "host-pin-drift": "node scripts/host-pin-drift.mjs",
     "fable": "node scripts/fable-run.mjs fable-host --outDir fable-host/output",

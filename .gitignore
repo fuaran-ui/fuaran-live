@@ -92,3 +92,7 @@ dist-measure/
 gates/projection-conformance/.fsharp-exec/
 gates/projection-conformance/.fsharp-probe/
 gates/projection-conformance/.fsharp-i18n-probe/
+
+# Fable go-red fixture build products
+test/fixtures/fable-red/bin/
+test/fixtures/fable-red/obj/

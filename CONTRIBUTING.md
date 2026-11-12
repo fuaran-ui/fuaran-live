@@ -44,6 +44,29 @@ So: the door is shut deliberately and stated plainly, rather than left ajar and 
 - **Telling us it's confusing.** If the thirty-second first run doesn't land, that's a real
   bug in a demo. Say so.
 
+## Running every arm locally
+
+The gate has arms, and an arm that cannot run is **skipped, never green**. `pnpm conformance`
+(and the publisher, `pnpm run conformance:report`) prints each arm as `RAN` or `SKIPPED` with
+the reason, then a total. Set `FUARAN_REQUIRE_ARMS=1` (CI does) or pass `--require-all-arms`
+and a skipped arm fails the run. A local run you intend to cite sets it.
+
+To run all three arms:
+
+```
+dotnet tool restore
+pnpm install --frozen-lockfile
+pnpm run fable:app && pnpm run fable      # a failed compile prints every compiler error
+python -m venv .venv
+.venv/Scripts/pip install fuaran-ui==0.12.0   # .venv/bin/pip on macOS/Linux; keep the pin
+                                              # equal to the one in .github/workflows/ci.yml
+pnpm run test:unit
+FUARAN_REQUIRE_ARMS=1 pnpm run conformance    # PowerShell: $env:FUARAN_REQUIRE_ARMS = '1'
+```
+
+The Python arm uses the repo-local `.venv`, or the interpreter named by `FUARAN_PY_PYTHON`.
+The corpus is read from the sibling `../wire-format-fixtures`, or `FUARAN_WIRE_FIXTURES`.
+
 ## One rule, if you are working in a fork
 
 Worth stating even though PRs are closed, because it is the rule this project

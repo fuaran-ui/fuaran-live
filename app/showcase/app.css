@@ -8050,3 +8050,68 @@ polygon.gi-dag-pending {
 .ug-verdict {
   margin-bottom: 0.9rem;
 }
+
+/* ─── Drag the Points (Phase 2851) ─────────────────────────────────────── */
+.geo-stage {
+  max-width: 46rem;
+  border: var(--ds-border);
+  border-radius: 6px;
+  background: var(--fuaran-color-elevated, #fff);
+  /* The drag is the page's own pointer handling: a touch on the stage moves a
+     point rather than scrolling the page. */
+  touch-action: none;
+  cursor: grab;
+}
+.geo-stage:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+.geo-stage svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* Point labels follow the theme's text colour, light or dark. */
+.geo-stage svg text {
+  fill: var(--fuaran-color-text, #1a1a1f);
+}
+.geo-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+  margin: 0.8rem 0 0;
+  font-size: 0.9rem;
+}
+.geo-dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+}
+.geo-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.geo-match {
+  font-size: 0.85rem;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.geo-bits {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.geo-bits th,
+.geo-bits td {
+  padding: 0.2rem 0.7rem 0.2rem 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.geo-bits code {
+  font-family: var(--ds-font-mono);
+}

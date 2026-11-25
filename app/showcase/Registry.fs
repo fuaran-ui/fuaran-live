@@ -295,7 +295,13 @@ let pages: Page list =
       Pillar = Pillar.Machine
       Wow =
         "Edit a grid, undo it and replay the history. The page has no undo code: every edit is an op, and undo, redo and the replayable record come from the published edit log."
-      Load = fun () -> importValueDynamic UndoGrid.page } ]
+      Load = fun () -> importValueDynamic UndoGrid.page }
+    { Id = "geometry"
+      Title = "Drag the Points"
+      Pillar = Pillar.Wire
+      Wow =
+        "Drag the points: the circle through three of them, the inside-or-outside sign for a fourth, and the Voronoi cells of all seven – pinned geometry in your browser, bit for bit the published answers."
+      Load = fun () -> importValueDynamic Geometry.page } ]
 
 let pagesInPillar (p: Pillar) : Page list =
   pages |> List.filter (fun d -> d.Pillar = p)

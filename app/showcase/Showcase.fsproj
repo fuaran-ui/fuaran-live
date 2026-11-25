@@ -110,6 +110,7 @@
     <Compile Include="testing\TimeMachineProbes.fs" />
     <Compile Include="testing\DataInTheInterfaceProbes.fs" />
     <Compile Include="testing\UndoGridProbes.fs" />
+    <Compile Include="testing\GeometryProbes.fs" />
     <!-- The page registry: after the pages, because it names each page's value;
          it loads each one as its own chunk. -->
     <Compile Include="Registry.fs" />
@@ -143,6 +144,9 @@
          Core version the tier declares. -->
     <PackageReference Include="Fuaran.Core.Function" Version="$(FuaranCoreVersion)" />
     <PackageReference Include="Fuaran.Core.Wire" Version="$(FuaranCoreVersion)" />
+    <!-- The geometry page (Phase 2851): the pinned conformal geometric algebra
+         package, compiled from its fable/ sources like every package here. -->
+    <PackageReference Include="Fuaran.Compute.GeometricAlgebra" Version="$(FuaranComputeVersion)" />
   </ItemGroup>
 
   <ItemGroup>

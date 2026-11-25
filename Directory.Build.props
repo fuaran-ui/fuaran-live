@@ -45,6 +45,13 @@
          Fuaran.UI.Program 0.104.0 declares Fuaran.Program.Runtime 0.13.0, so a
          lower pin is an NU1605 downgrade (Phase 2399 raised it from 0.10.0). -->
     <FuaranProgramVersion>0.13.0</FuaranProgramVersion>
+    <!-- The compute packages (Fuaran.Compute.*) this repo pins DIRECTLY: today
+         only the showcase's geometry page's geometric algebra package
+         (Phase 2851). It pins no Fuaran.Core.* at all (its chain is
+         Elementary -> Solvers), so it stands beside the tier's Core floor
+         above; the tier's own Compute dependencies (DataFrame, LinearAlgebra)
+         stay at the version the tier declares and are not lifted by it. -->
+    <FuaranComputeVersion>0.47.0</FuaranComputeVersion>
     <!-- The Fable / Elmish / Feliz toolchain, one producer each. -->
     <FableCoreVersion>5.0</FableCoreVersion>
     <FableElmishVersion>5.0.2</FableElmishVersion>

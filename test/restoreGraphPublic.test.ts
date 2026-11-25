@@ -39,6 +39,9 @@
 //    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.42.0 (a floor; the 0.104.0
 //    tier declares 0.42.0 too — see Directory.Build.props)
 //    Fuaran.Program.Runtime 0.13.0 (the floor Fuaran.UI.Program 0.104.0 declares)
+//    Fuaran.Compute.GeometricAlgebra 0.47.0 (re-checked 2026-11-25, Phase 2851: served,
+//    carries its fable/ sources, and pins no Fuaran.Core.* — its chain is
+//    Fuaran.Compute.Elementary 0.47.0 -> Fuaran.Compute.Solvers 0.47.0, both served)
 //  The program loop's UI adapter is a member of the UI family since Phase 2016:
 //  it ships from the language tier as `Fuaran.UI.Program` (it was
 //  `Fuaran.Program.UI`, published by the program domain up to 0.7.1), so it is
@@ -116,6 +119,9 @@ const ALLOWED_PACKAGE_IDS: readonly string[] = [
   // The program/logic domain runtime (public, nuget.org): the domain-generic
   // core. Its UI adapter is pinned with the UI family above.
   'Fuaran.Program.Runtime',
+  // The pinned conformal geometric algebra package (public, nuget.org): the
+  // showcase's geometry page (Phase 2851), compiled from its fable/ sources.
+  'Fuaran.Compute.GeometricAlgebra',
   // Fable / Feliz toolchain (public, nuget.org).
   'Fable.Core',
   'Fable.Elmish',
@@ -313,7 +319,9 @@ describe('NuGet restore-graph lock', () => {
           ? 'FuaranCoreVersion'
           : id.startsWith('Fuaran.Program.')
             ? 'FuaranProgramVersion'
-            : null;
+            : id.startsWith('Fuaran.Compute.')
+              ? 'FuaranComputeVersion'
+              : null;
     const crossed = pins.filter((p) => {
       const want = family(p.id);
       return want !== null && propertyName(p.version) !== want;

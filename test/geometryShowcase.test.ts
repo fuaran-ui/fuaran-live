@@ -84,7 +84,8 @@ describe('Phase 2851 – moving a point across the circle flips the sign', () =>
   it('flips once as D is dragged from inside the page circle to outside it', () => {
     const start = Array.from(P.geoInitialPoints() as Float64Array);
     const abc = start.slice(0, 6);
-    const [dx, dy] = [start[6], start[7]];
+    const dx = start[6] ?? Number.NaN;
+    const dy = start[7] ?? Number.NaN;
     // D starts inside, as the page's copy says.
     expect(side([...abc, dx, dy])).toBe('Inside');
 

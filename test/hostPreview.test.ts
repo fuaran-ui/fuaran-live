@@ -15,6 +15,10 @@
 //   4. The speech view (Phase 1813's `speech` column, ruled on in round 2): the
 //      speech vocabulary is pinned, each node carries its kind's declared class,
 //      and the omitted nodes are the listed ones.
+//   5. The `adaptiveCard` column (Phase 1814, ruled on 2026-11-26): ACCEPTED but
+//      not shown. The bundle carries it and its vocabulary and row shape are
+//      pinned, so a change to either still needs a ruling; the switcher does not
+//      offer a card view until one is built.
 //
 // The corpus is read at $FUARAN_WIRE_FIXTURES, else at the sibling
 // ../wire-format-fixtures clone (the layout CI checks out). An absent corpus is
@@ -158,10 +162,13 @@ describe('the host set is what the manifest declares', () => {
     // goes red on the bundle refresh, and the preview gains that host by ruling
     // on the column's vocabulary rather than by guessing it. `speech` (Phase
     // 1813) is ruled on: it is the speech view, and every row must carry it.
+    // `adaptiveCard` (Phase 1814) is ruled on as accepted but not shown: see the
+    // card-column test below.
     const rows: Record<string, unknown>[] = JSON.parse(readFileSync(bundledPath, 'utf8')).kinds;
     const members = new Set(rows.flatMap((r) => Object.keys(r)));
     expect([...members].sort()).toEqual(
       [
+        'adaptiveCard',
         'contract',
         'fallback',
         'fixtures',
@@ -178,6 +185,27 @@ describe('the host set is what the manifest declares', () => {
     // member the speech view does not read.
     for (const r of rows)
       expect(Object.keys(r.speech as object).sort(), String(r.kind)).toEqual(['class', 'note']);
+  });
+
+  it('the adaptiveCard column is accepted, not shown — its vocabulary and row shape are pinned', () => {
+    // Ruled 2026-11-26: the bundle carries the card column so it stays
+    // byte-identical to the corpus, but the preview offers no card view yet (the
+    // switcher test below still lists exactly three hosts). Pinning the five
+    // classes and each row's members keeps a later change to the column a
+    // ruling rather than a silent refresh.
+    const doc = JSON.parse(readFileSync(bundledPath, 'utf8'));
+    expect(doc.adaptiveCardClasses.map((c: { class: string }) => c.class)).toEqual([
+      'mapped',
+      'structural',
+      'open-live',
+      'flatten-to-text',
+      'omitted',
+    ]);
+    const pinned = new Set(doc.adaptiveCardClasses.map((c: { class: string }) => c.class));
+    for (const r of doc.kinds as { kind: string; adaptiveCard: Record<string, unknown> }[]) {
+      expect(Object.keys(r.adaptiveCard).sort(), r.kind).toEqual(['class', 'elements', 'note']);
+      expect(pinned.has(r.adaptiveCard['class']), r.kind).toBe(true);
+    }
   });
 
   it('the speech vocabulary is pinned — a new class needs a ruling, not silence', () => {

@@ -300,7 +300,7 @@ let pages: Page list =
       Title = "Drag the Points"
       Pillar = Pillar.Wire
       Wow =
-        "Drag the points: the circle through three of them, the inside-or-outside sign for a fourth, and the Voronoi cells of all seven – pinned geometry in your browser, bit for bit the published answers."
+        "Conformal geometric algebra in your browser: drag the points – the circle through three is one outer product, the inside-or-outside sign for a fourth one more, and the Voronoi cells of all seven that same test over every triple, bit for bit the published answers."
       Load = fun () -> importValueDynamic Geometry.page } ]
 
 let pagesInPillar (p: Pillar) : Page list =

@@ -1,8 +1,8 @@
 module Fuaran.Showcase.Geometry
 
 // ============================================================================
-//  Drag the Points — a circle, a sign and the Voronoi cells, from one
-//  published geometry package (Phase 2851).
+//  Drag the Points — conformal geometric algebra in the browser: a circle, a
+//  sign and the Voronoi cells, from one published package (Phase 2851).
 //
 //  The geometry is `Fuaran.Compute.GeometricAlgebra`, the conformal geometric
 //  algebra package, restored from the public registry and compiled by Fable
@@ -516,18 +516,20 @@ let private GeometryView () : ReactElement =
   let figurePanel =
     Exhibit.panel
       "Drag the points"
-      "A, B and C make the circle. D is tested against it: drag D across the circle and the sign flips. The coloured cells are the Voronoi cells of all seven points, and the grey lines the Delaunay triangles they are read from."
+      "A, B and C make the circle. D is tested against it: drag D across the circle and the sign flips. The coloured cells are the Voronoi cells of all seven points, and the thin lines the Delaunay triangles they are read from."
       [ stage; verdict ]
 
   let howPanel =
     Exhibit.panel
-      "One operation, applied everywhere"
+      "One algebra, one operation, applied everywhere"
       ""
       [ Html.ul
           [ prop.className "geo-steps"
             prop.children
               [ Html.li
-                  "The circle through A, B and C is one outer product of the three conformal points: Circle.through A B C."
+                  "In the conformal model of geometric algebra, a point x of the plane becomes the vector n0 + x + ½|x|² n∞ of an algebra built on five basis vectors. Circles, lines, spheres and planes are objects of the same algebra, so one set of products serves all of them."
+                Html.li
+                  "The circle through A, B and C is the outer product of the three conformal points, A ∧ B ∧ C: a trivector that is the circle itself. No centre or radius is solved for; the page reads them back only to draw it (Circle.through)."
                 Html.li
                   "Whether D is inside is the sign of D's power against that circle: Circle.side. Negative is inside, whatever order the circle's points came in."
                 Html.li
@@ -588,7 +590,7 @@ let private GeometryView () : ReactElement =
   Exhibit.shell
     "geometry"
     "Drag the Points"
-    "Drag the points: the circle through three of them, the inside-or-outside sign for a fourth, and the Voronoi cells of all seven, recomputed on every move by a pinned geometry package running in your browser."
+    "Geometric algebra, running in your browser. In conformal geometric algebra a point and a circle are each one object of the same algebra, and building or testing them is a product, not a formula solved case by case. Drag the points: the circle through three of them is one outer product, whether a fourth is inside it is the sign of one more product, and the Voronoi cells of all seven are that same test applied to every triple. All of it is recomputed on every move by Fuaran.Compute.GeometricAlgebra, a pinned geometric algebra package compiled into this page."
     [ figurePanel
       howPanel
       bytesPanel

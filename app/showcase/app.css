@@ -8071,9 +8071,14 @@ polygon.gi-dag-pending {
   width: 100%;
   height: auto;
 }
-/* Point labels follow the theme's text colour, light or dark. */
+/* Point labels and the Delaunay triangles' edges (the drawing's only lines)
+   follow the theme's text colour, so both read on a light or a dark stage. */
 .geo-stage svg text {
   fill: var(--fuaran-color-text, #1a1a1f);
+}
+.geo-stage svg line {
+  stroke: var(--fuaran-color-text, #1a1a1f);
+  stroke-width: 0.3;
 }
 .geo-verdict {
   display: flex;

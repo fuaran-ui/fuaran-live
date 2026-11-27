@@ -1196,7 +1196,17 @@ let rec private tsBinding (opq: Opq) (v: JsonValue) : string =
       + ", dependsOn: ["
       + (dep |> List.map strItem |> String.concat ", ")
       + "], accessor: () => undefined }"
-  | Some "Filter" -> "binding.filter(" + qs (strOf "name" v) + ")"
+  // A filter's `defaultValue` rides the wire when present; `binding.filter`
+  // takes only the name, so a default is spelled as the binding object itself.
+  | Some "Filter" ->
+    match JsonValue.tryField "defaultValue" v with
+    | Some d ->
+      "{ kind: 'Filter', name: "
+      + qs (strOf "name" v)
+      + ", defaultValue: "
+      + tsStaticValue d
+      + " }"
+    | None -> "binding.filter(" + qs (strOf "name" v) + ")"
   | Some "Selection" ->
     // 0.2.9/0.2.10 — `defaultValue` + `field` (declarative row-field projection)
     // ride the wire when present; omitted for the pre-629 minimal form.
@@ -3935,7 +3945,15 @@ let rec private pyBinding (opq: Opq) (v: JsonValue) : string =
         | Opq.Scalar -> "binding.static('<opaque>')")
      | Some value -> "binding.static(" + pyStaticValue value + ")"
      | None -> "binding.static(None)")
-  | Some "Filter" -> "binding.filter(" + pq (strOf "name" v) + ")"
+  // A filter's `defaultValue` rides the wire when present (the reference tier's
+  // `Binding.Filter(name, defaultValue)`); `binding.filter` takes it by keyword.
+  | Some "Filter" ->
+    let kw =
+      match JsonValue.tryField "defaultValue" v with
+      | Some d -> [ "defaultValue", pyStaticValue d ]
+      | None -> []
+
+    pyCall "binding.filter" [ pq (strOf "name" v) ] kw
   | Some "Selection" ->
     let kw =
       (match JsonValue.tryField "defaultValue" v with
@@ -6172,7 +6190,15 @@ let private fsRecordTable: (string * string * string list) list =
        "DataLabels|dataLabels|?|E:ChartDataLabels"
        "XScale|xScale|?|E:ChartXScale"
        "Annotations|annotations|?|L<U:ChartAnnotation>"
+       "Scale|scale|?|U:ChartScale"
+       "WithheldField|withheldField|?|s"
+       "Interval|interval|?|R:ChartInterval"
+       "SizeField|sizeField|?|s"
+       "SortBy|sortBy|?|R:ChartSort"
+       "PathField|pathField|?|s"
        "OnPointClick|onPointClick|?|C" ])
+    ("ChartInterval", "", [ "Low|low|!|s"; "High|high|!|s" ])
+    ("ChartSort", "", [ "Field|field|!|s"; "Direction|direction|!|E:SortDirection" ])
     ("CodeBlockSpec",
      "CodeBlock",
      [ "Code|code|!|s"
@@ -6366,7 +6392,11 @@ let private fsRecordTable: (string * string * string list) list =
        "Target|target|?|s"
        "Protection|protection|?|E:LinkProtection" ])
     ("ListSpec", "List", [ "Items|items|!|L<U:TextSource>"; "Ordered|ordered|=false|b" ])
-    ("MapMarker", "", [ "Label|label|!|s"; "Latitude|latitude|!|f"; "Longitude|longitude|!|f" ])
+    ("MapMarker",
+     "",
+     [ "Label|label|!|U:TextSource"
+       "Latitude|latitude|!|f"
+       "Longitude|longitude|!|f" ])
     ("MapSpec",
      "Map",
      [ "CentreLatitude|centreLatitude|!|f"
@@ -6375,6 +6405,7 @@ let private fsRecordTable: (string * string * string list) list =
        "Zoom|zoom|!|i"
        "OnMarkerClick|onMarkerClick|?|C" ])
     ("MarkdownCitation", "", [ "Label|label|?|U:TextSource"; "Name|name|!|s"; "Reference|reference|!|s" ])
+    ("TextSpec", "Text", [ "Text|text|!|U:TextSource" ])
     ("MarkdownSpec", "Markdown", [ "Text|text|!|U:TextSource"; "Citations|citations|=[]|L<R:MarkdownCitation>" ])
     ("MathSpec", "Math", [ "Source|source|!|s"; "Display|display|!|E:MathDisplay" ])
     ("MediaSpec",
@@ -6435,7 +6466,7 @@ let private fsRecordTable: (string * string * string list) list =
        "Orientation|orientation|!|E:ScrollOrientation"
        "MaxHeight|maxHeight|?|i"
        "MaxWidth|maxWidth|?|i" ])
-    ("SelectOption", "", [ "Label|label|!|s"; "Value|value|!|s" ])
+    ("SelectOption", "", [ "Label|label|!|U:TextSource"; "Value|value|!|s" ])
     ("SelectOptionGroup", "", [ "Label|label|!|s"; "Values|values|!|L<s>" ])
     ("TableCitation",
      "",
@@ -6452,7 +6483,7 @@ let private fsRecordTable: (string * string * string list) list =
        "Value|value|?|B<s>"
        "Placeholder|placeholder|?|U:TextSource"
        "Disabled|disabled|?|B<b>"
-       "Multiple|multiple|?|b"
+       "Multiple|multiple|=false|b"
        "Values|values|?|B<L<s>>"
        "Affordance|-|-|X:Option.None"
        "Groups|groups|=[]|L<R:SelectOptionGroup>" ])
@@ -6559,6 +6590,13 @@ let private fsUnionTable: (string * string * string list) list =
        "onConfirm|onConfirm|!|a"
        "onCancel|onCancel|?|a" ])
     ("Action", "Focus", [ "nodeId|nodeId|!|s" ])
+    ("Action",
+     "Choose",
+     [ "condition|condition|!|B<j>"
+       "whenTrue|whenTrue|!|a"
+       "whenFalse|whenFalse|?|a"
+       "exit|exit|?|B<j>" ])
+    ("Action", "Require", [ "condition|condition|!|B<j>" ])
     ("BoxLayout", "Auto", [])
     ("BoxLayout", "Flex", [ "direction|direction|!|E:Orientation"; "wrap|wrap|=false|b"; "gap|gap|?|i" ])
     ("BoxLayout", "Grid", [ "cols|cols|!|i"; "templateColumns|templateColumns|?|s"; "gap|gap|?|i" ])
@@ -6597,6 +6635,9 @@ let private fsUnionTable: (string * string * string list) list =
     ("ChartAnnotationRange", "XRange", [ "from|from|!|U:ChartAnnotationX"; "to|to|!|U:ChartAnnotationX" ])
     ("ChartAnnotationX", "Category", [ "key|key|!|s" ])
     ("ChartAnnotationX", "Date", [ "iso|iso|!|s" ])
+    ("ChartAnnotation", "ReferenceLineX", [ "value|value|!|f"; "label|label|?|U:TextSource" ])
+    ("ChartScale", "Sequential", [ "min|min|?|f"; "max|max|?|f" ])
+    ("ChartScale", "Diverging", [ "midpoint|midpoint|?|f"; "min|min|?|f"; "max|max|?|f" ])
     ("ColumnWidth", "Auto", [])
     ("ColumnWidth", "Fixed", [ "pixels|pixels|!|i" ])
     ("ColumnWidth", "Flex", [ "weight|weight|!|f" ])

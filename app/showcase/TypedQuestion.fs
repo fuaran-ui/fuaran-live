@@ -108,9 +108,10 @@ let private askTree (round: int) : Node<obj> =
                           FormFieldKind.choiceDeclarative
                             (Binding.Static(
                               Some
-                                [ { Value = "staging"; Label = "Staging" }
+                                [ { Value = "staging"
+                                    Label = TextSource.Literal "Staging" }
                                   { Value = "production"
-                                    Label = "Production" } ]
+                                    Label = TextSource.Literal "Production" } ]
                             ))
                             (Binding.State(envKey, Some "staging"))
                         Required = true
@@ -336,6 +337,8 @@ let private spaceText (s: ValueSpace) : string =
   // one, so a question never carries it; the arm exists so the match is total.
   | SlotTree(Some kind) -> sprintf "a %s subtree" kind
   | SlotTree None -> "a subtree"
+  | Document(Some name) -> sprintf "a %s document" name
+  | Document None -> "a JSON document"
 
 let private answerValueText (v: AnswerValue) : string =
   match v with

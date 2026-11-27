@@ -49,7 +49,9 @@ let private kAccent = "intake.accent"
 let private watchedKeys =
   Set.ofList [ kTitle; kTrack; kRoom; kTags; kLevel; kAccent ]
 
-let private option (value: string) (label: string) : SelectOption = { Value = value; Label = label }
+let private option (value: string) (label: string) : SelectOption =
+  { Value = value
+    Label = TextSource.Literal label }
 
 // ─── the form ────────────────────────────────────────────────────────────────
 

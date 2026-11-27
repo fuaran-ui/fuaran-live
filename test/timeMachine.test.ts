@@ -111,9 +111,15 @@ describe('Phase 296 – the merge round-trips through the DAG', () => {
   });
 
   it('a removal beside an edit of the removed node is not settled by naming a side', () => {
-    // The exec branch removes nodes the trunk still edits after the fork: the fold
-    // faults in one order, so precedence cannot admit it.
-    expect(TM.mergeResolvedJson('exec', 5, 'trunk')).toContain('FoldFaulted');
+    // The exec branch removes nodes the trunk still edits after the fork, so
+    // precedence cannot admit it. Since the 0.108.0 tier (its Phase 2695) the
+    // refusal is the typed one the default context gives the same pair, a
+    // `Refused` naming each edit beside its removal as `DeleteModify`, where the
+    // fold used to fault (`FoldFaulted`) with no entry to show.
+    const settled: string = TM.mergeResolvedJson('exec', 5, 'trunk');
+    expect(settled.startsWith('error:Refused')).toBe(true);
+    expect(settled).toContain('Class = DeleteModify');
+    expect(settled).not.toContain('FoldFaulted');
   });
 
   it('an edit both sides made identically is applied once, and the merge node has a Core address', () => {

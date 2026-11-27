@@ -38,7 +38,7 @@ module PatternBankEngine =
       Build: Map<string, string> -> Fuaran.UI.Types.Node<'msg> }
 
   type Bank<'msg> =
-    { Registry: FunctionRegistry
+    { Registry: FunctionRegistry<unit>
       Patterns: Map<string, Pattern<'msg>> }
 
   type Query =
@@ -48,7 +48,8 @@ module PatternBankEngine =
   let valueHole (addr: string) (name: string) (space: ValueSpace) : HoleDecl =
     { Addr = addr
       Name = name
-      Kind = ValueHole space }
+      Kind = ValueHole space
+      Slots = [] }
 
   let textHole (addr: string) (name: string) : HoleDecl = valueHole addr name AnyString
 
@@ -62,8 +63,12 @@ module PatternBankEngine =
       | RepeatHole _
       | ActionHole _ -> false
 
+    // The signature names each hole by its ADDRESS: since Core 0.45 the capability
+    // seam binds an argument by the hole's qualified name and holds it to a dotted
+    // segment grammar, unique per signature, which the caller-facing labels ("a
+    // label", "numbers") are not. `HoleDecl.Name` stays the label shown to a reader.
     { Addr = h.Addr
-      Name = h.Name
+      Name = h.Addr
       Kind = h.Kind
       Required = required }
 
@@ -74,12 +79,16 @@ module PatternBankEngine =
 
   let bank (patterns: Pattern<'msg> list) : Bank<'msg> =
     let registry =
-      (FunctionRegistry.empty, patterns)
+      (FunctionRegistry.empty<unit>, patterns)
       ||> List.fold (fun r p ->
         let cap =
-          Capability.create p.Id (signatureOf p.Title p.Holes) Placement.ClientDeclarative
+          Capability.create
+            p.Id
+            (signatureOf p.Title p.Holes)
+            Placement.ClientDeclarative
+            (Returns.Value(SlotTree(Some p.ResultType)))
 
-        match FunctionRegistry.register (FunctionRegistry.entry p.ResultType cap) r with
+        match FunctionRegistry.register (FunctionRegistry.entry cap) r with
         | Ok next -> next
         | Error _ -> r)
 

@@ -551,6 +551,17 @@ const UNDECODABLE_SYNTHESIS = new Set<string>([]);
 // the walker stops shaping fails here by name.
 const UNSHAPEABLE_SYNTHESIS = new Set<string>([]);
 
+// The kinds the F# language tier offers that the newest PUBLISHED TypeScript
+// decoder (`@fuaran-ui/ops`, which this sweep decodes with) predates. A declared
+// tier lag, not a defect of the walker: the palette's own read-back runs the F#
+// decoder, which accepts each of these, so a user's tree never holds one that
+// fails there. Each entry is held to the lag it names — the sweep below asserts
+// the published decoder STILL refuses it, so the entry reddens the day npm
+// serves the kind and must then be deleted.
+//   Text — the plain running-text node (the tier's Phase 2536, released in
+//   Fuaran.UI 0.107.0); `@fuaran-ui/ops` 0.33.5, the newest on npm, predates it.
+const TS_DECODER_LAG = new Set<string>(['Text']);
+
 describe('the synthesised defaults are strictly decodable and normalisation-stable', () => {
   // The subject is what the palette OFFERS, not everything the walker can shape.
   // Those differ, and the difference is load-bearing: `defaultNodeFor` reads its
@@ -581,6 +592,13 @@ describe('the synthesised defaults are strictly decodable and normalisation-stab
       // `expect` does not tell the compiler anything, so `.value` below is only
       // reachable behind a real guard. The failure carries the same detail.
       const first = decodeNode(wire);
+      if (TS_DECODER_LAG.has(kind)) {
+        expect(
+          first.ok,
+          `${kind} now decodes in the published TypeScript decoder: delete it from TS_DECODER_LAG`,
+        ).toBe(false);
+        continue;
+      }
       if (!first.ok) {
         throw new Error(`${kind} does not decode: ${first.error.code}`);
       }

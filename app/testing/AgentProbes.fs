@@ -674,9 +674,10 @@ let runPanelProbe
 /// through the shipped codec, so the probe drives the REAL envelope path.
 let private probeEnvelopeWire () : string =
   let flavourOptions: Fuaran.UI.Types.SelectOption list =
-    [ { Value = "compact"; Label = "Compact" }
+    [ { Value = "compact"
+        Label = Fuaran.UI.Generated.TextSource.Literal "Compact" }
       { Value = "detailed"
-        Label = "Detailed" } ]
+        Label = Fuaran.UI.Generated.TextSource.Literal "Detailed" } ]
 
   let tree: Fuaran.UI.Types.Node<obj> =
     Fuaran.UI.Fuaran.stack

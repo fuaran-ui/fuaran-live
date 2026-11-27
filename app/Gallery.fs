@@ -331,10 +331,14 @@ let private datasetExplorer: Node<obj> =
                   Source =
                     Binding.Static(
                       Some
-                        [ { Label = "All regions"; Value = "All" }
-                          { Label = "North"; Value = "North" }
-                          { Label = "South"; Value = "South" }
-                          { Label = "West"; Value = "West" } ]
+                        [ { Label = TextSource.Literal "All regions"
+                            Value = "All" }
+                          { Label = TextSource.Literal "North"
+                            Value = "North" }
+                          { Label = TextSource.Literal "South"
+                            Value = "South" }
+                          { Label = TextSource.Literal "West"
+                            Value = "West" } ]
                     )
                   Value = Some(Binding.State("explorer.region", Some "All")) }
             Fuaran.metric
@@ -551,9 +555,12 @@ let private signupForm: Node<obj> =
                         (FormFieldKind.choiceDeclarative
                           (Binding.Static(
                             Some
-                              [ { Label = "Just me"; Value = "1" }
-                                { Label = "2 to 10"; Value = "10" }
-                                { Label = "More than 10"; Value = "50" } ]
+                              [ { Label = TextSource.Literal "Just me"
+                                  Value = "1" }
+                                { Label = TextSource.Literal "2 to 10"
+                                  Value = "10" }
+                                { Label = TextSource.Literal "More than 10"
+                                  Value = "50" } ]
                           ))
                           (Binding.State("signup.team", Some "1")))
                       formFieldOf
@@ -642,13 +649,13 @@ let private regionalReview: Node<obj> =
                   Source =
                     Binding.Static(
                       Some
-                        [ { Label = "Leeds"
+                        [ { Label = TextSource.Literal "Leeds"
                             Latitude = 53.8008
                             Longitude = -1.5491 }
-                          { Label = "Bristol"
+                          { Label = TextSource.Literal "Bristol"
                             Latitude = 51.4545
                             Longitude = -2.5879 }
-                          { Label = "Cardiff"
+                          { Label = TextSource.Literal "Cardiff"
                             Latitude = 51.4816
                             Longitude = -3.1791 } ]
                     )
@@ -813,7 +820,11 @@ let private accessibleForm: Node<obj> =
                         false
                         (FormFieldKind.choiceDeclarative
                           (Binding.Static(
-                            Some [ { Label = "Morning"; Value = "am" }; { Label = "Afternoon"; Value = "pm" } ]
+                            Some
+                              [ { Label = TextSource.Literal "Morning"
+                                  Value = "am" }
+                                { Label = TextSource.Literal "Afternoon"
+                                  Value = "pm" } ]
                           ))
                           (Binding.State("callback.when", Some "am"))) ] }
             // A POLITE live region: a screen reader announces a change here

@@ -98,6 +98,8 @@ let spaceText (s: ValueSpace) : string =
   // the arm keeps the match total, so the ask table never fails on a contract that does.
   | SlotTree(Some kind) -> sprintf "a %s subtree" kind
   | SlotTree None -> "a subtree"
+  | Document(Some name) -> sprintf "a %s document" name
+  | Document None -> "a JSON document"
 
 let outcomeKindName (o: ElicitationOutcome) : string =
   match o with

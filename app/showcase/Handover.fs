@@ -44,7 +44,9 @@ let private kNote = "handover.note"
 
 let private watchedKeys = Set.ofList [ kIncident; kSeverity; kOwner; kNote ]
 
-let private option (value: string) : SelectOption = { Value = value; Label = value }
+let private option (value: string) : SelectOption =
+  { Value = value
+    Label = TextSource.Literal value }
 
 /// The shift-handover card. Every field is editable and every field is bound,
 /// which is what makes the copy buttons beside them worth anything.

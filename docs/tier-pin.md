@@ -314,6 +314,33 @@ the contract compiled against did not move at the switch.
 
 - **v0.104.0** (2026-11-11, Phase 2647) — a five-release jump over v0.99.1, and source-affecting for the showcase's merge pages. The UI op-stream DAG is Core's DAG: `DagMerge.mergeDag` is the one merge, and `TreeMerge`, `DagReplay`, `DagPrimacy` and `MergeConflict` are gone; a refusal is a typed `ReconcileFault` with a class. The Git for Interfaces, Counterfactual and Time Machine pages were rewritten over `DagReconcile` (the reconciliation policy over Core's conflict report) and show the refusal envelope, the agreement rule and Core node addresses. `Fuaran.Core.*` moved 0.40.2 → 0.42.0; `Fuaran.Program.Runtime` stays at 0.13.0. It rides with the `@fuaran-ui/*` v0.33.1 set (`ops` 0.33.1, `schema` 0.28.1, `renderer` 0.29.1, `ui` 0.27.0, `ai-tools` 0.14.3, `charts` 0.15.1, `op-stream` 0.12.1).
 
+- **v0.108.0** (2026-11-27, Phase 2756) — a four-release jump over v0.104.0
+  (0.105.0 is the tier's announced breaking cut; 0.106.0, 0.107.0 and 0.108.0
+  follow it), taken for the derivation trace (`Derivation.trace`, its Phase 2749)
+  and the renderer's derivation disclosure under `RenderPolicy.DerivationTrace`,
+  which the Show Your Working page is built on. Source-affecting in three ways,
+  each a recorded breaking entry of those releases: a select option's and a map
+  marker's `Label` is a `TextSource` (its Phase 2811), so every literal option
+  label is `TextSource.Literal`; Core 0.45's function registry carries its gate
+  context as a type argument, a hole declaration states its composed `Slots`, a
+  capability declares its result, and a signature names each hole by a qualified
+  name under a segment grammar, so the Pattern Bank registers its patterns as
+  `FunctionRegistry<unit>`, with `Returns.Value(SlotTree(Some kind))` and each
+  hole named by its address (its labels, "a label", are not segments); and
+  Core's `ValueSpace` gains `Document`, which both question-table readers name.
+  Two behaviours moved under the suite: a precedence merge that met an edit
+  beside a removal of its node refuses with typed `DeleteModify` entries, where
+  the fold used to fault (its Phase 2695; Time Machine's test now asserts the
+  typed refusal), and the palette offers the new plain `Text` node (its Phase
+  2536), which `@fuaran-ui/ops` 0.33.5, the newest on npm, predates, so the
+  structural-edit sweep declares it a TypeScript-decoder lag that reddens when
+  npm serves it. `Fuaran.Core.*` moved 0.42.0 → 0.45.0 and
+  `Fuaran.Program.Runtime` 0.13.0 → 0.17.0. The tier now declares FSharp.Core
+  10.1.300, which an SDK of the 10.0.3xx band or later supplies implicitly (CI's
+  `10.0.x` does; a 10.0.2xx SDK reports NU1605 and the Fable cracker stops on
+  it). The `@fuaran-ui/*` v0.33.1 set did not move: no newer npm release carries
+  anything the raise or the page needs.
+
 ## The package pins — the same release, by package
 
 Everything above is about the `ref:` in the workflows. Every F# project consumes
@@ -421,6 +448,16 @@ restore-graph suite, so a raise is one act with both costs: the source migration
   (`app/Projection.fs`) was taught `MetricSpec.Comparisons`, the figure members
   of `CellFormat` and `Format.Currency`'s fraction digits, which turned the F#
   conformance arm green against the corpus at main.
+- **0.99.1 → 0.104.0 → 0.108.0** (Phases 2647 and 2756) — the same releases, by
+  package. At 0.104.0 `Fuaran.Core.*` moved 0.40.2 → 0.42.0 with
+  `Fuaran.Program.Runtime` held at 0.13.0; at 0.108.0, read from the 0.108.0
+  nuspecs on the registry, `Fuaran.Core.*` moved 0.42.0 → 0.45.0 (point 2) and
+  `Fuaran.Program.Runtime` 0.13.0 → 0.17.0, the floor `Fuaran.UI.Program` 0.108.0
+  declares (point 3). The tier's own `Fuaran.Compute.*` dependency is 0.47.0,
+  the version `FuaranComputeVersion` already pinned for the geometry page, so
+  that property did not move. No `fable_modules` path but the version moved
+  (point 4), no declared tier lag closed (point 5), and the registry-evidence
+  block was re-checked against the flat-container index (point 6).
 - **The ceiling that twice held the family back is gone.** Before the loop's
   0.6.0 split, the tier widened a member of `Action` and the loop — a separate
   producer — still constructed the narrower form in its own Fable-packed

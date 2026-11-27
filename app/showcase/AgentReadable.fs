@@ -384,7 +384,9 @@ let private hasIntrospectionSurface () : bool = jsNative
 let private browserRuntime: Runtime.IFuaranRuntime =
   BrowserRuntime.createPermissive ()
 
-let private option (value: string) : SelectOption = { Value = value; Label = value }
+let private option (value: string) : SelectOption =
+  { Value = value
+    Label = TextSource.Literal value }
 
 let private holdForm: Node<obj> =
   Fuaran.card

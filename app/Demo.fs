@@ -76,11 +76,11 @@ let private findingRow (n: int) (text: string) : TreeOp<obj> =
 
 let private askSections: SelectOption list =
   [ { Value = "layout"
-      Label = "Layout & typography" }
+      Label = TextSource.Literal "Layout & typography" }
     { Value = "data-bindings"
-      Label = "Data bindings" }
+      Label = TextSource.Literal "Data bindings" }
     { Value = "empty-states"
-      Label = "Empty states" } ]
+      Label = TextSource.Literal "Empty states" } ]
 
 let private askTree: Node<obj> =
   Fuaran.stack
@@ -121,7 +121,10 @@ let private jsonParse (json: string) : obj = jsNative
 /// The label of a section value, for the closing turn's text.
 let private sectionLabel (value: string) : string =
   askSections
-  |> List.tryPick (fun o -> if o.Value = value then Some o.Label else None)
+  |> List.tryPick (fun o ->
+    match o.Label with
+    | TextSource.Literal text when o.Value = value -> Some text
+    | _ -> None)
   |> Option.defaultValue value
 
 /// The closing text, tailored to the threaded outcome the loop handed back –

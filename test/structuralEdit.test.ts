@@ -557,10 +557,11 @@ const UNSHAPEABLE_SYNTHESIS = new Set<string>([]);
 // decoder, which accepts each of these, so a user's tree never holds one that
 // fails there. Each entry is held to the lag it names — the sweep below asserts
 // the published decoder STILL refuses it, so the entry reddens the day npm
-// serves the kind and must then be deleted.
-//   Text — the plain running-text node (the tier's Phase 2536, released in
-//   Fuaran.UI 0.107.0); `@fuaran-ui/ops` 0.33.5, the newest on npm, predates it.
-const TS_DECODER_LAG = new Set<string>(['Text']);
+// serves the kind and must then be deleted. Empty since `@fuaran-ui/ops` 0.34.0
+// (Phase 2868), which decodes `Text`, the one kind it held (the tier's Phase
+// 2536); kept, like the set above, so the next lag is declared rather than
+// skipped.
+const TS_DECODER_LAG = new Set<string>([]);
 
 describe('the synthesised defaults are strictly decodable and normalisation-stable', () => {
   // The subject is what the palette OFFERS, not everything the walker can shape.

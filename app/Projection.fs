@@ -1559,6 +1559,23 @@ let rec private tsAction (v: JsonValue) : string =
     + qs (strOf "encoding" v)
     + ", () => 0)"
   | Some "Invoke" -> "action.invoke(" + qs (strOf "capabilityId" v) + ", " + tsInvokeArgs v + ")"
+  // The tier's Phase 2107 — the bounded core's guard and selection. `Choose` is
+  // spelled as the record rather than `action.choose`, because the builder has
+  // no `exit` parameter while the record (and its encoder) carries it; the
+  // optional members are omitted when absent.
+  | Some "Choose" ->
+    "{ kind: 'Choose', condition: "
+    + tsBinding Opq.Scalar (fieldReq "condition" v)
+    + (match JsonValue.tryField "exit" v with
+       | Some e -> ", exit: " + tsBinding Opq.Scalar e
+       | None -> "")
+    + ", whenTrue: "
+    + tsAction (fieldReq "whenTrue" v)
+    + (match JsonValue.tryField "whenFalse" v with
+       | Some f -> ", whenFalse: " + tsAction f
+       | None -> "")
+    + " }"
+  | Some "Require" -> "action.require(" + tsBinding Opq.Scalar (fieldReq "condition" v) + ")"
   | _ -> "action.chain([])"
 
 /// A figure's locale rides `format.inLocale` (Phase 2490) and its fraction digits

@@ -351,13 +351,21 @@ the contract compiled against did not move at the switch.
   page here loads the F# renderer's stylesheet. Every entry imports
   `@fuaran-ui/renderer/css` (the `importSideEffects` in `app/App.fs`,
   `app/showcase/App.fs` and `app/showcase/Receiver.fs`), the npm package's
-  copy, and the newest one npm serves (0.29.1) predates the fix, so the row
-  that declares `ltr` still aligns to the left edge of its right-to-left
-  card. Loading the TypeScript renderer's unreleased stylesheet in its place
-  aligned that row with its neighbours, reading `0417/2026-B`. A stylesheet
-  fix therefore reaches these pages through the npm `@fuaran-ui/renderer`
-  range in `package.json`, never through `FuaranUIVersion`. The
-  `@fuaran-ui/*` v0.33.1 set did not move.
+  copy, and at the raise the newest one npm served (0.29.1) predated the fix:
+  the row that declares `ltr` still aligned to the left edge of its
+  right-to-left card. A stylesheet fix therefore reaches these pages through
+  the npm `@fuaran-ui/renderer` range in `package.json`, never through
+  `FuaranUIVersion`. So the same phase moved the npm family to the
+  `@fuaran-ui/*` v0.33.6 set, the first to carry the fix: `renderer` 0.30.0,
+  and with it every range its peers require to resolve one family — `ops`
+  0.34.0, `schema` 0.29.0, `charts` 0.16.0, `ui` 0.29.0, `op-stream` 0.12.3
+  and `ai-tools` 0.14.4. On it the declared row's label and `0417/2026-B` end
+  at the same right edge as Amount and Due. The family raise closed two
+  declared lags as their locks said it would: `ops` 0.34.0 decodes `Text` (the
+  structural-edit sweep's `TS_DECODER_LAG` is empty again), and `ui` 0.29.0
+  models `action.choose` / `action.require`, so `app/Projection.fs` emits both
+  and their TypeScript-arm quarantine entries are gone; `fuaran.text` stays
+  quarantined there, since `ui` 0.29.0 still exports no `text`.
 
 ## The package pins — the same release, by package
 

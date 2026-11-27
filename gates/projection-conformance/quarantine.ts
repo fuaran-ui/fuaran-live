@@ -311,37 +311,10 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
       },
     ],
   ],
-  // 2 — the TypeScript host predates the tier this repo compiles (Phase 2756
-  // raised it to 0.108.0). Each entry clears when an @fuaran-ui/ui release that
-  // models the construct is on npm and pinned here.
-  [
-    'action-choose',
-    [
-      {
-        arm: 'typescript',
-        construct: 'action.choose',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#2107',
-        reason:
-          'the guard and selection actions are specified from the 0.105.0 tier (its Phase 2107); @fuaran-ui/ui 0.27.0, the newest npm release this repo can pin, exports no action.choose or action.require',
-      },
-    ],
-  ],
-  [
-    'action-require',
-    [
-      {
-        arm: 'typescript',
-        construct: 'action.require',
-        class: 'host',
-        owner: 'fuaran-ts',
-        phase: 'fuaran#2107',
-        reason:
-          'the guard and selection actions are specified from the 0.105.0 tier (its Phase 2107); @fuaran-ui/ui 0.27.0, the newest npm release this repo can pin, exports no action.choose or action.require',
-      },
-    ],
-  ],
+  // 2 — the TypeScript host predates the tier this repo compiles (0.109.0 since
+  // Phase 2868). Each entry clears when an @fuaran-ui/ui release that models the
+  // construct is on npm and pinned here. The guard and selection actions
+  // (action-choose, action-require) cleared at @fuaran-ui/ui 0.29.0.
   [
     'text-1',
     [
@@ -352,7 +325,7 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         owner: 'fuaran-ts',
         phase: 'fuaran#2536',
         reason:
-          'the plain Text node is specified from the 0.107.0 tier (its Phase 2536); @fuaran-ui/ui 0.27.0, the newest npm release this repo can pin, exports no fuaran.text',
+          'the plain Text node is specified from the 0.107.0 tier (its Phase 2536); @fuaran-ui/ui 0.29.0, the newest npm release this repo can pin, exports no fuaran.text',
       },
     ],
   ],
@@ -366,7 +339,7 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
         owner: 'fuaran-ts',
         phase: 'fuaran#2536',
         reason:
-          'the plain Text node is specified from the 0.107.0 tier (its Phase 2536); @fuaran-ui/ui 0.27.0, the newest npm release this repo can pin, exports no fuaran.text',
+          'the plain Text node is specified from the 0.107.0 tier (its Phase 2536); @fuaran-ui/ui 0.29.0, the newest npm release this repo can pin, exports no fuaran.text',
       },
     ],
   ],
@@ -401,7 +374,7 @@ const emptyTally = (): ArmTally => ({ host: 0, projector: 0, both: 0 });
  * each carried their own counts; prose cannot be wrong out loud.
  */
 export const QUARANTINE_CENSUS: Readonly<Record<Arm, ArmTally>> = {
-  typescript: { host: 4, projector: 0, both: 0 },
+  typescript: { host: 2, projector: 0, both: 0 },
   python: { host: 4, projector: 0, both: 0 },
   // The F# arm holds NONE, and its emptiness is an assertion of its own
   // (fuaran#1657) — every node fixture is required to compile, execute and

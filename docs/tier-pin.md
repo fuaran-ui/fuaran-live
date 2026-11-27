@@ -340,6 +340,24 @@ the contract compiled against did not move at the switch.
   `10.0.x` does; a 10.0.2xx SDK reports NU1605 and the Fable cracker stops on
   it). The `@fuaran-ui/*` v0.33.1 set did not move: no newer npm release carries
   anything the raise or the page needs.
+- **v0.109.0** (2026-11-27, Phase 2868) — a one-release step over v0.108.0,
+  taken for its Phase 2867 (a declared `style.direction` keeps the node's
+  alignment). That change is to the reference stylesheet only and the release
+  adds no public surface, so no source moved: both Fable outputs compiled
+  unchanged. The floors did not move either — the 0.109.0 nuspecs declare
+  `Fuaran.Core.*` 0.45.0, `Fuaran.Program.Runtime` 0.17.0 and
+  `Fuaran.Compute.*` 0.47.0, as 0.108.0 did. **The raise does not change what
+  the bidi page shows, and that is structural, not a defect of the raise:** no
+  page here loads the F# renderer's stylesheet. Every entry imports
+  `@fuaran-ui/renderer/css` (the `importSideEffects` in `app/App.fs`,
+  `app/showcase/App.fs` and `app/showcase/Receiver.fs`), the npm package's
+  copy, and the newest one npm serves (0.29.1) predates the fix, so the row
+  that declares `ltr` still aligns to the left edge of its right-to-left
+  card. Loading the TypeScript renderer's unreleased stylesheet in its place
+  aligned that row with its neighbours, reading `0417/2026-B`. A stylesheet
+  fix therefore reaches these pages through the npm `@fuaran-ui/renderer`
+  range in `package.json`, never through `FuaranUIVersion`. The
+  `@fuaran-ui/*` v0.33.1 set did not move.
 
 ## The package pins — the same release, by package
 
@@ -458,6 +476,12 @@ restore-graph suite, so a raise is one act with both costs: the source migration
   that property did not move. No `fable_modules` path but the version moved
   (point 4), no declared tier lag closed (point 5), and the registry-evidence
   block was re-checked against the flat-container index (point 6).
+- **0.108.0 → 0.109.0** (Phase 2868) — the same release, by package. Read from
+  the 0.109.0 nuspecs on the registry, every floor is unchanged (Core 0.45.0,
+  Program 0.17.0, Compute 0.47.0), so only `FuaranUIVersion` moved (point 1);
+  the four `fable_modules` paths moved with the version (point 4), no declared
+  tier lag closed (point 5), and the registry-evidence block was re-checked
+  against the flat-container index (point 6).
 - **The ceiling that twice held the family back is gone.** Before the loop's
   0.6.0 split, the tier widened a member of `Action` and the loop — a separate
   producer — still constructed the narrower form in its own Fable-packed

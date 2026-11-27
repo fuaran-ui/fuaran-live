@@ -26,19 +26,19 @@
 //  would have pinned a name that merely looked right, and nothing in this repo
 //  would have objected. See the `## Dependencies` section of `CLAUDE.md`.
 //
-//  REGISTRY EVIDENCE (re-checked 2026-11-27, Phase 2756, against the public flat-container
+//  REGISTRY EVIDENCE (re-checked 2026-11-27, Phase 2868, against the public flat-container
 //  index; recorded here rather than fetched by the test, which stays offline
 //  and deterministic). Every id+version below was served:
-//    Fuaran.UI 0.108.0 · Fuaran.UI.Renderer 0.108.0 · Fuaran.UI.Ops 0.108.0
-//    Fuaran.UI.OpStream.Abstractions 0.108.0 · Fuaran.UI.OpStream.Replay 0.108.0
-//    Fuaran.UI.ServerDriven 0.108.0 · Fuaran.UI.Program 0.108.0
-//    Fuaran.UI.AiWire 0.108.0 (one version with the family since Phase 2079)
+//    Fuaran.UI 0.109.0 · Fuaran.UI.Renderer 0.109.0 · Fuaran.UI.Ops 0.109.0
+//    Fuaran.UI.OpStream.Abstractions 0.109.0 · Fuaran.UI.OpStream.Replay 0.109.0
+//    Fuaran.UI.ServerDriven 0.109.0 · Fuaran.UI.Program 0.109.0
+//    Fuaran.UI.AiWire 0.109.0 (one version with the family since Phase 2079)
 //    Fuaran.UI.StyleObserver.Abstractions · Fuaran.UI.LayoutObserver.Abstractions
-//    · Fuaran.UI.OpStream.Dag.Merge 0.108.0 (each still carries its fable/
+//    · Fuaran.UI.OpStream.Dag.Merge 0.109.0 (each still carries its fable/
 //    sources: the showcase's Fable compile reads them from the restore)
-//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.45.0 (a floor; the 0.108.0
+//    Fuaran.Core.Tree/Ops/Function/OpStream/Wire 0.45.0 (a floor; the 0.109.0
 //    tier declares 0.45.0 too — see Directory.Build.props)
-//    Fuaran.Program.Runtime 0.17.0 (the floor Fuaran.UI.Program 0.108.0 declares)
+//    Fuaran.Program.Runtime 0.17.0 (the floor Fuaran.UI.Program 0.109.0 declares)
 //    Fuaran.Compute.GeometricAlgebra 0.47.0 (re-checked 2026-11-25, Phase 2851: served,
 //    carries its fable/ sources, and pins no Fuaran.Core.* — its chain is
 //    Fuaran.Compute.Elementary 0.47.0 -> Fuaran.Compute.Solvers 0.47.0, both served)
@@ -48,7 +48,7 @@
 //  pinned with the family and its old id leaves the allowed set.
 //  The `Fuaran.Core.*` line moves WITH the tier family and not on its own
 //  account: those are direct pins on packages the tier also depends on, and
-//  each tier release declares its own Core floor (0.108.0 declares 0.45.0) —
+//  each tier release declares its own Core floor (0.109.0 declares 0.45.0) —
 //  a direct pin beats a transitive floor, so leaving them behind downgrades the
 //  tier's own dependency (NU1605) rather than holding Core back. The reasoning
 //  is at the pins themselves in `app/FuaranLive.fsproj`.

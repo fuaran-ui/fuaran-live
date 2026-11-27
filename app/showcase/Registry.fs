@@ -296,6 +296,13 @@ let pages: Page list =
       Wow =
         "Edit a grid, undo it and replay the history. The page has no undo code: every edit is an op, and undo, redo and the replayable record come from the published edit log."
       Load = fun () -> importValueDynamic UndoGrid.page }
+    // Phase 2756 — the derivation trace, shown.
+    { Id = "show-your-working"
+      Title = "Show Your Working"
+      Pillar = Pillar.Machine
+      Wow =
+        "Click any number on a dashboard and step through how it was computed: each step by name, the columns it leaves and the table after it, ending on the number you clicked. The computation travelled with the view."
+      Load = fun () -> importValueDynamic ShowYourWorking.page }
     { Id = "geometry"
       Title = "Drag the Points"
       Pillar = Pillar.Wire

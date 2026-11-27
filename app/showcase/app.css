@@ -8120,3 +8120,156 @@ polygon.gi-dag-pending {
 .geo-bits code {
   font-family: var(--ds-font-mono);
 }
+
+/* ── Show Your Working (2756): the dashboard, the breakdown, the stepped derivation ── */
+.syw-headlines {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+}
+.syw-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.syw-stage {
+  box-sizing: border-box;
+  min-width: 0;
+  border: var(--ds-border);
+  border-radius: 0.75rem;
+  padding: 0.8rem;
+  background: var(--fuaran-color-elevated, #fff);
+  color: var(--fuaran-color-text, #1a2026);
+  overflow-x: auto;
+}
+.syw-choose,
+.syw-cell,
+.syw-step,
+.syw-nav-button {
+  min-height: 2.25rem;
+  border: var(--ds-border);
+  border-radius: 0.5rem;
+  background: var(--fuaran-color-elevated, #fff);
+  color: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 0.9rem;
+}
+.syw-cell {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.syw-chosen,
+.syw-step-on {
+  border-color: var(--fuaran-color-accent, #1f5fa8);
+  box-shadow: 0 0 0 2px var(--fuaran-color-accent, #1f5fa8);
+  font-weight: 600;
+}
+.syw-nav-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.syw-breakdown {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.syw-breakdown th,
+.syw-breakdown td {
+  padding: 0.3rem 0.6rem;
+  text-align: left;
+}
+.syw-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.syw-empty {
+  border: 1px dashed var(--fuaran-color-border, #c9ced4);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+.syw-empty-heading {
+  margin-top: 0;
+  font-weight: 600;
+}
+.syw-derivation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.syw-steps {
+  margin: 0;
+  padding-left: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.syw-stage-view {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.syw-stage-title {
+  margin-top: 0;
+}
+.syw-subhead {
+  margin: 0.8rem 0 0.3rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.syw-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+.syw-column-type {
+  margin-left: 0.3rem;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.syw-table-wrap {
+  overflow-x: auto;
+}
+.syw-rowcount {
+  margin: 0 0 0.3rem;
+  font-size: 0.8rem;
+  color: var(--fuaran-color-text-muted, #5a5a66);
+}
+.syw-table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.syw-table th,
+.syw-table td {
+  padding: 0.2rem 0.7rem 0.2rem 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.syw-step-wire,
+.syw-wire {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: var(--ds-font-mono);
+  font-size: 0.75rem;
+}
+.syw-result {
+  font-weight: 600;
+}
+.syw-refusal {
+  color: var(--fuaran-color-critical, #b42318);
+}
+.syw-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}

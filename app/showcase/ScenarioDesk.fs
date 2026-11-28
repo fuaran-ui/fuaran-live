@@ -19,7 +19,9 @@ module Fuaran.Showcase.ScenarioDesk
 //  Which sites read a parameter is the language tier's static read walk
 //  (`BindingWalk.reactiveRenderFacts`, projected on the filter channel by
 //  `BindingWalk.readerMap`), over the tree the page renders. It says which sites
-//  READ a parameter. It times nothing and counts no re-evaluation.
+//  READ a parameter. It times nothing and counts no re-evaluation. The page
+//  subscribes to the parameters, the table's filter and its sort and page keys,
+//  and redraws the desk against the live stores when any of them moves.
 //
 //  The copied view is `Stdlib.refinedPipeline`: the table's fixed pipeline with
 //  the chosen filters written in as literals, then the sort and the page as
@@ -451,6 +453,14 @@ let private readerList (tree: Node<obj>) (key: string) : ReactElement =
       prop.children
         [ for id in readersOf tree key -> Html.li [ Html.code [ prop.text id ]; Html.text (" " + siteName id) ] ] ]
 
+/// The desk drawn against `sources`, under the exhibits' runtime, which
+/// carries the table's sort and page writes to the live store.
+let private renderDesk (sources: BindingSources) (tree: Node<obj>) : ReactElement =
+  Render.render
+    { Render.RenderContext.create sources ignore tree with
+        Runtime = Exhibit.runtime }
+    tree
+
 [<ReactComponent>]
 let private ScenarioDeskView (tree: Node<obj>) : ReactElement =
   let watched =
@@ -596,7 +606,7 @@ let private ScenarioDeskView (tree: Node<obj>) : ReactElement =
     "The Scenario Desk"
     ("Move a parameter and watch two scenarios of one plan diverge, line by line, with their difference. Then sort and filter the week's lines and copy the view as the pipeline that describes it. "
      + whatIfContrast)
-    [ Html.div [ prop.className "sd-desk"; prop.children [ Exhibit.renderLive tree ] ]
+    [ Html.div [ prop.className "sd-desk"; prop.children [ renderDesk sources tree ] ]
       Html.div [ prop.className "sd-split"; prop.children [ readout; viewPanel ] ]
       Exhibit.wireDrawer "The desk, as canonical bytes" (CJson.encodeNode tree) ]
     [ Exhibit.Claim.Verified

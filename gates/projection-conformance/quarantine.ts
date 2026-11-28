@@ -311,8 +311,8 @@ export const QUARANTINE: ReadonlyMap<string, readonly QuarantineEntry[]> = new M
       },
     ],
   ],
-  // 2 — the TypeScript host predates the tier this repo compiles (0.109.0 since
-  // Phase 2868). Each entry clears when an @fuaran-ui/ui release that models the
+  // 2 — the TypeScript host predates the tier this repo compiles (0.109.1 since
+  // Phase 2759). Each entry clears when an @fuaran-ui/ui release that models the
   // construct is on npm and pinned here. The guard and selection actions
   // (action-choose, action-require) cleared at @fuaran-ui/ui 0.29.0.
   [

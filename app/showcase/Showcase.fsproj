@@ -140,6 +140,10 @@
          whose undo, redo and hash-chained record the page draws on. Already
          compiled by the playground; Fable-source-packed. -->
     <PackageReference Include="Fuaran.UI.ServerDriven" Version="$(FuaranUIVersion)" />
+    <!-- The Scenario Desk: the certified parameter panel, scenario comparison
+         and refinable table fragments (Phases 2752, 2753), compiled from the
+         fable/ sources the package carries since 0.109.1 (Phase 2874). -->
+    <PackageReference Include="Fuaran.UI.Fragments" Version="$(FuaranUIVersion)" />
     <!-- The Pattern Bank's signature search and the Versioning Envelope page's
          negotiation substrate. Fable-source-packed; at FuaranCoreVersion, the
          Core version the tier declares. -->

@@ -366,6 +366,15 @@ the contract compiled against did not move at the switch.
   models `action.choose` / `action.require`, so `app/Projection.fs` emits both
   and their TypeScript-arm quarantine entries are gone; `fuaran.text` stays
   quarantined there, since `ui` 0.29.0 still exports no `text`.
+- **v0.109.1** (2026-11-28, Phase 2759) — a patch step over v0.109.0, taken
+  for Phase 2874: `Fuaran.UI.Fragments`, the certified fragment library, now
+  ships its F# sources under `fable/`, so a Fable consumer can compile it. The
+  showcase's Scenario Desk page is built from it and pins it at
+  `FuaranUIVersion` (it is a member of the same release). The rest of the tier
+  delta is the renderer's handler strip reading attribute names rather than
+  values (`Sanitize.fs`, no public surface) and the reference stylesheet, which
+  no page here loads (see v0.109.0). No source outside the new page moved, and
+  the 0.109.1 nuspecs declare the same floors as 0.109.0.
 
 ## The package pins — the same release, by package
 
@@ -490,6 +499,15 @@ restore-graph suite, so a raise is one act with both costs: the source migration
   the four `fable_modules` paths moved with the version (point 4), no declared
   tier lag closed (point 5), and the registry-evidence block was re-checked
   against the flat-container index (point 6).
+- **0.109.0 → 0.109.1** (Phase 2759) — the same release, by package, and the
+  first to admit a new family member: `Fuaran.UI.Fragments`, which carries its
+  `fable/` sources from this release (Phase 2874). It joins the showcase's
+  references at `FuaranUIVersion` and the restore-graph lock's id set. Read
+  from the 0.109.1 nuspecs on the registry, every floor is unchanged (Core
+  0.45.0, Program 0.17.0, Compute 0.47.0), so only `FuaranUIVersion` moved
+  (point 1); the `fable_modules` paths moved with the version (point 4), no
+  declared tier lag closed (point 5), and the registry-evidence block was
+  re-checked against the flat-container index (point 6).
 - **The ceiling that twice held the family back is gone.** Before the loop's
   0.6.0 split, the tier widened a member of `Action` and the loop — a separate
   producer — still constructed the narrower form in its own Fable-packed

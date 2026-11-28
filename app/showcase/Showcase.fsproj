@@ -112,6 +112,7 @@
     <Compile Include="testing\UndoGridProbes.fs" />
     <Compile Include="testing\GeometryProbes.fs" />
     <Compile Include="testing\ShowYourWorkingProbes.fs" />
+    <Compile Include="testing\ScenarioDeskProbes.fs" />
     <!-- The page registry: after the pages, because it names each page's value;
          it loads each one as its own chunk. -->
     <Compile Include="Registry.fs" />

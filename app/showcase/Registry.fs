@@ -303,6 +303,13 @@ let pages: Page list =
       Wow =
         "Click any number on a dashboard and step through how it was computed: each step by name, the columns it leaves and the table after it, ending on the number you clicked. The computation travelled with the view."
       Load = fun () -> importValueDynamic ShowYourWorking.page }
+    // Phase 2759 — parameters, scenarios and a view, all as data.
+    { Id = "scenario-desk"
+      Title = "The Scenario Desk"
+      Pillar = Pillar.Value
+      Wow =
+        "Move a parameter and watch two scenarios of one plan diverge line by line, with the sites that read it named. Then sort and filter the table and copy the view as one pipeline: pasted back, it gives the same rows, byte for byte."
+      Load = fun () -> importValueDynamic ScenarioDesk.page }
     { Id = "geometry"
       Title = "Drag the Points"
       Pillar = Pillar.Wire

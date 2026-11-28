@@ -8273,3 +8273,78 @@ polygon.gi-dag-pending {
   gap: 0.5rem;
   margin-top: 0.8rem;
 }
+
+/* ── The Scenario Desk (2759): the desk, who reads what, the view as data ── */
+.sd-desk {
+  box-sizing: border-box;
+  min-width: 0;
+  border: var(--ds-border);
+  border-radius: 0.75rem;
+  padding: 0.8rem;
+  background: var(--fuaran-color-elevated, #fff);
+  color: var(--fuaran-color-text, #1a2026);
+  overflow-x: auto;
+}
+.sd-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+  margin-top: 1rem;
+}
+.sd-empty {
+  border: 1px dashed var(--fuaran-color-border, #c9ced4);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+.sd-empty-heading {
+  margin-top: 0;
+  font-weight: 600;
+}
+.sd-subhead {
+  margin: 0.8rem 0 0.3rem;
+  font-size: 0.85rem;
+}
+.sd-readers {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+}
+.sd-readers code {
+  font-family: var(--ds-font-mono);
+}
+.sd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+.sd-button {
+  min-height: 2.25rem;
+  border: var(--ds-border);
+  border-radius: 0.5rem;
+  background: var(--fuaran-color-elevated, #fff);
+  color: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 0.9rem;
+}
+.sd-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.sd-paste {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 6rem;
+  margin: 0.8rem 0 0.5rem;
+  font-family: var(--ds-font-mono);
+  font-size: 0.75rem;
+}
+.sd-match {
+  font-weight: 600;
+}
+.sd-differs,
+.sd-refusal {
+  color: var(--fuaran-color-critical, #b42318);
+}
